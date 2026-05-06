@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 
@@ -49,6 +50,11 @@ const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   path: '/minerar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
+  id: '/favoritos',
+  path: '/favoritos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/analise-ia'
     | '/dashboard'
+    | '/favoritos'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/analise-ia'
     | '/dashboard'
+    | '/favoritos'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/analise-ia'
     | '/_authenticated/dashboard'
+    | '/_authenticated/favoritos'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
@@ -170,6 +182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/favoritos': {
+      id: '/_authenticated/favoritos'
+      path: '/favoritos'
+      fullPath: '/favoritos'
+      preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -190,6 +209,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
@@ -198,6 +218,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnaliseIaRoute: AuthenticatedAnaliseIaRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
