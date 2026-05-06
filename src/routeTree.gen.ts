@@ -12,8 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
+import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -29,9 +34,26 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedOfertasSalvasRoute =
+  AuthenticatedOfertasSalvasRouteImport.update({
+    id: '/ofertas-salvas',
+    path: '/ofertas-salvas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOfertasEscaladasRoute =
+  AuthenticatedOfertasEscaladasRouteImport.update({
+    id: '/ofertas-escaladas',
+    path: '/ofertas-escaladas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   id: '/minerar',
   path: '/minerar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
+  id: '/favoritos',
+  path: '/favoritos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -39,39 +61,88 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedConfiguracoesRoute =
+  AuthenticatedConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
+  id: '/analise-ia',
+  path: '/analise-ia',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
+  '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
+  '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
+  '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
+  '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard' | '/minerar'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/analise-ia'
+    | '/configuracoes'
+    | '/dashboard'
+    | '/favoritos'
+    | '/minerar'
+    | '/ofertas-escaladas'
+    | '/ofertas-salvas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/minerar'
+  to:
+    | '/'
+    | '/login'
+    | '/analise-ia'
+    | '/configuracoes'
+    | '/dashboard'
+    | '/favoritos'
+    | '/minerar'
+    | '/ofertas-escaladas'
+    | '/ofertas-salvas'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/analise-ia'
+    | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
+    | '/_authenticated/favoritos'
     | '/_authenticated/minerar'
+    | '/_authenticated/ofertas-escaladas'
+    | '/_authenticated/ofertas-salvas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -103,11 +174,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/ofertas-salvas': {
+      id: '/_authenticated/ofertas-salvas'
+      path: '/ofertas-salvas'
+      fullPath: '/ofertas-salvas'
+      preLoaderRoute: typeof AuthenticatedOfertasSalvasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ofertas-escaladas': {
+      id: '/_authenticated/ofertas-escaladas'
+      path: '/ofertas-escaladas'
+      fullPath: '/ofertas-escaladas'
+      preLoaderRoute: typeof AuthenticatedOfertasEscaladasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/minerar': {
       id: '/_authenticated/minerar'
       path: '/minerar'
       fullPath: '/minerar'
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/favoritos': {
+      id: '/_authenticated/favoritos'
+      path: '/favoritos'
+      fullPath: '/favoritos'
+      preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -117,17 +209,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/configuracoes': {
+      id: '/_authenticated/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/analise-ia': {
+      id: '/_authenticated/analise-ia'
+      path: '/analise-ia'
+      fullPath: '/analise-ia'
+      preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
+  AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
+  AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
+  AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAnaliseIaRoute: AuthenticatedAnaliseIaRoute,
+  AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
+  AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
+  AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
