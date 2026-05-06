@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getOfferById, getAnalysisForOffer, toggleSaveOffer, fetchSavedIds, getOfferMetrics } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
@@ -13,7 +14,9 @@ import {
   ArrowLeft, Bookmark, BookmarkCheck, Sparkles, Wand2, Layers,
   Workflow, Download, Flame, Calendar, Globe, Tag, Megaphone,
   Clock, TrendingUp, Map, Target, Users, Lightbulb, Heart, MousePointerClick, Film, GitBranch,
+  Info, Copy,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
 
 export const Route = createFileRoute("/_authenticated/oferta/$id")({ component: OfferDetailPage });
 
@@ -74,15 +77,111 @@ function OfferDetailPage() {
   };
 
   const onExport = () => {
-    const data = { offer, analysis, exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `analise-${offer.advertiser_name.toLowerCase().replace(/\s+/g, "-")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Análise exportada");
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 48;
+    let y = margin;
+    const ensure = (h: number) => { if (y + h > pageHeight - margin) { doc.addPage(); y = margin; } };
+    const text = (txt: string, opts: { size?: number; bold?: boolean; color?: [number, number, number]; gap?: number } = {}) => {
+      const { size = 11, bold = false, color = [30, 30, 40], gap = 6 } = opts;
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      doc.setTextColor(...color);
+      const lines = doc.splitTextToSize(txt, pageWidth - margin * 2) as string[];
+      ensure(lines.length * (size * 1.2) + gap);
+      doc.text(lines, margin, y);
+      y += lines.length * (size * 1.2) + gap;
+    };
+    const divider = () => { ensure(14); doc.setDrawColor(220); doc.line(margin, y, pageWidth - margin, y); y += 14; };
+
+    // Header
+    doc.setFillColor(124, 58, 237);
+    doc.rect(0, 0, pageWidth, 6, "F");
+    y = margin;
+    text("EscalaFlow — Análise de Oferta", { size: 18, bold: true, color: [124, 58, 237] });
+    text(offer.advertiser_name, { size: 22, bold: true });
+    text(`${offer.niche} · ${offer.platform} · ${offer.country} · Detectada em ${detectedDate}`, { size: 10, color: [110, 110, 120] });
+    divider();
+
+    // Score gigante
+    text("Score de Escala", { size: 14, bold: true });
+    const cx = margin + 40, cy = y + 40, r = 38;
+    doc.setDrawColor(230); doc.setLineWidth(8);
+    doc.circle(cx, cy, r, "S");
+    doc.setDrawColor(124, 58, 237);
+    const segs = Math.round((offer.scale_score / 100) * 60);
+    for (let i = 0; i < segs; i++) {
+      const a1 = (-Math.PI / 2) + (i / 60) * Math.PI * 2;
+      const a2 = (-Math.PI / 2) + ((i + 1) / 60) * Math.PI * 2;
+      doc.line(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, cx + Math.cos(a2) * r, cy + Math.sin(a2) * r);
+    }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(24); doc.setTextColor(20, 20, 30);
+    doc.text(String(offer.scale_score), cx, cy + 8, { align: "center" });
+    doc.setFontSize(11); doc.setFont("helvetica", "normal"); doc.setTextColor(110, 110, 120);
+    doc.text(`${metrics.status.label} · ${lvl.label}`, cx + r + 24, cy - 6);
+    doc.text(`${metrics.activeAds} anúncios ativos · ${metrics.estimatedDays} dias escalando`, cx + r + 24, cy + 12);
+    doc.text(`Crescimento: +${metrics.growth}% · Países: ${metrics.countries.join(", ")}`, cx + r + 24, cy + 30);
+    y = cy + r + 24;
+    divider();
+
+    // Mapa Estratégico
+    text("Mapa Estratégico da Oferta", { size: 14, bold: true });
+    const blocks = [
+      ["Mecanismo", analysis.mechanism],
+      ["Promessa", analysis.promise],
+      ["Dores", analysis.pains.join(" · ")],
+      ["Desejos", analysis.desires.join(" · ")],
+      ["Avatar", analysis.target_audience],
+      ["CTA", cta],
+      ["Tipo de criativo", format],
+      ["Tipo de funil", "VSL → Oferta → Upsell + Remarketing"],
+    ];
+    blocks.forEach(([t, d]) => {
+      text(t, { size: 11, bold: true, color: [124, 58, 237], gap: 2 });
+      text(d, { size: 10, color: [60, 60, 70], gap: 8 });
+    });
+    divider();
+
+    // Score de Oportunidade
+    text("Score de Oportunidade", { size: 14, bold: true });
+    metrics.opportunity.forEach((m) => {
+      ensure(28);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(40, 40, 50);
+      doc.text(`${m.label}: ${m.value}/100`, margin, y);
+      const barW = pageWidth - margin * 2;
+      doc.setFillColor(235, 235, 240); doc.roundedRect(margin, y + 6, barW, 6, 3, 3, "F");
+      const c = m.tone === "good" ? [16, 185, 129] : m.tone === "warn" ? [245, 158, 11] : [239, 68, 68];
+      doc.setFillColor(c[0], c[1], c[2]);
+      doc.roundedRect(margin, y + 6, (m.value / 100) * barW, 6, 3, 3, "F");
+      y += 24;
+    });
+    text(`Ticket provável: ${metrics.ticketRange}`, { size: 11, bold: true, color: [124, 58, 237] });
+
+    // Footer
+    const pages = doc.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(150);
+      doc.text(`EscalaFlow · Página ${i} de ${pages}`, pageWidth / 2, pageHeight - 20, { align: "center" });
+    }
+    doc.save(`analise-${offer.advertiser_name.toLowerCase().replace(/\s+/g, "-")}.pdf`);
+    toast.success("PDF exportado");
+  };
+
+  const onCopySummary = async () => {
+    const summary =
+      `📊 ${offer.advertiser_name} (${offer.niche})\n\n` +
+      `🧠 Mecanismo:\n${analysis.mechanism}\n\n` +
+      `🎯 Promessa:\n${analysis.promise}\n\n` +
+      `🔥 Dores exploradas:\n${analysis.pains.map((p) => `• ${p}`).join("\n")}\n\n` +
+      `— Gerado por EscalaFlow`;
+    try {
+      await navigator.clipboard.writeText(summary);
+      toast.success("Resumo copiado para área de transferência");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
   };
 
   const [modalOpen, setModalOpen] = useState<null | "product" | "funnel" | "variations">(null);
