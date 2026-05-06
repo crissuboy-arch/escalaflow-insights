@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ export const Route = createFileRoute("/_authenticated/ofertas-escaladas")({ comp
 
 function ScaledPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [rows, setRows] = useState<any[]>([]);
   const [q, setQ] = useState("");
 
@@ -50,14 +51,14 @@ function ScaledPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((r) => (
-                <TableRow key={r.id}>
+                <TableRow key={r.id} className="cursor-pointer" onClick={() => navigate({ to: "/oferta/$id", params: { id: r.id } })}>
                   <TableCell className="font-medium">{r.advertiser_name}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.scale_score}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.ads_count}</TableCell>
+                  <TableCell className="text-right tabular-nums">{r.ads_count ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{r.niche}</TableCell>
                   <TableCell className="text-muted-foreground">{r.country}</TableCell>
                   <TableCell><StatusBadge status={r.status} /></TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

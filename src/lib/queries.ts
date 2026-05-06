@@ -142,3 +142,30 @@ export async function toggleFavorite(_userId: string, offerId: string, value: bo
 export async function fetchAnalyses(): Promise<DemoAnalysis[]> {
   return DEMO_ANALYSES;
 }
+
+export function getOfferById(id: string): DemoOffer | undefined {
+  return DEMO_OFFERS.find((o) => o.id === id);
+}
+
+export function getAnalysisForOffer(offerId: string): DemoAnalysis {
+  const found = DEMO_ANALYSES.find((a) => a.id === `analysis-${offerId}`);
+  if (found) return found;
+  const offer = getOfferById(offerId) ?? DEMO_OFFERS[0];
+  return {
+    id: `analysis-${offerId}`,
+    promise: `Alcance resultados em ${offer.niche.toLowerCase()} em até 30 dias com método validado.`,
+    mechanism: `Sistema proprietário em 3 etapas combinando ${offer.niche.toLowerCase()} com automação inteligente.`,
+    pains: ["Falta de tempo", "Resultados inconsistentes", "Sobrecarga de informação", "Falta de método claro"],
+    desires: ["Liberdade financeira", "Reconhecimento", "Resultados rápidos", "Confiança"],
+    target_audience: `Profissionais de 25-45 anos interessados em ${offer.niche.toLowerCase()}.`,
+    mental_triggers: ["Escassez", "Prova social", "Autoridade", "Reciprocidade", "Urgência"],
+    offer_structure: `Produto principal\n+ Bônus 1: Templates exclusivos\n+ Bônus 2: Comunidade VIP\n+ Garantia de 30 dias`,
+    creative_suggestions: [
+      "Vídeo testemunho de cliente real (60s)",
+      "Carrossel comparativo antes x depois",
+      "Reel curto com gancho nos 3 primeiros segundos",
+      "Imagem estática com headline forte e CTA",
+    ],
+    mined_offers: { advertiser_name: offer.advertiser_name, niche: offer.niche, image_url: offer.image_url },
+  };
+}
