@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import { useAuth } from "@/providers/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +17,7 @@ export const Route = createFileRoute("/login")({ component: LoginPage });
 function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,36 +25,19 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { if (data.session) navigate({ to: "/dashboard" }); });
-  }, [navigate]);
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard`, data: { full_name: fullName } },
-        });
-        if (error) throw error;
-        toast.success(t("auth.checkEmail"));
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/dashboard" });
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error");
-    } finally { setLoading(false); }
+    // Demo mode: any email/password works
+    setTimeout(() => {
+      signIn(email || "demo@escalaflow.app");
+      setLoading(false);
+      navigate({ to: "/dashboard" });
+    }, 300);
   };
 
-  const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) { toast.error("Google sign-in failed"); return; }
-    if (result.redirected) return;
-    navigate({ to: "/dashboard" });
+  const google = () => {
+    toast.info("Disponível em breve");
   };
 
   return (
