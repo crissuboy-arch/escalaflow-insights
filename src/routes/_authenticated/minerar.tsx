@@ -11,7 +11,7 @@ import { Search } from "lucide-react";
 import { fetchOffers, toggleSaveOffer } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { useAuth } from "@/providers/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchSavedIds } from "@/lib/queries";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
@@ -37,9 +37,7 @@ function MinePage() {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!user) return;
-    supabase.from("saved_offers").select("offer_id").eq("user_id", user.id).then(({ data }) => {
-      setSavedIds(new Set((data ?? []).map((d) => d.offer_id)));
-    });
+    fetchSavedIds(user.id).then(setSavedIds);
   }, [user]);
 
   const onSave = async (id: string) => {
