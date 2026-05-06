@@ -246,13 +246,13 @@ function OfferDetailPage() {
             {saved ? <BookmarkCheck className="mr-1 h-4 w-4" /> : <Bookmark className="mr-1 h-4 w-4" />}
             {saved ? "Salva" : "Salvar oferta"}
           </Button>
-          <Button onClick={soon("Gerar variações")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("variations")} variant="outline" className="flex-1 md:flex-none">
             <Sparkles className="mr-1 h-4 w-4" /> Variações
           </Button>
-          <Button onClick={soon("Modelar produto")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("product")} variant="outline" className="flex-1 md:flex-none">
             <Wand2 className="mr-1 h-4 w-4" /> Modelar
           </Button>
-          <Button onClick={soon("Criar funil")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("funnel")} variant="outline" className="flex-1 md:flex-none">
             <Workflow className="mr-1 h-4 w-4" /> Funil
           </Button>
           <Button onClick={onExport} variant="outline" className="flex-1 md:flex-none">
@@ -260,6 +260,73 @@ function OfferDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Modal: Modelar produto */}
+      <Dialog open={modalOpen === "product"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Produto modelado</DialogTitle>
+            <DialogDescription>Proposta gerada a partir da análise IA</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="rounded-lg p-4 text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+              <div className="text-xs uppercase opacity-80">{productPlan.format}</div>
+              <div className="text-xl font-bold">{productPlan.name}</div>
+              <div className="mt-1 text-2xl font-extrabold">{productPlan.price}</div>
+            </div>
+            <div><div className="font-semibold">Promessa</div><p className="text-muted-foreground">{productPlan.promise}</p></div>
+            <div>
+              <div className="font-semibold">Módulos</div>
+              <ul className="mt-1 space-y-1 text-muted-foreground">{productPlan.modules.map((m) => <li key={m}>• {m}</li>)}</ul>
+            </div>
+            <div>
+              <div className="font-semibold">Bônus</div>
+              <ul className="mt-1 space-y-1 text-muted-foreground">{productPlan.bonuses.map((b) => <li key={b}>• {b}</li>)}</ul>
+            </div>
+            <div><div className="font-semibold">Garantia</div><p className="text-muted-foreground">{productPlan.guarantee}</p></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Funil */}
+      <Dialog open={modalOpen === "funnel"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Funil de marketing</DialogTitle>
+            <DialogDescription>Etapas geradas a partir da oferta</DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-3">
+            {funnel.map((s, i) => (
+              <li key={s.stage} className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>{i + 1}</span>
+                  <div className="font-semibold">{s.stage}</div>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{s.desc}</p>
+              </li>
+            ))}
+          </ol>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Variações */}
+      <Dialog open={modalOpen === "variations"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Variações de criativo</DialogTitle>
+            <DialogDescription>4 variações geradas a partir da análise</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {variations.map((v, i) => (
+              <div key={i} className="rounded-lg border border-border/60 p-3">
+                <Badge variant="secondary" className="mb-2">{v.type}</Badge>
+                <div className="text-sm font-semibold">{v.headline}</div>
+                <p className="mt-1 text-xs text-muted-foreground">{v.copy}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
