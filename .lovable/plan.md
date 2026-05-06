@@ -1,71 +1,65 @@
-## Página Individual da Oferta
+# Plano: Mineração Inteligente Premium
 
-Criar uma rota dinâmica `/oferta/$id` que abre ao clicar em qualquer card de oferta (em Minerar, Escaladas, Salvas, Favoritos), exibindo análise profissional completa com dados demo locais.
+Melhorias na página `/minerar` e componentes relacionados, mantendo tudo local (sem backend).
 
-### 1. Nova rota
+## 1. Favoritos com estrela no card
 
-**Arquivo:** `src/routes/_authenticated/oferta.$id.tsx`
+- Em `src/components/OfferCard.tsx`: adicionar botão de estrela ao lado do bookmark.
+- Estado de favorito persistido em `localStorage` (já existe `toggleFavorite` / `FAV_KEY` em `queries.ts`).
+- Animação `framer-motion` (scale + glow) ao favoritar.
+- Carregar `favIds` na página Minerar e propagar via prop `favorited` para `OfferCard`.
+- Atualizar contador de favoritos no `AppSidebar` lendo `escalaflow_favs` + `subscribeChange("fav")`.
 
-Carrega a oferta de `DEMO_OFFERS` por id e a análise correspondente de `DEMO_ANALYSES` (ou gera fallback se não existir). Se id inválido → estado "oferta não encontrada" com link de volta.
+## 2. Slider de mineração premium
 
-### 2. Estrutura visual (top → bottom)
+- Aumentar `max` de 20 → 100 em `minerar.tsx`.
+- Estilizar trilho do slider com gradiente e glow (CSS custom em `styles.css`, classe `.slider-glow`).
+- Mostrar em tempo real: `"{offers.length} anúncios encontrados"` (atualizado conforme resultados).
+- Label do slider com valor destacado em cor primária.
 
-**Cabeçalho premium**
-- Botão "Voltar"
-- Capa em banner com gradiente sobreposto
-- Nome do anunciante (h1), nicho, país (com bandeira), plataforma, data detectada (mock), badge de status (Escalando / Validando / Quente)
-- Score destacado em círculo no canto direito
+## 3. Chips de filtros rápidos
 
-**Bloco de criativo**
-- Imagem mock (image_url)
-- Headline (gerada a partir do nome/nicho)
-- Copy principal (parágrafo demo)
-- CTA destacado em botão estilizado
-- Formato do anúncio (Vídeo / Carrossel / Imagem) — badge
+- Novo array de tags: Infoproduto, Produto físico, Emagrecimento, Beleza, Marketing, IA, Saúde, Finanças, Dropshipping, SaaS, Relacionamento, Nutra.
+- Renderizar como `Badge` clicáveis acima do grid de resultados.
+- Ao clicar: preenche `keyword` (e `niche` quando bater com nicho existente) e dispara `load()` automaticamente.
+- Chip ativo com estilo destacado (gradient + ring).
 
-**Análise IA** (grid 2 colunas em desktop, 1 em mobile)
-- Cards separados para: Mecanismo único, Promessa principal, Dores exploradas (lista), Desejos ativados (lista), Público-alvo, Gatilhos mentais (chips)
+## 4. Botão "Minerar com IA"
 
-**Score de escala**
-- Barra horizontal animada (framer-motion) preenchendo até `scale_score`
-- Label dinâmico baseado em faixa:
-  - 0–20: Oferta fria
-  - 21–40: Validando
-  - 41–60: Oferta quente
-  - 61–80: Escalando
-  - 81–100: Dominando
+- Botão secundário ao lado de "Minerar" com ícone `Sparkles` e gradiente glow.
+- Ao clicar: abre `Dialog` (shadcn) com loading animado (1.2s) e depois exibe blocos mock:
+  - Nichos aquecendo (lista com badges)
+  - Ofertas emergentes (mini-cards de 3 ofertas demo)
+  - Criativos escalando (lista)
+  - Países em tendência (badges com bandeira/sigla)
+  - Scores altos detectados (top 3 ofertas por `scale_score`)
+- Dados gerados a partir de `DEMO_OFFERS` em helper `getAITrends()` adicionado em `queries.ts`.
 
-**Ações** (sticky bottom em mobile, barra horizontal em desktop)
-- Salvar oferta (toggle real via `toggleSaveOffer` no localStorage)
-- Gerar variações (toast "em breve")
-- Modelar produto (toast "em breve")
-- Criar funil (toast "em breve")
-- Exportar análise (download JSON da análise via Blob — funcional)
+## 5. Seção "Tendências detectadas pela IA"
 
-### 3. Integrações com páginas existentes
+- Card permanente acima do grid de ofertas em `minerar.tsx`.
+- 4 itens com ícone 🔥 e texto rotativo (mock estático por enquanto):
+  - Produto crescendo na Espanha
+  - Oferta escalando em saúde
+  - Criativo repetido detectado
+  - Novo padrão de VSL identificado
+- Layout: grid 2x2 em desktop, stack no mobile, com hover glow.
 
-- `OfferCard.tsx`: trocar o botão "Analisar" para navegar a `/oferta/$id` em vez de `/analise-ia` com search param. O botão Sparkles continua sendo o CTA principal do card.
-- `ofertas-escaladas.tsx`: tornar linhas da tabela clicáveis para abrir a página da oferta.
-- Sidebar: nenhuma mudança (rota acessada via cards/tabela).
+## 6. Visual premium
 
-### 4. Design
+- Adicionar tokens em `src/styles.css`: `--shadow-glow`, `--gradient-ai`, classe `.card-glow` (hover com box-shadow colorido).
+- Loading elegante: skeleton shimmer durante `loading` em vez de grid vazio.
+- Micro animações com `framer-motion` (stagger no grid, fade-in nos chips/trends).
+- Badges modernos (rounded-full, gradient border nos ativos).
 
-- Tokens de `src/styles.css` (sem cores hardcoded)
-- `var(--gradient-primary)` no banner e na barra de score
-- `var(--shadow-elegant)` nos cards principais
-- Animações de entrada com framer-motion (fade + slide)
-- Totalmente responsivo (grid colapsa, ações viram sticky bar no mobile)
-- Funciona em dark e light mode
+## 7-9. Sem backend
 
-### 5. Sem backend
+Tudo via `localStorage` e `DEMO_OFFERS`. Nenhuma chamada de API real.
 
-- Tudo lido de `DEMO_OFFERS` / `DEMO_ANALYSES` em `src/lib/queries.ts`
-- Ações de salvar usam o `localStorage` já implementado
-- Exportar análise gera arquivo JSON local via `Blob` + `URL.createObjectURL`
+## Arquivos afetados
 
-### Arquivos afetados
-
-- **Novo:** `src/routes/_authenticated/oferta.$id.tsx`
-- **Editado:** `src/components/OfferCard.tsx` (link do CTA)
-- **Editado:** `src/routes/_authenticated/ofertas-escaladas.tsx` (linhas clicáveis)
-- **Editado:** `src/lib/queries.ts` (helper `getOfferById` + `getAnalysisByOfferId` se necessário)
+- `src/components/OfferCard.tsx` — botão estrela + animação + prop `favorited`
+- `src/routes/_authenticated/minerar.tsx` — chips, IA dialog, trends section, contador, slider 100, skeleton
+- `src/components/AppSidebar.tsx` — contador de favoritos
+- `src/lib/queries.ts` — helper `getAITrends()`, `fetchFavIds()`
+- `src/styles.css` — tokens de glow e gradiente IA
