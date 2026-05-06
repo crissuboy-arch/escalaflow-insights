@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchAnalyses } from "@/lib/queries";
 import { Sparkles, Target, Heart, Lightbulb, Users, Brain, Layers, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -16,11 +16,7 @@ function AIPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("ai_analyses")
-        .select("*, mined_offers(advertiser_name, niche, image_url)")
-        .order("created_at", { ascending: false });
-      const list = data ?? [];
+      const list = await fetchAnalyses();
       setItems(list);
       setSelected(list[0] ?? null);
     })();
