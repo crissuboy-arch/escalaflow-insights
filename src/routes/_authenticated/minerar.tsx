@@ -1,20 +1,37 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
-import { fetchOffers, toggleSaveOffer, subscribeChange } from "@/lib/queries";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Sparkles, Flame, TrendingUp, Loader2, Wand2 } from "lucide-react";
+import { fetchOffers, toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, type AITrends } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchSavedIds } from "@/lib/queries";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
+
+const QUICK_TAGS = [
+  "Infoproduto", "Produto físico", "Emagrecimento", "Beleza", "Marketing", "IA",
+  "Saúde", "Finanças", "Dropshipping", "SaaS", "Relacionamento", "Nutra",
+];
+const TAG_TO_NICHE: Record<string, string> = {
+  "Beleza": "Beleza", "Marketing": "Marketing", "Saúde": "Saúde", "Finanças": "Finanças",
+};
+
+const TRENDS = [
+  { emoji: "🔥", text: "Produto crescendo na Espanha", sub: "Nicho de saúde e beleza" },
+  { emoji: "📈", text: "Oferta escalando em saúde", sub: "Aumento de 47% em 7 dias" },
+  { emoji: "🎬", text: "Criativo repetido detectado", sub: "Padrão usado por 12 anunciantes" },
+  { emoji: "🎯", text: "Novo padrão de VSL identificado", sub: "Gancho de 3 segundos viralizando" },
+];
 
 function MinePage() {
   const { t } = useTranslation();
@@ -23,22 +40,36 @@ function MinePage() {
   const [niche, setNiche] = useState("all");
   const [country, setCountry] = useState("all");
   const [platform, setPlatform] = useState("all");
-  const [quantity, setQuantity] = useState(12);
+  const [quantity, setQuantity] = useState(20);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [offers, setOffers] = useState<any[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [trends, setTrends] = useState<AITrends | null>(null);
 
-  const load = async () => {
+  const load = async (opts?: { keyword?: string; niche?: string }) => {
     setLoading(true);
-    try { setOffers(await fetchOffers({ keyword, niche, country, platform, limit: quantity })); }
-    finally { setLoading(false); }
+    try {
+      setOffers(await fetchOffers({
+        keyword: opts?.keyword ?? keyword,
+        niche: opts?.niche ?? niche,
+        country, platform, limit: quantity,
+      }));
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!user) return;
     fetchSavedIds(user.id).then(setSavedIds);
-    const unsub = subscribeChange((s) => { if (s === "saved") fetchSavedIds(user.id).then(setSavedIds); });
+    fetchFavIds(user.id).then(setFavIds);
+    const unsub = subscribeChange((s) => {
+      if (s === "saved") fetchSavedIds(user.id).then(setSavedIds);
+      if (s === "fav") fetchFavIds(user.id).then(setFavIds);
+    });
     return unsub;
   }, [user]);
 
@@ -49,12 +80,85 @@ function MinePage() {
     toast.success(isSaved ? t("mine.saved") : "OK");
   };
 
+  const onTagClick = (tag: string) => {
+    const newActive = activeTag === tag ? null : tag;
+    setActiveTag(newActive);
+    const newKeyword = newActive ?? "";
+    const newNiche = newActive && TAG_TO_NICHE[newActive] ? TAG_TO_NICHE[newActive] : "all";
+    setKeyword(newKeyword);
+    setNiche(newNiche);
+    load({ keyword: newKeyword, niche: newNiche });
+  };
+
+  const onAIMine = async () => {
+    setAiOpen(true);
+    setAiLoading(true);
+    setTrends(null);
+    setTimeout(() => { setTrends(getAITrends()); setAiLoading(false); }, 1200);
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("mine.title")}</h1>
-        <p className="text-muted-foreground">{t("mine.subtitle")}</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">{t("mine.title")}</h1>
+          <p className="text-muted-foreground">{t("mine.subtitle")}</p>
+        </div>
+        <Button onClick={onAIMine} className="ai-glow text-white shadow-[var(--shadow-glow)] hover:opacity-90">
+          <Wand2 className="mr-2 h-4 w-4" /> Minerar com IA
+        </Button>
       </div>
+
+      {/* Tendências detectadas pela IA */}
+      <Card className="border-border/60 bg-gradient-to-br from-card to-primary/5">
+        <CardContent className="p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold">Tendências detectadas pela IA</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {TRENDS.map((tr, i) => (
+              <motion.div
+                key={tr.text}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="card-glow flex items-start gap-3 rounded-lg border border-border/60 bg-background/50 p-3"
+              >
+                <span className="text-xl">{tr.emoji}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{tr.text}</p>
+                  <p className="text-xs text-muted-foreground">{tr.sub}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filtros rápidos */}
+      <div className="flex flex-wrap gap-2">
+        {QUICK_TAGS.map((tag) => {
+          const active = activeTag === tag;
+          return (
+            <motion.button
+              key={tag}
+              whileTap={{ scale: 0.94 }}
+              onClick={() => onTagClick(tag)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                active
+                  ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
+                  : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
+              }`}
+              style={active ? { background: "var(--gradient-primary)" } : undefined}
+            >
+              {tag}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Filtros principais */}
       <Card className="border-border/60">
         <CardContent className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-6">
           <div className="lg:col-span-2"><Label>{t("mine.keyword")}</Label>
@@ -74,22 +178,129 @@ function MinePage() {
               <SelectContent><SelectItem value="all">{t("common.all")}</SelectItem>
                 {["Facebook","Instagram","TikTok","YouTube","LinkedIn","Pinterest"].map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
               </SelectContent></Select></div>
-          <div><Label>{t("mine.quantity")}: {quantity}</Label>
-            <Slider value={[quantity]} min={4} max={20} step={1} onValueChange={(v) => setQuantity(v[0])} className="mt-3" /></div>
-          <div className="md:col-span-2 lg:col-span-6">
-            <Button onClick={load} disabled={loading} className="w-full md:w-auto text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
-              <Search className="mr-2 h-4 w-4" /> {t("mine.submit")}
+          <div>
+            <Label className="flex items-center justify-between">
+              <span>{t("mine.quantity")}</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{quantity}</span>
+            </Label>
+            <Slider value={[quantity]} min={4} max={100} step={1} onValueChange={(v) => setQuantity(v[0])} className="mt-3" />
+          </div>
+          <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{offers.length}</span> anúncios encontrados
+            </p>
+            <Button onClick={() => load()} disabled={loading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+              {t("mine.submit")}
             </Button>
           </div>
         </CardContent>
       </Card>
-      {offers.length === 0 && !loading ? (
+
+      {/* Resultados */}
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-lg border border-border/60 bg-card">
+              <div className="aspect-video shimmer bg-muted" />
+              <div className="space-y-2 p-4">
+                <div className="h-4 w-3/4 shimmer rounded bg-muted" />
+                <div className="h-3 w-full shimmer rounded bg-muted" />
+                <div className="h-8 w-full shimmer rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : offers.length === 0 ? (
         <p className="py-12 text-center text-muted-foreground">{t("mine.noResults")}</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {offers.map((o) => <OfferCard key={o.id} offer={o} saved={savedIds.has(o.id)} onToggleSave={() => onSave(o.id)} />)}
-        </div>
+        <motion.div
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
+        >
+          {offers.map((o) => (
+            <motion.div key={o.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+              <OfferCard offer={o} saved={savedIds.has(o.id)} favorited={favIds.has(o.id)} onToggleSave={() => onSave(o.id)} />
+            </motion.div>
+          ))}
+        </motion.div>
       )}
+
+      {/* Dialog Minerar com IA */}
+      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wand2 className="h-5 w-5 text-primary" /> Mineração inteligente
+            </DialogTitle>
+          </DialogHeader>
+          <AnimatePresence mode="wait">
+            {aiLoading || !trends ? (
+              <motion.div key="l" exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-16">
+                <div className="relative">
+                  <div className="ai-glow h-16 w-16 rounded-full opacity-40 blur-xl" />
+                  <Loader2 className="absolute inset-0 m-auto h-10 w-10 animate-spin text-primary" />
+                </div>
+                <p className="mt-4 text-sm text-muted-foreground">A IA está varrendo milhares de anúncios...</p>
+              </motion.div>
+            ) : (
+              <motion.div key="r" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 py-2">
+                <section>
+                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Flame className="h-4 w-4 text-primary" /> Nichos aquecendo</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {trends.hotNiches.map((n) => (
+                      <Badge key={n.name} className="bg-primary/15 text-primary hover:bg-primary/20">{n.name} {n.growth}</Badge>
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" /> Ofertas emergentes</h3>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {trends.emergingOffers.map((o) => (
+                      <div key={o.id} className="card-glow rounded-lg border border-border/60 bg-card p-3">
+                        <p className="text-sm font-semibold line-clamp-1">{o.advertiser_name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{o.niche} · {o.country}</p>
+                        <p className="mt-2 text-xs font-bold text-primary">Score {o.scale_score}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold">Criativos escalando</h3>
+                  <ul className="space-y-1.5 text-sm text-muted-foreground">
+                    {trends.scalingCreatives.map((c) => <li key={c}>• {c}</li>)}
+                  </ul>
+                </section>
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold">Países em tendência</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {trends.trendingCountries.map((c) => (
+                      <Badge key={c.code} variant="outline" className="border-primary/30">
+                        {c.label} <span className="ml-1 text-primary">{c.growth}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                </section>
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold">Scores altos detectados</h3>
+                  <div className="space-y-2">
+                    {trends.topScores.map((o) => (
+                      <div key={o.id} className="flex items-center justify-between rounded-lg border border-border/60 p-2">
+                        <span className="text-sm">{o.advertiser_name}</span>
+                        <Badge className="bg-gradient-to-r from-primary to-accent text-primary-foreground">
+                          <Flame className="mr-1 h-3 w-3" /> {o.scale_score}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
