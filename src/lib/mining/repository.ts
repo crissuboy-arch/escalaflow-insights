@@ -23,7 +23,11 @@ function uid(): string {
 }
 
 function emit() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(EVT));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(EVT));
+    // Public alias requested by integrations
+    window.dispatchEvent(new Event("escalaFlow:mining:change"));
+  }
 }
 
 function readAll(): MinedAd[] {
@@ -70,17 +74,26 @@ export const miningRepo: MiningRepository = {
     return readAll().sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
   },
   async ingest(payload, source = "extension") {
-    const ad = normalize(payload, source);
     const rows = readAll();
+    // Dedup by adUrl (preferred) or by headline+platform fallback
+    const dupe = rows.find((r) =>
+      (payload.adUrl && r.adUrl && r.adUrl === payload.adUrl) ||
+      (!payload.adUrl && r.headline === (payload.headline ?? "").trim() && r.platform === (payload.platform ?? "Other"))
+    );
+    if (dupe) {
+      return dupe;
+    }
+    const ad = normalize(payload, source);
     rows.unshift(ad);
     writeAll(rows);
     return ad;
   },
   async ingestMany(payloads, source = "extension") {
-    const ads = payloads.map((p) => normalize(p, source));
-    const rows = readAll();
-    writeAll([...ads, ...rows]);
-    return ads;
+    const out: MinedAd[] = [];
+    for (const p of payloads) {
+      out.push(await miningRepo.ingest(p, source));
+    }
+    return out;
   },
   async update(id, patch) {
     const rows = readAll();
@@ -99,7 +112,14 @@ export const miningRepo: MiningRepository = {
   subscribe(cb) {
     if (typeof window === "undefined") return () => {};
     const h = () => cb();
+    const sh = (e: StorageEvent) => { if (e.key === STORAGE_KEY) cb(); };
     window.addEventListener(EVT, h);
-    return () => window.removeEventListener(EVT, h);
+    window.addEventListener("escalaFlow:mining:change", h);
+    window.addEventListener("storage", sh);
+    return () => {
+      window.removeEventListener(EVT, h);
+      window.removeEventListener("escalaFlow:mining:change", h);
+      window.removeEventListener("storage", sh);
+    };
   },
 };

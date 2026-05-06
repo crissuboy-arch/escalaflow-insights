@@ -53,10 +53,9 @@ function ImportAdPage() {
       console.log("[importar-anuncio] ingest payload:", payload);
       try {
         const ad = await miningRepo.ingest(payload, "extension");
-        console.log("[importar-anuncio] saved ad:", ad);
         const all = await miningRepo.list();
-        console.log("[importar-anuncio] repo size after ingest:", all.length);
-        toast.success("Oferta importada com sucesso");
+        console.log("[importar-anuncio] saved ad:", ad, "total:", all.length);
+        toast.success("Anúncio minerado com sucesso");
       } catch (e) {
         console.error("[importar-anuncio] ingest failed:", e);
         toast.error("Falha ao importar oferta");
