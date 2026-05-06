@@ -113,7 +113,7 @@ export async function insertTestAd() {
       score: 88,
       adUrl: `https://example.com/test/${id}`,
       analysisType: "manual",
-      creativeUrl: null,
+      creativeUrl: undefined,
       createdAt: new Date().toISOString(),
     },
     "manual",
