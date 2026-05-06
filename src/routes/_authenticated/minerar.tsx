@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Sparkles, Flame, TrendingUp, Loader2, Wand2 } from "lucide-react";
+import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2 } from "lucide-react";
 import { fetchOffers, toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, type AITrends } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { useAuth } from "@/providers/AuthProvider";
@@ -25,13 +25,6 @@ const QUICK_TAGS = [
 const TAG_TO_NICHE: Record<string, string> = {
   "Beleza": "Beleza", "Marketing": "Marketing", "Saúde": "Saúde", "Finanças": "Finanças",
 };
-
-const TRENDS = [
-  { emoji: "🔥", text: "Produto crescendo na Espanha", sub: "Nicho de saúde e beleza" },
-  { emoji: "📈", text: "Oferta escalando em saúde", sub: "Aumento de 47% em 7 dias" },
-  { emoji: "🎬", text: "Criativo repetido detectado", sub: "Padrão usado por 12 anunciantes" },
-  { emoji: "🎯", text: "Novo padrão de VSL identificado", sub: "Gancho de 3 segundos viralizando" },
-];
 
 function MinePage() {
   const { t } = useTranslation();
@@ -49,6 +42,7 @@ function MinePage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [trends, setTrends] = useState<AITrends | null>(null);
+  const signals = getAITrends().signals;
 
   const load = async (opts?: { keyword?: string; niche?: string }) => {
     setLoading(true);
@@ -104,9 +98,15 @@ function MinePage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("mine.title")}</h1>
           <p className="text-muted-foreground">{t("mine.subtitle")}</p>
         </div>
-        <Button onClick={onAIMine} className="ai-glow text-white shadow-[var(--shadow-glow)] hover:opacity-90">
-          <Wand2 className="mr-2 h-4 w-4" /> Minerar com IA
-        </Button>
+        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="relative">
+          <Button onClick={onAIMine} className="ai-pulse ai-glow relative overflow-hidden text-white hover:opacity-95">
+            <motion.span animate={{ rotate: [0, 12, -8, 0] }} transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }} className="mr-2 inline-flex">
+              <Wand2 className="h-4 w-4" />
+            </motion.span>
+            Minerar com IA
+            <Sparkles className="ml-2 h-3.5 w-3.5 animate-pulse" />
+          </Button>
+        </motion.div>
       </div>
 
       {/* Tendências detectadas pela IA */}
@@ -117,21 +117,51 @@ function MinePage() {
             <h2 className="font-semibold">Tendências detectadas pela IA</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {TRENDS.map((tr, i) => (
-              <motion.div
-                key={tr.text}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                className="card-glow flex items-start gap-3 rounded-lg border border-border/60 bg-background/50 p-3"
-              >
-                <span className="text-xl">{tr.emoji}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">{tr.text}</p>
-                  <p className="text-xs text-muted-foreground">{tr.sub}</p>
-                </div>
-              </motion.div>
-            ))}
+            {signals.map((sig, i) => {
+              const TrendIcon = sig.direction === "up" ? TrendingUp : sig.direction === "down" ? TrendingDown : Minus;
+              const trendColor = sig.direction === "up" ? "text-emerald-500" : sig.direction === "down" ? "text-red-500" : "text-muted-foreground";
+              return (
+                <motion.div
+                  key={sig.title}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08 }}
+                  className="card-glow rounded-xl border border-border/60 bg-background/50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-2xl">{sig.emoji}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight">{sig.title}</p>
+                        <p className="text-xs text-muted-foreground">{sig.subtitle}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="rounded-full text-xs">{sig.country}</Badge>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex-1">
+                      <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Score</span>
+                        <span className="font-bold text-foreground">{sig.score}</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${sig.score}%` }}
+                          transition={{ duration: 0.9, delay: i * 0.08 }}
+                          className="h-full rounded-full"
+                          style={{ background: "var(--gradient-primary)" }}
+                        />
+                      </div>
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs font-bold ${trendColor}`}>
+                      <TrendIcon className="h-3.5 w-3.5" /> {sig.direction === "down" ? "-" : "+"}{sig.growth}%
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[10px] text-muted-foreground">{sig.time}</div>
+                </motion.div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
