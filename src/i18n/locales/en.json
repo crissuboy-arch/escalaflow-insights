@@ -1,0 +1,116 @@
+{
+  "app": {
+    "name": "EscalaFlow",
+    "tagline": "AI-powered offer mining"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "fullName": "Full name",
+    "signInWithGoogle": "Sign in with Google",
+    "or": "or",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "signOut": "Sign out",
+    "welcomeBack": "Welcome back",
+    "createAccount": "Create your account",
+    "subtitle": "Access the offer mining platform",
+    "checkEmail": "Check your inbox to confirm your account."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "mine": "Mine Offers",
+    "saved": "Saved Offers",
+    "scaled": "Scaled Offers",
+    "ai": "AI Analysis",
+    "favorites": "Favorites",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "subtitle": "Overview of your operation",
+    "totalMined": "Mined Offers",
+    "totalSaved": "Saved Offers",
+    "totalAnalyses": "AI Analyses",
+    "hotOffers": "Hot Offers",
+    "recentScaled": "Latest Scaled Offers",
+    "scoreTrend": "Score Trend"
+  },
+  "mine": {
+    "title": "Mine Offers",
+    "subtitle": "Find scaled ads in any market",
+    "keyword": "Keyword",
+    "niche": "Niche",
+    "country": "Country",
+    "platform": "Platform",
+    "quantity": "Quantity",
+    "submit": "Mine Offers",
+    "results": "Results",
+    "analyze": "Analyze with AI",
+    "save": "Save",
+    "saved": "Saved",
+    "score": "Score",
+    "noResults": "No results. Adjust your filters and try again."
+  },
+  "scaled": {
+    "title": "Scaled Offers",
+    "subtitle": "Track scale status in real time",
+    "advertiser": "Advertiser",
+    "score": "Score",
+    "ads": "Ads",
+    "niche": "Niche",
+    "country": "Country",
+    "status": "Status",
+    "date": "Date",
+    "search": "Search advertiser..."
+  },
+  "status": {
+    "teste": "Testing",
+    "validando": "Validating",
+    "escalando": "Scaling",
+    "quente": "Hot Offer"
+  },
+  "ai": {
+    "title": "AI Analysis",
+    "subtitle": "Full AI-generated offer modeling",
+    "selectOffer": "Select an offer",
+    "noAnalyses": "No analyses available.",
+    "promise": "Main Promise",
+    "mechanism": "Unique Mechanism",
+    "pains": "Pains",
+    "desires": "Desires",
+    "audience": "Target Audience",
+    "triggers": "Mental Triggers",
+    "structure": "Offer Structure",
+    "creatives": "Creative Suggestions"
+  },
+  "saved_page": {
+    "title": "Saved Offers",
+    "subtitle": "Your personal offer library",
+    "empty": "You haven't saved any offers yet."
+  },
+  "favorites": {
+    "title": "Favorites",
+    "subtitle": "Your favorited offers",
+    "empty": "No favorites yet."
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize your experience",
+    "profile": "Profile",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "save": "Save changes",
+    "saved": "Changes saved"
+  },
+  "common": {
+    "loading": "Loading...",
+    "all": "All",
+    "any": "Any"
+  }
+}
