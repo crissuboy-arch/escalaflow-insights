@@ -222,6 +222,18 @@ export interface AITrends {
   scalingCreatives: string[];
   trendingCountries: { code: string; label: string; growth: string }[];
   topScores: DemoOffer[];
+  signals: TrendSignal[];
+}
+
+export interface TrendSignal {
+  emoji: string;
+  title: string;
+  subtitle: string;
+  score: number;
+  growth: number;
+  time: string;
+  country: string;
+  direction: "up" | "down" | "stable";
 }
 
 export function getAITrends(): AITrends {
@@ -243,5 +255,63 @@ export function getAITrends(): AITrends {
       { code: "PT", label: "Portugal", growth: "+22%" },
     ],
     topScores: sorted.slice(0, 3),
+    signals: [
+      { emoji: "🔥", title: "Produto crescendo na Espanha", subtitle: "Saúde e beleza", score: 92, growth: 47, time: "há 2h", country: "ES", direction: "up" },
+      { emoji: "📈", title: "Oferta escalando em saúde", subtitle: "Nutra dominando feed", score: 88, growth: 38, time: "há 5h", country: "BR", direction: "up" },
+      { emoji: "🎬", title: "Criativo repetido detectado", subtitle: "Padrão usado por 12 anunciantes", score: 76, growth: 12, time: "há 1d", country: "US", direction: "stable" },
+      { emoji: "🎯", title: "Novo padrão de VSL identificado", subtitle: "Gancho de 3 segundos viralizando", score: 95, growth: 61, time: "há 3h", country: "PT", direction: "up" },
+    ],
+  };
+}
+
+export interface OfferMetrics {
+  activeAds: number;
+  countries: string[];
+  estimatedDays: number;
+  growth: number;
+  status: { label: string; emoji: string };
+  spark: number[];
+  opportunity: { label: string; value: number; tone: "good" | "warn" | "bad" }[];
+  ticketRange: string;
+}
+
+function hash(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+export function getOfferMetrics(id: string, score: number): OfferMetrics {
+  const h = hash(id);
+  const activeAds = Math.round(score * 1.7) + (h % 40);
+  const allCountries = ["BR", "US", "ES", "PT", "FR", "MX", "AR"];
+  const countries = allCountries.slice(0, 3 + (h % 3));
+  const estimatedDays = 5 + (h % 25);
+  const growth = 8 + (h % 60);
+  const status = score >= 85
+    ? { label: "Dominando", emoji: "👑" }
+    : score >= 70 ? { label: "Escalando", emoji: "🚀" }
+    : score >= 50 ? { label: "Hot", emoji: "🔥" }
+    : { label: "Validando", emoji: "🧪" };
+  const spark = Array.from({ length: 12 }, (_, i) => 30 + ((h >> i) & 0x3f));
+  const ease = 60 + (h % 35);
+  const competition = 30 + ((h >> 3) % 60);
+  const viral = 50 + ((h >> 5) % 45);
+  const saturation = 20 + ((h >> 7) % 70);
+  const ticketLow = 47 + ((h >> 9) % 100);
+  const ticketHigh = ticketLow + 200 + ((h >> 11) % 600);
+  const tone = (v: number, inverted = false) =>
+    inverted
+      ? (v < 40 ? "good" : v < 70 ? "warn" : "bad")
+      : (v > 70 ? "good" : v > 40 ? "warn" : "bad");
+  return {
+    activeAds, countries, estimatedDays, growth, status, spark,
+    ticketRange: `R$ ${ticketLow} – R$ ${ticketHigh}`,
+    opportunity: [
+      { label: "Fácil de copiar", value: ease, tone: tone(ease) as "good" | "warn" | "bad" },
+      { label: "Concorrência", value: competition, tone: tone(competition, true) as "good" | "warn" | "bad" },
+      { label: "Potencial viral", value: viral, tone: tone(viral) as "good" | "warn" | "bad" },
+      { label: "Saturação", value: saturation, tone: tone(saturation, true) as "good" | "warn" | "bad" },
+    ],
   };
 }
