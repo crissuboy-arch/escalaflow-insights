@@ -1,28 +1,71 @@
-# Completar EscalaFlow — páginas faltantes e correções
+## Página Individual da Oferta
 
-## Estado atual
+Criar uma rota dinâmica `/oferta/$id` que abre ao clicar em qualquer card de oferta (em Minerar, Escaladas, Salvas, Favoritos), exibindo análise profissional completa com dados demo locais.
 
-Já está implementado: schema (profiles, user_roles, mined_offers, saved_offers, ai_analyses) com RLS e seed, auth (Email + Google via Lovable Cloud), i18n (pt/en/es/fr), tema dark/light, sidebar, header, login, dashboard e Minerar Ofertas.
+### 1. Nova rota
 
-## Problema
+**Arquivo:** `src/routes/_authenticated/oferta.$id.tsx`
 
-A sidebar referencia rotas que ainda não existem (`/ofertas-salvas`, `/ofertas-escaladas`, `/analise-ia`, `/favoritos`, `/configuracoes`). Como o TanStack Router faz checagem de tipo das rotas, isso quebra o build e o preview fica em branco.
+Carrega a oferta de `DEMO_OFFERS` por id e a análise correspondente de `DEMO_ANALYSES` (ou gera fallback se não existir). Se id inválido → estado "oferta não encontrada" com link de volta.
 
-## O que vou fazer
+### 2. Estrutura visual (top → bottom)
 
-1. **Criar as rotas autenticadas faltantes** em `src/routes/_authenticated/`:
-   - `ofertas-salvas.tsx` — grid de `OfferCard`s das ofertas salvas pelo usuário (join `saved_offers` × `mined_offers`), com botão remover.
-   - `ofertas-escaladas.tsx` — tabela moderna (shadcn `Table`) com colunas anunciante, score, nº anúncios, nicho, país, status (badge: Teste / Validando / Escalando / Oferta Quente), data.
-   - `analise-ia.tsx` — listagem das análises (`ai_analyses`) em cards; ao clicar, modal/painel detalhado com promessa, mecanismo, dores, desejos, público, gatilhos mentais, estrutura e sugestões de criativos.
-   - `favoritos.tsx` — mesma estrutura de Salvas, filtrando `is_favorite = true`, com toggle estrela.
-   - `configuracoes.tsx` — perfil (nome, idioma preferido com persistência em `profiles.preferred_language`) + preferências de tema (dark/light/system).
+**Cabeçalho premium**
+- Botão "Voltar"
+- Capa em banner com gradiente sobreposto
+- Nome do anunciante (h1), nicho, país (com bandeira), plataforma, data detectada (mock), badge de status (Escalando / Validando / Quente)
+- Score destacado em círculo no canto direito
 
-2. **Reaproveitar componentes existentes** (`OfferCard`, `StatusBadge`, shadcn Table/Card/Dialog/Tabs).
+**Bloco de criativo**
+- Imagem mock (image_url)
+- Headline (gerada a partir do nome/nicho)
+- Copy principal (parágrafo demo)
+- CTA destacado em botão estilizado
+- Formato do anúncio (Vídeo / Carrossel / Imagem) — badge
 
-3. **i18n** — acrescentar chaves novas (títulos, labels, placeholders, status) nos 4 idiomas.
+**Análise IA** (grid 2 colunas em desktop, 1 em mobile)
+- Cards separados para: Mecanismo único, Promessa principal, Dores exploradas (lista), Desejos ativados (lista), Público-alvo, Gatilhos mentais (chips)
 
-4. **Validar** — após editar, conferir build/dev-log e abrir preview em `/login` para confirmar render.
+**Score de escala**
+- Barra horizontal animada (framer-motion) preenchendo até `scale_score`
+- Label dinâmico baseado em faixa:
+  - 0–20: Oferta fria
+  - 21–40: Validando
+  - 41–60: Oferta quente
+  - 61–80: Escalando
+  - 81–100: Dominando
 
-## Fora do escopo (conforme solicitado)
+**Ações** (sticky bottom em mobile, barra horizontal em desktop)
+- Salvar oferta (toggle real via `toggleSaveOffer` no localStorage)
+- Gerar variações (toast "em breve")
+- Modelar produto (toast "em breve")
+- Criar funil (toast "em breve")
+- Exportar análise (download JSON da análise via Blob — funcional)
 
-Checkout, Stripe, geração de ebooks, SEO, automações, blogs. Sem alteração de schema — tabelas atuais já cobrem tudo.
+### 3. Integrações com páginas existentes
+
+- `OfferCard.tsx`: trocar o botão "Analisar" para navegar a `/oferta/$id` em vez de `/analise-ia` com search param. O botão Sparkles continua sendo o CTA principal do card.
+- `ofertas-escaladas.tsx`: tornar linhas da tabela clicáveis para abrir a página da oferta.
+- Sidebar: nenhuma mudança (rota acessada via cards/tabela).
+
+### 4. Design
+
+- Tokens de `src/styles.css` (sem cores hardcoded)
+- `var(--gradient-primary)` no banner e na barra de score
+- `var(--shadow-elegant)` nos cards principais
+- Animações de entrada com framer-motion (fade + slide)
+- Totalmente responsivo (grid colapsa, ações viram sticky bar no mobile)
+- Funciona em dark e light mode
+
+### 5. Sem backend
+
+- Tudo lido de `DEMO_OFFERS` / `DEMO_ANALYSES` em `src/lib/queries.ts`
+- Ações de salvar usam o `localStorage` já implementado
+- Exportar análise gera arquivo JSON local via `Blob` + `URL.createObjectURL`
+
+### Arquivos afetados
+
+- **Novo:** `src/routes/_authenticated/oferta.$id.tsx`
+- **Editado:** `src/components/OfferCard.tsx` (link do CTA)
+- **Editado:** `src/routes/_authenticated/ofertas-escaladas.tsx` (linhas clicáveis)
+- **Editado:** `src/lib/queries.ts` (helper `getOfferById` + `getAnalysisByOfferId` se necessário)
