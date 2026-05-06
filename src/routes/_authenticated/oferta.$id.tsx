@@ -556,8 +556,11 @@ function OfferDetailPage() {
           <Button onClick={() => setModalOpen("funnel")} variant="outline" className="flex-1 md:flex-none">
             <Workflow className="mr-1 h-4 w-4" /> Funil
           </Button>
+          <Button onClick={onCopySummary} variant="outline" className="flex-1 md:flex-none">
+            <Copy className="mr-1 h-4 w-4" /> Copiar resumo
+          </Button>
           <Button onClick={onExport} variant="outline" className="flex-1 md:flex-none">
-            <Download className="mr-1 h-4 w-4" /> Exportar
+            <Download className="mr-1 h-4 w-4" /> Exportar PDF
           </Button>
         </div>
       </div>
