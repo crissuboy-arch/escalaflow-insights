@@ -13,7 +13,7 @@ import {
   Workflow, Download, Flame, Calendar, Globe, Tag, Megaphone,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/oferta/")({ component: OfferDetailPage });
+export const Route = createFileRoute("/_authenticated/oferta/$id")({ component: OfferDetailPage });
 
 function scaleLabel(score: number) {
   if (score <= 20) return { label: "Oferta fria", tone: "muted" };
