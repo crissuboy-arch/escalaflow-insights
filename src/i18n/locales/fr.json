@@ -1,0 +1,116 @@
+{
+  "app": {
+    "name": "EscalaFlow",
+    "tagline": "Minage d'offres par IA"
+  },
+  "auth": {
+    "signIn": "Connexion",
+    "signUp": "S'inscrire",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "fullName": "Nom complet",
+    "signInWithGoogle": "Connexion avec Google",
+    "or": "ou",
+    "noAccount": "Pas encore de compte ?",
+    "haveAccount": "Déjà inscrit ?",
+    "signOut": "Déconnexion",
+    "welcomeBack": "Bon retour",
+    "createAccount": "Créez votre compte",
+    "subtitle": "Accédez à la plateforme de minage d'offres",
+    "checkEmail": "Vérifiez votre e-mail pour confirmer."
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "mine": "Miner des offres",
+    "saved": "Offres enregistrées",
+    "scaled": "Offres scalées",
+    "ai": "Analyse IA",
+    "favorites": "Favoris",
+    "settings": "Paramètres"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "subtitle": "Vue d'ensemble de votre activité",
+    "totalMined": "Offres minées",
+    "totalSaved": "Enregistrées",
+    "totalAnalyses": "Analyses IA",
+    "hotOffers": "Offres chaudes",
+    "recentScaled": "Dernières scalées",
+    "scoreTrend": "Tendance du score"
+  },
+  "mine": {
+    "title": "Miner des offres",
+    "subtitle": "Trouvez des annonces scalées sur n'importe quel marché",
+    "keyword": "Mot-clé",
+    "niche": "Niche",
+    "country": "Pays",
+    "platform": "Plateforme",
+    "quantity": "Quantité",
+    "submit": "Miner des offres",
+    "results": "Résultats",
+    "analyze": "Analyser avec IA",
+    "save": "Enregistrer",
+    "saved": "Enregistré",
+    "score": "Score",
+    "noResults": "Aucun résultat."
+  },
+  "scaled": {
+    "title": "Offres scalées",
+    "subtitle": "Suivez l'échelle en temps réel",
+    "advertiser": "Annonceur",
+    "score": "Score",
+    "ads": "Annonces",
+    "niche": "Niche",
+    "country": "Pays",
+    "status": "Statut",
+    "date": "Date",
+    "search": "Rechercher un annonceur..."
+  },
+  "status": {
+    "teste": "Test",
+    "validando": "Validation",
+    "escalando": "Scaling",
+    "quente": "Offre chaude"
+  },
+  "ai": {
+    "title": "Analyse IA",
+    "subtitle": "Modélisation complète par IA",
+    "selectOffer": "Choisissez une offre",
+    "noAnalyses": "Aucune analyse disponible.",
+    "promise": "Promesse principale",
+    "mechanism": "Mécanisme unique",
+    "pains": "Douleurs",
+    "desires": "Désirs",
+    "audience": "Audience cible",
+    "triggers": "Déclencheurs mentaux",
+    "structure": "Structure de l'offre",
+    "creatives": "Suggestions créatives"
+  },
+  "saved_page": {
+    "title": "Offres enregistrées",
+    "subtitle": "Votre bibliothèque personnelle",
+    "empty": "Aucune offre enregistrée."
+  },
+  "favorites": {
+    "title": "Favoris",
+    "subtitle": "Vos offres favorites",
+    "empty": "Aucun favori."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "subtitle": "Personnalisez votre expérience",
+    "profile": "Profil",
+    "language": "Langue",
+    "theme": "Thème",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "themeSystem": "Système",
+    "save": "Enregistrer",
+    "saved": "Modifications enregistrées"
+  },
+  "common": {
+    "loading": "Chargement...",
+    "all": "Tous",
+    "any": "Tous"
+  }
+}
