@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
@@ -33,6 +34,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedOfertasSalvasRoute =
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesByTo {
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesById {
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRouteTypes {
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/api/ingest'
     | '/oferta/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/api/ingest'
     | '/oferta/$id'
   id:
     | '__root__'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
+    | '/api/ingest'
     | '/_authenticated/oferta/$id'
   fileRoutesById: FileRoutesById
 }
@@ -161,6 +173,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiIngestRoute: typeof ApiIngestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/ofertas-salvas': {
@@ -275,7 +295,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiIngestRoute: ApiIngestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
