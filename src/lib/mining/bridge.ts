@@ -89,7 +89,7 @@ export async function seedDemoAds(count = 5): Promise<number> {
       country: DEMO_COUNTRIES[r % DEMO_COUNTRIES.length],
       niche: DEMO_NICHES[r % DEMO_NICHES.length],
       score: 50 + (r % 50),
-      adUrl: "https://example.com/ad",
+      adUrl: `https://example.com/ad/${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
       analysisType: DEMO_TYPES[r % DEMO_TYPES.length],
       creativeUrl: `https://images.unsplash.com/photo-15${(56761175 + r) % 99999999}?w=600`,
       createdAt: new Date(Date.now() - r * 60_000).toISOString(),
@@ -97,4 +97,25 @@ export async function seedDemoAds(count = 5): Promise<number> {
   });
   const ads = await miningRepo.ingestMany(payloads, "demo");
   return ads.length;
+}
+
+// Single test ingest — used by the "Teste de Importação" button.
+// Always inserts a unique ad regardless of dedup.
+export async function insertTestAd() {
+  const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return miningRepo.ingest(
+    {
+      headline: `Anúncio teste ${new Date().toLocaleTimeString()}`,
+      copy: "Este é um anúncio de teste inserido manualmente para validar a Central de Mineração.",
+      platform: "Facebook",
+      country: "BR",
+      niche: "Teste",
+      score: 88,
+      adUrl: `https://example.com/test/${id}`,
+      analysisType: "manual",
+      creativeUrl: null,
+      createdAt: new Date().toISOString(),
+    },
+    "manual",
+  );
 }
