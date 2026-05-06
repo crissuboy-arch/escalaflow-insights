@@ -1,39 +1,39 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
 
+interface DemoUser { id: string; email: string; }
 interface AuthCtx {
-  user: User | null;
-  session: Session | null;
+  user: DemoUser | null;
   loading: boolean;
+  signIn: (email: string) => void;
   signOut: () => Promise<void>;
 }
 
-const Ctx = createContext<AuthCtx>({ user: null, session: null, loading: true, signOut: async () => {} });
+const STORAGE_KEY = "escalaflow_demo_user";
+const Ctx = createContext<AuthCtx>({ user: null, loading: true, signIn: () => {}, signOut: async () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<DemoUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s);
-      setLoading(false);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    return () => subscription.unsubscribe();
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      if (raw) setUser(JSON.parse(raw));
+    } catch {}
+    setLoading(false);
   }, []);
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  const signIn = (email: string) => {
+    const u = { id: "demo-user", email };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    setUser(u);
+  };
+  const signOut = async () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
+  };
 
-  return (
-    <Ctx.Provider value={{ user: session?.user ?? null, session, loading, signOut }}>
-      {children}
-    </Ctx.Provider>
-  );
+  return <Ctx.Provider value={{ user, loading, signIn, signOut }}>{children}</Ctx.Provider>;
 }
 
 export const useAuth = () => useContext(Ctx);
