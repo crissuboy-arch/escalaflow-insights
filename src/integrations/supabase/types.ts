@@ -14,16 +14,212 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_analyses: {
+        Row: {
+          created_at: string
+          creative_suggestions: Json | null
+          desires: Json | null
+          id: string
+          is_demo: boolean
+          mechanism: string | null
+          mental_triggers: Json | null
+          offer_id: string
+          offer_structure: string | null
+          pains: Json | null
+          promise: string | null
+          target_audience: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          creative_suggestions?: Json | null
+          desires?: Json | null
+          id?: string
+          is_demo?: boolean
+          mechanism?: string | null
+          mental_triggers?: Json | null
+          offer_id: string
+          offer_structure?: string | null
+          pains?: Json | null
+          promise?: string | null
+          target_audience?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          creative_suggestions?: Json | null
+          desires?: Json | null
+          id?: string
+          is_demo?: boolean
+          mechanism?: string | null
+          mental_triggers?: Json | null
+          offer_id?: string
+          offer_structure?: string | null
+          pains?: Json | null
+          promise?: string | null
+          target_audience?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_analyses_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "mined_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mined_offers: {
+        Row: {
+          ads_count: number
+          advertiser_name: string
+          country: string
+          created_at: string
+          id: string
+          image_url: string | null
+          is_demo: boolean
+          keyword: string | null
+          niche: string
+          platform: string
+          scale_score: number
+          status: Database["public"]["Enums"]["offer_status"]
+          summary: string | null
+        }
+        Insert: {
+          ads_count?: number
+          advertiser_name: string
+          country: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_demo?: boolean
+          keyword?: string | null
+          niche: string
+          platform: string
+          scale_score?: number
+          status?: Database["public"]["Enums"]["offer_status"]
+          summary?: string | null
+        }
+        Update: {
+          ads_count?: number
+          advertiser_name?: string
+          country?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_demo?: boolean
+          keyword?: string | null
+          niche?: string
+          platform?: string
+          scale_score?: number
+          status?: Database["public"]["Enums"]["offer_status"]
+          summary?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          preferred_language: string
+          theme: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          preferred_language?: string
+          theme?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          preferred_language?: string
+          theme?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      saved_offers: {
+        Row: {
+          created_at: string
+          id: string
+          is_favorite: boolean
+          offer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          offer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          offer_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_offers_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "mined_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      offer_status: "teste" | "validando" | "escalando" | "quente"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +346,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      offer_status: ["teste", "validando", "escalando", "quente"],
+    },
   },
 } as const
