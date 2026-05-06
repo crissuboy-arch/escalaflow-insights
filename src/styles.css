@@ -156,3 +156,30 @@
     color: var(--color-foreground);
   }
 }
+
+@layer utilities {
+  .card-glow {
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .card-glow:hover {
+    box-shadow: var(--shadow-glow);
+  }
+  .ai-glow {
+    background: linear-gradient(135deg, oklch(0.65 0.24 290), oklch(0.74 0.15 210), oklch(0.65 0.2 330));
+    background-size: 200% 200%;
+    animation: ai-shimmer 4s ease infinite;
+  }
+  @keyframes ai-shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .shimmer {
+    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.06), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+}

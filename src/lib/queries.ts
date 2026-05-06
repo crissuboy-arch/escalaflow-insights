@@ -139,6 +139,14 @@ export async function fetchFavorites(_userId: string) {
   return DEMO_OFFERS.filter((o) => favs.has(o.id)).map((o) => ({ mined_offers: o, offer_id: o.id }));
 }
 
+export async function fetchFavIds(_userId?: string): Promise<Set<string>> {
+  return readSet(FAV_KEY);
+}
+
+export function getFavCount(): number {
+  return readSet(FAV_KEY).size;
+}
+
 export async function toggleSaveOffer(_userId: string, offerId: string): Promise<boolean> {
   const s = readSet(SAVED_KEY);
   const isSaved = s.has(offerId);
@@ -205,5 +213,35 @@ export function getAnalysisForOffer(offerId: string): DemoAnalysis {
       "Imagem estática com headline forte e CTA",
     ],
     mined_offers: { advertiser_name: offer.advertiser_name, niche: offer.niche, image_url: offer.image_url },
+  };
+}
+
+export interface AITrends {
+  hotNiches: { name: string; growth: string }[];
+  emergingOffers: DemoOffer[];
+  scalingCreatives: string[];
+  trendingCountries: { code: string; label: string; growth: string }[];
+  topScores: DemoOffer[];
+}
+
+export function getAITrends(): AITrends {
+  const sorted = [...DEMO_OFFERS].sort((a, b) => b.scale_score - a.scale_score);
+  const niches = Array.from(new Set(DEMO_OFFERS.map((o) => o.niche))).slice(0, 5);
+  return {
+    hotNiches: niches.map((n, i) => ({ name: n, growth: `+${20 + i * 11}%` })),
+    emergingOffers: sorted.slice(3, 6),
+    scalingCreatives: [
+      "Vídeo VSL com gancho de 3 segundos",
+      "Carrossel comparativo antes x depois",
+      "Reel com depoimento autêntico",
+      "Imagem estática com headline ousada",
+    ],
+    trendingCountries: [
+      { code: "ES", label: "Espanha", growth: "+47%" },
+      { code: "BR", label: "Brasil", growth: "+38%" },
+      { code: "US", label: "Estados Unidos", growth: "+29%" },
+      { code: "PT", label: "Portugal", growth: "+22%" },
+    ],
+    topScores: sorted.slice(0, 3),
   };
 }
