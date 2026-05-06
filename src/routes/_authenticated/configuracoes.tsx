@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import i18n from "@/i18n/config";
 
@@ -24,27 +23,24 @@ function SettingsPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from("profiles").select("full_name, preferred_language").eq("id", user.id).maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setFullName(data.full_name ?? "");
-          if (data.preferred_language) {
-            setLanguage(data.preferred_language);
-            i18n.changeLanguage(data.preferred_language);
-          }
+    try {
+      const raw = localStorage.getItem("escalaflow_profile");
+      if (raw) {
+        const p = JSON.parse(raw);
+        setFullName(p.full_name ?? "");
+        if (p.preferred_language) {
+          setLanguage(p.preferred_language);
+          i18n.changeLanguage(p.preferred_language);
         }
-      });
+      }
+    } catch {}
   }, [user]);
 
   const onSave = async () => {
     if (!user) return;
     setSaving(true);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName, preferred_language: language })
-      .eq("id", user.id);
+    localStorage.setItem("escalaflow_profile", JSON.stringify({ full_name: fullName, preferred_language: language }));
     setSaving(false);
-    if (error) return toast.error(error.message);
     i18n.changeLanguage(language);
     toast.success(t("settings.saved"));
   };

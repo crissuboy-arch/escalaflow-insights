@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import { useAuth } from "@/providers/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +17,7 @@ export const Route = createFileRoute("/login")({ component: LoginPage });
 function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,36 +25,19 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { if (data.session) navigate({ to: "/dashboard" }); });
-  }, [navigate]);
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email, password,
-          options: { emailRedirectTo: `${window.location.origin}/dashboard`, data: { full_name: fullName } },
-        });
-        if (error) throw error;
-        toast.success(t("auth.checkEmail"));
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/dashboard" });
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error");
-    } finally { setLoading(false); }
+    // Demo mode: any email/password works
+    setTimeout(() => {
+      signIn(email || "demo@escalaflow.app");
+      setLoading(false);
+      navigate({ to: "/dashboard" });
+    }, 300);
   };
 
-  const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-    if (result.error) { toast.error("Google sign-in failed"); return; }
-    if (result.redirected) return;
-    navigate({ to: "/dashboard" });
+  const google = () => {
+    toast.info("Disponível em breve");
   };
 
   return (
@@ -71,7 +54,7 @@ function LoginPage() {
           <CardContent className="p-6">
             <h2 className="mb-1 text-xl font-semibold">{mode === "signin" ? t("auth.welcomeBack") : t("auth.createAccount")}</h2>
             <p className="mb-5 text-sm text-muted-foreground">{t("app.tagline")}</p>
-            <Button type="button" variant="outline" className="w-full" onClick={google}>
+            <Button type="button" variant="outline" className="w-full opacity-70" onClick={google} title="Disponível em breve">
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12 5c1.6 0 3 .55 4.1 1.6l3-3C17.2 1.9 14.8 1 12 1 7.4 1 3.4 3.6 1.4 7.4l3.5 2.7C5.9 7.1 8.7 5 12 5z"/>
                 <path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.4-1.1 2.6-2.3 3.4l3.6 2.8c2.1-2 3.5-4.9 3.5-8.4z"/>

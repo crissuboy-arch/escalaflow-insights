@@ -2,9 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/providers/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
 import { OfferCard } from "@/components/OfferCard";
-import { toggleFavorite } from "@/lib/queries";
+import { toggleFavorite, fetchFavorites } from "@/lib/queries";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/favoritos")({ component: FavoritesPage });
@@ -16,12 +15,7 @@ function FavoritesPage() {
 
   const load = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from("saved_offers")
-      .select("*, mined_offers(*)")
-      .eq("user_id", user.id)
-      .eq("is_favorite", true);
-    setRows(data ?? []);
+    setRows(await fetchFavorites(user.id));
   };
   useEffect(() => { load(); }, [user]);
 

@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Bookmark, Sparkles, Flame } from "lucide-react";
-import { fetchOffers } from "@/lib/queries";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchOffers, fetchSavedIds, fetchAnalyses } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
@@ -24,11 +23,9 @@ function Dashboard() {
     (async () => {
       const offers = await fetchOffers();
       const hot = offers.filter((o) => o.status === "quente").length;
-      const { count: analyses } = await supabase.from("ai_analyses").select("*", { count: "exact", head: true });
-      const { count: saved } = user
-        ? await supabase.from("saved_offers").select("*", { count: "exact", head: true }).eq("user_id", user.id)
-        : { count: 0 };
-      setStats({ mined: offers.length, saved: saved ?? 0, analyses: analyses ?? 0, hot });
+      const analyses = (await fetchAnalyses()).length;
+      const saved = user ? (await fetchSavedIds(user.id)).size : 0;
+      setStats({ mined: offers.length, saved, analyses, hot });
       setRecent(offers.filter((o) => o.status === "escalando" || o.status === "quente").slice(0, 5));
     })();
   }, [user]);
