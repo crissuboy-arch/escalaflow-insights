@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
+import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
@@ -36,6 +37,12 @@ const AuthenticatedOfertasSalvasRoute =
     path: '/ofertas-salvas',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOfertasEscaladasRoute =
+  AuthenticatedOfertasEscaladasRouteImport.update({
+    id: '/ofertas-escaladas',
+    path: '/ofertas-escaladas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   id: '/minerar',
   path: '/minerar',
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRoutesByTo {
@@ -59,6 +67,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRoutesById {
@@ -68,13 +77,26 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
+  '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard' | '/minerar' | '/ofertas-salvas'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/minerar'
+    | '/ofertas-escaladas'
+    | '/ofertas-salvas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/minerar' | '/ofertas-salvas'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/minerar'
+    | '/ofertas-escaladas'
+    | '/ofertas-salvas'
   id:
     | '__root__'
     | '/'
@@ -82,6 +104,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/dashboard'
     | '/_authenticated/minerar'
+    | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
   fileRoutesById: FileRoutesById
 }
@@ -121,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfertasSalvasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/ofertas-escaladas': {
+      id: '/_authenticated/ofertas-escaladas'
+      path: '/ofertas-escaladas'
+      fullPath: '/ofertas-escaladas'
+      preLoaderRoute: typeof AuthenticatedOfertasEscaladasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/minerar': {
       id: '/_authenticated/minerar'
       path: '/minerar'
@@ -141,12 +171,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
+  AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
+  AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
 }
 
