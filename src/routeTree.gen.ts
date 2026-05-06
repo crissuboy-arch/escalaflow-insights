@@ -16,6 +16,7 @@ import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
@@ -59,6 +60,12 @@ const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   path: '/minerar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedImportarAnuncioRoute =
+  AuthenticatedImportarAnuncioRouteImport.update({
+    id: '/importar-anuncio',
+    path: '/importar-anuncio',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
   id: '/favoritos',
   path: '/favoritos',
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -114,6 +122,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -130,6 +139,7 @@ export interface FileRoutesById {
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
+  '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/favoritos'
+    | '/importar-anuncio'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/favoritos'
+    | '/importar-anuncio'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -175,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
     | '/_authenticated/favoritos'
+    | '/_authenticated/importar-anuncio'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/importar-anuncio': {
+      id: '/_authenticated/importar-anuncio'
+      path: '/importar-anuncio'
+      fullPath: '/importar-anuncio'
+      preLoaderRoute: typeof AuthenticatedImportarAnuncioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/favoritos': {
       id: '/_authenticated/favoritos'
       path: '/favoritos'
@@ -291,6 +311,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
+  AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
@@ -303,6 +324,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
+  AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
@@ -322,12 +344,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
