@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
-import { startExtensionBridge, detectExtension, seedDemoAds } from "@/lib/mining/bridge";
+import { startExtensionBridge, detectExtension, seedDemoAds, insertTestAd } from "@/lib/mining/bridge";
 import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
 
@@ -64,6 +64,13 @@ function MiningCenterPage() {
       const n = await seedDemoAds(5);
       toast.info(`Extensão não detectada — ${n} anúncios demo inseridos`);
     }
+    await refresh();
+  };
+
+  const onInsertTest = async () => {
+    await insertTestAd();
+    await refresh();
+    toast.success("Anúncio minerado com sucesso");
   };
 
   const onToggleFav = async (a: MinedAd) => miningRepo.update(a.id, { favorite: !a.favorite });
@@ -95,6 +102,9 @@ function MiningCenterPage() {
           <ConnectionPill connected={extensionConnected} />
           <Button variant="outline" size="sm" onClick={refresh}>
             <RefreshCw className="mr-1 h-4 w-4" /> Atualizar
+          </Button>
+          <Button variant="outline" size="sm" onClick={onInsertTest}>
+            <Sparkles className="mr-1 h-4 w-4" /> Teste de Importação
           </Button>
           <Button onClick={onReceive} className="ai-glow text-white">
             <Sparkles className="mr-2 h-4 w-4" /> Receber da Extensão
@@ -171,6 +181,11 @@ function MiningCenterPage() {
                   ? "Nenhum anúncio recebido ainda. Clique em \"Receber da Extensão\" para começar."
                   : "Nenhum anúncio corresponde aos filtros."}
               </p>
+              {ads.length === 0 && (
+                <Button onClick={onInsertTest} className="mt-2">
+                  <Sparkles className="mr-2 h-4 w-4" /> Inserir anúncio teste
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
