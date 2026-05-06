@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/providers/AuthProvider";
 import { OfferCard } from "@/components/OfferCard";
-import { toggleFavorite, fetchFavorites } from "@/lib/queries";
+import { toggleFavorite, fetchFavorites, subscribeChange } from "@/lib/queries";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/favoritos")({ component: FavoritesPage });
@@ -17,7 +17,7 @@ function FavoritesPage() {
     if (!user) return;
     setRows(await fetchFavorites(user.id));
   };
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); const unsub = subscribeChange((s) => { if (s === "fav") load(); }); return unsub; }, [user]);
 
   const onUnfav = async (offerId: string) => {
     if (!user) return;

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search } from "lucide-react";
-import { fetchOffers, toggleSaveOffer } from "@/lib/queries";
+import { fetchOffers, toggleSaveOffer, subscribeChange } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { useAuth } from "@/providers/AuthProvider";
 import { fetchSavedIds } from "@/lib/queries";
@@ -38,6 +38,8 @@ function MinePage() {
   useEffect(() => {
     if (!user) return;
     fetchSavedIds(user.id).then(setSavedIds);
+    const unsub = subscribeChange((s) => { if (s === "saved") fetchSavedIds(user.id).then(setSavedIds); });
+    return unsub;
   }, [user]);
 
   const onSave = async (id: string) => {

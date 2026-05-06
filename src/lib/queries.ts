@@ -78,6 +78,20 @@ export const DEMO_ANALYSES: DemoAnalysis[] = DEMO_OFFERS.slice(0, 6).map((o) => 
 
 const SAVED_KEY = "escalaflow_saved";
 const FAV_KEY = "escalaflow_favs";
+const ANALYSES_KEY = "escalaflow_analyses";
+const EVT = "escalaflow:change";
+
+function emitChange(scope: "saved" | "fav" | "analyses") {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(EVT, { detail: scope }));
+}
+
+export function subscribeChange(cb: (scope: "saved" | "fav" | "analyses") => void) {
+  if (typeof window === "undefined") return () => {};
+  const h = (e: Event) => cb((e as CustomEvent).detail);
+  window.addEventListener(EVT, h);
+  return () => window.removeEventListener(EVT, h);
+}
 
 const readSet = (key: string): Set<string> => {
   try {
@@ -130,6 +144,7 @@ export async function toggleSaveOffer(_userId: string, offerId: string): Promise
   const isSaved = s.has(offerId);
   if (isSaved) s.delete(offerId); else s.add(offerId);
   writeSet(SAVED_KEY, s);
+  emitChange("saved");
   return !isSaved;
 }
 
@@ -137,10 +152,33 @@ export async function toggleFavorite(_userId: string, offerId: string, value: bo
   const f = readSet(FAV_KEY);
   if (value) f.add(offerId); else f.delete(offerId);
   writeSet(FAV_KEY, f);
+  emitChange("fav");
+}
+
+function readAnalysesStore(): DemoAnalysis[] {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(ANALYSES_KEY) : null;
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function writeAnalysesStore(list: DemoAnalysis[]) {
+  if (typeof window !== "undefined") localStorage.setItem(ANALYSES_KEY, JSON.stringify(list));
 }
 
 export async function fetchAnalyses(): Promise<DemoAnalysis[]> {
-  return DEMO_ANALYSES;
+  const stored = readAnalysesStore();
+  const seen = new Set(stored.map((a) => a.id));
+  return [...stored, ...DEMO_ANALYSES.filter((a) => !seen.has(a.id))];
+}
+
+export async function createAnalysisForOffer(offerId: string): Promise<DemoAnalysis> {
+  const analysis = getAnalysisForOffer(offerId);
+  const list = readAnalysesStore();
+  const filtered = list.filter((a) => a.id !== analysis.id);
+  filtered.unshift(analysis);
+  writeAnalysesStore(filtered);
+  emitChange("analyses");
+  return analysis;
 }
 
 export function getOfferById(id: string): DemoOffer | undefined {

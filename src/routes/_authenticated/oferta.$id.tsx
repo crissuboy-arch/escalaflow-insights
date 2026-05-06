@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getOfferById, getAnalysisForOffer, toggleSaveOffer, fetchSavedIds } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
@@ -13,7 +14,7 @@ import {
   Workflow, Download, Flame, Calendar, Globe, Tag, Megaphone,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/oferta/")({ component: OfferDetailPage });
+export const Route = createFileRoute("/_authenticated/oferta/$id")({ component: OfferDetailPage });
 
 function scaleLabel(score: number) {
   if (score <= 20) return { label: "Oferta fria", tone: "muted" };
@@ -82,7 +83,37 @@ function OfferDetailPage() {
     toast.success("Análise exportada");
   };
 
-  const soon = (label: string) => () => toast.info(`${label} — disponível em breve`);
+  const [modalOpen, setModalOpen] = useState<null | "product" | "funnel" | "variations">(null);
+
+  const productPlan = {
+    name: `${offer.advertiser_name} Method`,
+    price: "R$ 497",
+    format: "Curso digital + comunidade",
+    promise: analysis.promise,
+    modules: [
+      `Módulo 1 — Fundamentos de ${offer.niche}`,
+      "Módulo 2 — Aplicação prática do mecanismo",
+      "Módulo 3 — Escalando seus resultados",
+      "Módulo 4 — Automação e otimização",
+    ],
+    bonuses: ["Templates exclusivos", "Comunidade VIP", "Mentoria em grupo mensal"],
+    guarantee: "30 dias incondicional",
+  };
+
+  const funnel = [
+    { stage: "Tráfego", desc: `Anúncios em ${offer.platform} segmentando ${analysis.target_audience}` },
+    { stage: "Landing page", desc: `Headline: "${headline}" + VSL de 8 minutos` },
+    { stage: "Página de oferta", desc: `Apresentação do mecanismo único + bônus + garantia` },
+    { stage: "E-mail / Remarketing", desc: "Sequência de 5 e-mails + retargeting nos não-compradores" },
+    { stage: "Pós-venda", desc: "Onboarding + comunidade + upsell de mentoria" },
+  ];
+
+  const variations = [
+    { type: "Vídeo", headline: `Como ${offer.niche.toLowerCase()} mudou minha vida em 30 dias`, copy: `Eu tentei de tudo até descobrir o método da ${offer.advertiser_name}. Veja o resultado.` },
+    { type: "Carrossel", headline: `5 erros que travam seus resultados em ${offer.niche}`, copy: `Slide a slide você vai entender o que está faltando — e a solução validada.` },
+    { type: "Imagem", headline: `${offer.advertiser_name}: o método que está dominando ${offer.niche}`, copy: `Resultados reais em poucos dias. Comece agora.` },
+    { type: "Reel", headline: `Pare tudo se você quer ${analysis.desires[0].toLowerCase()}`, copy: `Em 15 segundos eu te mostro o atalho que ninguém te contou.` },
+  ];
 
   return (
     <motion.div
@@ -215,13 +246,13 @@ function OfferDetailPage() {
             {saved ? <BookmarkCheck className="mr-1 h-4 w-4" /> : <Bookmark className="mr-1 h-4 w-4" />}
             {saved ? "Salva" : "Salvar oferta"}
           </Button>
-          <Button onClick={soon("Gerar variações")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("variations")} variant="outline" className="flex-1 md:flex-none">
             <Sparkles className="mr-1 h-4 w-4" /> Variações
           </Button>
-          <Button onClick={soon("Modelar produto")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("product")} variant="outline" className="flex-1 md:flex-none">
             <Wand2 className="mr-1 h-4 w-4" /> Modelar
           </Button>
-          <Button onClick={soon("Criar funil")} variant="outline" className="flex-1 md:flex-none">
+          <Button onClick={() => setModalOpen("funnel")} variant="outline" className="flex-1 md:flex-none">
             <Workflow className="mr-1 h-4 w-4" /> Funil
           </Button>
           <Button onClick={onExport} variant="outline" className="flex-1 md:flex-none">
@@ -229,6 +260,73 @@ function OfferDetailPage() {
           </Button>
         </div>
       </div>
+
+      {/* Modal: Modelar produto */}
+      <Dialog open={modalOpen === "product"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Produto modelado</DialogTitle>
+            <DialogDescription>Proposta gerada a partir da análise IA</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="rounded-lg p-4 text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+              <div className="text-xs uppercase opacity-80">{productPlan.format}</div>
+              <div className="text-xl font-bold">{productPlan.name}</div>
+              <div className="mt-1 text-2xl font-extrabold">{productPlan.price}</div>
+            </div>
+            <div><div className="font-semibold">Promessa</div><p className="text-muted-foreground">{productPlan.promise}</p></div>
+            <div>
+              <div className="font-semibold">Módulos</div>
+              <ul className="mt-1 space-y-1 text-muted-foreground">{productPlan.modules.map((m) => <li key={m}>• {m}</li>)}</ul>
+            </div>
+            <div>
+              <div className="font-semibold">Bônus</div>
+              <ul className="mt-1 space-y-1 text-muted-foreground">{productPlan.bonuses.map((b) => <li key={b}>• {b}</li>)}</ul>
+            </div>
+            <div><div className="font-semibold">Garantia</div><p className="text-muted-foreground">{productPlan.guarantee}</p></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Funil */}
+      <Dialog open={modalOpen === "funnel"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Funil de marketing</DialogTitle>
+            <DialogDescription>Etapas geradas a partir da oferta</DialogDescription>
+          </DialogHeader>
+          <ol className="space-y-3">
+            {funnel.map((s, i) => (
+              <li key={s.stage} className="rounded-lg border border-border/60 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>{i + 1}</span>
+                  <div className="font-semibold">{s.stage}</div>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{s.desc}</p>
+              </li>
+            ))}
+          </ol>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Variações */}
+      <Dialog open={modalOpen === "variations"} onOpenChange={(o) => !o && setModalOpen(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Variações de criativo</DialogTitle>
+            <DialogDescription>4 variações geradas a partir da análise</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {variations.map((v, i) => (
+              <div key={i} className="rounded-lg border border-border/60 p-3">
+                <Badge variant="secondary" className="mb-2">{v.type}</Badge>
+                <div className="text-sm font-semibold">{v.headline}</div>
+                <p className="mt-1 text-xs text-muted-foreground">{v.copy}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

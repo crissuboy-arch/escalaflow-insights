@@ -19,7 +19,7 @@ import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
-import { Route as AuthenticatedOfertaRouteImport } from './routes/_authenticated/oferta.'
+import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -73,9 +73,9 @@ const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
   path: '/analise-ia',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedOfertaRoute = AuthenticatedOfertaRouteImport.update({
-  id: '/oferta/',
-  path: '/oferta/',
+const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
+  id: '/oferta/$id',
+  path: '/oferta/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
@@ -89,7 +89,7 @@ export interface FileRoutesByFullPath {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
-  '/oferta/': typeof AuthenticatedOfertaRoute
+  '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,7 +101,7 @@ export interface FileRoutesByTo {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
-  '/oferta': typeof AuthenticatedOfertaRoute
+  '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,7 +115,7 @@ export interface FileRoutesById {
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
-  '/_authenticated/oferta/': typeof AuthenticatedOfertaRoute
+  '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,7 +129,7 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
-    | '/oferta/'
+    | '/oferta/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -141,7 +141,7 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
-    | '/oferta'
+    | '/oferta/$id'
   id:
     | '__root__'
     | '/'
@@ -154,7 +154,7 @@ export interface FileRouteTypes {
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
-    | '/_authenticated/oferta/'
+    | '/_authenticated/oferta/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -235,11 +235,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/oferta/': {
-      id: '/_authenticated/oferta/'
-      path: '/oferta'
-      fullPath: '/oferta/'
-      preLoaderRoute: typeof AuthenticatedOfertaRouteImport
+    '/_authenticated/oferta/$id': {
+      id: '/_authenticated/oferta/$id'
+      path: '/oferta/$id'
+      fullPath: '/oferta/$id'
+      preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
   }
@@ -253,7 +253,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
-  AuthenticatedOfertaRoute: typeof AuthenticatedOfertaRoute
+  AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -264,7 +264,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
-  AuthenticatedOfertaRoute: AuthenticatedOfertaRoute,
+  AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

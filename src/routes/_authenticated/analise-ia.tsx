@@ -1,26 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { fetchAnalyses } from "@/lib/queries";
+import { fetchAnalyses, subscribeChange } from "@/lib/queries";
 import { Sparkles, Target, Heart, Lightbulb, Users, Brain, Layers, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 
-export const Route = createFileRoute("/_authenticated/analise-ia")({ component: AIPage });
+export const Route = createFileRoute("/_authenticated/analise-ia")({
+  component: AIPage,
+  validateSearch: (s: Record<string, unknown>) => ({ offer: typeof s.offer === "string" ? s.offer : undefined }),
+});
 
 function AIPage() {
   const { t } = useTranslation();
+  const search = useSearch({ from: "/_authenticated/analise-ia" }) as { offer?: string };
   const [items, setItems] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const list = await fetchAnalyses();
-      setItems(list);
-      setSelected(list[0] ?? null);
-    })();
-  }, []);
+  const load = async () => {
+    const list = await fetchAnalyses();
+    setItems(list);
+    const target = search.offer ? list.find((a) => a.id === `analysis-${search.offer}`) : null;
+    setSelected(target ?? list[0] ?? null);
+  };
+  useEffect(() => { load(); const unsub = subscribeChange((s) => { if (s === "analyses") load(); }); return unsub; }, [search.offer]);
 
   return (
     <div className="space-y-6">

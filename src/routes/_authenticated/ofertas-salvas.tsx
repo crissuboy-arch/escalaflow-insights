@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/providers/AuthProvider";
-import { fetchSaved, toggleSaveOffer } from "@/lib/queries";
+import { fetchSaved, toggleSaveOffer, subscribeChange } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ function SavedPage() {
   const [rows, setRows] = useState<any[]>([]);
 
   const load = async () => { if (user) setRows(await fetchSaved(user.id)); };
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); const unsub = subscribeChange((s) => { if (s === "saved") load(); }); return unsub; }, [user]);
 
   const onRemove = async (offerId: string) => {
     if (!user) return;
