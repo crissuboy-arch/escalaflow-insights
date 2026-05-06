@@ -1,65 +1,75 @@
-# Plano: Mineração Inteligente Premium
+# Plano: Refinamento Premium EscalaFlow
 
-Melhorias na página `/minerar` e componentes relacionados, mantendo tudo local (sem backend).
+Tudo mock/local, sem backend.
 
-## 1. Favoritos com estrela no card
+## 1. Página Favoritos como biblioteca premium (`src/routes/_authenticated/favoritos.tsx`)
 
-- Em `src/components/OfferCard.tsx`: adicionar botão de estrela ao lado do bookmark.
-- Estado de favorito persistido em `localStorage` (já existe `toggleFavorite` / `FAV_KEY` em `queries.ts`).
-- Animação `framer-motion` (scale + glow) ao favoritar.
-- Carregar `favIds` na página Minerar e propagar via prop `favorited` para `OfferCard`.
-- Atualizar contador de favoritos no `AppSidebar` lendo `escalaflow_favs` + `subscribeChange("fav")`.
+- Cabeçalho com contador de itens e ícone Heart em destaque.
+- Grid responsivo: 1 col mobile, 2 col md, 3 col lg (cards maiores que o padrão de Minerar).
+- Novo `<FavoriteCard />` inline com:
+  - imagem maior (aspect 16/10), overlay gradiente
+  - estrela amarela grande no canto com glow constante
+  - badges modernos (rounded-full, ícones)
+  - score grande sobre a imagem
+  - hover: glow + lift via `card-glow` e `framer-motion`
+  - botão "Analisar" com gradient + botão para remover favorito
+- Empty state visual com ícone, mensagem e CTA "Minerar ofertas".
 
-## 2. Slider de mineração premium
+## 2. Botão "Minerar com IA" mais premium (`src/routes/_authenticated/minerar.tsx`)
 
-- Aumentar `max` de 20 → 100 em `minerar.tsx`.
-- Estilizar trilho do slider com gradiente e glow (CSS custom em `styles.css`, classe `.slider-glow`).
-- Mostrar em tempo real: `"{offers.length} anúncios encontrados"` (atualizado conforme resultados).
-- Label do slider com valor destacado em cor primária.
+- Wrap do botão com camada de glow pulsante (div absolute blur).
+- Ícone Wand2 com pequena rotação no hover (motion).
+- Pequena partícula/sparkle animado ao lado do texto.
+- Loading dentro do dialog: substituir spinner por animação de "scan" — barra horizontal cruzando + 3 dots digitando "Analisando padrões…".
 
-## 3. Chips de filtros rápidos
+## 3. Tendências detectadas pela IA enriquecidas
 
-- Novo array de tags: Infoproduto, Produto físico, Emagrecimento, Beleza, Marketing, IA, Saúde, Finanças, Dropshipping, SaaS, Relacionamento, Nutra.
-- Renderizar como `Badge` clicáveis acima do grid de resultados.
-- Ao clicar: preenche `keyword` (e `niche` quando bater com nicho existente) e dispara `load()` automaticamente.
-- Chip ativo com estilo destacado (gradient + ring).
+Atualizar mock no array `TRENDS` em minerar.tsx para cada item conter: emoji, título, subtítulo, **score**, **growth %**, **time**, **country**, **trendDirection** (up/down/stable). Renderizar:
+- linha do topo: emoji + título + badge de país
+- linha meio: barra de score mini + % crescimento (verde com seta)
+- rodapé: "há 2h" + indicador visual de tendência (sparkline minimalista CSS ou ícone TrendingUp animado)
 
-## 4. Botão "Minerar com IA"
+## 4. Página individual da oferta — header premium (`src/routes/_authenticated/oferta.$id.tsx`)
 
-- Botão secundário ao lado de "Minerar" com ícone `Sparkles` e gradiente glow.
-- Ao clicar: abre `Dialog` (shadcn) com loading animado (1.2s) e depois exibe blocos mock:
-  - Nichos aquecendo (lista com badges)
-  - Ofertas emergentes (mini-cards de 3 ofertas demo)
-  - Criativos escalando (lista)
-  - Países em tendência (badges com bandeira/sigla)
-  - Scores altos detectados (top 3 ofertas por `scale_score`)
-- Dados gerados a partir de `DEMO_OFFERS` em helper `getAITrends()` adicionado em `queries.ts`.
+Nova grade de métricas abaixo do banner (4 cards):
+- **Score gigante**: círculo SVG com progresso animado, valor central enorme, label de status.
+- **Anúncios ativos**: número derivado mock (ex.: `score * 1.7`), com ícone Megaphone.
+- **Países detectados**: chips de bandeiras (3-5 países mock).
+- **Tempo estimado de escala**: ex. "12 dias", ícone Clock.
+- **Tendência de crescimento**: % + seta + sparkline mock.
+- **Status premium**: badge gradiente "🔥 Hot", "🚀 Escalando" etc.
 
-## 5. Seção "Tendências detectadas pela IA"
+## 5. Mapa Estratégico da Oferta
 
-- Card permanente acima do grid de ofertas em `minerar.tsx`.
-- 4 itens com ícone 🔥 e texto rotativo (mock estático por enquanto):
-  - Produto crescendo na Espanha
-  - Oferta escalando em saúde
-  - Criativo repetido detectado
-  - Novo padrão de VSL identificado
-- Layout: grid 2x2 em desktop, stack no mobile, com hover glow.
+Novo card `MapaEstrategico` na página da oferta. Layout em grid 2x4 (responsivo) com 8 blocos visuais conectados:
+- Mecanismo, Promessa, Dores, Desejos, Avatar, CTA, Tipo de criativo, Tipo de funil.
+- Cada bloco: ícone colorido + título + texto curto da `analysis`.
+- Estilo "mapa": fundo gradient sutil, bordas glow, micro animação de fade-in com stagger.
 
-## 6. Visual premium
+## 6. Score de Oportunidade
 
-- Adicionar tokens em `src/styles.css`: `--shadow-glow`, `--gradient-ai`, classe `.card-glow` (hover com box-shadow colorido).
-- Loading elegante: skeleton shimmer durante `loading` em vez de grid vazio.
-- Micro animações com `framer-motion` (stagger no grid, fade-in nos chips/trends).
-- Badges modernos (rounded-full, gradient border nos ativos).
+Novo card `ScoreOportunidade` na página da oferta. 5 métricas com barras horizontais animadas:
+- Fácil de copiar (0-100)
+- Concorrência (0-100, invertido visualmente — vermelho alto = ruim)
+- Potencial viral
+- Saturação (invertido)
+- Ticket provável (R$ XX-XXX, mostrado como faixa)
 
-## 7-9. Sem backend
+Valores derivados deterministicamente do `offer.id`/`scale_score` para serem consistentes. Cada barra com cor semântica (verde/amarelo/vermelho) e ícone.
 
-Tudo via `localStorage` e `DEMO_OFFERS`. Nenhuma chamada de API real.
+## 7. Refinamento visual geral
+
+- Adicionar utilitário `.glass` em `src/styles.css` (backdrop-blur + border sutil) para uso em headers de cards premium.
+- Reduzir uso de `Badge variant="secondary"` em favor de chips com ícones.
+- Garantir contraste em dark/light verificando os novos componentes.
+- Stagger animations consistentes (delay 0.05s entre filhos).
 
 ## Arquivos afetados
 
-- `src/components/OfferCard.tsx` — botão estrela + animação + prop `favorited`
-- `src/routes/_authenticated/minerar.tsx` — chips, IA dialog, trends section, contador, slider 100, skeleton
-- `src/components/AppSidebar.tsx` — contador de favoritos
-- `src/lib/queries.ts` — helper `getAITrends()`, `fetchFavIds()`
-- `src/styles.css` — tokens de glow e gradiente IA
+- `src/styles.css` — utilitário `.glass`, animação pulse para botão IA, sparkline base.
+- `src/lib/queries.ts` — enriquecer `getAITrends`/novo helper `getOfferMetrics(id)` retornando ads ativos, países, tempo escala, growth, opportunity scores.
+- `src/routes/_authenticated/minerar.tsx` — botão IA premium, trends enriquecidas, loading scan.
+- `src/routes/_authenticated/favoritos.tsx` — biblioteca premium com `FavoriteCard` inline.
+- `src/routes/_authenticated/oferta.$id.tsx` — métricas no header, Mapa Estratégico, Score de Oportunidade.
+
+Sem novas dependências.

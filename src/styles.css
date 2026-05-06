@@ -182,4 +182,40 @@
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
+  .glass {
+    backdrop-filter: blur(12px);
+    background: oklch(1 0 0 / 0.04);
+    border: 1px solid oklch(1 0 0 / 0.08);
+  }
+  .ai-pulse {
+    position: relative;
+  }
+  .ai-pulse::before {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, oklch(0.65 0.24 290), oklch(0.74 0.15 210), oklch(0.65 0.2 330));
+    background-size: 200% 200%;
+    filter: blur(14px);
+    opacity: 0.55;
+    z-index: -1;
+    animation: ai-shimmer 4s ease infinite, ai-pulse-anim 2.4s ease-in-out infinite;
+  }
+  @keyframes ai-pulse-anim {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.75; }
+  }
+  .scan-line {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, oklch(0.74 0.15 210 / 0.6), transparent);
+    background-size: 30% 100%;
+    background-repeat: no-repeat;
+    animation: scan 1.4s linear infinite;
+  }
+  @keyframes scan {
+    0% { background-position: -30% 0; }
+    100% { background-position: 130% 0; }
+  }
 }
