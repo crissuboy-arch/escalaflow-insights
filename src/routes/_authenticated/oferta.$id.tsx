@@ -412,13 +412,32 @@ function OfferDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <TooltipProvider delayDuration={150}>
           {metrics.opportunity.map((m, i) => {
             const color = m.tone === "good" ? "bg-emerald-500" : m.tone === "warn" ? "bg-amber-500" : "bg-red-500";
             const text = m.tone === "good" ? "text-emerald-500" : m.tone === "warn" ? "text-amber-500" : "text-red-500";
+            const descriptions: Record<string, string> = {
+              "Fácil de copiar": "Quão simples é replicar essa oferta — produto, criativos e funil. Quanto maior, mais rápido você consegue lançar uma versão própria.",
+              "Concorrência": "Quantos players já estão competindo nesse nicho. Valores baixos = oceano azul; valores altos = mercado disputado.",
+              "Potencial viral": "Probabilidade do criativo gerar compartilhamentos orgânicos e escala rápida nas plataformas.",
+              "Saturação": "Quanto o público-alvo já foi exposto a essa oferta. Saturação alta indica fadiga e queda de conversão.",
+            };
             return (
               <div key={m.label}>
                 <div className="mb-1.5 flex items-center justify-between text-sm">
-                  <span className="font-medium">{m.label}</span>
+                  <span className="flex items-center gap-1.5 font-medium">
+                    {m.label}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Mais info">
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        {descriptions[m.label]}
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
                   <span className={`font-bold ${text}`}>{m.value}/100</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -432,9 +451,24 @@ function OfferDetailPage() {
               </div>
             );
           })}
+          </TooltipProvider>
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Ticket provável</span>
+              <TooltipProvider delayDuration={150}>
+                <span className="flex items-center gap-1.5 text-sm font-medium">
+                  Ticket provável
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Mais info">
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                      Faixa de preço estimada para esse tipo de produto, baseada no nicho e estrutura observada nos criativos.
+                    </TooltipContent>
+                  </Tooltip>
+                </span>
+              </TooltipProvider>
               <span className="text-lg font-extrabold text-primary">{metrics.ticketRange}</span>
             </div>
           </div>
