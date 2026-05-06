@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +29,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
+  id: '/minerar',
+  path: '/minerar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -38,11 +44,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/minerar': typeof AuthenticatedMinerarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/minerar': typeof AuthenticatedMinerarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -50,18 +58,20 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard'
+  fullPaths: '/' | '/login' | '/dashboard' | '/minerar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard'
+  to: '/' | '/login' | '/dashboard' | '/minerar'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/minerar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -93,6 +103,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/minerar': {
+      id: '/_authenticated/minerar'
+      path: '/minerar'
+      fullPath: '/minerar'
+      preLoaderRoute: typeof AuthenticatedMinerarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -105,10 +122,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
