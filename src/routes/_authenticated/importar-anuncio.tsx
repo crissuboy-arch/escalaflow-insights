@@ -31,9 +31,10 @@ function ImportAdPage() {
     ranRef.current = true;
 
     (async () => {
+      console.log("[importar-anuncio] search params:", search);
       if (!search.headline) {
         toast.error("Parâmetros inválidos: headline é obrigatório");
-        navigate({ to: "/central-mineracao" });
+        navigate({ to: "/central-mineracao", replace: true });
         return;
       }
       const payload: MiningIngestPayload = {
@@ -49,13 +50,19 @@ function ImportAdPage() {
         creativeUrl: search.creativeUrl,
         raw: { via: "url-import" },
       };
+      console.log("[importar-anuncio] ingest payload:", payload);
       try {
-        await miningRepo.ingest(payload, "extension");
+        const ad = await miningRepo.ingest(payload, "extension");
+        console.log("[importar-anuncio] saved ad:", ad);
+        const all = await miningRepo.list();
+        console.log("[importar-anuncio] repo size after ingest:", all.length);
         toast.success("Oferta importada com sucesso");
       } catch (e) {
+        console.error("[importar-anuncio] ingest failed:", e);
         toast.error("Falha ao importar oferta");
       }
-      navigate({ to: "/central-mineracao" });
+      // Pequeno delay para o localStorage event propagar antes de navegar
+      setTimeout(() => navigate({ to: "/central-mineracao", replace: true }), 60);
     })();
   }, [search, navigate]);
 
