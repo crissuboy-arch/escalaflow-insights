@@ -268,12 +268,23 @@ function MinePage() {
           </DialogHeader>
           <AnimatePresence mode="wait">
             {aiLoading || !trends ? (
-              <motion.div key="l" exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-16">
-                <div className="relative">
-                  <div className="ai-glow h-16 w-16 rounded-full opacity-40 blur-xl" />
-                  <Loader2 className="absolute inset-0 m-auto h-10 w-10 animate-spin text-primary" />
+              <motion.div key="l" exit={{ opacity: 0 }} className="flex flex-col items-center justify-center gap-5 py-14">
+                <div className="relative h-20 w-20">
+                  <div className="ai-glow absolute inset-0 rounded-full opacity-50 blur-xl" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-2 border-dashed border-primary/40"
+                  />
+                  <Wand2 className="absolute inset-0 m-auto h-8 w-8 text-primary" />
                 </div>
-                <p className="mt-4 text-sm text-muted-foreground">A IA está varrendo milhares de anúncios...</p>
+                <div className="relative h-1.5 w-64 overflow-hidden rounded-full bg-muted">
+                  <div className="scan-line" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold">Analisando padrões<motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.4 }}>…</motion.span></p>
+                  <p className="mt-1 text-xs text-muted-foreground">A IA está varrendo milhares de anúncios em tempo real</p>
+                </div>
               </motion.div>
             ) : (
               <motion.div key="r" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 py-2">
