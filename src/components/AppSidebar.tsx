@@ -1,20 +1,27 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
+import { useEffect, useState } from "react";
 import { LayoutDashboard, Search, Bookmark, TrendingUp, Sparkles, Heart, Settings } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader } from "@/components/ui/sidebar";
+import { getFavCount, subscribeChange } from "@/lib/queries";
 
 export function AppSidebar() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const [favCount, setFavCount] = useState(0);
+  useEffect(() => {
+    setFavCount(getFavCount());
+    return subscribeChange((s) => { if (s === "fav") setFavCount(getFavCount()); });
+  }, []);
   const items = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark },
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
-    { to: "/favoritos", label: t("nav.favorites"), icon: Heart },
+    { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
-  ];
+  ] as { to: string; label: string; icon: typeof LayoutDashboard; badge?: number }[];
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
@@ -33,7 +40,12 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild isActive={path === it.to}>
                     <Link to={it.to} className="flex items-center gap-3">
                       <it.icon className="h-4 w-4" />
-                      <span>{it.label}</span>
+                      <span className="flex-1">{it.label}</span>
+                      {it.badge ? (
+                        <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden">
+                          {it.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
