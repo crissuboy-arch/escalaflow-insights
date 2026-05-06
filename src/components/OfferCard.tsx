@@ -33,7 +33,7 @@ export function OfferCard({ offer, saved, onToggleSave }: { offer: Offer; saved?
           </div>
           <div className="flex gap-2 pt-1">
             <Button asChild size="sm" variant="default" className="flex-1">
-              <Link to="/analise-ia" search={{ offer: offer.id } as never}>
+              <Link to="/oferta/$id" params={{ id: offer.id }}>
                 <Sparkles className="mr-1 h-3.5 w-3.5" /> {t("mine.analyze")}
               </Link>
             </Button>
