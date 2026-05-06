@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getOfferById, getAnalysisForOffer, toggleSaveOffer, fetchSavedIds } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
@@ -82,7 +83,37 @@ function OfferDetailPage() {
     toast.success("Análise exportada");
   };
 
-  const soon = (label: string) => () => toast.info(`${label} — disponível em breve`);
+  const [modalOpen, setModalOpen] = useState<null | "product" | "funnel" | "variations">(null);
+
+  const productPlan = {
+    name: `${offer.advertiser_name} Method`,
+    price: "R$ 497",
+    format: "Curso digital + comunidade",
+    promise: analysis.promise,
+    modules: [
+      `Módulo 1 — Fundamentos de ${offer.niche}`,
+      "Módulo 2 — Aplicação prática do mecanismo",
+      "Módulo 3 — Escalando seus resultados",
+      "Módulo 4 — Automação e otimização",
+    ],
+    bonuses: ["Templates exclusivos", "Comunidade VIP", "Mentoria em grupo mensal"],
+    guarantee: "30 dias incondicional",
+  };
+
+  const funnel = [
+    { stage: "Tráfego", desc: `Anúncios em ${offer.platform} segmentando ${analysis.target_audience}` },
+    { stage: "Landing page", desc: `Headline: "${headline}" + VSL de 8 minutos` },
+    { stage: "Página de oferta", desc: `Apresentação do mecanismo único + bônus + garantia` },
+    { stage: "E-mail / Remarketing", desc: "Sequência de 5 e-mails + retargeting nos não-compradores" },
+    { stage: "Pós-venda", desc: "Onboarding + comunidade + upsell de mentoria" },
+  ];
+
+  const variations = [
+    { type: "Vídeo", headline: `Como ${offer.niche.toLowerCase()} mudou minha vida em 30 dias`, copy: `Eu tentei de tudo até descobrir o método da ${offer.advertiser_name}. Veja o resultado.` },
+    { type: "Carrossel", headline: `5 erros que travam seus resultados em ${offer.niche}`, copy: `Slide a slide você vai entender o que está faltando — e a solução validada.` },
+    { type: "Imagem", headline: `${offer.advertiser_name}: o método que está dominando ${offer.niche}`, copy: `Resultados reais em poucos dias. Comece agora.` },
+    { type: "Reel", headline: `Pare tudo se você quer ${analysis.desires[0].toLowerCase()}`, copy: `Em 15 segundos eu te mostro o atalho que ninguém te contou.` },
+  ];
 
   return (
     <motion.div
