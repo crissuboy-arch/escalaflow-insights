@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/StatusBadge";
-import { getOfferById, getAnalysisForOffer, toggleSaveOffer, fetchSavedIds } from "@/lib/queries";
+import { getOfferById, getAnalysisForOffer, toggleSaveOffer, fetchSavedIds, getOfferMetrics } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
 import {
   ArrowLeft, Bookmark, BookmarkCheck, Sparkles, Wand2, Layers,
   Workflow, Download, Flame, Calendar, Globe, Tag, Megaphone,
+  Clock, TrendingUp, Map, Target, Users, Lightbulb, Heart, MousePointerClick, Film, GitBranch,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/oferta/$id")({ component: OfferDetailPage });
@@ -63,6 +64,7 @@ function OfferDetailPage() {
   const copy = `Descubra como milhares de pessoas estão transformando seus resultados em ${offer.niche.toLowerCase()} usando o sistema validado da ${offer.advertiser_name}. Resultados reais, método simples, sem complicações.`;
   const cta = "QUERO COMEÇAR AGORA";
   const lvl = scaleLabel(offer.scale_score);
+  const metrics = getOfferMetrics(id, offer.scale_score);
 
   const onSave = async () => {
     if (!user) return;
