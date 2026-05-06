@@ -176,6 +176,172 @@ function OfferDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Metrics premium header */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Score gigante */}
+        <Card className="card-glow border-border/60 bg-gradient-to-br from-card to-primary/10">
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="relative h-20 w-20 shrink-0">
+              <svg viewBox="0 0 36 36" className="h-full w-full -rotate-90">
+                <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted" />
+                <motion.circle
+                  cx="18" cy="18" r="15.5" fill="none" stroke="url(#g1)" strokeWidth="3" strokeLinecap="round"
+                  initial={{ strokeDasharray: "0 100" }}
+                  animate={{ strokeDasharray: `${offer.scale_score} 100` }}
+                  transition={{ duration: 1.4, ease: "easeOut" }}
+                  pathLength={100}
+                />
+                <defs>
+                  <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="oklch(0.65 0.24 290)" />
+                    <stop offset="100%" stopColor="oklch(0.74 0.15 210)" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-extrabold leading-none">{offer.scale_score}</span>
+                <span className="text-[9px] uppercase text-muted-foreground">score</span>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs uppercase text-muted-foreground">Status</div>
+              <div className="text-lg font-bold">{metrics.status.emoji} {metrics.status.label}</div>
+              <div className="text-xs text-primary">{lvl.label}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Anúncios ativos */}
+        <Card className="card-glow border-border/60">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+              <Megaphone className="h-3.5 w-3.5" /> Anúncios ativos
+            </div>
+            <div className="mt-2 text-3xl font-extrabold">{metrics.activeAds}</div>
+            <div className="mt-1 flex items-center gap-1 text-xs text-emerald-500">
+              <TrendingUp className="h-3 w-3" /> +{metrics.growth}% nos últimos 7d
+            </div>
+            <div className="mt-3 flex h-8 items-end gap-0.5">
+              {metrics.spark.map((v, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${v}%` }}
+                  transition={{ delay: i * 0.04, duration: 0.4 }}
+                  className="flex-1 rounded-sm"
+                  style={{ background: "var(--gradient-primary)", opacity: 0.6 + (i / 24) }}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Países detectados */}
+        <Card className="card-glow border-border/60">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+              <Globe className="h-3.5 w-3.5" /> Países detectados
+            </div>
+            <div className="mt-2 text-3xl font-extrabold">{metrics.countries.length}</div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {metrics.countries.map((c) => (
+                <Badge key={c} variant="outline" className="rounded-full border-primary/30 bg-primary/5 text-primary">{c}</Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tempo estimado */}
+        <Card className="card-glow border-border/60">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" /> Escalando há
+            </div>
+            <div className="mt-2 text-3xl font-extrabold">{metrics.estimatedDays} <span className="text-base font-medium text-muted-foreground">dias</span></div>
+            <div className="mt-3">
+              <div className="text-xs text-muted-foreground">Ticket provável</div>
+              <div className="text-sm font-bold text-primary">{metrics.ticketRange}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Mapa Estratégico */}
+      <Card className="border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Map className="h-4 w-4 text-primary" /> Mapa Estratégico da Oferta
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <motion.div
+            className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+            initial="h" animate="s"
+            variants={{ h: {}, s: { transition: { staggerChildren: 0.06 } } }}
+          >
+            {[
+              { icon: Lightbulb, title: "Mecanismo", text: analysis.mechanism, color: "text-amber-500" },
+              { icon: Target, title: "Promessa", text: analysis.promise, color: "text-emerald-500" },
+              { icon: Flame, title: "Dores", text: analysis.pains.slice(0, 3).join(" · "), color: "text-red-500" },
+              { icon: Heart, title: "Desejos", text: analysis.desires.slice(0, 3).join(" · "), color: "text-pink-500" },
+              { icon: Users, title: "Avatar", text: analysis.target_audience, color: "text-sky-500" },
+              { icon: MousePointerClick, title: "CTA", text: cta, color: "text-primary" },
+              { icon: Film, title: "Tipo de criativo", text: format, color: "text-purple-500" },
+              { icon: GitBranch, title: "Tipo de funil", text: "VSL → Oferta → Upsell + Remarketing", color: "text-cyan-500" },
+            ].map((b) => (
+              <motion.div
+                key={b.title}
+                variants={{ h: { opacity: 0, y: 10 }, s: { opacity: 1, y: 0 } }}
+                className="card-glow rounded-xl border border-border/60 bg-background/60 p-4"
+              >
+                <div className={`mb-2 flex items-center gap-2 ${b.color}`}>
+                  <b.icon className="h-4 w-4" />
+                  <span className="text-xs font-bold uppercase tracking-wide">{b.title}</span>
+                </div>
+                <p className="text-sm leading-snug text-foreground/90 line-clamp-3">{b.text}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </CardContent>
+      </Card>
+
+      {/* Score de Oportunidade */}
+      <Card className="border-border/60">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Target className="h-4 w-4 text-primary" /> Score de Oportunidade
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {metrics.opportunity.map((m, i) => {
+            const color = m.tone === "good" ? "bg-emerald-500" : m.tone === "warn" ? "bg-amber-500" : "bg-red-500";
+            const text = m.tone === "good" ? "text-emerald-500" : m.tone === "warn" ? "text-amber-500" : "text-red-500";
+            return (
+              <div key={m.label}>
+                <div className="mb-1.5 flex items-center justify-between text-sm">
+                  <span className="font-medium">{m.label}</span>
+                  <span className={`font-bold ${text}`}>{m.value}/100</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${m.value}%` }}
+                    transition={{ duration: 1, delay: i * 0.1, ease: "easeOut" }}
+                    className={`h-full rounded-full ${color}`}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Ticket provável</span>
+              <span className="text-lg font-extrabold text-primary">{metrics.ticketRange}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Creative */}
       <Card className="border-border/60">
         <CardHeader><CardTitle>Criativo</CardTitle></CardHeader>
