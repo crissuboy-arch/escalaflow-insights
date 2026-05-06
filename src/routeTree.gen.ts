@@ -12,12 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 
@@ -33,6 +35,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedOfertasSalvasRoute =
@@ -68,6 +75,12 @@ const AuthenticatedConfiguracoesRoute =
     path: '/configuracoes',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedCentralMineracaoRoute =
+  AuthenticatedCentralMineracaoRouteImport.update({
+    id: '/central-mineracao',
+    path: '/central-mineracao',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
   id: '/analise-ia',
   path: '/analise-ia',
@@ -83,24 +96,28 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRoutesById {
@@ -109,12 +126,14 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/analise-ia': typeof AuthenticatedAnaliseIaRoute
+  '/_authenticated/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
 }
 export interface FileRouteTypes {
@@ -123,24 +142,28 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/analise-ia'
+    | '/central-mineracao'
     | '/configuracoes'
     | '/dashboard'
     | '/favoritos'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/api/ingest'
     | '/oferta/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/analise-ia'
+    | '/central-mineracao'
     | '/configuracoes'
     | '/dashboard'
     | '/favoritos'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/api/ingest'
     | '/oferta/$id'
   id:
     | '__root__'
@@ -148,12 +171,14 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/analise-ia'
+    | '/_authenticated/central-mineracao'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
     | '/_authenticated/favoritos'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
+    | '/api/ingest'
     | '/_authenticated/oferta/$id'
   fileRoutesById: FileRoutesById
 }
@@ -161,6 +186,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiIngestRoute: typeof ApiIngestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/ofertas-salvas': {
@@ -228,6 +261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/central-mineracao': {
+      id: '/_authenticated/central-mineracao'
+      path: '/central-mineracao'
+      fullPath: '/central-mineracao'
+      preLoaderRoute: typeof AuthenticatedCentralMineracaoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/analise-ia': {
       id: '/_authenticated/analise-ia'
       path: '/analise-ia'
@@ -247,6 +287,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
+  AuthenticatedCentralMineracaoRoute: typeof AuthenticatedCentralMineracaoRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
@@ -258,6 +299,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnaliseIaRoute: AuthenticatedAnaliseIaRoute,
+  AuthenticatedCentralMineracaoRoute: AuthenticatedCentralMineracaoRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
@@ -275,7 +317,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiIngestRoute: ApiIngestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
