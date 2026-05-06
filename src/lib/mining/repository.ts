@@ -112,7 +112,14 @@ export const miningRepo: MiningRepository = {
   subscribe(cb) {
     if (typeof window === "undefined") return () => {};
     const h = () => cb();
+    const sh = (e: StorageEvent) => { if (e.key === STORAGE_KEY) cb(); };
     window.addEventListener(EVT, h);
-    return () => window.removeEventListener(EVT, h);
+    window.addEventListener("escalaFlow:mining:change", h);
+    window.addEventListener("storage", sh);
+    return () => {
+      window.removeEventListener(EVT, h);
+      window.removeEventListener("escalaFlow:mining:change", h);
+      window.removeEventListener("storage", sh);
+    };
   },
 };
