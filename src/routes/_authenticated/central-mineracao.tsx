@@ -42,10 +42,7 @@ import {
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
-import {
-  startExtensionBridge,
-  detectExtension,
-} from "@/lib/mining/bridge";
+import { startExtensionBridge, detectExtension } from "@/lib/mining/bridge";
 import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
