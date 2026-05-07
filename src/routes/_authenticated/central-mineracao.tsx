@@ -39,6 +39,7 @@ import {
   Rocket,
   Bot,
   BookmarkCheck,
+  Puzzle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
@@ -235,18 +236,64 @@ function MiningCenterPage() {
     miningRepo.update(a.id, { status: a.status === "reviewed" ? "new" : "reviewed" });
   const onDelete = async (a: MinedAd) => miningRepo.remove(a.id);
   const onScale = async (a: MinedAd) => {
+    console.log("enviando para escala", a.id);
     const persisted = { ...toPersisted(a), scaled: true };
     await scaleCollectedAd(persisted);
     await miningRepo.update(a.id, { scaled: true, status: "reviewed" });
     setScaledIds((s) => new Set(s).add(persisted.key));
-    toast.success("Enviado para Escalada");
+    toast.success("Oferta enviada para escala");
+  };
+  const resolveAdUrl = (a: MinedAd): string | null => {
+    const raw = (a.raw ?? {}) as Record<string, unknown>;
+    const cands = [
+      a.adUrl,
+      (a as unknown as { libraryUrl?: string }).libraryUrl,
+      typeof raw.ad_snapshot_url === "string" ? (raw.ad_snapshot_url as string) : null,
+      typeof raw.url === "string" ? (raw.url as string) : null,
+      a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null,
+    ];
+    return cands.find((u) => typeof u === "string" && /^https?:\/\//i.test(u as string)) as
+      | string
+      | null
+      | undefined ?? null;
+  };
+  const onOpenAd = (a: MinedAd) => {
+    const url = resolveAdUrl(a);
+    console.log("abrindo anúncio", url);
+    openExternal(url);
+  };
+  const onOpenExtension = (a: MinedAd) => {
+    const raw = (a.raw ?? {}) as Record<string, unknown>;
+    const url =
+      (a as unknown as { extensionUrl?: string }).extensionUrl ??
+      (typeof raw.extension_url === "string" ? (raw.extension_url as string) : null) ??
+      (typeof raw.extensionUrl === "string" ? (raw.extensionUrl as string) : null);
+    console.log("abrindo extensão", url);
+    if (url && /^https?:\/\//i.test(url)) {
+      openExternal(url);
+    } else {
+      toast.message("Extensão não disponível");
+    }
   };
   const onOpenChatGPT = (a: MinedAd) => {
-    const prompt = `Faça engenharia reversa do anúncio:\n\nAnunciante: ${a.advertiser || "—"}\nHeadline: ${a.headline}\nCopy: ${a.copy}\nCTA: ${a.cta || "—"}\nNicho: ${a.niche} | País: ${a.country}\nPlataforma: ${a.platform}\nLink: ${a.adUrl || "—"}\n\n1) Big Idea\n2) Avatar\n3) Estrutura\n4) Gatilhos\n5) Como escalar`;
+    console.log("abrindo chatgpt", a);
+    const prompt = [
+      "Faça engenharia reversa do anúncio:",
+      "",
+      `Headline: ${a.headline || "—"}`,
+      `Copy: ${a.copy || "—"}`,
+      `CTA: ${a.cta || "—"}`,
+      `Nicho: ${a.niche || "—"}`,
+      `Plataforma: ${a.platform || "—"}`,
+      `Score: ${a.score ?? "—"}`,
+      "",
+      "1) Big Idea  2) Avatar  3) Estrutura  4) Gatilhos  5) Como escalar",
+    ].join("\n");
     rememberAdForAnalysis(toPersisted(a));
     openChatGPTWithPrompt(prompt);
   };
   const onSave = async (a: MinedAd) => {
+    console.log("salvando oferta", a.id);
     const persisted = toPersisted(a);
     const isSaved = await saveCollectedAd(persisted);
     setSavedIds((s) => {
