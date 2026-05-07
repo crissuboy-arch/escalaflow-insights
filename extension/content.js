@@ -1,225 +1,318 @@
-// EscalaFlow Miner — content script (Facebook/Meta Ads Library)
-// Injects a floating "⚡ IA PRO" button with quick actions:
-// - captures the ad data
-// - saves it to EscalaFlow (/importar-anuncio)
-// - asks background.js to open ChatGPT and auto-inject a tailored prompt.
+// EscalaFlow Miner — content script (Meta/Facebook Ads Library)
+// Per-card "⚡ IA PRO" button + real DOM scraping with MutationObserver.
 (() => {
-  const BTN_ID = "escala-ia-pro";
-  const MENU_ID = "escala-ia-pro-menu";
-  const TOAST_ID = "escala-ia-pro-toast";
+  const BTN_CLASS = "escala-card-btn";
+  const MENU_ID = "escala-card-menu";
+  const TOAST_ID = "escala-toast";
+  const FLOAT_ID = "escala-float";
+  const CARD_ATTR = "data-escala-card";
   const DEFAULT_ENDPOINT =
     "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3e6.lovable.app";
 
-  // ---------- styles ----------
-  if (!document.getElementById("escala-ia-pro-style")) {
+  // ---------------- styles ----------------
+  if (!document.getElementById("escala-style")) {
     const style = document.createElement("style");
-    style.id = "escala-ia-pro-style";
+    style.id = "escala-style";
     style.textContent = `
-      #${BTN_ID}{position:fixed;top:84px;right:20px;z-index:2147483647;
+      .${BTN_CLASS}{position:absolute;top:8px;right:8px;z-index:99999;
+        padding:6px 10px;border:0;border-radius:999px;cursor:pointer;
+        font:700 11px/1 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;color:#fff;
+        background:linear-gradient(135deg,#7c3aed,#3b82f6,#a855f7);
+        box-shadow:0 6px 18px rgba(124,58,237,.45);transition:transform .12s ease,filter .12s ease;}
+      .${BTN_CLASS}:hover{transform:scale(1.05);filter:brightness(1.1)}
+      [${CARD_ATTR}]{position:relative}
+      #${FLOAT_ID}{position:fixed;top:84px;right:20px;z-index:2147483647;
         padding:10px 16px;border:0;border-radius:999px;cursor:pointer;
-        font:700 13px/1 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;
-        color:#fff;letter-spacing:.02em;
-        background:linear-gradient(135deg,#7c3aed 0%,#3b82f6 50%,#a855f7 100%);
-        box-shadow:0 10px 30px rgba(124,58,237,.45),0 2px 6px rgba(0,0,0,.2);
-        transition:transform .15s ease, box-shadow .15s ease, filter .15s ease;}
-      #${BTN_ID}:hover{transform:translateY(-1px) scale(1.03);filter:brightness(1.08);
-        box-shadow:0 14px 36px rgba(124,58,237,.55),0 4px 10px rgba(0,0,0,.25);}
-      #${BTN_ID}:active{transform:translateY(0) scale(.98)}
-      #${MENU_ID}{position:fixed;top:130px;right:20px;z-index:2147483647;
-        min-width:260px;border-radius:14px;overflow:hidden;
-        background:rgba(15,18,32,.96);backdrop-filter:blur(10px);
-        border:1px solid rgba(168,85,247,.35);
-        box-shadow:0 20px 50px rgba(0,0,0,.45);
-        font:600 13px -apple-system,system-ui,Segoe UI,Roboto,sans-serif;
-        color:#e6edf7;display:none;}
-      #${MENU_ID}.open{display:block;animation:escFade .12s ease-out}
-      #${MENU_ID} button{display:flex;align-items:center;gap:8px;width:100%;
-        padding:11px 14px;background:transparent;border:0;color:#e6edf7;
-        font:600 13px inherit;cursor:pointer;text-align:left;}
-      #${MENU_ID} button:hover{background:rgba(124,58,237,.18)}
+        font:700 13px -apple-system,system-ui,sans-serif;color:#fff;
+        background:linear-gradient(135deg,#7c3aed,#3b82f6,#a855f7);
+        box-shadow:0 10px 30px rgba(124,58,237,.45)}
+      #${MENU_ID}{position:fixed;z-index:2147483647;min-width:240px;border-radius:12px;
+        overflow:hidden;background:rgba(15,18,32,.97);backdrop-filter:blur(10px);
+        border:1px solid rgba(168,85,247,.35);box-shadow:0 20px 50px rgba(0,0,0,.5);
+        font:600 13px -apple-system,system-ui,sans-serif;color:#e6edf7;display:none}
+      #${MENU_ID}.open{display:block}
+      #${MENU_ID} button{display:block;width:100%;padding:10px 14px;background:transparent;
+        border:0;color:#e6edf7;text-align:left;cursor:pointer;font:600 13px inherit}
+      #${MENU_ID} button:hover{background:rgba(124,58,237,.2)}
       #${MENU_ID} .sep{height:1px;background:rgba(255,255,255,.06)}
       #${TOAST_ID}{position:fixed;bottom:24px;right:24px;z-index:2147483647;
         padding:12px 16px;border-radius:12px;color:#fff;font:600 13px -apple-system,system-ui,sans-serif;
         background:linear-gradient(135deg,#16a34a,#22c55e);
         box-shadow:0 12px 30px rgba(34,197,94,.45);opacity:0;transform:translateY(8px);
-        transition:opacity .2s ease, transform .2s ease;pointer-events:none}
+        transition:opacity .2s,transform .2s;pointer-events:none}
       #${TOAST_ID}.show{opacity:1;transform:translateY(0)}
-      @keyframes escFade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
     `;
     document.head.appendChild(style);
   }
 
   function toast(msg) {
     let el = document.getElementById(TOAST_ID);
-    if (!el) {
-      el = document.createElement("div");
-      el.id = TOAST_ID;
-      document.body.appendChild(el);
-    }
-    el.textContent = msg;
-    el.classList.add("show");
-    clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove("show"), 2400);
+    if (!el) { el = document.createElement("div"); el.id = TOAST_ID; document.body.appendChild(el); }
+    el.textContent = msg; el.classList.add("show");
+    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 2400);
   }
 
   function getEndpoint() {
     return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get(["endpoint"], ({ endpoint }) =>
-          resolve((endpoint || DEFAULT_ENDPOINT).replace(/\/$/, "")));
-      } catch { resolve(DEFAULT_ENDPOINT); }
+      try { chrome.storage.local.get(["endpoint"], ({ endpoint }) =>
+        resolve((endpoint || DEFAULT_ENDPOINT).replace(/\/$/, ""))); }
+      catch { resolve(DEFAULT_ENDPOINT); }
     });
   }
 
-  // ---------- scrape ----------
-  function scrapeAd() {
-    const text = (sel) => {
-      const el = document.querySelector(sel);
-      return el ? el.textContent.trim() : "";
-    };
-    const allText = (sel) =>
-      Array.from(document.querySelectorAll(sel))
-        .map((e) => e.textContent.trim())
-        .filter(Boolean);
-
-    const advertiser =
-      text('a[role="link"][href*="/ads/library/?view_all_page_id"]') ||
-      text('div[role="article"] a[role="link"] strong') ||
-      "";
-
-    const headline =
-      text('div[role="article"] strong') ||
-      text('div[role="main"] h2') ||
-      advertiser ||
-      document.title.replace(/ \| Facebook.*/, "").slice(0, 140) ||
-      "Anúncio Facebook";
-
-    const copies = allText('div[role="article"] div[dir="auto"], div[role="article"] span[dir="auto"]');
-    const copy = copies.sort((a, b) => b.length - a.length)[0] || "";
-    const description = copies.filter((c) => c !== copy).sort((a, b) => b.length - a.length)[0] || "";
-
-    const img = document.querySelector('div[role="article"] img');
-    const video = document.querySelector('div[role="article"] video');
-    const creativeUrl = (video && video.poster) || (img && img.src) || "";
-
-    const idMatch = location.href.match(/id=(\d+)/) || document.body.innerHTML.match(/"adArchiveID":"(\d+)"/);
-    const adLibraryId = idMatch ? idMatch[1] : "";
-
-    return {
-      headline: headline.slice(0, 200),
-      copy: copy.slice(0, 1500),
-      description: description.slice(0, 600),
-      link: location.href,
-      platform: "Facebook",
-      country: "BR",
-      niche: "Geral",
-      score: 80,
-      creativeUrl,
-      advertiser,
-      adLibraryId,
-      createdAt: new Date().toISOString(),
-    };
+  // ---------------- card detection ----------------
+  // The Ads Library renders each ad as a card containing an internal link
+  // like /ads/library/?id=<adArchiveID>. We use that as the anchor to find cards.
+  function findCards() {
+    const cards = new Set();
+    // Strategy 1: links to /ads/library/?id= → walk up to a tall container
+    document.querySelectorAll('a[href*="/ads/library/?id="], a[href*="ads/library/?id="]').forEach((a) => {
+      let el = a;
+      for (let i = 0; i < 10 && el && el.parentElement; i++) {
+        el = el.parentElement;
+        if (!el) break;
+        const r = el.getBoundingClientRect();
+        if (r.height >= 260 && r.width >= 220) { cards.add(el); break; }
+      }
+    });
+    // Strategy 2: explicit "Library ID" text — climb to card container
+    if (cards.size === 0) {
+      document.querySelectorAll('div').forEach((d) => {
+        const t = d.textContent || "";
+        if (/Library ID:|ID da biblioteca:/.test(t) && d.children.length < 20) {
+          let el = d;
+          for (let i = 0; i < 8 && el.parentElement; i++) {
+            el = el.parentElement;
+            const r = el.getBoundingClientRect();
+            if (r.height >= 260 && r.width >= 220) { cards.add(el); break; }
+          }
+        }
+      });
+    }
+    return Array.from(cards);
   }
 
-  function buildUrl(endpoint, data, analysisType) {
+  function tx(el) { return (el && el.textContent || "").trim(); }
+
+  // ---------------- per-card scrape ----------------
+  function capturarCardReal(card) {
+    const html = card.innerHTML || "";
+    const text = card.innerText || "";
+
+    // adLibraryId
+    let adLibraryId = "";
+    const idLink = card.querySelector('a[href*="/ads/library/?id="], a[href*="ads/library/?id="]');
+    if (idLink) {
+      const m = idLink.href.match(/[?&]id=(\d+)/);
+      if (m) adLibraryId = m[1];
+    }
+    if (!adLibraryId) {
+      const m = text.match(/(?:Library ID|ID da biblioteca)[:\s]*([\d]{6,})/i);
+      if (m) adLibraryId = m[1];
+    }
+
+    // advertiser — first strong link, often a page link
+    const advLink =
+      card.querySelector('a[href*="/ads/library/?view_all_page_id"]') ||
+      card.querySelector('a[role="link"] strong') ||
+      card.querySelector('a[role="link"]');
+    const advertiser = tx(advLink).slice(0, 120);
+
+    // status (Active / Inactive / Ativo / Inativo)
+    let status = "";
+    const statusMatch = text.match(/\b(Active|Inactive|Ativo|Inativo|Em veiculação|Não está em veiculação)\b/i);
+    if (statusMatch) status = statusMatch[1];
+
+    // start date
+    let startDate = "";
+    const dateMatch = text.match(/(?:Started running on|Iniciou a veicula(?:ç|c)[aã]o em|Começou a ser exibido em)\s*([^\n·•]+)/i);
+    if (dateMatch) startDate = dateMatch[1].trim().slice(0, 60);
+
+    // platforms (Facebook, Instagram, Audience Network, Messenger, Threads)
+    const platforms = [];
+    ["Facebook", "Instagram", "Messenger", "Audience Network", "Threads"].forEach((p) => {
+      if (new RegExp(`\\b${p}\\b`, "i").test(text)) platforms.push(p);
+    });
+
+    // copy — the longest paragraph-like block inside the card body
+    const candidates = Array.from(
+      card.querySelectorAll('div[dir="auto"], span[dir="auto"], div[data-ad-preview="message"]'),
+    )
+      .map((el) => tx(el))
+      .filter((t) => t && t.length > 20 && !/^Library ID|^ID da biblioteca|Started running|Iniciou a/i.test(t));
+    candidates.sort((a, b) => b.length - a.length);
+    const copy = (candidates[0] || "").slice(0, 2000);
+    const description = (candidates[1] || "").slice(0, 800);
+
+    // headline — common Meta preview headline node, fallback to short emphasized text
+    let headline = "";
+    const headlineEl =
+      card.querySelector('[data-ad-preview="headline"]') ||
+      card.querySelector('strong span, strong');
+    if (headlineEl) headline = tx(headlineEl).slice(0, 200);
+    if (!headline) {
+      const short = candidates.find((t) => t.length < 120);
+      headline = (short || advertiser || "Anúncio Facebook").slice(0, 200);
+    }
+
+    // CTA — typical CTA buttons appear as <a role="button"> or short capitalized link
+    let cta = "";
+    const ctaEl = card.querySelector('a[role="button"], div[role="button"]');
+    if (ctaEl) cta = tx(ctaEl).slice(0, 60);
+    if (!cta) {
+      const m = text.match(/\b(Saiba mais|Comprar|Cadastre-se|Inscrever-se|Baixar|Assine|Solicitar|Reservar|Shop Now|Learn More|Sign Up|Download|Get Offer|Subscribe|Apply Now)\b/);
+      if (m) cta = m[1];
+    }
+
+    // media
+    const imgEl = card.querySelector('img[src*="scontent"], img[src^="https://"]:not([width="16"]):not([width="20"])');
+    const videoEl = card.querySelector('video');
+    const imageUrl = imgEl ? imgEl.src : "";
+    const videoUrl = videoEl ? (videoEl.src || videoEl.currentSrc || "") : "";
+    const thumbnail = videoEl && videoEl.poster ? videoEl.poster : imageUrl;
+
+    // background-image fallback
+    let bgImage = "";
+    if (!imageUrl) {
+      const bgEl = card.querySelector('[style*="background-image"]');
+      if (bgEl) {
+        const m = bgEl.getAttribute("style").match(/background-image:\s*url\(["']?([^"')]+)["']?\)/);
+        if (m) bgImage = m[1];
+      }
+    }
+
+    // url — preferred ad library deep link
+    const url = (idLink && idLink.href) || location.href;
+
+    // creativeType
+    let creativeType = "image";
+    if (videoUrl) creativeType = "video";
+    else if (card.querySelectorAll('img[src*="scontent"]').length > 1) creativeType = "carousel";
+
+    // country — try URL param
+    let country = "BR";
+    const cMatch = location.href.match(/[?&]country=([A-Z]{2})/);
+    if (cMatch) country = cMatch[1];
+
+    // niche inference (very rough)
+    const lower = (headline + " " + copy + " " + advertiser).toLowerCase();
+    const nicheMap = [
+      ["Emagrecimento", /(emagrec|peso|gordura|barriga|jejum|low carb|weight loss)/],
+      ["Renda Online", /(renda extra|trabalh.* casa|ganhar dinheiro|afiliad|dropshipping)/],
+      ["Beleza", /(skincare|beleza|cabelo|maquiag|rejuvenesc|botox)/],
+      ["Saúde", /(diabet|press[aã]o|colesterol|sa[uú]de|articulaç|enxaqueca)/],
+      ["Finanças", /(invest|cripto|trader|bolsa|d[óo]lar|renda fixa)/],
+      ["Relacionamento", /(relacionamento|conquist|namor|sedu)/],
+      ["Educação", /(curso|aula|treinamento|certificad|mentoria)/],
+      ["Espiritualidade", /(or(a|aç)|salmo|f[ée]|deus|espiritual)/],
+    ];
+    let niche = "Geral";
+    for (const [name, rx] of nicheMap) { if (rx.test(lower)) { niche = name; break; } }
+
+    // score heuristic
+    let score = 70;
+    if (videoUrl) score += 5;
+    if (copy.length > 400) score += 5;
+    if (status && /Active|Ativo|veicula/i.test(status)) score += 10;
+    if (platforms.length >= 3) score += 5;
+    score = Math.min(99, score);
+
+    const payload = {
+      advertiser,
+      headline,
+      copy,
+      cta,
+      description,
+      imageUrl: imageUrl || bgImage,
+      videoUrl,
+      thumbnail: thumbnail || bgImage,
+      adLibraryId,
+      startDate,
+      platforms,
+      country,
+      status,
+      creativeType,
+      niche,
+      score,
+      url,
+      link: url,
+      platform: "Facebook",
+      createdAt: new Date().toISOString(),
+    };
+
+    console.log("[EscalaFlow] card encontrado", { adLibraryId, advertiser });
+    console.log("[EscalaFlow] mídia capturada", { imageUrl: payload.imageUrl, videoUrl, thumbnail: payload.thumbnail });
+    console.log("[EscalaFlow] payload real", payload);
+    return payload;
+  }
+
+  // ---------------- send ----------------
+  function buildUrl(endpoint, ad, analysisType) {
     const u = new URL(endpoint + "/importar-anuncio");
     const set = (k, v) => v != null && v !== "" && u.searchParams.set(k, String(v));
-    set("headline", data.headline);
-    set("copy", data.copy);
-    set("description", data.description);
-    set("link", data.link);
-    set("platform", data.platform);
-    set("country", data.country);
-    set("niche", data.niche);
-    set("score", data.score);
+    set("headline", ad.headline);
+    set("copy", ad.copy);
+    set("description", ad.description);
+    set("link", ad.url);
+    set("platform", ad.platform);
+    set("country", ad.country);
+    set("niche", ad.niche);
+    set("score", ad.score);
     set("analysisType", analysisType || "manual");
-    set("creativeUrl", data.creativeUrl);
-    set("advertiser", data.advertiser);
-    set("adLibraryId", data.adLibraryId);
-    set("createdAt", data.createdAt);
+    set("creativeUrl", ad.imageUrl || ad.thumbnail || ad.videoUrl);
+    set("advertiser", ad.advertiser);
+    set("adLibraryId", ad.adLibraryId);
+    set("cta", ad.cta);
+    set("startDate", ad.startDate);
+    set("status", ad.status);
+    set("creativeType", ad.creativeType);
+    set("platforms", (ad.platforms || []).join(","));
+    set("createdAt", ad.createdAt);
     return u.toString();
   }
 
-  // ---------- prompts ----------
   function buildPrompt(type, ad) {
-    const base = `Anúncio capturado da Meta Ads Library:
+    const base = `Anúncio REAL capturado da Meta Ads Library:
 - Anunciante: ${ad.advertiser || "—"}
 - Headline: ${ad.headline}
 - Copy: ${ad.copy}
 - Descrição: ${ad.description || "—"}
-- Link: ${ad.link}
-- País: ${ad.country} | Plataforma: ${ad.platform} | Nicho: ${ad.niche}
+- CTA: ${ad.cta || "—"}
+- Status: ${ad.status || "—"} | Início: ${ad.startDate || "—"}
+- Plataformas: ${(ad.platforms || []).join(", ") || "—"}
+- País: ${ad.country} | Nicho: ${ad.niche}
+- Tipo de criativo: ${ad.creativeType}
+- Criativo: ${ad.imageUrl || ad.videoUrl || ad.thumbnail || "—"}
+- Link: ${ad.url}
 - ID da Biblioteca: ${ad.adLibraryId || "—"}
 `;
-
     const prompts = {
-      ai: `${base}
-Faça engenharia reversa COMPLETA deste anúncio:
-1. Big Idea e ângulo de marketing
-2. Avatar (dores, desejos, objeções)
-3. Estrutura da copy (gancho, prova, CTA)
-4. Gatilhos mentais usados
-5. Por que este criativo funciona
-6. Sugestões para escalar`,
-      variations: `${base}
-Gere 10 variações de criativos baseadas neste anúncio:
-- 3 variações de headline
-- 3 variações de copy
-- 2 ideias de criativo (vídeo/imagem)
-- 2 ângulos novos`,
-      "offer-structure": `${base}
-Faça o breakdown da OFERTA:
-1. Produto principal e promessa
-2. Bônus aparentes
-3. Garantia
-4. Stack de valor
-5. Preço e ancoragem
-6. Como melhorar esta oferta`,
-      "quiz-funnel": `${base}
-Monte um FUNIL DE QUIZ baseado neste anúncio:
-- Hook do quiz
-- 6 a 8 perguntas
-- Segmentação por respostas
-- Página de resultado
-- Oferta no final`,
-      "unique-mechanism": `${base}
-Identifique o MECANISMO ÚNICO deste anúncio:
-- Qual o mecanismo central
-- Por que é "novo"
-- Como nomear/posicionar
-- Como reforçar o mecanismo na copy`,
-      manual: `${base}
-Resuma este anúncio em 5 bullets e dê uma nota de 0 a 100 para potencial de escala.`,
+      ai: `${base}\nFaça engenharia reversa COMPLETA:\n1. Big Idea e ângulo\n2. Avatar (dores, desejos, objeções)\n3. Estrutura da copy (gancho, prova, CTA)\n4. Gatilhos mentais\n5. Por que funciona\n6. Como escalar`,
+      variations: `${base}\nGere 10 variações:\n- 3 headlines\n- 3 copies\n- 2 ideias de criativo\n- 2 ângulos novos`,
+      "offer-structure": `${base}\nBreakdown da OFERTA:\n1. Produto e promessa\n2. Bônus\n3. Garantia\n4. Stack de valor\n5. Preço e ancoragem\n6. Como melhorar`,
+      "quiz-funnel": `${base}\nMonte um FUNIL DE QUIZ:\n- Hook\n- 6-8 perguntas\n- Segmentação\n- Página de resultado\n- Oferta`,
+      "unique-mechanism": `${base}\nIdentifique o MECANISMO ÚNICO:\n- Mecanismo central\n- Por que é "novo"\n- Nome/posicionamento\n- Reforço na copy`,
+      manual: `${base}\nResuma em 5 bullets e dê nota 0-100 de potencial de escala.`,
     };
     return prompts[type] || prompts.manual;
   }
 
-  // ---------- send ----------
-  async function send(analysisType) {
+  async function send(card, analysisType) {
+    const ad = capturarCardReal(card);
     const endpoint = await getEndpoint();
-    const ad = scrapeAd();
-    console.log("[EscalaFlow] anúncio capturado", { analysisType, ad });
-
-    // 1) Salvar no EscalaFlow (abre aba de importação que persiste no localStorage)
-    const importUrl = buildUrl(endpoint, ad, analysisType);
-    window.open(importUrl, "_blank", "noopener");
+    window.open(buildUrl(endpoint, ad, analysisType), "_blank", "noopener");
     toast("Anúncio minerado com sucesso");
-
-    // 2) Disparar ChatGPT automatizado (exceto "manual" / Salvar Anúncio)
     if (analysisType !== "manual") {
-      const prompt = buildPrompt(analysisType, ad);
       try {
         chrome.runtime.sendMessage(
-          { type: "ESCALA_OPEN_CHATGPT", prompt, ad },
+          { type: "ESCALA_OPEN_CHATGPT", prompt: buildPrompt(analysisType, ad), ad },
           (res) => console.log("[EscalaFlow] ChatGPT aberto", res),
         );
-      } catch (e) {
-        console.warn("[EscalaFlow] falha ao abrir ChatGPT", e);
-      }
+      } catch (e) { console.warn("[EscalaFlow] falha ChatGPT", e); }
     }
   }
 
-  // ---------- menu ----------
+  // ---------------- menu ----------------
   const ACTIONS = [
     ["🧠 Análise do Anúncio", "ai"],
     ["🎨 Variações de Criativo", "variations"],
@@ -234,50 +327,93 @@ Resuma este anúncio em 5 bullets e dê uma nota de 0 a 100 para potencial de es
     if (menu) return menu;
     menu = document.createElement("div");
     menu.id = MENU_ID;
+    document.body.appendChild(menu);
+    return menu;
+  }
+
+  function openMenuFor(card, anchor) {
+    const menu = ensureMenu();
+    menu.innerHTML = "";
     ACTIONS.forEach(([label, type], i) => {
       const b = document.createElement("button");
       b.textContent = label;
       b.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
         menu.classList.remove("open");
-        send(type);
+        send(card, type);
       });
       menu.appendChild(b);
       if (i < ACTIONS.length - 1) {
         const s = document.createElement("div"); s.className = "sep"; menu.appendChild(s);
       }
     });
-    document.body.appendChild(menu);
-    return menu;
+    const r = anchor.getBoundingClientRect();
+    menu.style.top = (r.bottom + 6) + "px";
+    menu.style.left = Math.max(8, r.right - 240) + "px";
+    menu.classList.add("open");
   }
 
-  function inject() {
-    if (document.getElementById(BTN_ID)) return;
-    if (!document.body) return;
+  // ---------------- inject buttons ----------------
+  function attachToCard(card) {
+    if (card.hasAttribute(CARD_ATTR)) return;
+    card.setAttribute(CARD_ATTR, "1");
+    if (getComputedStyle(card).position === "static") card.style.position = "relative";
     const btn = document.createElement("button");
-    btn.id = BTN_ID; btn.type = "button"; btn.textContent = "⚡ IA PRO";
+    btn.type = "button"; btn.className = BTN_CLASS; btn.textContent = "⚡ IA PRO";
     btn.addEventListener("click", (e) => {
       e.preventDefault(); e.stopPropagation();
-      const menu = ensureMenu();
-      menu.classList.toggle("open");
+      openMenuFor(card, btn);
     });
-    document.body.appendChild(btn);
-    ensureMenu();
-    console.log("[EscalaFlow] botão inserido");
+    card.appendChild(btn);
+  }
+
+  function injectAll() {
+    const cards = findCards();
+    cards.forEach(attachToCard);
+    if (cards.length) console.log(`[EscalaFlow] ${cards.length} cards detectados`);
+    ensureFloating(cards);
+  }
+
+  // Floating fallback button — uses topmost visible card
+  function ensureFloating(cards) {
+    let fb = document.getElementById(FLOAT_ID);
+    if (!fb) {
+      fb = document.createElement("button");
+      fb.id = FLOAT_ID; fb.type = "button"; fb.textContent = "⚡ IA PRO";
+      fb.title = "Capturar primeiro anúncio visível";
+      document.body.appendChild(fb);
+      fb.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const all = findCards();
+        const visible = all.find((c) => {
+          const r = c.getBoundingClientRect();
+          return r.top >= 0 && r.top < innerHeight * 0.7;
+        }) || all[0];
+        if (!visible) { toast("Nenhum anúncio detectado"); return; }
+        openMenuFor(visible, fb);
+      });
+    }
   }
 
   document.addEventListener("click", (e) => {
     const menu = document.getElementById(MENU_ID);
-    const btn = document.getElementById(BTN_ID);
     if (!menu || !menu.classList.contains("open")) return;
-    if (menu.contains(e.target) || (btn && btn.contains(e.target))) return;
+    if (menu.contains(e.target)) return;
+    if (e.target.classList && e.target.classList.contains(BTN_CLASS)) return;
+    if (e.target.id === FLOAT_ID) return;
     menu.classList.remove("open");
   });
 
-  inject();
-  const obs = new MutationObserver(() => {
-    if (!document.getElementById(BTN_ID)) inject();
-  });
+  // debounce + observe
+  let scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(() => { scheduled = false; injectAll(); }, 400);
+  }
+
+  injectAll();
+  const obs = new MutationObserver(schedule);
   if (document.body) obs.observe(document.body, { childList: true, subtree: true });
-  setInterval(inject, 2000);
+  setInterval(schedule, 2500);
 })();
