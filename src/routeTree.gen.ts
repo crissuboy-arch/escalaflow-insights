@@ -22,6 +22,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
+import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -93,6 +94,11 @@ const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
   path: '/analise-ia',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
+  id: '/api/collector/run',
+  path: '/api/collector/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
   id: '/oferta/$id',
   path: '/oferta/$id',
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/api/ingest'
     | '/oferta/$id'
+    | '/api/collector/run'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/api/ingest'
     | '/oferta/$id'
+    | '/api/collector/run'
   id:
     | '__root__'
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ofertas-salvas'
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
+    | '/api/collector/run'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,6 +212,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiCollectorRunRoute: typeof ApiCollectorRunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -295,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/collector/run': {
+      id: '/api/collector/run'
+      path: '/api/collector/run'
+      fullPath: '/api/collector/run'
+      preLoaderRoute: typeof ApiCollectorRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/oferta/$id': {
       id: '/_authenticated/oferta/$id'
       path: '/oferta/$id'
@@ -340,6 +360,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiCollectorRunRoute: ApiCollectorRunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
