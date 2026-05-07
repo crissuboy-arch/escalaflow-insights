@@ -1,24 +1,50 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Search, Bookmark, TrendingUp, Sparkles, Heart, Settings, Radio } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader } from "@/components/ui/sidebar";
-import { getFavCount, subscribeChange } from "@/lib/queries";
+import {
+  LayoutDashboard,
+  Search,
+  Bookmark,
+  TrendingUp,
+  Sparkles,
+  Heart,
+  Settings,
+  Radio,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
+import { getFavCount, getSavedCount, getScaledCount, subscribeChange } from "@/lib/queries";
 
 export function AppSidebar() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const [favCount, setFavCount] = useState(0);
+  const [savedCount, setSavedCount] = useState(0);
+  const [scaledCount, setScaledCount] = useState(0);
   useEffect(() => {
-    setFavCount(getFavCount());
-    return subscribeChange((s) => { if (s === "fav") setFavCount(getFavCount()); });
+    const sync = () => {
+      setFavCount(getFavCount());
+      setSavedCount(getSavedCount());
+      setScaledCount(getScaledCount());
+    };
+    sync();
+    return subscribeChange(sync);
   }, []);
   const items = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
-    { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark },
-    { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp },
+    { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
+    { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
     { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
@@ -27,8 +53,15 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground font-bold" style={{ background: "var(--gradient-primary)" }}>E</div>
-          <span className="font-bold tracking-tight group-data-[collapsible=icon]:hidden">EscalaFlow</span>
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground font-bold"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            E
+          </div>
+          <span className="font-bold tracking-tight group-data-[collapsible=icon]:hidden">
+            EscalaFlow
+          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>

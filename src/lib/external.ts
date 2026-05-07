@@ -7,7 +7,7 @@ import { toast } from "sonner";
 export function openExternal(...candidates: Array<string | null | undefined>): boolean {
   const url = candidates.find((u) => typeof u === "string" && /^https?:\/\//i.test(u));
   if (!url) {
-    toast.error("Link não encontrado para este anúncio.");
+    toast.error("Link original não encontrado.");
     return false;
   }
   try {
@@ -36,12 +36,12 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
 }
 
 export async function openChatGPTWithPrompt(prompt: string): Promise<void> {
+  const copyPromise = navigator.clipboard.writeText(prompt);
+  openExternal("https://chatgpt.com/");
   try {
-    await navigator.clipboard.writeText(prompt);
+    await copyPromise;
     toast.success("Prompt copiado. Cole no ChatGPT.");
   } catch {
     toast.message("Abra o ChatGPT e cole seu prompt.");
   }
-  const url = "https://chatgpt.com/?q=" + encodeURIComponent(prompt);
-  openExternal(url, "https://chatgpt.com/");
 }

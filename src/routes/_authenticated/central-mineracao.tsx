@@ -5,24 +5,69 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Radio, Search, Star, Globe, Megaphone, Flame, ExternalLink,
-  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download, Rocket, Bot,
+  Radio,
+  Search,
+  Star,
+  Globe,
+  Megaphone,
+  Flame,
+  ExternalLink,
+  Sparkles,
+  Trash2,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  Wifi,
+  WifiOff,
+  Download,
+  Rocket,
+  Bot,
+  BookmarkCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
-import { startExtensionBridge, detectExtension, seedDemoAds, insertTestAd } from "@/lib/mining/bridge";
+import {
+  startExtensionBridge,
+  detectExtension,
+  seedDemoAds,
+  insertTestAd,
+} from "@/lib/mining/bridge";
 import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Radar } from "lucide-react";
 import { openExternal, openChatGPTWithPrompt } from "@/lib/external";
+import {
+  favoriteCollectedAd,
+  fetchFavoriteAds,
+  fetchSavedAds,
+  fetchScaledAds,
+  rememberAdForAnalysis,
+  saveCollectedAd,
+  scaleCollectedAd,
+  subscribeChange,
+  type PersistedAd,
+} from "@/lib/queries";
 
-export const Route = createFileRoute("/_authenticated/central-mineracao")({ component: MiningCenterPage });
+export const Route = createFileRoute("/_authenticated/central-mineracao")({
+  component: MiningCenterPage,
+});
 
 function MiningCenterPage() {
   const [ads, setAds] = useState<MinedAd[]>([]);
@@ -34,6 +79,30 @@ function MiningCenterPage() {
   const [favOnly, setFavOnly] = useState(false);
   const [mining, setMining] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const [scaledIds, setScaledIds] = useState<Set<string>>(new Set());
+
+  const getAdKey = (a: MinedAd) => a.adLibraryId || a.adUrl || a.id.replace(/^db_/, "");
+  const toPersisted = (a: MinedAd): PersistedAd => ({
+    key: getAdKey(a),
+    ad_library_id: a.adLibraryId ?? null,
+    ad_url: a.adUrl ?? null,
+    advertiser: a.advertiser || "Anunciante",
+    headline: a.headline,
+    copy: a.copy || null,
+    cta: a.cta ?? null,
+    image_url: a.creativeType === "video" ? null : a.creativeUrl,
+    video_url: a.creativeType === "video" ? a.creativeUrl : null,
+    platform: a.platform,
+    country: a.country,
+    niche: a.niche,
+    score: a.score,
+    created_at: a.createdAt,
+    saved_at: new Date().toISOString(),
+    scaled: a.scaled,
+    platforms: a.platforms?.length ? a.platforms : [a.platform],
+  });
 
   const refresh = async () => {
     const local = await miningRepo.list();
@@ -111,9 +180,24 @@ function MiningCenterPage() {
   useEffect(() => {
     refresh();
     const unsub = miningRepo.subscribe(refresh);
+    const loadPersisted = async () => {
+      const [saved, favs, scaled] = await Promise.all([
+        fetchSavedAds(),
+        fetchFavoriteAds(),
+        fetchScaledAds(),
+      ]);
+      setSavedIds(new Set(saved.map((a) => a.key)));
+      setFavIds(new Set(favs.map((a) => a.key)));
+      setScaledIds(new Set(scaled.map((a) => a.key)));
+    };
+    loadPersisted();
+    const unsubPersisted = subscribeChange(() => loadPersisted());
     startExtensionBridge((n) => toast.success(`${n} anúncio(s) recebido(s) da extensão`));
     detectExtension().then(setExtensionConnected);
-    return unsub;
+    return () => {
+      unsub();
+      unsubPersisted();
+    };
   }, []);
 
   const platforms = useMemo(() => Array.from(new Set(ads.map((a) => a.platform))), [ads]);
@@ -122,14 +206,15 @@ function MiningCenterPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ads.filter((a) => {
+      const key = getAdKey(a);
       if (platform !== "all" && a.platform !== platform) return false;
       if (country !== "all" && a.country !== country) return false;
       if (status !== "all" && a.status !== status) return false;
-      if (favOnly && !a.favorite) return false;
+      if (favOnly && !a.favorite && !favIds.has(key)) return false;
       if (q && !`${a.headline} ${a.copy} ${a.niche}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [ads, search, platform, country, status, favOnly]);
+  }, [ads, search, platform, country, status, favOnly, favIds]);
 
   const onReceive = async () => {
     const present = await detectExtension();
@@ -149,17 +234,43 @@ function MiningCenterPage() {
     toast.success("Anúncio minerado com sucesso");
   };
 
-  const onToggleFav = async (a: MinedAd) => miningRepo.update(a.id, { favorite: !a.favorite });
+  const onToggleFav = async (a: MinedAd) => {
+    const persisted = toPersisted(a);
+    const next = !favIds.has(persisted.key);
+    await favoriteCollectedAd(persisted, next);
+    await miningRepo.update(a.id, { favorite: next });
+    setFavIds((s) => {
+      const n = new Set(s);
+      if (next) n.add(persisted.key);
+      else n.delete(persisted.key);
+      return n;
+    });
+  };
   const onMarkReviewed = async (a: MinedAd) =>
     miningRepo.update(a.id, { status: a.status === "reviewed" ? "new" : "reviewed" });
   const onDelete = async (a: MinedAd) => miningRepo.remove(a.id);
   const onScale = async (a: MinedAd) => {
+    const persisted = { ...toPersisted(a), scaled: true };
+    await scaleCollectedAd(persisted);
     await miningRepo.update(a.id, { scaled: true, status: "reviewed" });
+    setScaledIds((s) => new Set(s).add(persisted.key));
     toast.success("Enviado para Escalada");
   };
   const onOpenChatGPT = (a: MinedAd) => {
     const prompt = `Faça engenharia reversa do anúncio:\n\nAnunciante: ${a.advertiser || "—"}\nHeadline: ${a.headline}\nCopy: ${a.copy}\nCTA: ${a.cta || "—"}\nNicho: ${a.niche} | País: ${a.country}\nPlataforma: ${a.platform}\nLink: ${a.adUrl || "—"}\n\n1) Big Idea\n2) Avatar\n3) Estrutura\n4) Gatilhos\n5) Como escalar`;
+    rememberAdForAnalysis(toPersisted(a));
     openChatGPTWithPrompt(prompt);
+  };
+  const onSave = async (a: MinedAd) => {
+    const persisted = toPersisted(a);
+    const isSaved = await saveCollectedAd(persisted);
+    setSavedIds((s) => {
+      const n = new Set(s);
+      if (isSaved) n.add(persisted.key);
+      else n.delete(persisted.key);
+      return n;
+    });
+    toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
   };
   const onClearAll = async () => {
     if (!confirm("Limpar toda a central de mineração?")) return;
@@ -172,13 +283,17 @@ function MiningCenterPage() {
       {/* Header */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-[var(--shadow-glow)]" style={{ background: "var(--gradient-primary)" }}>
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-[var(--shadow-glow)]"
+            style={{ background: "var(--gradient-primary)" }}
+          >
             <Radio className="h-6 w-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Central de Mineração</h1>
             <p className="text-muted-foreground">
-              <span className="font-semibold text-foreground">{ads.length}</span> anúncios recebidos · banco local
+              <span className="font-semibold text-foreground">{ads.length}</span> anúncios recebidos
+              · banco local
             </p>
           </div>
         </div>
@@ -190,8 +305,17 @@ function MiningCenterPage() {
             onChange={(e) => setKeyword(e.target.value)}
             className="h-9 w-44"
           />
-          <Button onClick={onMineNow} disabled={mining} className="text-white" style={{ background: "var(--gradient-primary)" }}>
-            {mining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
+          <Button
+            onClick={onMineNow}
+            disabled={mining}
+            className="text-white"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            {mining ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Radar className="mr-2 h-4 w-4" />
+            )}
             Minerar Agora
           </Button>
           <Button
@@ -235,9 +359,11 @@ function MiningCenterPage() {
           <div>
             <p className="font-semibold">Modo demonstração</p>
             <p className="text-muted-foreground">
-              Os anúncios são armazenados localmente neste navegador. A persistência em nuvem (Supabase / Convex / API)
-              será habilitada na integração final. O endpoint <code className="rounded bg-muted px-1">/api/ingest</code> e o canal
-              <code className="ml-1 rounded bg-muted px-1">window.postMessage</code> já aceitam dados reais da extensão.
+              Os anúncios são armazenados localmente neste navegador. A persistência em nuvem
+              (Supabase / Convex / API) será habilitada na integração final. O endpoint{" "}
+              <code className="rounded bg-muted px-1">/api/ingest</code> e o canal
+              <code className="ml-1 rounded bg-muted px-1">window.postMessage</code> já aceitam
+              dados reais da extensão.
             </p>
           </div>
         </CardContent>
@@ -249,25 +375,44 @@ function MiningCenterPage() {
           <div className="md:col-span-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Buscar headline, copy ou nicho…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <Input
+                className="pl-9"
+                placeholder="Buscar headline, copy ou nicho…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
           </div>
           <Select value={platform} onValueChange={setPlatform}>
-            <SelectTrigger><SelectValue placeholder="Plataforma" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Plataforma" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas plataformas</SelectItem>
-              {platforms.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              {platforms.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={country} onValueChange={setCountry}>
-            <SelectTrigger><SelectValue placeholder="País" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="País" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos países</SelectItem>
-              {countries.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {countries.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={status} onValueChange={(v) => setStatus(v as MiningStatus | "all")}>
-            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos status</SelectItem>
               <SelectItem value="new">Novo</SelectItem>
@@ -276,8 +421,15 @@ function MiningCenterPage() {
             </SelectContent>
           </Select>
           <div className="flex items-center justify-between gap-2 md:col-span-5">
-            <Button variant={favOnly ? "default" : "outline"} size="sm" onClick={() => setFavOnly((v) => !v)}>
-              <Star className={`mr-1 h-4 w-4 ${favOnly ? "fill-yellow-300 text-yellow-300" : ""}`} /> Apenas favoritos
+            <Button
+              variant={favOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFavOnly((v) => !v)}
+            >
+              <Star
+                className={`mr-1 h-4 w-4 ${favOnly ? "fill-yellow-300 text-yellow-300" : ""}`}
+              />{" "}
+              Apenas favoritos
             </Button>
             <Button variant="ghost" size="sm" onClick={onClearAll} disabled={ads.length === 0}>
               <Trash2 className="mr-1 h-4 w-4" /> Limpar tudo
@@ -294,7 +446,7 @@ function MiningCenterPage() {
               <Radio className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {ads.length === 0
-                  ? "Nenhum anúncio recebido ainda. Clique em \"Receber da Extensão\" para começar."
+                  ? 'Nenhum anúncio recebido ainda. Clique em "Receber da Extensão" para começar.'
                   : "Nenhum anúncio corresponde aos filtros."}
               </p>
               {ads.length === 0 && (
@@ -321,83 +473,182 @@ function MiningCenterPage() {
                 </TableHeader>
                 <TableBody>
                   <TooltipProvider delayDuration={200}>
-                    {filtered.map((a) => (
-                      <TableRow key={a.id} className="group">
-                        <TableCell>
-                          <button onClick={() => onToggleFav(a)} aria-label="Favoritar">
-                            <Star className={`h-4 w-4 transition ${a.favorite ? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]" : "text-muted-foreground hover:text-foreground"}`} />
-                          </button>
-                        </TableCell>
-                        <TableCell className="max-w-[320px]">
-                          <div className="flex items-start gap-2">
-                            {a.creativeUrl && (
-                              <img src={a.creativeUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" loading="lazy" />
-                            )}
-                            <div className="min-w-0">
-                              <p className="font-medium leading-snug line-clamp-1">{a.headline}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-1">{a.copy || "—"}</p>
-                              {a.tags && a.tags.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                  {a.tags.map((t) => (
-                                    <span key={t} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{t}</span>
-                                  ))}
-                                </div>
+                    {filtered.map((a) => {
+                      const key = getAdKey(a);
+                      const isFav = favIds.has(key) || a.favorite;
+                      const isSaved = savedIds.has(key);
+                      const isScaled = scaledIds.has(key) || a.scaled;
+                      return (
+                        <TableRow key={a.id} className="group">
+                          <TableCell>
+                            <button onClick={() => onToggleFav(a)} aria-label="Favoritar">
+                              <Star
+                                className={`h-4 w-4 transition ${isFav ? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]" : "text-muted-foreground hover:text-foreground"}`}
+                              />
+                            </button>
+                          </TableCell>
+                          <TableCell className="max-w-[320px]">
+                            <div className="flex items-start gap-2">
+                              {a.creativeUrl && (
+                                <img
+                                  src={a.creativeUrl}
+                                  alt=""
+                                  className="h-10 w-10 shrink-0 rounded object-cover"
+                                  loading="lazy"
+                                />
                               )}
+                              <div className="min-w-0">
+                                <p className="font-medium leading-snug line-clamp-1">
+                                  {a.headline}
+                                </p>
+                                <p className="text-xs text-muted-foreground line-clamp-1">
+                                  {a.copy || "—"}
+                                </p>
+                                {a.tags && a.tags.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {a.tags.map((t) => (
+                                      <span
+                                        key={t}
+                                        className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary"
+                                      >
+                                        {t}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell><Badge variant="outline" className="rounded-full"><Megaphone className="mr-1 h-3 w-3" />{a.platform}</Badge></TableCell>
-                        <TableCell><Badge variant="outline" className="rounded-full"><Globe className="mr-1 h-3 w-3" />{a.country}</Badge></TableCell>
-                        <TableCell><span className="text-sm">{a.niche}</span></TableCell>
-                        <TableCell className="text-right">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                            <Flame className="h-3 w-3" /> {a.score}
-                          </span>
-                        </TableCell>
-                        <TableCell><Badge variant="secondary" className="rounded-full">{a.analysisType}</Badge></TableCell>
-                        <TableCell>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant={a.source === "extension" ? "default" : a.source === "demo" ? "outline" : "secondary"} className="rounded-full">
-                                {a.source}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {a.source === "demo" ? "Inserido em modo demonstração" : a.source === "extension" ? "Capturado pela extensão" : "Inserido manualmente"}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
-                            <Button size="icon" variant="ghost" onClick={() => openExternal(a.adUrl, a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null)}>
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="rounded-full">
+                              <Megaphone className="mr-1 h-3 w-3" />
+                              {a.platform}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="rounded-full">
+                              <Globe className="mr-1 h-3 w-3" />
+                              {a.country}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{a.niche}</span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                              <Flame className="h-3 w-3" /> {a.score}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="rounded-full">
+                              {a.analysisType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" onClick={() => onOpenChatGPT(a)} aria-label="Abrir no ChatGPT">
-                                  <Bot className="h-4 w-4 text-violet-500" />
-                                </Button>
+                                <Badge
+                                  variant={
+                                    a.source === "extension"
+                                      ? "default"
+                                      : a.source === "demo"
+                                        ? "outline"
+                                        : "secondary"
+                                  }
+                                  className="rounded-full"
+                                >
+                                  {a.source}
+                                </Badge>
                               </TooltipTrigger>
-                              <TooltipContent>Abrir no ChatGPT</TooltipContent>
+                              <TooltipContent>
+                                {a.source === "demo"
+                                  ? "Inserido em modo demonstração"
+                                  : a.source === "extension"
+                                    ? "Capturado pela extensão"
+                                    : "Inserido manualmente"}
+                              </TooltipContent>
                             </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" onClick={() => onScale(a)} aria-label="Enviar para Escalada">
-                                  <Rocket className={`h-4 w-4 ${a.scaled ? "text-emerald-500" : "text-amber-500"}`} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>{a.scaled ? "Já escalado" : "Enviar para Escalada"}</TooltipContent>
-                            </Tooltip>
-                            <Button size="icon" variant="ghost" onClick={() => onMarkReviewed(a)} aria-label="Marcar como revisado">
-                              <CheckCircle2 className={`h-4 w-4 ${a.status === "reviewed" ? "text-emerald-500" : ""}`} />
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={() => onDelete(a)} aria-label="Remover">
-                              <Trash2 className="h-4 w-4 text-red-500/80" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() =>
+                                  openExternal(
+                                    a.adUrl,
+                                    a.adLibraryId
+                                      ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}`
+                                      : null,
+                                  )
+                                }
+                                aria-label="Abrir anúncio"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => onSave(a)}
+                                aria-label="Salvar oferta"
+                              >
+                                <BookmarkCheck
+                                  className={`h-4 w-4 ${isSaved ? "text-primary" : ""}`}
+                                />
+                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => onOpenChatGPT(a)}
+                                    aria-label="Abrir no ChatGPT"
+                                  >
+                                    <Bot className="h-4 w-4 text-violet-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Abrir no ChatGPT</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => onScale(a)}
+                                    aria-label="Enviar para Escalada"
+                                  >
+                                    <Rocket
+                                      className={`h-4 w-4 ${isScaled ? "text-emerald-500" : "text-amber-500"}`}
+                                    />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {isScaled ? "Já escalado" : "Enviar para Escalada"}
+                                </TooltipContent>
+                              </Tooltip>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => onMarkReviewed(a)}
+                                aria-label="Marcar como revisado"
+                              >
+                                <CheckCircle2
+                                  className={`h-4 w-4 ${a.status === "reviewed" ? "text-emerald-500" : ""}`}
+                                />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => onDelete(a)}
+                                aria-label="Remover"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500/80" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TooltipProvider>
                 </TableBody>
               </Table>
@@ -411,10 +662,22 @@ function MiningCenterPage() {
 
 function ConnectionPill({ connected }: { connected: boolean | null }) {
   if (connected === null) {
-    return <Badge variant="outline" className="rounded-full"><RefreshCw className="mr-1 h-3 w-3 animate-spin" /> Detectando…</Badge>;
+    return (
+      <Badge variant="outline" className="rounded-full">
+        <RefreshCw className="mr-1 h-3 w-3 animate-spin" /> Detectando…
+      </Badge>
+    );
   }
   if (connected) {
-    return <Badge className="rounded-full bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20"><Wifi className="mr-1 h-3 w-3" /> Extensão conectada</Badge>;
+    return (
+      <Badge className="rounded-full bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/20">
+        <Wifi className="mr-1 h-3 w-3" /> Extensão conectada
+      </Badge>
+    );
   }
-  return <Badge variant="outline" className="rounded-full text-muted-foreground"><WifiOff className="mr-1 h-3 w-3" /> Extensão não detectada</Badge>;
+  return (
+    <Badge variant="outline" className="rounded-full text-muted-foreground">
+      <WifiOff className="mr-1 h-3 w-3" /> Extensão não detectada
+    </Badge>
+  );
 }
