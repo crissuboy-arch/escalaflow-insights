@@ -171,6 +171,36 @@ function MinePage() {
     navigate({ to: "/analise-ia", search: { offer: ingested.id } as never });
   };
 
+  const onSaveCollected = async (ad: CollectedAd) => {
+    if (!user) return;
+    const key = ad.ad_library_id || ad.ad_url || ad.id;
+    await miningRepo.ingestMany([
+      {
+        headline: ad.headline || ad.advertiser,
+        copy: ad.copy ?? "",
+        platform: ad.platform,
+        country: ad.country,
+        niche: ad.niche,
+        score: ad.score,
+        adUrl: ad.ad_url ?? undefined,
+        adLibraryId: ad.ad_library_id ?? undefined,
+        analysisType: "manual",
+        creativeUrl: ad.image_url || ad.video_url || undefined,
+        creativeType: ad.video_url ? "video" : ad.image_url ? "image" : undefined,
+        advertiser: ad.advertiser,
+        cta: ad.cta ?? undefined,
+        createdAt: ad.created_at,
+      },
+    ], "extension");
+    const isSaved = await toggleSaveOffer(user.id, key);
+    setSavedIds((s) => {
+      const n = new Set(s);
+      isSaved ? n.add(key) : n.delete(key);
+      return n;
+    });
+    toast.success(isSaved ? "Salvo na Central" : "Removido dos salvos");
+  };
+
   const onFavoriteCollected = async (ad: CollectedAd) => {
     if (!user) return;
     const key = ad.ad_library_id || ad.ad_url || ad.id;
