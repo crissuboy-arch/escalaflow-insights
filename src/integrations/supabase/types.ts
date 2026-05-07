@@ -70,6 +70,78 @@ export type Database = {
           },
         ]
       }
+      collected_ads: {
+        Row: {
+          ad_library_id: string | null
+          ad_url: string | null
+          advertiser: string
+          copy: string | null
+          country: string
+          created_at: string
+          creative_type: string | null
+          cta: string | null
+          favorite: boolean
+          headline: string
+          id: string
+          image_url: string | null
+          keyword: string | null
+          niche: string
+          platform: string
+          raw: Json | null
+          score: number
+          source: string
+          status: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          ad_library_id?: string | null
+          ad_url?: string | null
+          advertiser?: string
+          copy?: string | null
+          country?: string
+          created_at?: string
+          creative_type?: string | null
+          cta?: string | null
+          favorite?: boolean
+          headline?: string
+          id?: string
+          image_url?: string | null
+          keyword?: string | null
+          niche?: string
+          platform?: string
+          raw?: Json | null
+          score?: number
+          source?: string
+          status?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          ad_library_id?: string | null
+          ad_url?: string | null
+          advertiser?: string
+          copy?: string | null
+          country?: string
+          created_at?: string
+          creative_type?: string | null
+          cta?: string | null
+          favorite?: boolean
+          headline?: string
+          id?: string
+          image_url?: string | null
+          keyword?: string | null
+          niche?: string
+          platform?: string
+          raw?: Json | null
+          score?: number
+          source?: string
+          status?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: []
+      }
       mined_offers: {
         Row: {
           ads_count: number
