@@ -105,7 +105,10 @@ function EbookPage() {
   };
 
   useEffect(() => {
-    refreshDrafts();
+    // Wait for Supabase session to hydrate before calling auth-protected fns
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) refreshDrafts();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
