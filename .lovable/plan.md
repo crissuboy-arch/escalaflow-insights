@@ -1,75 +1,66 @@
-# Plano: Refinamento Premium EscalaFlow
+## Diagnosis
 
-Tudo mock/local, sem backend.
+The DB sample confirms the problem is in **normalization, not Apify**: rows show `headline = advertiser`, empty `copy`, null `image_url`/`video_url`. The `curious_coder/facebook-ads-library-scraper` actor returns ad data in a **nested `snapshot` object** (with `cards[]`, `images[]`, `videos[]`, `body.text`, `title`, `link_description`, `cta_text`, `page_name`, `original_image_url`, `resized_image_url`, `video_preview_image_url`, `video_hd_url`, etc.), and our current `pick()` only looks at top-level keys. So 99% of useful fields are silently dropped.
 
-## 1. Página Favoritos como biblioteca premium (`src/routes/_authenticated/favoritos.tsx`)
+We're also not persisting the raw payload, which makes debugging blind.
 
-- Cabeçalho com contador de itens e ícone Heart em destaque.
-- Grid responsivo: 1 col mobile, 2 col md, 3 col lg (cards maiores que o padrão de Minerar).
-- Novo `<FavoriteCard />` inline com:
-  - imagem maior (aspect 16/10), overlay gradiente
-  - estrela amarela grande no canto com glow constante
-  - badges modernos (rounded-full, ícones)
-  - score grande sobre a imagem
-  - hover: glow + lift via `card-glow` e `framer-motion`
-  - botão "Analisar" com gradient + botão para remover favorito
-- Empty state visual com ícone, mensagem e CTA "Minerar ofertas".
+## Plan
 
-## 2. Botão "Minerar com IA" mais premium (`src/routes/_authenticated/minerar.tsx`)
+### 1. Persist raw payload for forensics
+- In `collector.run.ts`, include `raw: a.raw` when inserting into `collected_ads` (column already exists, currently null).
+- Add `raw?: unknown` to `CollectorAd` type, populated by the normalizer with the original Apify item.
 
-- Wrap do botão com camada de glow pulsante (div absolute blur).
-- Ícone Wand2 com pequena rotação no hover (motion).
-- Pequena partícula/sparkle animado ao lado do texto.
-- Loading dentro do dialog: substituir spinner por animação de "scan" — barra horizontal cruzando + 3 dots digitando "Analisando padrões…".
+### 2. Rewrite the normalizer to walk the actor's real shape
+File: `src/lib/collector/collector.normalizer.ts`
 
-## 3. Tendências detectadas pela IA enriquecidas
+- Add `deepPick(obj, paths[])` helper that supports dotted paths (`snapshot.body.text`, `snapshot.cards.0.body`) and returns the first non-empty string.
+- Add `deepFindString(obj, regex)` fallback that recursively scans for the first URL matching `\.(jpg|png|webp)` or `\.mp4` if structured paths miss.
+- Map fields with this priority order (real keys from this actor):
 
-Atualizar mock no array `TRENDS` em minerar.tsx para cada item conter: emoji, título, subtítulo, **score**, **growth %**, **time**, **country**, **trendDirection** (up/down/stable). Renderizar:
-- linha do topo: emoji + título + badge de país
-- linha meio: barra de score mini + % crescimento (verde com seta)
-- rodapé: "há 2h" + indicador visual de tendência (sparkline minimalista CSS ou ícone TrendingUp animado)
+  | Field | Source priority |
+  |---|---|
+  | `advertiser` | `snapshot.page_name` → `page_name` → `advertiser_name` → `pageName` |
+  | `headline` | `snapshot.title` → `snapshot.cards[0].title` → `ad_creative_link_title` → `title` |
+  | `copy` | `snapshot.body.text` → `snapshot.body.markup.__html` → `snapshot.cards[0].body` → `ad_creative_body` → `body` |
+  | `cta` | `snapshot.cta_text` → `snapshot.cards[0].cta_text` → `cta_type` |
+  | `imageUrl` | `snapshot.images[0].original_image_url` → `snapshot.images[0].resized_image_url` → `snapshot.cards[0].original_image_url` → `snapshot.cards[0].resized_image_url` → `snapshot.videos[0].video_preview_image_url` → top-level `image_url` → deep-find image regex |
+  | `videoUrl` | `snapshot.videos[0].video_hd_url` → `snapshot.videos[0].video_sd_url` → `snapshot.cards[0].video_hd_url` → top-level `video_url` |
+  | `videoThumbnail` | `snapshot.videos[0].video_preview_image_url` → `snapshot.cards[0].video_preview_image_url` |
+  | `adLibraryId` | `ad_archive_id` → `adArchiveId` → `snapshot.ad_archive_id` |
+  | `adUrl` | derived from `adLibraryId` (Facebook Ads Library URL) → `url` |
+  | `platform` | `publisher_platform[]` joined (Facebook/Instagram/Messenger/Audience Network) — keep first as primary |
+  | `country` | `snapshot.country` → top-level `country` → input fallback |
+  | `startDate` | `start_date` (epoch) → ISO string |
 
-## 4. Página individual da oferta — header premium (`src/routes/_authenticated/oferta.$id.tsx`)
+- If `videoUrl` is present and `imageUrl` is missing, **use `videoThumbnail` as `imageUrl`** so the card always has visual media when available. No fake/placeholder generation — if both are absent, leave empty.
 
-Nova grade de métricas abaixo do banner (4 cards):
-- **Score gigante**: círculo SVG com progresso animado, valor central enorme, label de status.
-- **Anúncios ativos**: número derivado mock (ex.: `score * 1.7`), com ícone Megaphone.
-- **Países detectados**: chips de bandeiras (3-5 países mock).
-- **Tempo estimado de escala**: ex. "12 dias", ícone Clock.
-- **Tendência de crescimento**: % + seta + sparkline mock.
-- **Status premium**: badge gradiente "🔥 Hot", "🚀 Escalando" etc.
+### 3. Increase fields requested from the actor
+File: `src/lib/collector/collector.apify.ts`
+- Pass `scrapeAdDetails: true` (and `scrapePageAds.activeStatus: "active"` already present) so the actor returns `snapshot` (full creative payload) instead of summary-only.
+- Add a `console.log("[apify] sample item keys:", Object.keys(first), JSON.stringify(first).slice(0, 1500))` of the first item (server-side only) for one-shot debugging.
 
-## 5. Mapa Estratégico da Oferta
+### 4. Update types
+File: `src/lib/collector/collector.types.ts`
+- Add to `CollectorAd`: `videoThumbnail?: string`, `startDate?: string`, `platforms?: string[]`, `raw?: unknown`, `mediaSource?: "image"|"video-thumb"|"card-image"|"none"` (which path resolved the media — used for the UI badge).
 
-Novo card `MapaEstrategico` na página da oferta. Layout em grid 2x4 (responsivo) com 8 blocos visuais conectados:
-- Mecanismo, Promessa, Dores, Desejos, Avatar, CTA, Tipo de criativo, Tipo de funil.
-- Cada bloco: ícone colorido + título + texto curto da `analysis`.
-- Estilo "mapa": fundo gradient sutil, bordas glow, micro animação de fade-in com stagger.
+### 5. Persist new fields
+File: `src/routes/api/collector.run.ts`
+- Include `raw: a.raw` in the row payload (column exists).
+- No DB schema change needed (existing columns cover everything except `start_date`, which we'll add via migration only if user wants it persisted — initially keep it client-side from the response).
 
-## 6. Score de Oportunidade
+### 6. Frontend: media-source debug badge + fuller debug
+File: `src/routes/_authenticated/minerar.tsx`
+- Each card: small badge showing `mediaSource` (e.g. "imagem", "thumb do vídeo", "sem mídia"). No invented content.
+- Expand the existing "Debug temporário" panel: show counts of items with image / video / neither, and the field paths that resolved for the first item.
+- Keep "sem mídia capturada" / "sem copy capturada" placeholders but only when truly empty after the new normalization pass.
 
-Novo card `ScoreOportunidade` na página da oferta. 5 métricas com barras horizontais animadas:
-- Fácil de copiar (0-100)
-- Concorrência (0-100, invertido visualmente — vermelho alto = ruim)
-- Potencial viral
-- Saturação (invertido)
-- Ticket provável (R$ XX-XXX, mostrado como faixa)
+### 7. Validation
+- Trigger a new mining run for "diabetes" via the UI after deploy.
+- Expect: most cards now have `imageUrl` or `videoThumbnail`, real `copy` text, real `headline ≠ advertiser`, and `mediaSource` badge populated.
+- Inspect `collected_ads.raw` in DB to confirm payload shape for any remaining empties — adjust priority list if a new key surfaces.
 
-Valores derivados deterministicamente do `offer.id`/`scale_score` para serem consistentes. Cada barra com cor semântica (verde/amarelo/vermelho) e ícone.
-
-## 7. Refinamento visual geral
-
-- Adicionar utilitário `.glass` em `src/styles.css` (backdrop-blur + border sutil) para uso em headers de cards premium.
-- Reduzir uso de `Badge variant="secondary"` em favor de chips com ícones.
-- Garantir contraste em dark/light verificando os novos componentes.
-- Stagger animations consistentes (delay 0.05s entre filhos).
-
-## Arquivos afetados
-
-- `src/styles.css` — utilitário `.glass`, animação pulse para botão IA, sparkline base.
-- `src/lib/queries.ts` — enriquecer `getAITrends`/novo helper `getOfferMetrics(id)` retornando ads ativos, países, tempo escala, growth, opportunity scores.
-- `src/routes/_authenticated/minerar.tsx` — botão IA premium, trends enriquecidas, loading scan.
-- `src/routes/_authenticated/favoritos.tsx` — biblioteca premium com `FavoriteCard` inline.
-- `src/routes/_authenticated/oferta.$id.tsx` — métricas no header, Mapa Estratégico, Score de Oportunidade.
-
-Sem novas dependências.
+### What this plan does NOT do
+- No mocks, no fake images, no synthetic copy.
+- No changes to extension or ChatGPT integration.
+- No DB schema migration (uses existing columns).
+- No change to the Apify token or the actor identity.
