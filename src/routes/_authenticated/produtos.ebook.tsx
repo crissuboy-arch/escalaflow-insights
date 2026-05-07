@@ -17,9 +17,15 @@ import {
   generateEbookOutline,
   generateEbookChapter,
   generateEbookCover,
+  saveEbookDraft,
+  listEbookDrafts,
+  loadEbookDraft,
+  deleteEbookDraft,
 } from "@/lib/ebook.functions";
 import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
+import { EbookPreview } from "@/components/ebook/EbookPreview";
+import { DraftList, type DraftRow } from "@/components/ebook/DraftList";
 
 export const Route = createFileRoute("/_authenticated/produtos/ebook")({
   component: EbookPage,
@@ -67,11 +73,19 @@ function EbookPage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [ebookId, setEbookId] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<DraftRow[]>([]);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
   const fnExtract = useServerFn(extractEbookBriefing);
   const fnOutline = useServerFn(generateEbookOutline);
   const fnChapter = useServerFn(generateEbookChapter);
   const fnCover = useServerFn(generateEbookCover);
+  const fnSave = useServerFn(saveEbookDraft);
+  const fnList = useServerFn(listEbookDrafts);
+  const fnLoad = useServerFn(loadEbookDraft);
+  const fnDelete = useServerFn(deleteEbookDraft);
 
   useEffect(() => {
     Promise.all([fetchFavoriteAds(), fetchSavedAds(), fetchScaledAds()]).then(([f, s, sc]) => {
@@ -81,7 +95,89 @@ function EbookPage() {
     });
   }, []);
 
-  const goNext = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  const refreshDrafts = async () => {
+    try {
+      const list = await fnList();
+      setDrafts(list as DraftRow[]);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    refreshDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveDraft = async (overrides?: { step?: number; status?: "draft" | "ready" }) => {
+    if (!briefing && !selectedAd) return;
+    try {
+      const payload = {
+        source_ad_key: selectedAd?.key ?? null,
+        title: briefing?.title || selectedAd?.headline?.slice(0, 80) || "Novo Ebook",
+        subtitle: briefing?.subtitle ?? null,
+        niche: briefing?.niche ?? selectedAd?.niche ?? null,
+        briefing: (briefing ?? {}) as Record<string, unknown>,
+        outline,
+        chapters,
+        layout,
+        cover_url: coverUrl,
+        status: overrides?.status ?? "draft",
+        step: overrides?.step ?? step,
+        chapter_count: chapterCount,
+      };
+      const { id } = await fnSave({ data: { id: ebookId ?? undefined, payload } });
+      setEbookId(id);
+      setSavedAt(new Date());
+      refreshDrafts();
+    } catch (e) {
+      console.error("saveDraft", e);
+    }
+  };
+
+  const onResumeDraft = async (id: string) => {
+    setBusy("Carregando rascunho…");
+    try {
+      const row = (await fnLoad({ data: { id } })) as Record<string, unknown>;
+      setEbookId(id);
+      setBriefing((row.briefing as Briefing) ?? null);
+      setOutline((row.outline as Outline) ?? []);
+      setChapters((row.chapters as Chapter[]) ?? []);
+      setLayout((row.layout as EbookLayout) ?? "classico");
+      setCoverUrl((row.cover_url as string | null) ?? null);
+      setChapterCount((row.chapter_count as number) ?? 6);
+      const adKey = row.source_ad_key as string | null;
+      if (adKey) {
+        const ad = ads.find((a) => a.key === adKey) ?? null;
+        setSelectedAd(ad);
+      }
+      setStep(((row.step as number) ?? 0) as number);
+      toast.success("Rascunho retomado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao carregar rascunho");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onDeleteDraft = async (id: string) => {
+    try {
+      await fnDelete({ data: { id } });
+      if (ebookId === id) setEbookId(null);
+      refreshDrafts();
+      toast.success("Rascunho excluído");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir");
+    }
+  };
+
+  const goNext = () => {
+    setStep((s) => {
+      const next = Math.min(STEPS.length - 1, s + 1);
+      setTimeout(() => saveDraft({ step: next }), 0);
+      return next;
+    });
+  };
   const goBack = () => setStep((s) => Math.max(0, s - 1));
 
   const onExtract = async () => {
@@ -177,12 +273,32 @@ function EbookPage() {
         acc.push({ title: outline[i].title, markdown });
         setChapters([...acc]);
         setProgress({ done: i + 1, total: outline.length });
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        saveDraft();
       }
       toast.success("Capítulos gerados");
     } catch (e) {
       toast.error(await errMsg(e, "Falha durante geração"));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const onRegenerateChapter = async (i: number) => {
+    if (!briefing || !outline[i]) return;
+    setRegeneratingIndex(i);
+    try {
+      const { markdown } = await fnChapter({
+        data: { briefing, chapter: outline[i], index: i, total: outline.length },
+      });
+      const next = chapters.map((c, idx) => (idx === i ? { ...c, markdown } : c));
+      setChapters(next);
+      saveDraft();
+      toast.success(`Capítulo ${i + 1} regerado`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao regerar capítulo");
+    } finally {
+      setRegeneratingIndex(null);
     }
   };
 
@@ -207,24 +323,7 @@ function EbookPage() {
       a.click();
       URL.revokeObjectURL(url);
 
-      // persist
-      const { data: userRes } = await supabase.auth.getUser();
-      const uid = userRes.user?.id;
-      if (uid) {
-        await supabase.from("ebooks").insert({
-          user_id: uid,
-          source_ad_key: selectedAd?.key ?? null,
-          title: briefing.title,
-          subtitle: briefing.subtitle,
-          niche: briefing.niche,
-          briefing,
-          outline,
-          chapters,
-          layout,
-          cover_url: coverUrl,
-          status: "ready",
-        });
-      }
+      await saveDraft({ status: "ready" });
       toast.success("PDF exportado");
     } catch (e) {
       toast.error(await errMsg(e, "Falha ao exportar PDF"));
@@ -254,7 +353,14 @@ function EbookPage() {
           <h1 className="text-3xl font-bold tracking-tight">Criar Ebook</h1>
           <p className="text-muted-foreground">Transforme um anúncio minerado em ebook pronto para venda.</p>
         </div>
+        {savedAt && (
+          <span className="ml-auto text-xs text-muted-foreground">
+            Rascunho salvo às {savedAt.toLocaleTimeString()}
+          </span>
+        )}
       </div>
+
+      <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
 
       {/* Stepper */}
       <div className="flex flex-wrap gap-2">
@@ -485,16 +591,21 @@ function EbookPage() {
                 <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
               </Button>
             </div>
-            <div className="space-y-3">
-              {chapters.map((c, i) => (
-                <details key={i} className="rounded-lg border border-border/60 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold">
-                    {i + 1}. {c.title}
-                  </summary>
-                  <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{c.markdown}</pre>
-                </details>
-              ))}
-            </div>
+            {chapters.length > 0 && briefing && (
+              <EbookPreview
+                title={briefing.title}
+                subtitle={briefing.subtitle}
+                layout={layout}
+                coverUrl={coverUrl}
+                chapters={chapters}
+                onChange={(next) => {
+                  setChapters(next);
+                  saveDraft();
+                }}
+                onRegenerate={onRegenerateChapter}
+                regeneratingIndex={regeneratingIndex}
+              />
+            )}
           </CardContent>
         </Card>
       )}

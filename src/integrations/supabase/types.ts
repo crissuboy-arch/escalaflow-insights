@@ -145,6 +145,7 @@ export type Database = {
       ebooks: {
         Row: {
           briefing: Json
+          chapter_count: number
           chapters: Json
           cover_url: string | null
           created_at: string
@@ -154,6 +155,7 @@ export type Database = {
           outline: Json
           source_ad_key: string | null
           status: string
+          step: number
           subtitle: string | null
           title: string
           updated_at: string
@@ -161,6 +163,7 @@ export type Database = {
         }
         Insert: {
           briefing?: Json
+          chapter_count?: number
           chapters?: Json
           cover_url?: string | null
           created_at?: string
@@ -170,6 +173,7 @@ export type Database = {
           outline?: Json
           source_ad_key?: string | null
           status?: string
+          step?: number
           subtitle?: string | null
           title?: string
           updated_at?: string
@@ -177,6 +181,7 @@ export type Database = {
         }
         Update: {
           briefing?: Json
+          chapter_count?: number
           chapters?: Json
           cover_url?: string | null
           created_at?: string
@@ -186,6 +191,7 @@ export type Database = {
           outline?: Json
           source_ad_key?: string | null
           status?: string
+          step?: number
           subtitle?: string | null
           title?: string
           updated_at?: string
