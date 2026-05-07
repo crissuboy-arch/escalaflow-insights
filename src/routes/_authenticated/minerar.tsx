@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge as UIBadge } from "@/components/ui/badge";
 import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkCheck, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { openExternal } from "@/lib/external";
 
 type CollectedAd = {
   id: string;
@@ -442,7 +443,14 @@ function MinePage() {
           <div><Label>{t("mine.country")}</Label>
             <Select value={country} onValueChange={setCountry}><SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">{t("common.all")}</SelectItem>
-                {["BR","US","ES","PT","FR"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {[
+                  { code: "BR", label: "Brasil" },
+                  { code: "US", label: "Estados Unidos" },
+                  { code: "GB", label: "Reino Unido" },
+                  { code: "ES", label: "Espanha" },
+                  { code: "PT", label: "Portugal" },
+                  { code: "FR", label: "França" },
+                ].map((c) => <SelectItem key={c.code} value={c.code}>{c.label} ({c.code})</SelectItem>)}
               </SelectContent></Select></div>
           <div><Label>{t("mine.platform")}</Label>
             <Select value={platform} onValueChange={setPlatform}><SelectTrigger><SelectValue /></SelectTrigger>
@@ -510,24 +518,7 @@ function MinePage() {
             </Button>
           </div>
 
-          {collectorDebug && (
-            <div className="mb-4 rounded-lg border border-border/60 bg-muted/30 p-4 text-xs">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <Badge variant="secondary" className="rounded-full">Debug temporário</Badge>
-                <span className="font-semibold">Total recebido: {collectorDebug.total}</span>
-                <span className="text-muted-foreground">Campos: {collectorDebug.fields.join(", ") || "nenhum"}</span>
-              </div>
-              <div className="mb-2 flex flex-wrap items-center gap-3 text-muted-foreground">
-                <span>Com imagem: <b className="text-foreground">{collectorDebug.withImage}</b></span>
-                <span>Com vídeo: <b className="text-foreground">{collectorDebug.withVideo}</b></span>
-                <span>Sem mídia: <b className="text-foreground">{collectorDebug.withoutMedia}</b></span>
-                <span>Fontes: {Object.entries(collectorDebug.mediaSources).map(([k, v]) => `${k}=${v}`).join(", ") || "—"}</span>
-              </div>
-              <pre className="max-h-48 overflow-auto rounded-md bg-background/70 p-3 text-[11px] leading-relaxed text-muted-foreground">
-                {JSON.stringify(collectorDebug.firstItem, null, 2)}
-              </pre>
-            </div>
-          )}
+          {/* Debug visual removido — logs continuam no console do navegador */}
 
           {collectedLoading && visibleCollected.length === 0 ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -586,11 +577,7 @@ function MinePage() {
                           sem mídia capturada
                         </div>
                       )}
-                      {a.media_source && a.media_source !== "none" && (
-                        <div className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-1 text-[10px] font-medium text-muted-foreground backdrop-blur">
-                          mídia: {a.media_source}
-                        </div>
-                      )}
+                      {/* badge de mídia técnico removido */}
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-4">
                       <div>
@@ -613,10 +600,15 @@ function MinePage() {
                         <Button size="sm" variant="outline" onClick={() => onFavoriteCollected(a)}>
                           <Star className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`} /> Favoritar
                         </Button>
-                        <Button size="sm" variant="ghost" asChild disabled={!a.ad_url}>
-                          <a href={a.ad_url || "#"} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
-                          </a>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => openExternal(
+                            a.ad_url,
+                            a.ad_library_id ? `https://www.facebook.com/ads/library/?id=${a.ad_library_id}` : null,
+                          )}
+                        >
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
                         </Button>
                       </div>
                     </div>
