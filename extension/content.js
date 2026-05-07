@@ -294,9 +294,27 @@
 
   async function send(card, analysisType) {
     const ad = capturarCardReal(card);
+    try {
+      await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: "ESCALA_CAPTURE" }, (res) => {
+          if (res?.ok && res.dataUrl && !ad.imageUrl && !ad.thumbnail) ad.thumbnail = res.dataUrl;
+          resolve();
+        });
+      });
+    } catch {}
     const endpoint = await getEndpoint();
     window.open(buildUrl(endpoint, ad, analysisType), "_blank", "noopener");
-    toast("Anúncio minerado com sucesso");
+    try {
+      window.postMessage({ source: "escalaflow-extension", type: "ingest", payload: {
+        headline: ad.headline, copy: ad.copy, adUrl: ad.url, platform: ad.platform,
+        country: ad.country, niche: ad.niche, score: ad.score, analysisType,
+        creativeUrl: ad.imageUrl || ad.thumbnail || ad.videoUrl,
+        advertiser: ad.advertiser, cta: ad.cta, description: ad.description,
+        adLibraryId: ad.adLibraryId, startDate: ad.startDate,
+        creativeType: ad.creativeType, platforms: ad.platforms, createdAt: ad.createdAt,
+      }}, "*");
+    } catch {}
+    toast("Anúncio salvo na Central");
     if (analysisType !== "manual") {
       try {
         chrome.runtime.sendMessage(
@@ -331,7 +349,15 @@
       b.textContent = label;
       b.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
-        menu.classList.remove("open"); send(card, type);
+        menu.classList.remove("open");
+        const orig = anchor.textContent;
+        anchor.textContent = "⏳ enviando…";
+        anchor.style.opacity = "1";
+        anchor.style.pointerEvents = "none";
+        Promise.resolve(send(card, type)).finally(() => {
+          anchor.textContent = orig;
+          anchor.style.pointerEvents = "";
+        });
       });
       menu.appendChild(b);
       if (i < ACTIONS.length - 1) {
