@@ -136,7 +136,7 @@ export const saveEbookDraft = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const row = { ...data.payload, user_id: userId };
+    const row = { ...data.payload, user_id: userId } as never;
     if (data.id) {
       const { data: out, error } = await supabase
         .from("ebooks")
