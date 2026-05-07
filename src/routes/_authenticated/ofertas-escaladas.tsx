@@ -29,6 +29,8 @@ type Row = {
   created_at: string;
   ad_library_id: string | null;
   ad_url: string | null;
+  scaled?: boolean;
+  repeatedCreativeCount?: number;
 };
 
 type Scaled = {
@@ -48,6 +50,8 @@ type Scaled = {
   created_at: string;
   ad_library_id: string | null;
   ad_url: string | null;
+  scaled?: boolean;
+  repeatedCreativeCount?: number;
 };
 
 export const Route = createFileRoute("/_authenticated/ofertas-escaladas")({ component: ScaledPage });
@@ -86,6 +90,8 @@ function ScaledPage() {
         created_at: a.created_at,
         ad_library_id: a.ad_library_id,
         ad_url: a.ad_url,
+        scaled: a.scaled,
+        repeatedCreativeCount: a.repeatedCreativeCount,
       }));
       const map = new Map<string, Row>();
       [...persistedRows, ...dbRows].forEach((r) => { if (!map.has(r.key)) map.set(r.key, r); });
@@ -126,8 +132,10 @@ function ScaledPage() {
         created_at: top.created_at,
         ad_library_id: top.ad_library_id,
         ad_url: top.ad_url,
+        scaled: arr.some((x) => x.scaled),
+        repeatedCreativeCount: Math.max(arr.length, ...arr.map((x) => x.repeatedCreativeCount ?? 0)),
       };
-      if (item.score >= 80 || item.count > 1 || item.platforms.length > 1) out.push(item);
+      if (item.scaled || item.score >= 80 || item.repeatedCreativeCount > 1 || item.platforms.length > 1) out.push(item);
     }
     return out.sort((a, b) => b.score - a.score || b.count - a.count);
   }, [rows]);
