@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Heart, Star, Flame, Sparkles, Globe, Megaphone, Search, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { fetchFavoriteAds, favoriteCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
+import { openExternal } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/favoritos")({ component: FavoritesPage });
 
@@ -103,10 +104,14 @@ function FavoritesPage() {
                     <Button onClick={() => onAnalyze(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
                       <Sparkles className="mr-1 h-4 w-4" /> Analisar IA
                     </Button>
-                    <Button variant="outline" asChild disabled={!a.ad_url}>
-                      <a href={a.ad_url || "#"} target="_blank" rel="noreferrer">
-                        <ExternalLink className="mr-1 h-4 w-4" /> Abrir
-                      </a>
+                    <Button
+                      variant="outline"
+                      onClick={() => openExternal(
+                        a.ad_url,
+                        a.ad_library_id ? `https://www.facebook.com/ads/library/?id=${a.ad_library_id}` : null,
+                      )}
+                    >
+                      <ExternalLink className="mr-1 h-4 w-4" /> Abrir
                     </Button>
                   </div>
                 </div>
