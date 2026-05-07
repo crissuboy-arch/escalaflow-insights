@@ -146,9 +146,20 @@ function MiningCenterPage() {
   useEffect(() => {
     refresh();
     const unsub = miningRepo.subscribe(refresh);
+    const loadPersisted = async () => {
+      const [saved, favs, scaled] = await Promise.all([fetchSavedAds(), fetchFavoriteAds(), fetchScaledAds()]);
+      setSavedIds(new Set(saved.map((a) => a.key)));
+      setFavIds(new Set(favs.map((a) => a.key)));
+      setScaledIds(new Set(scaled.map((a) => a.key)));
+    };
+    loadPersisted();
+    const unsubPersisted = subscribeChange(() => loadPersisted());
     startExtensionBridge((n) => toast.success(`${n} anúncio(s) recebido(s) da extensão`));
     detectExtension().then(setExtensionConnected);
-    return unsub;
+    return () => {
+      unsub();
+      unsubPersisted();
+    };
   }, []);
 
   const platforms = useMemo(() => Array.from(new Set(ads.map((a) => a.platform))), [ads]);
@@ -184,17 +195,33 @@ function MiningCenterPage() {
     toast.success("Anúncio minerado com sucesso");
   };
 
-  const onToggleFav = async (a: MinedAd) => miningRepo.update(a.id, { favorite: !a.favorite });
+  const onToggleFav = async (a: MinedAd) => {
+    const persisted = toPersisted(a);
+    const next = !favIds.has(persisted.key);
+    await favoriteCollectedAd(persisted, next);
+    await miningRepo.update(a.id, { favorite: next });
+    setFavIds((s) => { const n = new Set(s); next ? n.add(persisted.key) : n.delete(persisted.key); return n; });
+  };
   const onMarkReviewed = async (a: MinedAd) =>
     miningRepo.update(a.id, { status: a.status === "reviewed" ? "new" : "reviewed" });
   const onDelete = async (a: MinedAd) => miningRepo.remove(a.id);
   const onScale = async (a: MinedAd) => {
+    const persisted = { ...toPersisted(a), scaled: true };
+    await scaleCollectedAd(persisted);
     await miningRepo.update(a.id, { scaled: true, status: "reviewed" });
+    setScaledIds((s) => new Set(s).add(persisted.key));
     toast.success("Enviado para Escalada");
   };
   const onOpenChatGPT = (a: MinedAd) => {
     const prompt = `Faça engenharia reversa do anúncio:\n\nAnunciante: ${a.advertiser || "—"}\nHeadline: ${a.headline}\nCopy: ${a.copy}\nCTA: ${a.cta || "—"}\nNicho: ${a.niche} | País: ${a.country}\nPlataforma: ${a.platform}\nLink: ${a.adUrl || "—"}\n\n1) Big Idea\n2) Avatar\n3) Estrutura\n4) Gatilhos\n5) Como escalar`;
+    rememberAdForAnalysis(toPersisted(a));
     openChatGPTWithPrompt(prompt);
+  };
+  const onSave = async (a: MinedAd) => {
+    const persisted = toPersisted(a);
+    const isSaved = await saveCollectedAd(persisted);
+    setSavedIds((s) => { const n = new Set(s); isSaved ? n.add(persisted.key) : n.delete(persisted.key); return n; });
+    toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
   };
   const onClearAll = async () => {
     if (!confirm("Limpar toda a central de mineração?")) return;
