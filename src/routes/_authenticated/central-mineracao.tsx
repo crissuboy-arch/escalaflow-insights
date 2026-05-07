@@ -331,9 +331,6 @@ function MiningCenterPage() {
           <Button variant="outline" size="sm" onClick={refresh}>
             <RefreshCw className="mr-1 h-4 w-4" /> Atualizar
           </Button>
-          <Button variant="outline" size="sm" onClick={onInsertTest}>
-            <Sparkles className="mr-1 h-4 w-4" /> Teste de Importação
-          </Button>
           <Button onClick={onReceive} className="ai-glow text-white">
             <Sparkles className="mr-2 h-4 w-4" /> Receber da Extensão
           </Button>
@@ -437,11 +434,6 @@ function MiningCenterPage() {
                   ? 'Nenhum anúncio recebido ainda. Clique em "Receber da Extensão" para começar.'
                   : "Nenhum anúncio corresponde aos filtros."}
               </p>
-              {ads.length === 0 && (
-                <Button onClick={onInsertTest} className="mt-2">
-                  <Sparkles className="mr-2 h-4 w-4" /> Inserir anúncio teste
-                </Button>
-              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
