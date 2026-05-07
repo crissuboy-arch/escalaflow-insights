@@ -21,6 +21,17 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Radar } from "lucide-react";
 import { openExternal, openChatGPTWithPrompt } from "@/lib/external";
+import {
+  favoriteCollectedAd,
+  fetchFavoriteAds,
+  fetchSavedAds,
+  fetchScaledAds,
+  rememberAdForAnalysis,
+  saveCollectedAd,
+  scaleCollectedAd,
+  subscribeChange,
+  type PersistedAd,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/central-mineracao")({ component: MiningCenterPage });
 
@@ -34,6 +45,30 @@ function MiningCenterPage() {
   const [favOnly, setFavOnly] = useState(false);
   const [mining, setMining] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [favIds, setFavIds] = useState<Set<string>>(new Set());
+  const [scaledIds, setScaledIds] = useState<Set<string>>(new Set());
+
+  const getAdKey = (a: MinedAd) => a.adLibraryId || a.adUrl || a.id.replace(/^db_/, "");
+  const toPersisted = (a: MinedAd): PersistedAd => ({
+    key: getAdKey(a),
+    ad_library_id: a.adLibraryId ?? null,
+    ad_url: a.adUrl ?? null,
+    advertiser: a.advertiser || "Anunciante",
+    headline: a.headline,
+    copy: a.copy || null,
+    cta: a.cta ?? null,
+    image_url: a.creativeType === "video" ? null : a.creativeUrl,
+    video_url: a.creativeType === "video" ? a.creativeUrl : null,
+    platform: a.platform,
+    country: a.country,
+    niche: a.niche,
+    score: a.score,
+    created_at: a.createdAt,
+    saved_at: new Date().toISOString(),
+    scaled: a.scaled,
+    platforms: a.platforms?.length ? a.platforms : [a.platform],
+  });
 
   const refresh = async () => {
     const local = await miningRepo.list();
