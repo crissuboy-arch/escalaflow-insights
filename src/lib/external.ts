@@ -36,11 +36,12 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
 }
 
 export async function openChatGPTWithPrompt(prompt: string): Promise<void> {
+  const copyPromise = navigator.clipboard.writeText(prompt);
+  openExternal("https://chatgpt.com/");
   try {
-    await navigator.clipboard.writeText(prompt);
+    await copyPromise;
     toast.success("Prompt copiado. Cole no ChatGPT.");
   } catch {
     toast.message("Abra o ChatGPT e cole seu prompt.");
   }
-  openExternal("https://chatgpt.com/");
 }
