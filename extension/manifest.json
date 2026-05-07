@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "EscalaFlow Miner",
+  "version": "1.0.0",
+  "description": "Minera anúncios do Facebook Ads Library e envia para o EscalaFlow.",
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://www.facebook.com/*",
+    "https://*.facebook.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png",
+    "default_title": "EscalaFlow Miner"
+  },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/ads/library/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "48": "icon.png", "128": "icon.png" }
+}
