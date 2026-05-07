@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import {
   Radio, Search, Star, Globe, Megaphone, Flame, ExternalLink,
-  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download,
+  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download, Rocket, Bot,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
@@ -77,6 +77,15 @@ function MiningCenterPage() {
   const onMarkReviewed = async (a: MinedAd) =>
     miningRepo.update(a.id, { status: a.status === "reviewed" ? "new" : "reviewed" });
   const onDelete = async (a: MinedAd) => miningRepo.remove(a.id);
+  const onScale = async (a: MinedAd) => {
+    await miningRepo.update(a.id, { scaled: true, status: "reviewed" });
+    toast.success("Enviado para Escalada");
+  };
+  const onOpenChatGPT = (a: MinedAd) => {
+    const prompt = `Faça engenharia reversa do anúncio:\n\nAnunciante: ${a.advertiser || "—"}\nHeadline: ${a.headline}\nCopy: ${a.copy}\nCTA: ${a.cta || "—"}\nNicho: ${a.niche} | País: ${a.country}\nPlataforma: ${a.platform}\nLink: ${a.adUrl || "—"}\n\n1) Big Idea\n2) Avatar\n3) Estrutura\n4) Gatilhos\n5) Como escalar`;
+    const url = "https://chatgpt.com/?q=" + encodeURIComponent(prompt);
+    window.open(url, "_blank", "noopener");
+  };
   const onClearAll = async () => {
     if (!confirm("Limpar toda a central de mineração?")) return;
     await miningRepo.clear();
@@ -242,6 +251,13 @@ function MiningCenterPage() {
                             <div className="min-w-0">
                               <p className="font-medium leading-snug line-clamp-1">{a.headline}</p>
                               <p className="text-xs text-muted-foreground line-clamp-1">{a.copy || "—"}</p>
+                              {a.tags && a.tags.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {a.tags.map((t) => (
+                                    <span key={t} className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{t}</span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </TableCell>
@@ -271,6 +287,22 @@ function MiningCenterPage() {
                             {a.adUrl && (
                               <Button asChild size="icon" variant="ghost"><a href={a.adUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
                             )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" onClick={() => onOpenChatGPT(a)} aria-label="Abrir no ChatGPT">
+                                  <Bot className="h-4 w-4 text-violet-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Abrir no ChatGPT</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button size="icon" variant="ghost" onClick={() => onScale(a)} aria-label="Enviar para Escalada">
+                                  <Rocket className={`h-4 w-4 ${a.scaled ? "text-emerald-500" : "text-amber-500"}`} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{a.scaled ? "Já escalado" : "Enviar para Escalada"}</TooltipContent>
+                            </Tooltip>
                             <Button size="icon" variant="ghost" onClick={() => onMarkReviewed(a)} aria-label="Marcar como revisado">
                               <CheckCircle2 className={`h-4 w-4 ${a.status === "reviewed" ? "text-emerald-500" : ""}`} />
                             </Button>
