@@ -4,10 +4,21 @@ import { toast } from "sonner";
  * Opens a URL in a new tab, escaping the preview iframe.
  * Accepts a list of candidate URLs and uses the first valid one.
  */
-export function openExternal(...candidates: Array<string | null | undefined>): boolean {
+export function openExternal(
+  ...args: Array<string | null | undefined | { errorMessage?: string }>
+): boolean {
+  let errorMessage = "Link não encontrado";
+  const candidates: Array<string | null | undefined> = [];
+  for (const arg of args) {
+    if (arg && typeof arg === "object") {
+      if (arg.errorMessage) errorMessage = arg.errorMessage;
+    } else {
+      candidates.push(arg as string | null | undefined);
+    }
+  }
   const url = candidates.find((u) => typeof u === "string" && /^https?:\/\//i.test(u));
   if (!url) {
-    toast.error("Link não encontrado");
+    toast.error(errorMessage);
     return false;
   }
   console.log("abrindo url externa", url);
