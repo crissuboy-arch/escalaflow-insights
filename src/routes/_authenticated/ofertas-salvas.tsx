@@ -1,42 +1,97 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/providers/AuthProvider";
-import { fetchSaved, toggleSaveOffer, subscribeChange } from "@/lib/queries";
-import { OfferCard } from "@/components/OfferCard";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
+import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search } from "lucide-react";
+import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/ofertas-salvas")({ component: SavedPage });
 
 function SavedPage() {
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const [rows, setRows] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [ads, setAds] = useState<PersistedAd[]>([]);
 
-  const load = async () => { if (user) setRows(await fetchSaved(user.id)); };
-  useEffect(() => { load(); const unsub = subscribeChange((s) => { if (s === "saved") load(); }); return unsub; }, [user]);
-
-  const onRemove = async (offerId: string) => {
-    if (!user) return;
-    await toggleSaveOffer(user.id, offerId);
-    toast.success("OK");
+  const load = async () => setAds(await fetchSavedAds());
+  useEffect(() => {
     load();
-  };
+    const unsub = subscribeChange((s) => { if (s === "saved") load(); });
+    return unsub;
+  }, []);
 
-  const offers = rows.map((r) => r.mined_offers).filter(Boolean);
+  const onRemove = async (a: PersistedAd) => {
+    await saveCollectedAd(a); // toggles off
+    toast.success("Removido dos salvos");
+  };
+  const onAnalyze = async (a: PersistedAd) => {
+    await rememberAdForAnalysis(a);
+    navigate({ to: "/analise-ia", search: { ad: a.key } as never });
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{t("saved_page.title")}</h1>
-        <p className="text-muted-foreground">{t("saved_page.subtitle")}</p>
+        <p className="text-muted-foreground">
+          <span className="font-semibold text-foreground">{ads.length}</span> {ads.length === 1 ? "anúncio salvo" : "anúncios salvos"}
+        </p>
       </div>
-      {offers.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">{t("saved_page.empty")}</p>
+      {ads.length === 0 ? (
+        <Card className="flex flex-col items-center gap-3 border-dashed border-border/60 bg-card/50 px-6 py-16 text-center">
+          <BookmarkCheck className="h-10 w-10 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Nenhuma oferta salva ainda.</p>
+          <Button asChild className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+            <Link to="/minerar"><Search className="mr-2 h-4 w-4" /> Minerar anúncios</Link>
+          </Button>
+        </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {offers.map((o) => (
-            <OfferCard key={o.id} offer={o} saved onToggleSave={() => onRemove(o.id)} />
+          {ads.map((a) => (
+            <motion.div key={a.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <Card className="overflow-hidden border-border/60 bg-card transition hover:border-primary/40">
+                <div className="relative aspect-video bg-muted">
+                  {a.video_url ? (
+                    <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline controls />
+                  ) : a.image_url ? (
+                    <img src={a.image_url} alt={a.headline} className="h-full w-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                      <ImageIcon className="h-8 w-8 opacity-40" />
+                    </div>
+                  )}
+                  <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 text-xs font-bold backdrop-blur">
+                    <Flame className="h-3 w-3 text-primary" /> {a.score}
+                  </div>
+                </div>
+                <div className="space-y-2 p-4">
+                  <h3 className="line-clamp-1 text-sm font-semibold">{a.advertiser}</h3>
+                  <p className="line-clamp-2 text-xs text-muted-foreground">{a.headline}</p>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge variant="secondary" className="text-xs"><Megaphone className="mr-1 h-3 w-3" />{a.platform}</Badge>
+                    <Badge variant="outline" className="text-xs"><Globe className="mr-1 h-3 w-3" />{a.country}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <Button size="sm" onClick={() => onAnalyze(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                      <Sparkles className="mr-1 h-3.5 w-3.5" /> IA
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => onRemove(a)}>
+                      <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> Remover
+                    </Button>
+                    {a.ad_url && (
+                      <Button size="sm" variant="ghost" className="col-span-2" asChild>
+                        <a href={a.ad_url} target="_blank" rel="noreferrer">
+                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
           ))}
         </div>
       )}
