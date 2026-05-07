@@ -109,3 +109,91 @@ export const generateEbookCover = createServerFn({ method: "POST" })
       throw new Error(e instanceof Error ? e.message : "Falha ao gerar capa");
     }
   });
+
+const ChapterSchema = z.object({ title: z.string(), markdown: z.string() });
+const DraftPayloadSchema = z.object({
+  source_ad_key: z.string().nullable().optional(),
+  title: z.string().min(1).max(300),
+  subtitle: z.string().max(500).nullable().optional(),
+  niche: z.string().max(200).nullable().optional(),
+  briefing: z.record(z.string(), z.unknown()).default({}),
+  outline: z.array(OutlineChapterSchema).default([]),
+  chapters: z.array(ChapterSchema).default([]),
+  layout: z.enum(["classico", "moderno", "minimalista"]).default("classico"),
+  cover_url: z.string().nullable().optional(),
+  status: z.enum(["draft", "ready"]).default("draft"),
+  step: z.number().min(0).max(10).default(0),
+  chapter_count: z.number().min(3).max(15).default(6),
+});
+
+export const saveEbookDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { id?: string; payload: z.infer<typeof DraftPayloadSchema> }) =>
+      z
+        .object({ id: z.string().uuid().optional(), payload: DraftPayloadSchema })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const row = { ...data.payload, user_id: userId };
+    if (data.id) {
+      const { data: out, error } = await supabase
+        .from("ebooks")
+        .update(row)
+        .eq("id", data.id)
+        .eq("user_id", userId)
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+      return { id: out.id };
+    }
+    const { data: out, error } = await supabase
+      .from("ebooks")
+      .insert(row)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: out.id };
+  });
+
+export const listEbookDrafts = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data, error } = await supabase
+      .from("ebooks")
+      .select("id, title, niche, status, step, chapter_count, cover_url, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const loadEbookDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) =>
+    z.object({ id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row, error } = await supabase
+      .from("ebooks")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (error) throw new Error(error.message);
+    return row;
+  });
+
+export const deleteEbookDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) =>
+    z.object({ id: z.string().uuid() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase.from("ebooks").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
