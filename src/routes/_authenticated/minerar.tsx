@@ -11,8 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar } from "lucide-react";
-import { fetchOffers, toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, type AITrends } from "@/lib/queries";
-import { OfferCard } from "@/components/OfferCard";
+import { toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, type AITrends } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
 import { miningRepo } from "@/lib/mining/repository";
@@ -67,10 +66,8 @@ function MinePage() {
   const [platform, setPlatform] = useState("all");
   const [quantity, setQuantity] = useState(20);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [offers, setOffers] = useState<any[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [trends, setTrends] = useState<AITrends | null>(null);
@@ -118,18 +115,6 @@ function MinePage() {
     };
   }, []);
 
-  const load = async (opts?: { keyword?: string; niche?: string }) => {
-    setLoading(true);
-    try {
-      setOffers(await fetchOffers({
-        keyword: opts?.keyword ?? keyword,
-        niche: opts?.niche ?? niche,
-        country, platform, limit: quantity,
-      }));
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!user) return;
     fetchSavedIds(user.id).then(setSavedIds);
@@ -221,7 +206,6 @@ function MinePage() {
     const newNiche = newActive && TAG_TO_NICHE[newActive] ? TAG_TO_NICHE[newActive] : "all";
     setKeyword(newKeyword);
     setNiche(newNiche);
-    load({ keyword: newKeyword, niche: newNiche });
   };
 
   const onAIMine = async () => {
