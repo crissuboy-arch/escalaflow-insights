@@ -40,6 +40,20 @@ type Chapter = { title: string; markdown: string };
 
 const STEPS = ["Anúncio", "Briefing", "Estrutura", "Layout & Capa", "Capítulos & PDF"];
 
+async function errMsg(e: unknown, fallback: string): Promise<string> {
+  if (e instanceof Error) return e.message || fallback;
+  if (typeof Response !== "undefined" && e instanceof Response) {
+    try {
+      const t = await e.text();
+      return t || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  if (typeof e === "string") return e;
+  return fallback;
+}
+
 function EbookPage() {
   const [step, setStep] = useState(0);
   const [ads, setAds] = useState<PersistedAd[]>([]);
@@ -91,7 +105,7 @@ function EbookPage() {
       setBriefing(b);
       goNext();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar briefing");
+      toast.error(await errMsg(e, "Falha ao gerar briefing"));
     } finally {
       setBusy(null);
     }
@@ -105,7 +119,7 @@ function EbookPage() {
       setOutline(o);
       goNext();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar estrutura");
+      toast.error(await errMsg(e, "Falha ao gerar estrutura"));
     } finally {
       setBusy(null);
     }
@@ -143,7 +157,7 @@ function EbookPage() {
       }
       toast.success("Capa gerada");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar capa");
+      toast.error(await errMsg(e, "Falha ao gerar capa"));
     } finally {
       setBusy(null);
     }
@@ -166,7 +180,7 @@ function EbookPage() {
       }
       toast.success("Capítulos gerados");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha durante geração");
+      toast.error(await errMsg(e, "Falha durante geração"));
     } finally {
       setBusy(null);
     }
@@ -213,7 +227,7 @@ function EbookPage() {
       }
       toast.success("PDF exportado");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao exportar PDF");
+      toast.error(await errMsg(e, "Falha ao exportar PDF"));
     } finally {
       setBusy(null);
     }
