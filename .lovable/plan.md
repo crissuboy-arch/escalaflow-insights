@@ -1,55 +1,85 @@
-## Corrigir erro "[object Response]" no fluxo do ebook
+## Rascunhos persistidos + prévia do ebook antes do PDF
 
-### Causa raiz
+Dois recursos sobre o módulo `/produtos/ebook` existente. Sem mexer em minerador, coleta, Apify ou extensão.
 
-Quando uma server function falha, o erro pode chegar ao cliente como um objeto `Response` (não como `Error`). Isso acontece em dois pontos:
+### 1. Rascunhos no banco (retomar de onde parou)
 
-1. **`requireSupabaseAuth`** (`src/integrations/supabase/auth-middleware.ts`) faz `throw new Response("Unauthorized…", { status: 401 })`. Quando a sessão Supabase expira ou o bearer token não chega à server function (caso comum no `generateEbookOutline`, que demora alguns segundos), o middleware lança um `Response`. No cliente, o `catch (e)` faz `e instanceof Error ? e.message : "Falha…"` — mas `e` é um `Response`, então cai no fallback. Pior: em algum ponto do toast/console o objeto é coagido para string e vira literalmente `"[object Response]"`, que aparece como overlay de runtime error.
-2. **`aiChat`** (`src/lib/ebook.server.ts`) já lança `Error` com mensagem, então não é o ofensor — mas vamos blindar mesmo assim.
+A tabela `ebooks` já existe com RLS por usuário e suporta `status` (`draft|ready`) + `briefing/outline/chapters/layout/cover_url` em jsonb. Vamos usá-la também para rascunhos durante a geração — não só no final.
 
-O `[object Response]` **não** vem de retornar `response` em vez de `response.json()` — todos os handlers já chamam `.json()` corretamente. O problema é exclusivamente de **propagação de erro**.
+**Estado no front (`produtos.ebook.tsx`)**
+- Adicionar `ebookId: string | null` ao componente.
+- Cada vez que o usuário avança um passo OU termina um capítulo, chamar `saveDraft()` via debounce (500 ms) que faz upsert na tabela `ebooks` com `status='draft'`, gravando: `source_ad_key`, `title`, `subtitle`, `niche`, `briefing`, `outline`, `chapters`, `layout`, `cover_url`, `step` (novo), `chapter_count` (novo).
+- Primeira escrita gera `id` (insert), próximas usam update por `id`.
 
-### Correções
+**Server functions novas (`src/lib/ebook.functions.ts` + helpers em `ebook.server.ts`)**
+- `saveEbookDraft({ id?, payload })` → upsert via `supabaseAdmin`/contexto autenticado, retorna `{ id }`. RLS já garante isolamento por user.
+- `listEbookDrafts()` → retorna `[{ id, title, niche, status, step, updated_at, cover_url }]` ordenado por `updated_at desc`.
+- `loadEbookDraft({ id })` → retorna o ebook completo para hidratar o stepper.
+- `deleteEbookDraft({ id })`.
 
-#### 1. `src/integrations/supabase/auth-middleware.ts`
-Trocar `throw new Response(msg, { status })` por `throw new Error(msg)` em todos os pontos. TanStack Start serializa `Error.message` corretamente para o cliente; `Response` não é serializável e gera o "[object Response]".
+**UI**
+- No topo da página, novo card colapsável "Continuar rascunho" listando os últimos 5 ebooks `draft|ready`. Cada item: thumb da capa, título, nicho, "Capítulo X/Y", botão **Retomar** e botão **Excluir**.
+- Ao clicar Retomar: hidrata todos os states (`briefing/outline/chapters/layout/coverUrl/chapterCount/selectedAd?`) e pula direto para `step` salvo.
+- Indicador discreto "Rascunho salvo às HH:MM" perto do stepper depois de cada save.
+- Ao clicar **Exportar PDF** com sucesso, marca `status='ready'`.
 
-> Nota: o arquivo é marcado como auto-gerado, mas como ele é a fonte do bug e o usuário está bloqueado, vamos editá-lo (é apenas um aviso, não é regenerado automaticamente neste template).
+**Migração**
+- `ALTER TABLE public.ebooks ADD COLUMN step int NOT NULL DEFAULT 0;`
+- `ALTER TABLE public.ebooks ADD COLUMN chapter_count int NOT NULL DEFAULT 6;`
+- Trigger `set_updated_at` (já existe a função) em `BEFORE UPDATE` para manter `updated_at` em dia.
+- Index `ebooks_user_updated_idx (user_id, updated_at desc)` para a listagem.
 
-#### 2. `src/lib/ebook.functions.ts`
-Envolver cada `.handler` com `try/catch` que normaliza o erro:
-```ts
-try { return await aiGenerateOutline(...) }
-catch (e) { throw new Error(e instanceof Error ? e.message : "Falha ao gerar estrutura") }
-```
-Garante que mesmo se algum lib interno lançar um `Response` ou objeto não-serializável, o cliente recebe sempre um `Error` com mensagem legível.
+### 2. Prévia do ebook antes do PDF
 
-#### 3. `src/routes/_authenticated/produtos.ebook.tsx`
-Ajustar os 5 `catch (e)` (`onExtract`, `onOutline`, `onCover`, `onGenerateChapters`, `onExport`) para extrair mensagem mesmo quando `e` é um `Response`:
-```ts
-async function errMsg(e: unknown, fallback: string) {
-  if (e instanceof Error) return e.message;
-  if (e instanceof Response) {
-    try { return (await e.text()) || fallback; } catch { return fallback; }
-  }
-  return fallback;
-}
-```
-Assim, se algum dia voltar a chegar um `Response`, o usuário vê o texto real, nunca `[object Response]`.
+Substituir o atual `<details>` cru por uma prévia de qualidade no passo 5.
 
-#### 4. Verificação
-- Releitura dos 4 server fns (`extractEbookBriefing`, `generateEbookOutline`, `generateEbookChapter`, `generateEbookCover`): todos retornam objetos JSON puros (`Briefing`, `OutlineChapter[]`, `{ markdown }`, `{ dataUrl }`). Nenhum retorna `Response`. ✅
-- `aiChat` já faz `await res.text()` no erro e `res.json()` no sucesso. ✅
-- Nada da extensão, minerador, Apify ou collector é tocado.
+**Renderização markdown**
+- A dependência `marked` já está instalada (usada pelo `ebook/pdf.ts`). Adicionar `dompurify` para sanitizar o HTML antes de injetar, evitando XSS em conteúdo gerado pela IA.
+- Helper `renderMarkdownSafe(md)` em `src/lib/ebook/preview.ts`.
 
-### Arquivos editados
+**Componente `EbookPreview`**
+Local: `src/components/ebook/EbookPreview.tsx`. Exibido no passo 5, acima dos botões de exportar.
 
-- `src/integrations/supabase/auth-middleware.ts` — `throw new Response` → `throw new Error`.
-- `src/lib/ebook.functions.ts` — `try/catch` normalizando erros nos 4 handlers.
-- `src/routes/_authenticated/produtos.ebook.tsx` — helper `errMsg` aplicado nos 5 `catch`.
+Layout em duas abas (`Tabs` shadcn):
+1. **Markdown** — lista de capítulos colapsáveis com `<Textarea>` editável por capítulo. Salvar edição atualiza `chapters[i].markdown` no state e dispara `saveDraft()`. Botão "Regerar este capítulo" chama `generateEbookChapter` apenas para aquele índice.
+2. **Páginas** — simulação visual de páginas A5/A4 paginadas, aplicando o `layout` escolhido (`classico/moderno/minimalista`) com tipografia equivalente à do PDF:
+   - Capa (se `coverUrl`) como primeira "folha".
+   - Sumário gerado a partir de `chapters[].title`.
+   - Cada capítulo renderizado como bloco; quebras de página simuladas via CSS (`break-after: page` em print + caixas com `aspect-ratio: 1/1.414` na tela com overflow oculto e separador entre páginas).
+   - Pré-visualização rola dentro de uma área `max-h-[70vh] overflow-auto` com fundo cinza, cada página em cartão branco com sombra.
+   - Estilos por layout em `src/lib/ebook/preview-styles.ts` espelhando `LAYOUTS` (mesmas famílias de fonte / cores / margens declaradas no PDF), garantindo paridade WYSIWYG aproximada.
 
-### Resultado esperado
+**Edição rápida**
+- Cada capítulo na aba Markdown ganha botões: `Editar`, `Salvar`, `Regerar`. Edições só persistem após "Salvar" (evita save por keystroke).
 
-- Erro overlay `[object Response]` desaparece.
-- Em caso de sessão expirada, usuário vê mensagem clara ("Sessão expirada, faça login novamente" via mensagem do middleware) em vez de objeto cru.
-- Geração de briefing/estrutura/capa/capítulos continua funcionando exatamente como antes nos casos de sucesso.
+**Fluxo**
+- Passo 5 atualizado: `Gerar capítulos` → preview aparece → usuário ajusta → `Exportar PDF` continua igual (usa o mesmo `chapters` já no state).
+
+### Arquivos
+
+**Novos**
+- `src/components/ebook/EbookPreview.tsx`
+- `src/components/ebook/DraftList.tsx`
+- `src/lib/ebook/preview.ts` (renderMarkdownSafe + helpers de paginação)
+- `src/lib/ebook/preview-styles.ts`
+- `supabase/migrations/<ts>_ebooks_drafts.sql`
+
+**Editados**
+- `src/lib/ebook.functions.ts` — `saveEbookDraft`, `listEbookDrafts`, `loadEbookDraft`, `deleteEbookDraft`.
+- `src/lib/ebook.server.ts` — schemas + helpers de upsert (usando o supabase autenticado do middleware).
+- `src/routes/_authenticated/produtos.ebook.tsx` — integra rascunho (state `ebookId`, `saveDraft` debounced, lista no topo, hidratação) + substitui o bloco cru do passo 5 por `<EbookPreview />`.
+
+**Dependências**
+- `bun add dompurify` (+ `@types/dompurify`).
+- `marked` já presente.
+- `pdf-lib` permanece para export.
+
+### Pontos confirmados por padrão
+- Auto-save: ao avançar de passo e ao concluir cada capítulo (não a cada keystroke).
+- Lista de rascunhos visível no topo da página `/produtos/ebook` (não em rota separada). Posso criar `/produtos/ebooks` listando todos depois se quiser.
+- Sem versionamento — cada rascunho é um único registro mutável.
+
+### Restrições respeitadas
+- Sem alteração em `/minerar`, `central-mineracao`, collector, Apify, extensão, token.
+- IA continua só no backend.
+- RLS em `ebooks` já cobre tudo; só adicionamos colunas + trigger + index.
