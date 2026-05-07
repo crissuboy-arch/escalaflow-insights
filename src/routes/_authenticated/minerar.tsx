@@ -376,6 +376,118 @@ function MinePage() {
       </Card>
 
       {/* Resultados */}
+      {/* Anúncios coletados (Motor de Coleta) */}
+      <Card className="border-border/60">
+        <CardContent className="p-6">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Radar className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Anúncios coletados</h2>
+              <Badge variant="outline" className="rounded-full">{collected.length}</Badge>
+            </div>
+            <Button size="sm" variant="ghost" onClick={fetchCollected}>
+              <Loader2 className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`} />
+              Atualizar
+            </Button>
+          </div>
+
+          {collectedLoading && collected.length === 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="space-y-2 rounded-lg border border-border/60 p-3">
+                  <Skeleton className="aspect-video w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              ))}
+            </div>
+          ) : collected.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <Radar className="h-10 w-10 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Nenhum anúncio coletado ainda. Digite uma palavra-chave e clique em
+                <span className="mx-1 font-semibold text-foreground">Minerar com Motor de Coleta</span>.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {collected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => (
+                  <motion.div
+                    key={a.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="group flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
+                  >
+                    <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                      {a.video_url ? (
+                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline />
+                      ) : a.image_url ? (
+                        <img src={a.image_url} alt={a.headline} className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                          <ImageIcon className="h-8 w-8 opacity-40" />
+                        </div>
+                      )}
+                      <div className="absolute left-2 top-2 flex gap-1">
+                        <UIBadge className="rounded-full bg-background/80 text-foreground backdrop-blur">
+                          <FlameIcon className="mr-1 h-3 w-3 text-primary" />{a.score}
+                        </UIBadge>
+                      </div>
+                      <div className="absolute right-2 top-2">
+                        <UIBadge variant="outline" className="rounded-full bg-background/80 backdrop-blur">
+                          {a.platform}
+                        </UIBadge>
+                      </div>
+                    </div>
+                    <div className="flex flex-1 flex-col gap-2 p-3">
+                      <p className="line-clamp-1 text-sm font-semibold">{a.advertiser}</p>
+                      <p className="line-clamp-2 text-xs text-muted-foreground">{a.headline || a.copy || "—"}</p>
+                      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Globe2 className="h-3 w-3" />{a.country}
+                          {a.cta && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{a.cta}</span>}
+                        </div>
+                        {a.ad_url && (
+                          <a
+                            href={a.ad_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                          >
+                            Ver <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              {collected.length > PAGE_SIZE && (
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Página {page + 1} de {Math.ceil(collected.length / PAGE_SIZE)}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+                      Anterior
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={(page + 1) * PAGE_SIZE >= collected.length}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
