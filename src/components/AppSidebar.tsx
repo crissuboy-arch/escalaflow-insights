@@ -11,6 +11,7 @@ import {
   Settings,
   Radio,
   BookOpen,
+  Sparkle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,6 +50,7 @@ export function AppSidebar() {
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
     { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
+    { to: "/produtos/playbook", label: "Playbook", icon: Sparkle },
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ] as { to: string; label: string; icon: typeof LayoutDashboard; badge?: number }[];
   return (

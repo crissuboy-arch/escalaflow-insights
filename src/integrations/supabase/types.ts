@@ -247,6 +247,63 @@ export type Database = {
         }
         Relationships: []
       }
+      playbooks: {
+        Row: {
+          avatar: string | null
+          briefing: Json
+          cover_url: string | null
+          created_at: string
+          id: string
+          niche: string | null
+          promise: string | null
+          scenes: Json
+          source_ad_key: string | null
+          status: string
+          step: number
+          theme: string
+          title: string
+          unique_mechanism: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar?: string | null
+          briefing?: Json
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          niche?: string | null
+          promise?: string | null
+          scenes?: Json
+          source_ad_key?: string | null
+          status?: string
+          step?: number
+          theme?: string
+          title?: string
+          unique_mechanism?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar?: string | null
+          briefing?: Json
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          niche?: string | null
+          promise?: string | null
+          scenes?: Json
+          source_ad_key?: string | null
+          status?: string
+          step?: number
+          theme?: string
+          title?: string
+          unique_mechanism?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
