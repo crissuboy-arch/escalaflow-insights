@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar } from "lucide-react";
-import { toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, saveCollectedAd, favoriteCollectedAd, type AITrends, type PersistedAd } from "@/lib/queries";
+import { toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, saveCollectedAd, favoriteCollectedAd, rememberAdForAnalysis, type AITrends, type PersistedAd } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
 import { miningRepo } from "@/lib/mining/repository";
@@ -140,15 +140,8 @@ function MinePage() {
 
   const onAnalyzeCollected = async (ad: CollectedAd) => {
     console.log("analysis payload", ad);
-    // also persist for analise-ia page lookup
-    await saveCollectedAd({
-      key: ad.ad_library_id || ad.ad_url || ad.id,
-      ad_library_id: ad.ad_library_id, ad_url: ad.ad_url,
-      advertiser: ad.advertiser, headline: ad.headline, copy: ad.copy, cta: ad.cta,
-      image_url: ad.image_url, video_url: ad.video_url,
-      platform: ad.platform, country: ad.country, niche: ad.niche,
-      score: ad.score, created_at: ad.created_at, saved_at: new Date().toISOString(),
-    }).catch(() => {});
+    const persisted = toPersisted(ad);
+    await rememberAdForAnalysis(persisted).catch(() => {});
     const [ingested] = await miningRepo.ingestMany([
       {
         headline: ad.headline || ad.advertiser,
@@ -168,7 +161,7 @@ function MinePage() {
       },
     ], "extension");
     toast.success("Anúncio enviado para Análise IA");
-    navigate({ to: "/analise-ia", search: { offer: ingested.id } as never });
+    navigate({ to: "/analise-ia", search: { ad: persisted.key } as never });
   };
 
   const toPersisted = (ad: CollectedAd): PersistedAd => {
