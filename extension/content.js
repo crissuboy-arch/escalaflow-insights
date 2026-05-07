@@ -1,5 +1,5 @@
 // EscalaFlow Miner — content script (Meta/Facebook Ads Library)
-// Per-card "⚡ IA PRO" button + real DOM scraping with MutationObserver.
+// Robust card detection + per-card "⚡ IA PRO" button.
 (() => {
   const BTN_CLASS = "escala-card-btn";
   const MENU_ID = "escala-card-menu";
@@ -8,6 +8,8 @@
   const CARD_ATTR = "data-escala-card";
   const DEFAULT_ENDPOINT =
     "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3e6.lovable.app";
+  const DEBUG = true;
+  const log = (...a) => DEBUG && console.log("[EscalaFlow]", ...a);
 
   // ---------------- styles ----------------
   if (!document.getElementById("escala-style")) {
@@ -18,9 +20,11 @@
         padding:6px 10px;border:0;border-radius:999px;cursor:pointer;
         font:700 11px/1 -apple-system,system-ui,Segoe UI,Roboto,sans-serif;color:#fff;
         background:linear-gradient(135deg,#7c3aed,#3b82f6,#a855f7);
-        box-shadow:0 6px 18px rgba(124,58,237,.45);transition:transform .12s ease,filter .12s ease;}
+        box-shadow:0 6px 18px rgba(124,58,237,.45);
+        opacity:0;transition:opacity .15s ease,transform .12s ease,filter .12s ease;}
+      [${CARD_ATTR}]:hover .${BTN_CLASS},.${BTN_CLASS}:hover,.${BTN_CLASS}:focus{opacity:1}
       .${BTN_CLASS}:hover{transform:scale(1.05);filter:brightness(1.1)}
-      [${CARD_ATTR}]{position:relative}
+      [${CARD_ATTR}]{position:relative !important}
       #${FLOAT_ID}{position:fixed;top:84px;right:20px;z-index:2147483647;
         padding:10px 16px;border:0;border-radius:999px;cursor:pointer;
         font:700 13px -apple-system,system-ui,sans-serif;color:#fff;
@@ -61,45 +65,76 @@
   }
 
   // ---------------- card detection ----------------
-  // The Ads Library renders each ad as a card containing an internal link
-  // like /ads/library/?id=<adArchiveID>. We use that as the anchor to find cards.
+  // Multi-strategy resilient card finder.
   function findCards() {
     const cards = new Set();
-    // Strategy 1: links to /ads/library/?id= → walk up to a tall container
-    document.querySelectorAll('a[href*="/ads/library/?id="], a[href*="ads/library/?id="]').forEach((a) => {
-      let el = a;
-      for (let i = 0; i < 10 && el && el.parentElement; i++) {
-        el = el.parentElement;
-        if (!el) break;
-        const r = el.getBoundingClientRect();
-        if (r.height >= 260 && r.width >= 220) { cards.add(el); break; }
-      }
+
+    // Strategy A: anchors that point to a specific ad library entry.
+    const anchorSelectors = [
+      'a[href*="/ads/library/?id="]',
+      'a[href*="ads/library/?id="]',
+      'a[href*="view_all_page_id"]',
+    ];
+    document.querySelectorAll(anchorSelectors.join(",")).forEach((a) => {
+      const card = climbToCard(a);
+      if (card) cards.add(card);
     });
-    // Strategy 2: explicit "Library ID" text — climb to card container
+
+    // Strategy B: text markers visible on every ad card.
+    if (cards.size < 2) {
+      const TEXT_RX = /(Library ID|ID da biblioteca|Identificação da biblioteca|Started running on|Em circulação desde|Ver detalhes do an[úu]ncio|See ad details|Veiculando|Identifiant de la biblioth)/i;
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => TEXT_RX.test(n.nodeValue || "") ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT,
+      });
+      let n;
+      while ((n = walker.nextNode())) {
+        const card = climbToCard(n.parentElement);
+        if (card) cards.add(card);
+      }
+    }
+
+    // Strategy C: role=article (some Meta surfaces use it).
     if (cards.size === 0) {
-      document.querySelectorAll('div').forEach((d) => {
-        const t = d.textContent || "";
-        if (/Library ID:|ID da biblioteca:/.test(t) && d.children.length < 20) {
-          let el = d;
-          for (let i = 0; i < 8 && el.parentElement; i++) {
-            el = el.parentElement;
-            const r = el.getBoundingClientRect();
-            if (r.height >= 260 && r.width >= 220) { cards.add(el); break; }
-          }
-        }
+      document.querySelectorAll('[role="article"]').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.height >= 220 && r.width >= 200) cards.add(el);
       });
     }
-    return Array.from(cards);
+
+    // De-dupe nested: drop any card that contains another card.
+    const arr = Array.from(cards);
+    const filtered = arr.filter((c) => !arr.some((o) => o !== c && c.contains(o)));
+    return filtered;
+  }
+
+  function climbToCard(start) {
+    if (!start) return null;
+    let el = start;
+    let best = null;
+    for (let i = 0; i < 14 && el && el !== document.body; i++) {
+      const r = el.getBoundingClientRect();
+      // Heuristic for an ad card: tall-ish, narrowish column, has an image or video inside.
+      const hasMedia = el.querySelector("img, video, [style*='background-image']");
+      if (r.height >= 280 && r.width >= 200 && r.width <= 700 && hasMedia) {
+        best = el;
+        // Prefer the tightest enclosing card → keep climbing only one more level.
+        const parent = el.parentElement;
+        if (parent) {
+          const pr = parent.getBoundingClientRect();
+          if (pr.width > 760 || pr.height > r.height * 1.6) break;
+        }
+      }
+      el = el.parentElement;
+    }
+    return best;
   }
 
   function tx(el) { return (el && el.textContent || "").trim(); }
 
   // ---------------- per-card scrape ----------------
   function capturarCardReal(card) {
-    const html = card.innerHTML || "";
     const text = card.innerText || "";
 
-    // adLibraryId
     let adLibraryId = "";
     const idLink = card.querySelector('a[href*="/ads/library/?id="], a[href*="ads/library/?id="]');
     if (idLink) {
@@ -107,44 +142,38 @@
       if (m) adLibraryId = m[1];
     }
     if (!adLibraryId) {
-      const m = text.match(/(?:Library ID|ID da biblioteca)[:\s]*([\d]{6,})/i);
+      const m = text.match(/(?:Library ID|ID da biblioteca|Identificação da biblioteca)[:\s]*([\d]{6,})/i);
       if (m) adLibraryId = m[1];
     }
 
-    // advertiser — first strong link, often a page link
     const advLink =
-      card.querySelector('a[href*="/ads/library/?view_all_page_id"]') ||
+      card.querySelector('a[href*="view_all_page_id"]') ||
       card.querySelector('a[role="link"] strong') ||
       card.querySelector('a[role="link"]');
     const advertiser = tx(advLink).slice(0, 120);
 
-    // status (Active / Inactive / Ativo / Inativo)
     let status = "";
-    const statusMatch = text.match(/\b(Active|Inactive|Ativo|Inativo|Em veiculação|Não está em veiculação)\b/i);
+    const statusMatch = text.match(/\b(Active|Inactive|Ativo|Inativo|Em veiculação|Não está em veiculação|Veiculando)\b/i);
     if (statusMatch) status = statusMatch[1];
 
-    // start date
     let startDate = "";
-    const dateMatch = text.match(/(?:Started running on|Iniciou a veicula(?:ç|c)[aã]o em|Começou a ser exibido em)\s*([^\n·•]+)/i);
+    const dateMatch = text.match(/(?:Started running on|Iniciou a veicula(?:ç|c)[aã]o em|Em circula[cç][aã]o desde|Começou a ser exibido em)\s*([^\n·•]+)/i);
     if (dateMatch) startDate = dateMatch[1].trim().slice(0, 60);
 
-    // platforms (Facebook, Instagram, Audience Network, Messenger, Threads)
     const platforms = [];
     ["Facebook", "Instagram", "Messenger", "Audience Network", "Threads"].forEach((p) => {
       if (new RegExp(`\\b${p}\\b`, "i").test(text)) platforms.push(p);
     });
 
-    // copy — the longest paragraph-like block inside the card body
     const candidates = Array.from(
       card.querySelectorAll('div[dir="auto"], span[dir="auto"], div[data-ad-preview="message"]'),
     )
       .map((el) => tx(el))
-      .filter((t) => t && t.length > 20 && !/^Library ID|^ID da biblioteca|Started running|Iniciou a/i.test(t));
+      .filter((t) => t && t.length > 20 && !/^Library ID|^ID da biblioteca|Started running|Iniciou a|Em circula/i.test(t));
     candidates.sort((a, b) => b.length - a.length);
     const copy = (candidates[0] || "").slice(0, 2000);
     const description = (candidates[1] || "").slice(0, 800);
 
-    // headline — common Meta preview headline node, fallback to short emphasized text
     let headline = "";
     const headlineEl =
       card.querySelector('[data-ad-preview="headline"]') ||
@@ -155,7 +184,6 @@
       headline = (short || advertiser || "Anúncio Facebook").slice(0, 200);
     }
 
-    // CTA — typical CTA buttons appear as <a role="button"> or short capitalized link
     let cta = "";
     const ctaEl = card.querySelector('a[role="button"], div[role="button"]');
     if (ctaEl) cta = tx(ctaEl).slice(0, 60);
@@ -164,14 +192,12 @@
       if (m) cta = m[1];
     }
 
-    // media
-    const imgEl = card.querySelector('img[src*="scontent"], img[src^="https://"]:not([width="16"]):not([width="20"])');
+    const imgEl = card.querySelector('img[src*="scontent"], img[src*="fbcdn"], img[src^="https://"]:not([width="16"]):not([width="20"])');
     const videoEl = card.querySelector('video');
     const imageUrl = imgEl ? imgEl.src : "";
     const videoUrl = videoEl ? (videoEl.src || videoEl.currentSrc || "") : "";
     const thumbnail = videoEl && videoEl.poster ? videoEl.poster : imageUrl;
 
-    // background-image fallback
     let bgImage = "";
     if (!imageUrl) {
       const bgEl = card.querySelector('[style*="background-image"]');
@@ -181,20 +207,15 @@
       }
     }
 
-    // url — preferred ad library deep link
     const url = (idLink && idLink.href) || location.href;
-
-    // creativeType
     let creativeType = "image";
     if (videoUrl) creativeType = "video";
-    else if (card.querySelectorAll('img[src*="scontent"]').length > 1) creativeType = "carousel";
+    else if (card.querySelectorAll('img[src*="scontent"], img[src*="fbcdn"]').length > 1) creativeType = "carousel";
 
-    // country — try URL param
     let country = "BR";
     const cMatch = location.href.match(/[?&]country=([A-Z]{2})/);
     if (cMatch) country = cMatch[1];
 
-    // niche inference (very rough)
     const lower = (headline + " " + copy + " " + advertiser).toLowerCase();
     const nicheMap = [
       ["Emagrecimento", /(emagrec|peso|gordura|barriga|jejum|low carb|weight loss)/],
@@ -209,7 +230,6 @@
     let niche = "Geral";
     for (const [name, rx] of nicheMap) { if (rx.test(lower)) { niche = name; break; } }
 
-    // score heuristic
     let score = 70;
     if (videoUrl) score += 5;
     if (copy.length > 400) score += 5;
@@ -218,31 +238,15 @@
     score = Math.min(99, score);
 
     const payload = {
-      advertiser,
-      headline,
-      copy,
-      cta,
-      description,
-      imageUrl: imageUrl || bgImage,
-      videoUrl,
+      advertiser, headline, copy, cta, description,
+      imageUrl: imageUrl || bgImage, videoUrl,
       thumbnail: thumbnail || bgImage,
-      adLibraryId,
-      startDate,
-      platforms,
-      country,
-      status,
-      creativeType,
-      niche,
-      score,
-      url,
-      link: url,
-      platform: "Facebook",
+      adLibraryId, startDate, platforms, country, status,
+      creativeType, niche, score,
+      url, link: url, platform: "Facebook",
       createdAt: new Date().toISOString(),
     };
-
-    console.log("[EscalaFlow] card encontrado", { adLibraryId, advertiser });
-    console.log("[EscalaFlow] mídia capturada", { imageUrl: payload.imageUrl, videoUrl, thumbnail: payload.thumbnail });
-    console.log("[EscalaFlow] payload real", payload);
+    log("anúncio capturado", payload);
     return payload;
   }
 
@@ -250,21 +254,12 @@
   function buildUrl(endpoint, ad, analysisType) {
     const u = new URL(endpoint + "/importar-anuncio");
     const set = (k, v) => v != null && v !== "" && u.searchParams.set(k, String(v));
-    set("headline", ad.headline);
-    set("copy", ad.copy);
-    set("description", ad.description);
-    set("link", ad.url);
-    set("platform", ad.platform);
-    set("country", ad.country);
-    set("niche", ad.niche);
-    set("score", ad.score);
-    set("analysisType", analysisType || "manual");
+    set("headline", ad.headline); set("copy", ad.copy); set("description", ad.description);
+    set("link", ad.url); set("platform", ad.platform); set("country", ad.country);
+    set("niche", ad.niche); set("score", ad.score); set("analysisType", analysisType || "manual");
     set("creativeUrl", ad.imageUrl || ad.thumbnail || ad.videoUrl);
-    set("advertiser", ad.advertiser);
-    set("adLibraryId", ad.adLibraryId);
-    set("cta", ad.cta);
-    set("startDate", ad.startDate);
-    set("status", ad.status);
+    set("advertiser", ad.advertiser); set("adLibraryId", ad.adLibraryId);
+    set("cta", ad.cta); set("startDate", ad.startDate); set("status", ad.status);
     set("creativeType", ad.creativeType);
     set("platforms", (ad.platforms || []).join(","));
     set("createdAt", ad.createdAt);
@@ -287,12 +282,12 @@
 - ID da Biblioteca: ${ad.adLibraryId || "—"}
 `;
     const prompts = {
-      ai: `${base}\nFaça engenharia reversa COMPLETA:\n1. Big Idea e ângulo\n2. Avatar (dores, desejos, objeções)\n3. Estrutura da copy (gancho, prova, CTA)\n4. Gatilhos mentais\n5. Por que funciona\n6. Como escalar`,
-      variations: `${base}\nGere 10 variações:\n- 3 headlines\n- 3 copies\n- 2 ideias de criativo\n- 2 ângulos novos`,
-      "offer-structure": `${base}\nBreakdown da OFERTA:\n1. Produto e promessa\n2. Bônus\n3. Garantia\n4. Stack de valor\n5. Preço e ancoragem\n6. Como melhorar`,
-      "quiz-funnel": `${base}\nMonte um FUNIL DE QUIZ:\n- Hook\n- 6-8 perguntas\n- Segmentação\n- Página de resultado\n- Oferta`,
-      "unique-mechanism": `${base}\nIdentifique o MECANISMO ÚNICO:\n- Mecanismo central\n- Por que é "novo"\n- Nome/posicionamento\n- Reforço na copy`,
-      manual: `${base}\nResuma em 5 bullets e dê nota 0-100 de potencial de escala.`,
+      ai: `${base}\nFaça engenharia reversa COMPLETA:\n1. Big Idea\n2. Avatar\n3. Estrutura da copy\n4. Gatilhos\n5. Por que funciona\n6. Como escalar`,
+      variations: `${base}\nGere 10 variações: 3 headlines, 3 copies, 2 criativos, 2 ângulos`,
+      "offer-structure": `${base}\nBreakdown da OFERTA: produto, bônus, garantia, stack, preço, melhorias`,
+      "quiz-funnel": `${base}\nMonte FUNIL DE QUIZ: hook, 6-8 perguntas, segmentação, resultado, oferta`,
+      "unique-mechanism": `${base}\nIdentifique MECANISMO ÚNICO: central, novidade, nome, reforço`,
+      manual: `${base}\nResuma em 5 bullets e dê nota 0-100.`,
     };
     return prompts[type] || prompts.manual;
   }
@@ -306,7 +301,7 @@
       try {
         chrome.runtime.sendMessage(
           { type: "ESCALA_OPEN_CHATGPT", prompt: buildPrompt(analysisType, ad), ad },
-          (res) => console.log("[EscalaFlow] ChatGPT aberto", res),
+          (res) => log("ChatGPT aberto", res),
         );
       } catch (e) { console.warn("[EscalaFlow] falha ChatGPT", e); }
     }
@@ -325,22 +320,18 @@
   function ensureMenu() {
     let menu = document.getElementById(MENU_ID);
     if (menu) return menu;
-    menu = document.createElement("div");
-    menu.id = MENU_ID;
-    document.body.appendChild(menu);
-    return menu;
+    menu = document.createElement("div"); menu.id = MENU_ID;
+    document.body.appendChild(menu); return menu;
   }
 
   function openMenuFor(card, anchor) {
-    const menu = ensureMenu();
-    menu.innerHTML = "";
+    const menu = ensureMenu(); menu.innerHTML = "";
     ACTIONS.forEach(([label, type], i) => {
       const b = document.createElement("button");
       b.textContent = label;
       b.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
-        menu.classList.remove("open");
-        send(card, type);
+        menu.classList.remove("open"); send(card, type);
       });
       menu.appendChild(b);
       if (i < ACTIONS.length - 1) {
@@ -370,29 +361,28 @@
   function injectAll() {
     const cards = findCards();
     cards.forEach(attachToCard);
-    if (cards.length) console.log(`[EscalaFlow] ${cards.length} cards detectados`);
-    ensureFloating(cards);
+    log("cards encontrados:", cards.length);
+    ensureFloating();
   }
 
-  // Floating fallback button — uses topmost visible card
-  function ensureFloating(cards) {
+  function ensureFloating() {
     let fb = document.getElementById(FLOAT_ID);
-    if (!fb) {
-      fb = document.createElement("button");
-      fb.id = FLOAT_ID; fb.type = "button"; fb.textContent = "⚡ IA PRO";
-      fb.title = "Capturar primeiro anúncio visível";
-      document.body.appendChild(fb);
-      fb.addEventListener("click", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const all = findCards();
-        const visible = all.find((c) => {
-          const r = c.getBoundingClientRect();
-          return r.top >= 0 && r.top < innerHeight * 0.7;
-        }) || all[0];
-        if (!visible) { toast("Nenhum anúncio detectado"); return; }
-        openMenuFor(visible, fb);
-      });
-    }
+    if (fb) return;
+    fb = document.createElement("button");
+    fb.id = FLOAT_ID; fb.type = "button"; fb.textContent = "⚡ IA PRO";
+    fb.title = "Capturar primeiro anúncio visível";
+    document.body.appendChild(fb);
+    fb.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const all = findCards();
+      log("[float] cards encontrados:", all.length);
+      const visible = all.find((c) => {
+        const r = c.getBoundingClientRect();
+        return r.top >= 0 && r.top < innerHeight * 0.9 && r.bottom > 0;
+      }) || all[0];
+      if (!visible) { toast("Nenhum anúncio detectado"); return; }
+      openMenuFor(visible, fb);
+    });
   }
 
   document.addEventListener("click", (e) => {
@@ -404,16 +394,16 @@
     menu.classList.remove("open");
   });
 
-  // debounce + observe
   let scheduled = false;
   function schedule() {
     if (scheduled) return;
     scheduled = true;
-    setTimeout(() => { scheduled = false; injectAll(); }, 400);
+    setTimeout(() => { scheduled = false; injectAll(); }, 500);
   }
 
   injectAll();
   const obs = new MutationObserver(schedule);
   if (document.body) obs.observe(document.body, { childList: true, subtree: true });
   setInterval(schedule, 2500);
+  window.addEventListener("scroll", schedule, { passive: true });
 })();
