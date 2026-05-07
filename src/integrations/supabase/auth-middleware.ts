@@ -6,7 +6,26 @@ import type { Database } from './types'
 
 
 
-export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
+export const requireSupabaseAuth = createMiddleware({ type: 'function' })
+  .client(async ({ next }) => {
+    // Attach the current Supabase session token as Authorization header
+    // so the server middleware can validate the user.
+    let headers: Record<string, string> = {};
+    if (typeof window !== 'undefined') {
+      try {
+        const { supabase } = await import('./client');
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+      } catch (e) {
+        console.error('[requireSupabaseAuth client] failed to get session', e);
+      }
+    }
+    return next({ sendContext: {}, headers });
+  })
+  .server(
   async ({ next }) => {
     
     const SUPABASE_URL = process.env.SUPABASE_URL;
