@@ -420,7 +420,7 @@ function MinePage() {
           </div>
           <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{offers.length}</span> anúncios encontrados
+              <span className="font-semibold text-foreground">{visibleCollected.length}</span> anúncios coletados
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -432,9 +432,9 @@ function MinePage() {
                 {collecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
                 Minerar com Motor de Coleta
               </Button>
-              <Button onClick={() => load()} disabled={loading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                {t("mine.submit")}
+              <Button onClick={fetchCollected} disabled={collectedLoading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                {collectedLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                Atualizar coleta
               </Button>
             </div>
           </div>
