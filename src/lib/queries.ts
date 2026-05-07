@@ -40,15 +40,41 @@ export interface DemoAnalysis {
   mined_offers: { advertiser_name: string; niche: string; image_url: string | null };
 }
 
-const NICHES = ["Saúde", "Finanças", "Marketing", "Educação", "Beleza", "Tecnologia", "Produtividade", "E-commerce", "Carreira"];
+const NICHES = [
+  "Saúde",
+  "Finanças",
+  "Marketing",
+  "Educação",
+  "Beleza",
+  "Tecnologia",
+  "Produtividade",
+  "E-commerce",
+  "Carreira",
+];
 const COUNTRIES = ["BR", "US", "ES", "PT", "FR"];
 const PLATFORMS = ["Facebook", "Instagram", "TikTok", "YouTube", "LinkedIn", "Pinterest"];
 const STATUSES: DemoOffer["status"][] = ["escalando", "validando", "quente"];
 const NAMES = [
-  "ScaleMaster Pro", "GrowthHack Academy", "MetaAds Lab", "InfinityFunnel", "PeakConverter",
-  "EliteDropship", "BrainBoost AI", "FitRevolution", "WealthMatrix", "CodeNinja School",
-  "GlowSkin Co", "ZenMind App", "AdGenius", "TurboLeads", "CreatorOS", "RevenuePulse",
-  "StealthCommerce", "VelocityMarketing", "ClarityCoach", "NextLevelAds",
+  "ScaleMaster Pro",
+  "GrowthHack Academy",
+  "MetaAds Lab",
+  "InfinityFunnel",
+  "PeakConverter",
+  "EliteDropship",
+  "BrainBoost AI",
+  "FitRevolution",
+  "WealthMatrix",
+  "CodeNinja School",
+  "GlowSkin Co",
+  "ZenMind App",
+  "AdGenius",
+  "TurboLeads",
+  "CreatorOS",
+  "RevenuePulse",
+  "StealthCommerce",
+  "VelocityMarketing",
+  "ClarityCoach",
+  "NextLevelAds",
 ];
 
 const COVER_IMAGES = [
@@ -77,7 +103,12 @@ export const DEMO_ANALYSES: DemoAnalysis[] = DEMO_OFFERS.slice(0, 6).map((o) => 
   id: `analysis-${o.id}`,
   promise: `Alcance resultados em ${o.niche.toLowerCase()} em até 30 dias com método validado.`,
   mechanism: `Sistema proprietário em 3 etapas combinando ${o.niche.toLowerCase()} com automação.`,
-  pains: ["Falta de tempo", "Resultados inconsistentes", "Sobrecarga de informação", "Falta de método claro"],
+  pains: [
+    "Falta de tempo",
+    "Resultados inconsistentes",
+    "Sobrecarga de informação",
+    "Falta de método claro",
+  ],
   desires: ["Liberdade financeira", "Reconhecimento", "Resultados rápidos", "Confiança"],
   target_audience: `Profissionais de 25-45 anos interessados em ${o.niche.toLowerCase()}.`,
   mental_triggers: ["Escassez", "Prova social", "Autoridade", "Reciprocidade", "Urgência"],
@@ -166,7 +197,8 @@ export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
   writeAdMap(SAVED_ADS_KEY, m);
   // mirror id-set for legacy callers
   const s = readSet(SAVED_KEY);
-  if (existed) s.delete(ad.key); else s.add(ad.key);
+  if (existed) s.delete(ad.key);
+  else s.add(ad.key);
   writeSet(SAVED_KEY, s);
   emitChange("saved");
   console.log("offer saved", ad.key, !existed);
@@ -180,7 +212,8 @@ export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Prom
   else delete m[ad.key];
   writeAdMap(FAV_ADS_KEY, m);
   const f = readSet(FAV_KEY);
-  if (value) f.add(ad.key); else f.delete(ad.key);
+  if (value) f.add(ad.key);
+  else f.delete(ad.key);
   writeSet(FAV_KEY, f);
   emitChange("fav");
   console.log("favorite saved", ad.key, value);
@@ -208,7 +241,13 @@ export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
 export async function fetchScaledAds(): Promise<PersistedAd[]> {
   const m = readAdMap(SCALED_ADS_KEY);
   const list = Object.values(m)
-    .filter((ad) => ad.scaled || ad.score >= 80 || (ad.repeatedCreativeCount ?? 0) > 1 || (ad.platforms?.length ?? 1) > 1)
+    .filter(
+      (ad) =>
+        ad.scaled ||
+        ad.score >= 80 ||
+        (ad.repeatedCreativeCount ?? 0) > 1 ||
+        (ad.platforms?.length ?? 1) > 1,
+    )
     .sort((a, b) => b.score - a.score || b.saved_at.localeCompare(a.saved_at));
   console.log("loaded scaled offers", list.length);
   return list;
@@ -220,24 +259,34 @@ export function getScaledCount(): number {
   return Object.keys(readAdMap(SCALED_ADS_KEY)).length;
 }
 export function getPersistedAdByKey(key: string): PersistedAd | undefined {
-  return readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key] ?? readAdMap(SCALED_ADS_KEY)[key];
+  return (
+    readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key] ?? readAdMap(SCALED_ADS_KEY)[key]
+  );
 }
 
 export async function fetchOffers(filters?: {
-  keyword?: string; niche?: string; country?: string; platform?: string; limit?: number;
+  keyword?: string;
+  niche?: string;
+  country?: string;
+  platform?: string;
+  limit?: number;
 }): Promise<DemoOffer[]> {
   let list = [...DEMO_OFFERS];
   if (filters?.keyword) {
     const k = filters.keyword.toLowerCase();
-    list = list.filter((o) =>
-      o.advertiser_name.toLowerCase().includes(k) ||
-      (o.summary ?? "").toLowerCase().includes(k) ||
-      o.keyword.includes(k)
+    list = list.filter(
+      (o) =>
+        o.advertiser_name.toLowerCase().includes(k) ||
+        (o.summary ?? "").toLowerCase().includes(k) ||
+        o.keyword.includes(k),
     );
   }
-  if (filters?.niche && filters.niche !== "all") list = list.filter((o) => o.niche === filters.niche);
-  if (filters?.country && filters.country !== "all") list = list.filter((o) => o.country === filters.country);
-  if (filters?.platform && filters.platform !== "all") list = list.filter((o) => o.platform === filters.platform);
+  if (filters?.niche && filters.niche !== "all")
+    list = list.filter((o) => o.niche === filters.niche);
+  if (filters?.country && filters.country !== "all")
+    list = list.filter((o) => o.country === filters.country);
+  if (filters?.platform && filters.platform !== "all")
+    list = list.filter((o) => o.platform === filters.platform);
   list.sort((a, b) => b.scale_score - a.scale_score);
   if (filters?.limit) list = list.slice(0, filters.limit);
   return list;
@@ -245,7 +294,10 @@ export async function fetchOffers(filters?: {
 
 export async function fetchSaved(_userId: string) {
   const saved = readSet(SAVED_KEY);
-  return DEMO_OFFERS.filter((o) => saved.has(o.id)).map((o) => ({ mined_offers: o, offer_id: o.id }));
+  return DEMO_OFFERS.filter((o) => saved.has(o.id)).map((o) => ({
+    mined_offers: o,
+    offer_id: o.id,
+  }));
 }
 
 export async function fetchSavedIds(_userId: string): Promise<Set<string>> {
@@ -254,7 +306,10 @@ export async function fetchSavedIds(_userId: string): Promise<Set<string>> {
 
 export async function fetchFavorites(_userId: string) {
   const favs = readSet(FAV_KEY);
-  return DEMO_OFFERS.filter((o) => favs.has(o.id)).map((o) => ({ mined_offers: o, offer_id: o.id }));
+  return DEMO_OFFERS.filter((o) => favs.has(o.id)).map((o) => ({
+    mined_offers: o,
+    offer_id: o.id,
+  }));
 }
 
 export async function fetchFavIds(_userId?: string): Promise<Set<string>> {
@@ -268,7 +323,8 @@ export function getFavCount(): number {
 export async function toggleSaveOffer(_userId: string, offerId: string): Promise<boolean> {
   const s = readSet(SAVED_KEY);
   const isSaved = s.has(offerId);
-  if (isSaved) s.delete(offerId); else s.add(offerId);
+  if (isSaved) s.delete(offerId);
+  else s.add(offerId);
   writeSet(SAVED_KEY, s);
   emitChange("saved");
   return !isSaved;
@@ -276,7 +332,8 @@ export async function toggleSaveOffer(_userId: string, offerId: string): Promise
 
 export async function toggleFavorite(_userId: string, offerId: string, value: boolean) {
   const f = readSet(FAV_KEY);
-  if (value) f.add(offerId); else f.delete(offerId);
+  if (value) f.add(offerId);
+  else f.delete(offerId);
   writeSet(FAV_KEY, f);
   emitChange("fav");
 }
@@ -285,7 +342,9 @@ function readAnalysesStore(): DemoAnalysis[] {
   try {
     const raw = typeof window !== "undefined" ? localStorage.getItem(ANALYSES_KEY) : null;
     return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 function writeAnalysesStore(list: DemoAnalysis[]) {
   if (typeof window !== "undefined") localStorage.setItem(ANALYSES_KEY, JSON.stringify(list));
@@ -319,7 +378,12 @@ export function getAnalysisForOffer(offerId: string): DemoAnalysis {
     id: `analysis-${offerId}`,
     promise: `Alcance resultados em ${offer.niche.toLowerCase()} em até 30 dias com método validado.`,
     mechanism: `Sistema proprietário em 3 etapas combinando ${offer.niche.toLowerCase()} com automação inteligente.`,
-    pains: ["Falta de tempo", "Resultados inconsistentes", "Sobrecarga de informação", "Falta de método claro"],
+    pains: [
+      "Falta de tempo",
+      "Resultados inconsistentes",
+      "Sobrecarga de informação",
+      "Falta de método claro",
+    ],
     desires: ["Liberdade financeira", "Reconhecimento", "Resultados rápidos", "Confiança"],
     target_audience: `Profissionais de 25-45 anos interessados em ${offer.niche.toLowerCase()}.`,
     mental_triggers: ["Escassez", "Prova social", "Autoridade", "Reciprocidade", "Urgência"],
@@ -330,7 +394,11 @@ export function getAnalysisForOffer(offerId: string): DemoAnalysis {
       "Reel curto com gancho nos 3 primeiros segundos",
       "Imagem estática com headline forte e CTA",
     ],
-    mined_offers: { advertiser_name: offer.advertiser_name, niche: offer.niche, image_url: offer.image_url },
+    mined_offers: {
+      advertiser_name: offer.advertiser_name,
+      niche: offer.niche,
+      image_url: offer.image_url,
+    },
   };
 }
 
@@ -374,10 +442,46 @@ export function getAITrends(): AITrends {
     ],
     topScores: sorted.slice(0, 3),
     signals: [
-      { emoji: "🔥", title: "Produto crescendo na Espanha", subtitle: "Saúde e beleza", score: 92, growth: 47, time: "há 2h", country: "ES", direction: "up" },
-      { emoji: "📈", title: "Oferta escalando em saúde", subtitle: "Nutra dominando feed", score: 88, growth: 38, time: "há 5h", country: "BR", direction: "up" },
-      { emoji: "🎬", title: "Criativo repetido detectado", subtitle: "Padrão usado por 12 anunciantes", score: 76, growth: 12, time: "há 1d", country: "US", direction: "stable" },
-      { emoji: "🎯", title: "Novo padrão de VSL identificado", subtitle: "Gancho de 3 segundos viralizando", score: 95, growth: 61, time: "há 3h", country: "PT", direction: "up" },
+      {
+        emoji: "🔥",
+        title: "Produto crescendo na Espanha",
+        subtitle: "Saúde e beleza",
+        score: 92,
+        growth: 47,
+        time: "há 2h",
+        country: "ES",
+        direction: "up",
+      },
+      {
+        emoji: "📈",
+        title: "Oferta escalando em saúde",
+        subtitle: "Nutra dominando feed",
+        score: 88,
+        growth: 38,
+        time: "há 5h",
+        country: "BR",
+        direction: "up",
+      },
+      {
+        emoji: "🎬",
+        title: "Criativo repetido detectado",
+        subtitle: "Padrão usado por 12 anunciantes",
+        score: 76,
+        growth: 12,
+        time: "há 1d",
+        country: "US",
+        direction: "stable",
+      },
+      {
+        emoji: "🎯",
+        title: "Novo padrão de VSL identificado",
+        subtitle: "Gancho de 3 segundos viralizando",
+        score: 95,
+        growth: 61,
+        time: "há 3h",
+        country: "PT",
+        direction: "up",
+      },
     ],
   };
 }
@@ -406,11 +510,14 @@ export function getOfferMetrics(id: string, score: number): OfferMetrics {
   const countries = allCountries.slice(0, 3 + (h % 3));
   const estimatedDays = 5 + (h % 25);
   const growth = 8 + (h % 60);
-  const status = score >= 85
-    ? { label: "Dominando", emoji: "👑" }
-    : score >= 70 ? { label: "Escalando", emoji: "🚀" }
-    : score >= 50 ? { label: "Hot", emoji: "🔥" }
-    : { label: "Validando", emoji: "🧪" };
+  const status =
+    score >= 85
+      ? { label: "Dominando", emoji: "👑" }
+      : score >= 70
+        ? { label: "Escalando", emoji: "🚀" }
+        : score >= 50
+          ? { label: "Hot", emoji: "🔥" }
+          : { label: "Validando", emoji: "🧪" };
   const spark = Array.from({ length: 12 }, (_, i) => 30 + ((h >> i) & 0x3f));
   const ease = 60 + (h % 35);
   const competition = 30 + ((h >> 3) % 60);
@@ -420,16 +527,37 @@ export function getOfferMetrics(id: string, score: number): OfferMetrics {
   const ticketHigh = ticketLow + 200 + ((h >> 11) % 600);
   const tone = (v: number, inverted = false) =>
     inverted
-      ? (v < 40 ? "good" : v < 70 ? "warn" : "bad")
-      : (v > 70 ? "good" : v > 40 ? "warn" : "bad");
+      ? v < 40
+        ? "good"
+        : v < 70
+          ? "warn"
+          : "bad"
+      : v > 70
+        ? "good"
+        : v > 40
+          ? "warn"
+          : "bad";
   return {
-    activeAds, countries, estimatedDays, growth, status, spark,
+    activeAds,
+    countries,
+    estimatedDays,
+    growth,
+    status,
+    spark,
     ticketRange: `R$ ${ticketLow} – R$ ${ticketHigh}`,
     opportunity: [
       { label: "Fácil de copiar", value: ease, tone: tone(ease) as "good" | "warn" | "bad" },
-      { label: "Concorrência", value: competition, tone: tone(competition, true) as "good" | "warn" | "bad" },
+      {
+        label: "Concorrência",
+        value: competition,
+        tone: tone(competition, true) as "good" | "warn" | "bad",
+      },
       { label: "Potencial viral", value: viral, tone: tone(viral) as "good" | "warn" | "bad" },
-      { label: "Saturação", value: saturation, tone: tone(saturation, true) as "good" | "warn" | "bad" },
+      {
+        label: "Saturação",
+        value: saturation,
+        tone: tone(saturation, true) as "good" | "warn" | "bad",
+      },
     ],
   };
 }

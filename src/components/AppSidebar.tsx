@@ -1,8 +1,27 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
-import { LayoutDashboard, Search, Bookmark, TrendingUp, Sparkles, Heart, Settings, Radio } from "lucide-react";
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader } from "@/components/ui/sidebar";
+import {
+  LayoutDashboard,
+  Search,
+  Bookmark,
+  TrendingUp,
+  Sparkles,
+  Heart,
+  Settings,
+  Radio,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+} from "@/components/ui/sidebar";
 import { getFavCount, getSavedCount, getScaledCount, subscribeChange } from "@/lib/queries";
 
 export function AppSidebar() {
@@ -34,8 +53,15 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground font-bold" style={{ background: "var(--gradient-primary)" }}>E</div>
-          <span className="font-bold tracking-tight group-data-[collapsible=icon]:hidden">EscalaFlow</span>
+          <div
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground font-bold"
+            style={{ background: "var(--gradient-primary)" }}
+          >
+            E
+          </div>
+          <span className="font-bold tracking-tight group-data-[collapsible=icon]:hidden">
+            EscalaFlow
+          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
