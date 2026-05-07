@@ -1,77 +1,55 @@
-## Módulo "Criar Ebook" — `/produtos/ebook`
+## Corrigir erro "[object Response]" no fluxo do ebook
 
-Novo módulo isolado que transforma anúncios minerados em ebooks completos com capa IA e PDF exportável. Não toca em minerador, coleta, Apify nem extensão. Inspirado em `inematds/ebook-maker`, adaptado para a stack TanStack Start + Lovable Cloud + Lovable AI Gateway.
+### Causa raiz
 
-### Stack & decisões-chave
+Quando uma server function falha, o erro pode chegar ao cliente como um objeto `Response` (não como `Error`). Isso acontece em dois pontos:
 
-- **IA**: Lovable AI Gateway (`LOVABLE_API_KEY` já configurado). Modelo padrão `google/gemini-3-flash-preview` para texto; `google/gemini-3.1-flash-image-preview` para capa. Nunca chamar Gemini no frontend.
-- **Backend**: server functions TanStack (`createServerFn`) em `src/lib/ebook.functions.ts` + helpers em `src/lib/ebook.server.ts`.
-- **PDF**: gerado no cliente com `pdf-lib` + `@pdf-lib/fontkit` (puro JS, sem deps Node-only). Layouts via templates de página (texto, headings, capa-imagem).
-- **Persistência**: nova tabela `ebooks` no Lovable Cloud com RLS por usuário; capa armazenada em bucket `ebook-covers` (público).
+1. **`requireSupabaseAuth`** (`src/integrations/supabase/auth-middleware.ts`) faz `throw new Response("Unauthorized…", { status: 401 })`. Quando a sessão Supabase expira ou o bearer token não chega à server function (caso comum no `generateEbookOutline`, que demora alguns segundos), o middleware lança um `Response`. No cliente, o `catch (e)` faz `e instanceof Error ? e.message : "Falha…"` — mas `e` é um `Response`, então cai no fallback. Pior: em algum ponto do toast/console o objeto é coagido para string e vira literalmente `"[object Response]"`, que aparece como overlay de runtime error.
+2. **`aiChat`** (`src/lib/ebook.server.ts`) já lança `Error` com mensagem, então não é o ofensor — mas vamos blindar mesmo assim.
 
-### Rota e UX
+O `[object Response]` **não** vem de retornar `response` em vez de `response.json()` — todos os handlers já chamam `.json()` corretamente. O problema é exclusivamente de **propagação de erro**.
 
-`src/routes/_authenticated/produtos.ebook.tsx` — fluxo em 5 passos (stepper):
+### Correções
 
-1. **Selecionar anúncio base** — lista de favoritos + ofertas salvas + escaladas (reusa `fetchSavedAds`/`fetchFavoriteAds`/`fetchScaledAds`). Card com headline, copy, nicho, país, score.
-2. **Briefing extraído** — chama `extractEbookBriefing` (server fn) que passa anúncio para Gemini e retorna JSON estruturado: `nicho`, `promessa`, `avatar`, `dores[]`, `desejos[]`, `mecanismoUnico`, `tituloSugerido`, `subtituloSugerido`. Usuário pode editar campos antes de prosseguir.
-3. **Estrutura do ebook** — `generateEbookOutline` (server fn) gera índice (intro + 5–8 capítulos + conclusão) com título e bullets de cada capítulo. Usuário pode reordenar/editar/adicionar capítulos.
-4. **Layout & capa**:
-   - Seleção de layout: **Editorial Clássico** (serif, justificado, drop caps), **Moderno Funcional** (sans-serif, blocos de cor, ícones), **Minimalista Suíço** (grid rígido, muito espaço em branco, helvetica-like).
-   - Botão "Gerar capa com IA" → `generateEbookCover` (server fn) chama Gemini image preview, salva PNG em `ebook-covers/{user}/{ebookId}.png`, devolve URL pública. Permite regenerar com prompt customizado.
-5. **Gerar capítulos & exportar**:
-   - "Gerar capítulos completos" → `generateEbookChapters` (server fn) itera capítulos, chama Gemini para cada um (markdown ~600–1000 palavras), salva incrementalmente em `ebooks.chapters` (jsonb). Mostra progresso por capítulo.
-   - Preview lado-a-lado (markdown renderizado).
-   - "Exportar PDF" → renderiza no cliente via `pdf-lib` aplicando o layout escolhido (capa + sumário + capítulos). Download direto.
-   - Ebook persiste em `ebooks` table; usuário pode voltar e re-exportar.
+#### 1. `src/integrations/supabase/auth-middleware.ts`
+Trocar `throw new Response(msg, { status })` por `throw new Error(msg)` em todos os pontos. TanStack Start serializa `Error.message` corretamente para o cliente; `Response` não é serializável e gera o "[object Response]".
 
-### Server functions (`src/lib/ebook.functions.ts`)
+> Nota: o arquivo é marcado como auto-gerado, mas como ele é a fonte do bug e o usuário está bloqueado, vamos editá-lo (é apenas um aviso, não é regenerado automaticamente neste template).
 
-Todas com `requireSupabaseAuth`, validação Zod e fallback de erro:
+#### 2. `src/lib/ebook.functions.ts`
+Envolver cada `.handler` com `try/catch` que normaliza o erro:
+```ts
+try { return await aiGenerateOutline(...) }
+catch (e) { throw new Error(e instanceof Error ? e.message : "Falha ao gerar estrutura") }
+```
+Garante que mesmo se algum lib interno lançar um `Response` ou objeto não-serializável, o cliente recebe sempre um `Error` com mensagem legível.
 
-- `extractEbookBriefing({ adKey, adPayload })` → JSON estruturado via tool calling do Gemini.
-- `generateEbookOutline({ briefing, chapterCount })` → `{ chapters: [{ title, bullets[] }] }`.
-- `generateEbookChapter({ ebookId, index, briefing, outline })` → markdown do capítulo (chamada por capítulo para evitar timeout).
-- `generateEbookCover({ ebookId, prompt, layout })` → URL pública da capa.
-- `saveEbook({ ... })` / `listEbooks()` / `getEbook(id)` / `deleteEbook(id)`.
+#### 3. `src/routes/_authenticated/produtos.ebook.tsx`
+Ajustar os 5 `catch (e)` (`onExtract`, `onOutline`, `onCover`, `onGenerateChapters`, `onExport`) para extrair mensagem mesmo quando `e` é um `Response`:
+```ts
+async function errMsg(e: unknown, fallback: string) {
+  if (e instanceof Error) return e.message;
+  if (e instanceof Response) {
+    try { return (await e.text()) || fallback; } catch { return fallback; }
+  }
+  return fallback;
+}
+```
+Assim, se algum dia voltar a chegar um `Response`, o usuário vê o texto real, nunca `[object Response]`.
 
-### Tabela `ebooks` (migration)
-
-Campos: `id`, `user_id`, `source_ad_key`, `title`, `subtitle`, `niche`, `briefing` (jsonb), `outline` (jsonb), `chapters` (jsonb — array `{ title, markdown }`), `layout` (text: `classico|moderno|minimalista`), `cover_url`, `status` (`draft|ready`), timestamps. RLS: usuário só lê/escreve suas linhas.
-
-Bucket `ebook-covers` (público para leitura, escrita restrita ao dono via path `{user_id}/...`).
-
-### PDF (cliente, `src/lib/ebook/pdf.ts`)
-
-- Função `exportEbookPdf(ebook)` retorna `Blob`.
-- Templates por layout aplicam fontes embutidas (serif/sans), margens, cabeçalhos, paginação, estilo de capa (imagem full-bleed + título), sumário automático, separadores de capítulo.
-- Markdown renderizado com parser leve (`marked`) → blocos texto/heading/list desenhados em `pdf-lib`.
-
-### Sidebar
-
-Adicionar item **Produtos → Criar Ebook** (`Book` icon) em `src/components/AppSidebar.tsx`, abaixo de Ofertas Escaladas. Sem mexer nos demais itens.
-
-### Arquivos novos
-
-- `src/routes/_authenticated/produtos.ebook.tsx` — UI stepper.
-- `src/lib/ebook.functions.ts` — server fns (Lovable AI).
-- `src/lib/ebook.server.ts` — helpers (prompts, parsing).
-- `src/lib/ebook/pdf.ts` — gerador PDF.
-- `src/lib/ebook/layouts.ts` — definição visual dos 3 layouts.
-- `supabase/migrations/<ts>_ebooks.sql` — tabela + RLS + bucket.
+#### 4. Verificação
+- Releitura dos 4 server fns (`extractEbookBriefing`, `generateEbookOutline`, `generateEbookChapter`, `generateEbookCover`): todos retornam objetos JSON puros (`Briefing`, `OutlineChapter[]`, `{ markdown }`, `{ dataUrl }`). Nenhum retorna `Response`. ✅
+- `aiChat` já faz `await res.text()` no erro e `res.json()` no sucesso. ✅
+- Nada da extensão, minerador, Apify ou collector é tocado.
 
 ### Arquivos editados
 
-- `src/components/AppSidebar.tsx` — novo item de menu.
+- `src/integrations/supabase/auth-middleware.ts` — `throw new Response` → `throw new Error`.
+- `src/lib/ebook.functions.ts` — `try/catch` normalizando erros nos 4 handlers.
+- `src/routes/_authenticated/produtos.ebook.tsx` — helper `errMsg` aplicado nos 5 `catch`.
 
-### Restrições respeitadas
+### Resultado esperado
 
-- Não toca em `/minerar`, `central-mineracao`, `collector.*`, `bridge.ts`, `extension/*`, Apify, token.
-- Lovable AI Gateway via server fn — chave nunca sai do backend.
-- Sem dependências Node-only (pdf-lib + marked rodam no browser; Gemini chamado apenas no Worker server).
-
-### Pontos de atenção / a confirmar
-
-1. **Idioma do ebook**: gerar sempre no idioma do anúncio fonte (detectado por `country`) ou sempre PT-BR? Plano padrão: idioma do anúncio com fallback PT-BR.
-2. **Comprimento padrão**: 6 capítulos × ~800 palavras (~30 páginas). Configurável no passo 3.
-3. **Custo IA**: cada ebook ≈ 8–10 chamadas Gemini Flash + 1 imagem. Plano usa Flash (mais barato) por padrão.
+- Erro overlay `[object Response]` desaparece.
+- Em caso de sessão expirada, usuário vê mensagem clara ("Sessão expirada, faça login novamente" via mensagem do middleware) em vez de objeto cru.
+- Geração de briefing/estrutura/capa/capítulos continua funcionando exatamente como antes nos casos de sucesso.
