@@ -10,6 +10,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useTheme } from "@/providers/ThemeProvider";
 import { toast } from "sonner";
 import i18n from "@/i18n/config";
+import { Radar, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({ component: SettingsPage });
 
@@ -105,6 +106,35 @@ function SettingsPage() {
               >
                 {t("settings.themeDark")}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Radar className="h-4 w-4 text-primary" />
+              Motor de Coleta
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              O Motor de Coleta permite mineração em massa de anúncios diretamente da
+              Biblioteca de Anúncios. A chave é armazenada de forma segura no servidor
+              e nunca é exposta no navegador.
+            </p>
+            <div>
+              <Label>Chave do Motor de Coleta</Label>
+              <Input
+                type="password"
+                value="••••••••••••••••"
+                disabled
+                readOnly
+              />
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                Configurada com segurança. Para alterar, contate o administrador do workspace.
+              </p>
             </div>
           </CardContent>
         </Card>
