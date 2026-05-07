@@ -158,8 +158,7 @@ function MiningCenterPage() {
   };
   const onOpenChatGPT = (a: MinedAd) => {
     const prompt = `Faça engenharia reversa do anúncio:\n\nAnunciante: ${a.advertiser || "—"}\nHeadline: ${a.headline}\nCopy: ${a.copy}\nCTA: ${a.cta || "—"}\nNicho: ${a.niche} | País: ${a.country}\nPlataforma: ${a.platform}\nLink: ${a.adUrl || "—"}\n\n1) Big Idea\n2) Avatar\n3) Estrutura\n4) Gatilhos\n5) Como escalar`;
-    const url = "https://chatgpt.com/?q=" + encodeURIComponent(prompt);
-    window.open(url, "_blank", "noopener");
+    openChatGPTWithPrompt(prompt);
   };
   const onClearAll = async () => {
     if (!confirm("Limpar toda a central de mineração?")) return;
@@ -369,9 +368,9 @@ function MiningCenterPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
-                            {a.adUrl && (
-                              <Button asChild size="icon" variant="ghost"><a href={a.adUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /></a></Button>
-                            )}
+                            <Button size="icon" variant="ghost" onClick={() => openExternal(a.adUrl, a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null)}>
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button size="icon" variant="ghost" onClick={() => onOpenChatGPT(a)} aria-label="Abrir no ChatGPT">
