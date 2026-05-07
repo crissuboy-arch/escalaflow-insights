@@ -9,7 +9,8 @@ export function getAnalyzedAdByKey(key: string): PersistedAd | undefined {
   return (
     readAdMap(ANALYZED_ADS_KEY)[key] ??
     readAdMap(SAVED_ADS_KEY)[key] ??
-    readAdMap(FAV_ADS_KEY)[key]
+    readAdMap(FAV_ADS_KEY)[key] ??
+    readAdMap(SCALED_ADS_KEY)[key]
   );
 }
 // Local demo data — no backend
