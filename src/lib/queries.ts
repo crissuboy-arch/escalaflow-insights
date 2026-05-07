@@ -1,3 +1,17 @@
+const ANALYZED_ADS_KEY = "escalaflow_analyzed_ads_v1";
+
+export async function rememberAdForAnalysis(ad: PersistedAd): Promise<void> {
+  const m = readAdMap(ANALYZED_ADS_KEY);
+  m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
+  writeAdMap(ANALYZED_ADS_KEY, m);
+}
+export function getAnalyzedAdByKey(key: string): PersistedAd | undefined {
+  return (
+    readAdMap(ANALYZED_ADS_KEY)[key] ??
+    readAdMap(SAVED_ADS_KEY)[key] ??
+    readAdMap(FAV_ADS_KEY)[key]
+  );
+}
 // Local demo data — no backend
 export interface DemoOffer {
   id: string;
