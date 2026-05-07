@@ -38,12 +38,17 @@ type CollectedAd = {
   keyword: string | null;
   score: number;
   created_at: string;
+  media_source?: string;
 };
 
 type CollectorDebug = {
   total: number;
   firstItem: unknown | null;
   fields: string[];
+  withImage: number;
+  withVideo: number;
+  withoutMedia: number;
+  mediaSources: Record<string, number>;
 };
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
@@ -240,10 +245,24 @@ function MinePage() {
       const data = (await res.json()) as CollectorRunResult;
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
+      const adsArr = data.ads ?? [];
+      const sources: Record<string, number> = {};
+      let wImg = 0, wVid = 0, wNone = 0;
+      for (const a of adsArr) {
+        const ms = (a as unknown as { mediaSource?: string }).mediaSource ?? "none";
+        sources[ms] = (sources[ms] ?? 0) + 1;
+        if (a.videoUrl) wVid++;
+        else if (a.imageUrl) wImg++;
+        else wNone++;
+      }
       setCollectorDebug({
-        total: data.ads?.length ?? 0,
-        firstItem: data.ads?.[0] ?? null,
-        fields: data.ads?.[0] ? Object.keys(data.ads[0] as unknown as Record<string, unknown>) : [],
+        total: adsArr.length,
+        firstItem: adsArr[0] ?? null,
+        fields: adsArr[0] ? Object.keys(adsArr[0] as unknown as Record<string, unknown>) : [],
+        withImage: wImg,
+        withVideo: wVid,
+        withoutMedia: wNone,
+        mediaSources: sources,
       });
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
@@ -257,6 +276,7 @@ function MinePage() {
         image_url: a.imageUrl ?? null,
         video_url: a.videoUrl ?? null,
         creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
+        media_source: (a as unknown as { mediaSource?: string }).mediaSource,
         platform: a.platform,
         country: a.country,
         niche: a.niche,
@@ -493,6 +513,12 @@ function MinePage() {
                 <span className="font-semibold">Total recebido: {collectorDebug.total}</span>
                 <span className="text-muted-foreground">Campos: {collectorDebug.fields.join(", ") || "nenhum"}</span>
               </div>
+              <div className="mb-2 flex flex-wrap items-center gap-3 text-muted-foreground">
+                <span>Com imagem: <b className="text-foreground">{collectorDebug.withImage}</b></span>
+                <span>Com vídeo: <b className="text-foreground">{collectorDebug.withVideo}</b></span>
+                <span>Sem mídia: <b className="text-foreground">{collectorDebug.withoutMedia}</b></span>
+                <span>Fontes: {Object.entries(collectorDebug.mediaSources).map(([k, v]) => `${k}=${v}`).join(", ") || "—"}</span>
+              </div>
               <pre className="max-h-48 overflow-auto rounded-md bg-background/70 p-3 text-[11px] leading-relaxed text-muted-foreground">
                 {JSON.stringify(collectorDebug.firstItem, null, 2)}
               </pre>
@@ -554,6 +580,11 @@ function MinePage() {
                       {!hasMedia && (
                         <div className="absolute bottom-2 left-2 rounded-full bg-background/80 px-2 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
                           sem mídia capturada
+                        </div>
+                      )}
+                      {a.media_source && a.media_source !== "none" && (
+                        <div className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-1 text-[10px] font-medium text-muted-foreground backdrop-blur">
+                          mídia: {a.media_source}
                         </div>
                       )}
                     </div>

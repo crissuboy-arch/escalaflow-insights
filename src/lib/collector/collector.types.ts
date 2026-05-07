@@ -16,14 +16,19 @@ export interface CollectorAd {
   cta?: string;
   imageUrl?: string;
   videoUrl?: string;
+  videoThumbnail?: string;
   adLibraryId?: string;
   adUrl?: string;
   platform: string;
+  platforms?: string[];
   country: string;
   niche: string;
   score: number;
   source: "collector";
   createdAt: string;
+  startDate?: string;
+  mediaSource?: "image" | "video-thumb" | "card-image" | "deep-find" | "none";
+  raw?: unknown;
 }
 
 export interface CollectorRunResult {
