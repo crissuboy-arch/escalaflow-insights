@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getAnalyzedAdByKey, fetchSavedAds, fetchFavoriteAds, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { ArrowLeft, Sparkles, Target, Heart, Lightbulb, Users, Brain, Layers, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
+import { openExternal } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/analise-ia")({
   component: AIPage,
@@ -114,13 +115,16 @@ function AIPage() {
                       <Badge variant="secondary">{selected.platform}</Badge>
                       <Badge variant="secondary">{selected.country}</Badge>
                       <Badge variant="secondary">Score {selected.score}</Badge>
-                      {selected.ad_url && (
-                        <Button size="sm" variant="secondary" asChild>
-                          <a href={selected.ad_url} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-1 h-3 w-3" /> Abrir anúncio
-                          </a>
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openExternal(
+                          selected.ad_url,
+                          selected.ad_library_id ? `https://www.facebook.com/ads/library/?id=${selected.ad_library_id}` : null,
+                        )}
+                      >
+                        <ExternalLink className="mr-1 h-3 w-3" /> Abrir anúncio
+                      </Button>
                     </div>
                   </div>
                 </div>

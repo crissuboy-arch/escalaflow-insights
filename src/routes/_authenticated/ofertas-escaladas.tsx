@@ -5,8 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp } from "lucide-react";
+import { Search, TrendingUp, Info, Sparkles, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useNavigate } from "@tanstack/react-router";
+import { rememberAdForAnalysis } from "@/lib/queries";
+import { openExternal } from "@/lib/external";
 
 type Row = {
   id: string;
@@ -40,6 +45,9 @@ function ScaledPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
+  const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -85,8 +93,43 @@ function ScaledPage() {
     () => scaled.filter((r) => r.advertiser.toLowerCase().includes(q.toLowerCase()) || r.headline.toLowerCase().includes(q.toLowerCase())),
     [scaled, q],
   );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const onAnalyze = (r: Scaled) => {
+    const row = rows.find((x) => x.advertiser === r.advertiser && x.headline === r.headline);
+    if (!row) return;
+    const key = row.ad_library_id || row.ad_url || row.id;
+    rememberAdForAnalysis({
+      key,
+      ad_library_id: row.ad_library_id,
+      ad_url: row.ad_url,
+      advertiser: row.advertiser,
+      headline: row.headline,
+      copy: null,
+      cta: null,
+      image_url: null,
+      video_url: null,
+      platform: row.platform,
+      country: row.country,
+      niche: row.niche,
+      score: row.score,
+      created_at: row.created_at,
+      saved_at: new Date().toISOString(),
+    });
+    navigate({ to: "/analise-ia", search: { ad: key } as never });
+  };
+
+  const onOpen = (r: Scaled) => {
+    const row = rows.find((x) => x.advertiser === r.advertiser && x.headline === r.headline);
+    openExternal(
+      row?.ad_url,
+      row?.ad_library_id ? `https://www.facebook.com/ads/library/?id=${row.ad_library_id}` : null,
+    );
+  };
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{t("scaled.title")}</h1>
@@ -115,16 +158,28 @@ function ScaledPage() {
                 <TableRow>
                   <TableHead>Anunciante</TableHead>
                   <TableHead>Headline</TableHead>
-                  <TableHead className="text-right">Score</TableHead>
+                  <TableHead className="text-right">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 cursor-help">
+                          Score <Info className="h-3 w-3 text-muted-foreground" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        Score representa potencial de escala com base em mídia, copy, repetição, plataforma e sinais de anúncio ativo.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableHead>
                   <TableHead className="text-right">Anúncios</TableHead>
                   <TableHead>Plataformas</TableHead>
                   <TableHead>País</TableHead>
                   <TableHead>Nicho</TableHead>
                   <TableHead>Detectado</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((r, i) => (
+                {visible.map((r, i) => (
                   <TableRow key={i}>
                     <TableCell className="font-medium">{r.advertiser}</TableCell>
                     <TableCell className="max-w-[280px] truncate text-muted-foreground">{r.headline}</TableCell>
@@ -136,13 +191,33 @@ function ScaledPage() {
                     <TableCell className="text-muted-foreground">{r.country}</TableCell>
                     <TableCell className="text-muted-foreground">{r.niche}</TableCell>
                     <TableCell className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => onOpen(r)} title="Ver detalhes">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => onAnalyze(r)} title="Analisar com IA">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          {filtered.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between border-t border-border/60 p-3">
+              <p className="text-xs text-muted-foreground">Página {page + 1} de {pageCount}</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Anterior</Button>
+                <Button size="sm" variant="outline" disabled={page + 1 >= pageCount} onClick={() => setPage((p) => p + 1)}>Próxima</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }

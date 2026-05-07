@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search } from "lucide-react";
 import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
+import { openExternal } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/ofertas-salvas")({ component: SavedPage });
 
@@ -81,13 +82,17 @@ function SavedPage() {
                     <Button size="sm" variant="outline" onClick={() => onRemove(a)}>
                       <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> Remover
                     </Button>
-                    {a.ad_url && (
-                      <Button size="sm" variant="ghost" className="col-span-2" asChild>
-                        <a href={a.ad_url} target="_blank" rel="noreferrer">
-                          <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
-                        </a>
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="col-span-2"
+                      onClick={() => openExternal(
+                        a.ad_url,
+                        a.ad_library_id ? `https://www.facebook.com/ads/library/?id=${a.ad_library_id}` : null,
+                      )}
+                    >
+                      <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
+                    </Button>
                   </div>
                 </div>
               </Card>
