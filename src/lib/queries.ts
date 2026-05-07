@@ -95,14 +95,15 @@ const FAV_KEY = "escalaflow_favs";
 const ANALYSES_KEY = "escalaflow_analyses";
 const SAVED_ADS_KEY = "escalaflow_saved_ads_v1";
 const FAV_ADS_KEY = "escalaflow_fav_ads_v1";
+const SCALED_ADS_KEY = "escalaflow_scaled_ads_v1";
 const EVT = "escalaflow:change";
 
-function emitChange(scope: "saved" | "fav" | "analyses") {
+function emitChange(scope: "saved" | "fav" | "analyses" | "scaled") {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(EVT, { detail: scope }));
 }
 
-export function subscribeChange(cb: (scope: "saved" | "fav" | "analyses") => void) {
+export function subscribeChange(cb: (scope: "saved" | "fav" | "analyses" | "scaled") => void) {
   if (typeof window === "undefined") return () => {};
   const h = (e: Event) => cb((e as CustomEvent).detail);
   window.addEventListener(EVT, h);
@@ -138,6 +139,9 @@ export interface PersistedAd {
   score: number;
   created_at: string;
   saved_at: string;
+  scaled?: boolean;
+  repeatedCreativeCount?: number;
+  platforms?: string[];
 }
 
 function readAdMap(key: string): Record<string, PersistedAd> {
@@ -153,6 +157,7 @@ function writeAdMap(key: string, m: Record<string, PersistedAd>) {
 }
 
 export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
+  console.log("saving offer", ad);
   const m = readAdMap(SAVED_ADS_KEY);
   const existed = !!m[ad.key];
   if (existed) delete m[ad.key];
@@ -168,6 +173,7 @@ export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
 }
 
 export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Promise<void> {
+  console.log("saving favorite", ad);
   const m = readAdMap(FAV_ADS_KEY);
   if (value) m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
   else delete m[ad.key];
@@ -182,17 +188,38 @@ export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Prom
 export async function fetchSavedAds(): Promise<PersistedAd[]> {
   const m = readAdMap(SAVED_ADS_KEY);
   const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("saved offers loaded", list.length);
+  console.log("loaded saved offers", list.length);
   return list;
 }
 export async function fetchFavoriteAds(): Promise<PersistedAd[]> {
   const m = readAdMap(FAV_ADS_KEY);
   const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("favorites loaded", list.length);
+  console.log("loaded favorites", list.length);
   return list;
 }
+export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
+  console.log("saving scaled", ad);
+  const m = readAdMap(SCALED_ADS_KEY);
+  m[ad.key] = { ...ad, scaled: true, saved_at: new Date().toISOString() };
+  writeAdMap(SCALED_ADS_KEY, m);
+  emitChange("scaled");
+}
+export async function fetchScaledAds(): Promise<PersistedAd[]> {
+  const m = readAdMap(SCALED_ADS_KEY);
+  const list = Object.values(m)
+    .filter((ad) => ad.scaled || ad.score >= 80 || (ad.repeatedCreativeCount ?? 0) > 1 || (ad.platforms?.length ?? 1) > 1)
+    .sort((a, b) => b.score - a.score || b.saved_at.localeCompare(a.saved_at));
+  console.log("loaded scaled offers", list.length);
+  return list;
+}
+export function getSavedCount(): number {
+  return Object.keys(readAdMap(SAVED_ADS_KEY)).length;
+}
+export function getScaledCount(): number {
+  return Object.keys(readAdMap(SCALED_ADS_KEY)).length;
+}
 export function getPersistedAdByKey(key: string): PersistedAd | undefined {
-  return readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key];
+  return readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key] ?? readAdMap(SCALED_ADS_KEY)[key];
 }
 
 export async function fetchOffers(filters?: {
