@@ -45,8 +45,6 @@ import { miningRepo } from "@/lib/mining/repository";
 import {
   startExtensionBridge,
   detectExtension,
-  seedDemoAds,
-  insertTestAd,
 } from "@/lib/mining/bridge";
 import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
@@ -219,19 +217,9 @@ function MiningCenterPage() {
   const onReceive = async () => {
     const present = await detectExtension();
     setExtensionConnected(present);
-    if (present) {
-      toast.success("Extensão detectada — aguardando dados…");
-    } else {
-      const n = await seedDemoAds(5);
-      toast.info(`Extensão não detectada — ${n} anúncios demo inseridos`);
-    }
+    if (present) toast.success("Extensão detectada — aguardando dados…");
+    else toast.info("Extensão não detectada. Use 'Minerar Agora' para coletar anúncios reais.");
     await refresh();
-  };
-
-  const onInsertTest = async () => {
-    await insertTestAd();
-    await refresh();
-    toast.success("Anúncio minerado com sucesso");
   };
 
   const onToggleFav = async (a: MinedAd) => {
