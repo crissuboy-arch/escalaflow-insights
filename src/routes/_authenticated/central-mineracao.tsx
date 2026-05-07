@@ -20,6 +20,7 @@ import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Radar } from "lucide-react";
+import { openExternal, openChatGPTWithPrompt } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/central-mineracao")({ component: MiningCenterPage });
 
