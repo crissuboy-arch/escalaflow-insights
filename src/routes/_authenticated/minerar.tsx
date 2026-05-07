@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,15 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar } from "lucide-react";
-import { fetchOffers, toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, type AITrends } from "@/lib/queries";
-import { OfferCard } from "@/components/OfferCard";
+import { toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, type AITrends } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
 import { miningRepo } from "@/lib/mining/repository";
 import type { CollectorRunResult } from "@/lib/collector/collector.types";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge as UIBadge } from "@/components/ui/badge";
-import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2 } from "lucide-react";
+import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkCheck, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type CollectedAd = {
@@ -41,6 +40,12 @@ type CollectedAd = {
   created_at: string;
 };
 
+type CollectorDebug = {
+  total: number;
+  firstItem: unknown | null;
+  fields: string[];
+};
+
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
 
 const QUICK_TAGS = [
@@ -54,29 +59,31 @@ const TAG_TO_NICHE: Record<string, string> = {
 function MinePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [keyword, setKeyword] = useState("");
   const [niche, setNiche] = useState("all");
   const [country, setCountry] = useState("all");
   const [platform, setPlatform] = useState("all");
   const [quantity, setQuantity] = useState(20);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [offers, setOffers] = useState<any[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [trends, setTrends] = useState<AITrends | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [collectorProgress, setCollectorProgress] = useState(0);
   const [collectorFound, setCollectorFound] = useState<number | null>(null);
+  const [collectorDebug, setCollectorDebug] = useState<CollectorDebug | null>(null);
   const signals = getAITrends().signals;
 
   // Real ads from collected_ads (Supabase)
   const [collected, setCollected] = useState<CollectedAd[]>([]);
+  const [latestRunAds, setLatestRunAds] = useState<CollectedAd[]>([]);
   const [collectedLoading, setCollectedLoading] = useState(true);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 12;
+  const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
 
   const fetchCollected = async () => {
     setCollectedLoading(true);
@@ -88,6 +95,7 @@ function MinePage() {
         .limit(200);
       if (error) throw error;
       console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
+      console.log("[minerar] collected_ads rows:", data ?? []);
       setCollected((data ?? []) as CollectedAd[]);
     } catch (e) {
       console.error("[minerar] collected_ads fetch failed", e);
@@ -107,18 +115,6 @@ function MinePage() {
     };
   }, []);
 
-  const load = async (opts?: { keyword?: string; niche?: string }) => {
-    setLoading(true);
-    try {
-      setOffers(await fetchOffers({
-        keyword: opts?.keyword ?? keyword,
-        niche: opts?.niche ?? niche,
-        country, platform, limit: quantity,
-      }));
-    } finally { setLoading(false); }
-  };
-
-  useEffect(() => { load(); }, []);
   useEffect(() => {
     if (!user) return;
     fetchSavedIds(user.id).then(setSavedIds);
@@ -137,6 +133,72 @@ function MinePage() {
     toast.success(isSaved ? t("mine.saved") : "OK");
   };
 
+  const onAnalyzeCollected = async (ad: CollectedAd) => {
+    const [ingested] = await miningRepo.ingestMany([
+      {
+        headline: ad.headline || ad.advertiser,
+        copy: ad.copy ?? "",
+        platform: ad.platform,
+        country: ad.country,
+        niche: ad.niche,
+        score: ad.score,
+        adUrl: ad.ad_url ?? undefined,
+        adLibraryId: ad.ad_library_id ?? undefined,
+        analysisType: "manual",
+        creativeUrl: ad.image_url || ad.video_url || undefined,
+        creativeType: ad.video_url ? "video" : ad.image_url ? "image" : undefined,
+        advertiser: ad.advertiser,
+        cta: ad.cta ?? undefined,
+        createdAt: ad.created_at,
+      },
+    ], "extension");
+    toast.success("Anúncio enviado para Análise IA");
+    navigate({ to: "/analise-ia", search: { offer: ingested.id } as never });
+  };
+
+  const onSaveCollected = async (ad: CollectedAd) => {
+    if (!user) return;
+    const key = ad.ad_library_id || ad.ad_url || ad.id;
+    await miningRepo.ingestMany([
+      {
+        headline: ad.headline || ad.advertiser,
+        copy: ad.copy ?? "",
+        platform: ad.platform,
+        country: ad.country,
+        niche: ad.niche,
+        score: ad.score,
+        adUrl: ad.ad_url ?? undefined,
+        adLibraryId: ad.ad_library_id ?? undefined,
+        analysisType: "manual",
+        creativeUrl: ad.image_url || ad.video_url || undefined,
+        creativeType: ad.video_url ? "video" : ad.image_url ? "image" : undefined,
+        advertiser: ad.advertiser,
+        cta: ad.cta ?? undefined,
+        createdAt: ad.created_at,
+      },
+    ], "extension");
+    const isSaved = await toggleSaveOffer(user.id, key);
+    setSavedIds((s) => {
+      const n = new Set(s);
+      isSaved ? n.add(key) : n.delete(key);
+      return n;
+    });
+    toast.success(isSaved ? "Salvo na Central" : "Removido dos salvos");
+  };
+
+  const onFavoriteCollected = async (ad: CollectedAd) => {
+    if (!user) return;
+    const key = ad.ad_library_id || ad.ad_url || ad.id;
+    const next = !favIds.has(key);
+    await toggleFavorite(user.id, key, next);
+    setFavIds((s) => {
+      const n = new Set(s);
+      next ? n.add(key) : n.delete(key);
+      return n;
+    });
+    toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
+  };
+
   const onTagClick = (tag: string) => {
     const newActive = activeTag === tag ? null : tag;
     setActiveTag(newActive);
@@ -144,7 +206,6 @@ function MinePage() {
     const newNiche = newActive && TAG_TO_NICHE[newActive] ? TAG_TO_NICHE[newActive] : "all";
     setKeyword(newKeyword);
     setNiche(newNiche);
-    load({ keyword: newKeyword, niche: newNiche });
   };
 
   const onAIMine = async () => {
@@ -179,6 +240,11 @@ function MinePage() {
       const data = (await res.json()) as CollectorRunResult;
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
+      setCollectorDebug({
+        total: data.ads?.length ?? 0,
+        firstItem: data.ads?.[0] ?? null,
+        fields: data.ads?.[0] ? Object.keys(data.ads[0] as unknown as Record<string, unknown>) : [],
+      });
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
         id: a.adLibraryId || `${Date.now()}-${idx}`,
@@ -198,6 +264,7 @@ function MinePage() {
         score: a.score,
         created_at: a.createdAt || new Date().toISOString(),
       }));
+      setLatestRunAds(optimistic);
       setCollected((prev) => {
         const map = new Map<string, CollectedAd>();
         [...optimistic, ...prev].forEach((x) => {
@@ -226,8 +293,8 @@ function MinePage() {
         "extension",
       );
       setCollectorProgress(100);
-      setCollectorFound(data.ads?.length ?? ingested.length);
-      toast.success(`Mineração concluída: ${data.ads?.length ?? ingested.length} anúncios`);
+      setCollectorFound(optimistic.length || ingested.length);
+      toast.success(`Mineração concluída: ${optimistic.length || ingested.length} anúncios`);
       await fetchCollected();
       setPage(0);
     } catch (e) {
@@ -367,7 +434,7 @@ function MinePage() {
           </div>
           <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{offers.length}</span> anúncios encontrados
+              <span className="font-semibold text-foreground">{visibleCollected.length}</span> anúncios coletados
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -379,9 +446,9 @@ function MinePage() {
                 {collecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
                 Minerar com Motor de Coleta
               </Button>
-              <Button onClick={() => load()} disabled={loading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                {t("mine.submit")}
+              <Button onClick={fetchCollected} disabled={collectedLoading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                {collectedLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                Atualizar coleta
               </Button>
             </div>
           </div>
@@ -404,7 +471,6 @@ function MinePage() {
         </CardContent>
       </Card>
 
-      {/* Resultados */}
       {/* Anúncios coletados (Motor de Coleta) */}
       <Card className="border-border/60">
         <CardContent className="p-6">
@@ -412,7 +478,7 @@ function MinePage() {
             <div className="flex items-center gap-2">
               <Radar className="h-4 w-4 text-primary" />
               <h2 className="font-semibold">Anúncios coletados</h2>
-              <Badge variant="outline" className="rounded-full">{collected.length}</Badge>
+              <Badge variant="outline" className="rounded-full">{visibleCollected.length}</Badge>
             </div>
             <Button size="sm" variant="ghost" onClick={fetchCollected}>
               <Loader2 className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`} />
@@ -420,8 +486,21 @@ function MinePage() {
             </Button>
           </div>
 
-          {collectedLoading && collected.length === 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {collectorDebug && (
+            <div className="mb-4 rounded-lg border border-border/60 bg-muted/30 p-4 text-xs">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="rounded-full">Debug temporário</Badge>
+                <span className="font-semibold">Total recebido: {collectorDebug.total}</span>
+                <span className="text-muted-foreground">Campos: {collectorDebug.fields.join(", ") || "nenhum"}</span>
+              </div>
+              <pre className="max-h-48 overflow-auto rounded-md bg-background/70 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                {JSON.stringify(collectorDebug.firstItem, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {collectedLoading && visibleCollected.length === 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="space-y-2 rounded-lg border border-border/60 p-3">
                   <Skeleton className="aspect-video w-full" />
@@ -430,7 +509,7 @@ function MinePage() {
                 </div>
               ))}
             </div>
-          ) : collected.length === 0 ? (
+          ) : visibleCollected.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <Radar className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
@@ -440,22 +519,26 @@ function MinePage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {collected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleCollected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
+                  const key = a.ad_library_id || a.ad_url || a.id;
+                  const hasMedia = Boolean(a.video_url || a.image_url);
+                  return (
                   <motion.div
-                    key={a.id}
+                    key={key}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="group flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
+                    className="group flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
                   >
-                    <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
                       {a.video_url ? (
-                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline />
+                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline controls />
                       ) : a.image_url ? (
                         <img src={a.image_url} alt={a.headline} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
                           <ImageIcon className="h-8 w-8 opacity-40" />
+                          <span className="text-sm font-medium">sem mídia capturada</span>
                         </div>
                       )}
                       <div className="absolute left-2 top-2 flex gap-1">
@@ -468,34 +551,48 @@ function MinePage() {
                           {a.platform}
                         </UIBadge>
                       </div>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-2 p-3">
-                      <p className="line-clamp-1 text-sm font-semibold">{a.advertiser}</p>
-                      <p className="line-clamp-2 text-xs text-muted-foreground">{a.headline || a.copy || "—"}</p>
-                      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Globe2 className="h-3 w-3" />{a.country}
-                          {a.cta && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{a.cta}</span>}
+                      {!hasMedia && (
+                        <div className="absolute bottom-2 left-2 rounded-full bg-background/80 px-2 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+                          sem mídia capturada
                         </div>
-                        {a.ad_url && (
-                          <a
-                            href={a.ad_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                          >
-                            Ver <ExternalLink className="h-3 w-3" />
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-3 p-4">
+                      <div>
+                        <p className="line-clamp-1 text-base font-semibold">{a.advertiser || "Anunciante não informado"}</p>
+                        <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{a.headline || "Sem headline capturada"}</p>
+                        <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{a.copy || "Sem copy capturada"}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="rounded-full">{a.platform || "Plataforma não informada"}</Badge>
+                        <Badge variant="outline" className="rounded-full"><Globe2 className="mr-1 h-3 w-3" />{a.country || "—"}</Badge>
+                        {a.cta && <Badge variant="outline" className="rounded-full">{a.cta}</Badge>}
+                      </div>
+                      <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-2">
+                        <Button size="sm" onClick={() => onAnalyzeCollected(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                          <Sparkles className="mr-1 h-3.5 w-3.5" /> Analisar com IA
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => onSaveCollected(a)}>
+                          <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> {savedIds.has(key) ? "Salvo" : "Salvar"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => onFavoriteCollected(a)}>
+                          <Star className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`} /> Favoritar
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild disabled={!a.ad_url}>
+                          <a href={a.ad_url || "#"} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
                           </a>
-                        )}
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
-              {collected.length > PAGE_SIZE && (
+              {visibleCollected.length > PAGE_SIZE && (
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    Página {page + 1} de {Math.ceil(collected.length / PAGE_SIZE)}
+                    Página {page + 1} de {Math.ceil(visibleCollected.length / PAGE_SIZE)}
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
@@ -504,7 +601,7 @@ function MinePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(page + 1) * PAGE_SIZE >= collected.length}
+                      disabled={(page + 1) * PAGE_SIZE >= visibleCollected.length}
                       onClick={() => setPage((p) => p + 1)}
                     >
                       Próxima
@@ -516,36 +613,6 @@ function MinePage() {
           )}
         </CardContent>
       </Card>
-
-      {collected.length > 0 ? null : loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="overflow-hidden rounded-lg border border-border/60 bg-card">
-              <div className="aspect-video shimmer bg-muted" />
-              <div className="space-y-2 p-4">
-                <div className="h-4 w-3/4 shimmer rounded bg-muted" />
-                <div className="h-3 w-full shimmer rounded bg-muted" />
-                <div className="h-8 w-full shimmer rounded bg-muted" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : offers.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">{t("mine.noResults")}</p>
-      ) : (
-        <motion.div
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          initial="hidden"
-          animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
-        >
-          {offers.map((o) => (
-            <motion.div key={o.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
-              <OfferCard offer={o} saved={savedIds.has(o.id)} favorited={favIds.has(o.id)} onToggleSave={() => onSave(o.id)} />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
 
       {/* Dialog Minerar com IA */}
       <Dialog open={aiOpen} onOpenChange={setAiOpen}>
