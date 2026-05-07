@@ -28,7 +28,11 @@ export const extractEbookBriefing = createServerFn({ method: "POST" })
     z.object({ ad: AdInputSchema }).parse(d),
   )
   .handler(async ({ data }) => {
-    return await aiExtractBriefing(data.ad);
+    try {
+      return await aiExtractBriefing(data.ad);
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar briefing");
+    }
   });
 
 export const generateEbookOutline = createServerFn({ method: "POST" })
@@ -42,7 +46,11 @@ export const generateEbookOutline = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data }) => {
-    return await aiGenerateOutline(data.briefing, data.chapterCount);
+    try {
+      return await aiGenerateOutline(data.briefing, data.chapterCount);
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar estrutura");
+    }
   });
 
 export const generateEbookChapter = createServerFn({ method: "POST" })
@@ -64,13 +72,17 @@ export const generateEbookChapter = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data }) => {
-    const markdown = await aiGenerateChapter(
-      data.briefing,
-      data.chapter,
-      data.index,
-      data.total,
-    );
-    return { markdown };
+    try {
+      const markdown = await aiGenerateChapter(
+        data.briefing,
+        data.chapter,
+        data.index,
+        data.total,
+      );
+      return { markdown };
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar capítulo");
+    }
   });
 
 export const generateEbookCover = createServerFn({ method: "POST" })
@@ -86,10 +98,14 @@ export const generateEbookCover = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data }) => {
-    const dataUrl = await aiGenerateCover(
-      data.briefing,
-      data.layout,
-      data.customPrompt,
-    );
-    return { dataUrl };
+    try {
+      const dataUrl = await aiGenerateCover(
+        data.briefing,
+        data.layout,
+        data.customPrompt,
+      );
+      return { dataUrl };
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar capa");
+    }
   });
