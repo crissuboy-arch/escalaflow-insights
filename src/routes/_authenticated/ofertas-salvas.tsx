@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search } from "lucide-react";
 import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
+import { openExternal } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/ofertas-salvas")({ component: SavedPage });
 
