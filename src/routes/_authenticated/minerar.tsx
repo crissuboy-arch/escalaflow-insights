@@ -38,12 +38,17 @@ type CollectedAd = {
   keyword: string | null;
   score: number;
   created_at: string;
+  media_source?: string;
 };
 
 type CollectorDebug = {
   total: number;
   firstItem: unknown | null;
   fields: string[];
+  withImage: number;
+  withVideo: number;
+  withoutMedia: number;
+  mediaSources: Record<string, number>;
 };
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
