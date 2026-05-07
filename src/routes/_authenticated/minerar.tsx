@@ -229,7 +229,7 @@ function MinePage() {
       setCollectorDebug({
         total: data.ads?.length ?? 0,
         firstItem: data.ads?.[0] ?? null,
-        fields: data.ads?.[0] ? Object.keys(data.ads[0] as Record<string, unknown>) : [],
+        fields: data.ads?.[0] ? Object.keys(data.ads[0] as unknown as Record<string, unknown>) : [],
       });
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
