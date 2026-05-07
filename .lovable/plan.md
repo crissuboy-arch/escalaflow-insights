@@ -1,75 +1,77 @@
-## Melhorias finais — Central de Mineração
+## Módulo "Criar Ebook" — `/produtos/ebook`
 
-### 1. Prompt enriquecido para "Abrir no ChatGPT"
+Novo módulo isolado que transforma anúncios minerados em ebooks completos com capa IA e PDF exportável. Não toca em minerador, coleta, Apify nem extensão. Inspirado em `inematds/ebook-maker`, adaptado para a stack TanStack Start + Lovable Cloud + Lovable AI Gateway.
 
-Em `src/routes/_authenticated/central-mineracao.tsx`, expandir `onOpenChatGPT` para enviar um prompt completo, com todos os campos disponíveis e os links reais resolvidos:
+### Stack & decisões-chave
 
-- **Anunciante** (`a.advertiser`)
-- **Headline** (`a.headline`)
-- **Copy completa** (`a.copy`)
-- **CTA** (`a.cta`)
-- **Descrição** (`a.description` / `raw.description`)
-- **Nicho** (`a.niche`)
-- **País** (`a.country`)
-- **Plataforma(s)** (`a.platform` + `a.platforms`)
-- **Score** (`a.score`)
-- **Tipo de criativo** (`a.creativeType`)
-- **Data de início** (`a.startDate`)
-- **Link do anúncio** (`resolveAdUrl(a)`)
-- **Link do criativo** (`a.creativeUrl`)
-- **Link do perfil/anunciante** (resolvido via `resolveProfileUrl`, ver §2)
-- **Ad Library ID**
+- **IA**: Lovable AI Gateway (`LOVABLE_API_KEY` já configurado). Modelo padrão `google/gemini-3-flash-preview` para texto; `google/gemini-3.1-flash-image-preview` para capa. Nunca chamar Gemini no frontend.
+- **Backend**: server functions TanStack (`createServerFn`) em `src/lib/ebook.functions.ts` + helpers em `src/lib/ebook.server.ts`.
+- **PDF**: gerado no cliente com `pdf-lib` + `@pdf-lib/fontkit` (puro JS, sem deps Node-only). Layouts via templates de página (texto, headings, capa-imagem).
+- **Persistência**: nova tabela `ebooks` no Lovable Cloud com RLS por usuário; capa armazenada em bucket `ebook-covers` (público).
 
-Estrutura do prompt (mantém roteiro de engenharia reversa):
-```
-Faça engenharia reversa do anúncio abaixo e responda:
-1) Big Idea  2) Avatar  3) Promessa & Mecanismo
-4) Estrutura da copy  5) Gatilhos mentais  6) Como escalar
+### Rota e UX
 
-DADOS DO ANÚNCIO
-Anunciante: ...
-Headline: ...
-Copy: ...
-CTA: ...
-Nicho: ... | País: ... | Plataforma: ...
-Score: ... | Tipo criativo: ... | Início: ...
+`src/routes/_authenticated/produtos.ebook.tsx` — fluxo em 5 passos (stepper):
 
-LINKS REAIS
-Anúncio: <url ou "não disponível">
-Criativo: <url ou "não disponível">
-Perfil: <url ou "não disponível">
-Library ID: <id ou "não disponível">
-```
+1. **Selecionar anúncio base** — lista de favoritos + ofertas salvas + escaladas (reusa `fetchSavedAds`/`fetchFavoriteAds`/`fetchScaledAds`). Card com headline, copy, nicho, país, score.
+2. **Briefing extraído** — chama `extractEbookBriefing` (server fn) que passa anúncio para Gemini e retorna JSON estruturado: `nicho`, `promessa`, `avatar`, `dores[]`, `desejos[]`, `mecanismoUnico`, `tituloSugerido`, `subtituloSugerido`. Usuário pode editar campos antes de prosseguir.
+3. **Estrutura do ebook** — `generateEbookOutline` (server fn) gera índice (intro + 5–8 capítulos + conclusão) com título e bullets de cada capítulo. Usuário pode reordenar/editar/adicionar capítulos.
+4. **Layout & capa**:
+   - Seleção de layout: **Editorial Clássico** (serif, justificado, drop caps), **Moderno Funcional** (sans-serif, blocos de cor, ícones), **Minimalista Suíço** (grid rígido, muito espaço em branco, helvetica-like).
+   - Botão "Gerar capa com IA" → `generateEbookCover` (server fn) chama Gemini image preview, salva PNG em `ebook-covers/{user}/{ebookId}.png`, devolve URL pública. Permite regenerar com prompt customizado.
+5. **Gerar capítulos & exportar**:
+   - "Gerar capítulos completos" → `generateEbookChapters` (server fn) itera capítulos, chama Gemini para cada um (markdown ~600–1000 palavras), salva incrementalmente em `ebooks.chapters` (jsonb). Mostra progresso por capítulo.
+   - Preview lado-a-lado (markdown renderizado).
+   - "Exportar PDF" → renderiza no cliente via `pdf-lib` aplicando o layout escolhido (capa + sumário + capítulos). Download direto.
+   - Ebook persiste em `ebooks` table; usuário pode voltar e re-exportar.
 
-Manter `rememberAdForAnalysis(toPersisted(a))` antes de chamar `openChatGPTWithPrompt(prompt)`. Logar `console.log("abrindo chatgpt", a)`.
+### Server functions (`src/lib/ebook.functions.ts`)
 
-### 2. Validação + fallback nos botões externos
+Todas com `requireSupabaseAuth`, validação Zod e fallback de erro:
 
-Criar um helper `resolveProfileUrl(a)` (semelhante ao `resolveAdUrl` já existente) que tenta:
-- `a.raw?.page_url`
-- `a.raw?.profile_url`
-- `a.raw?.advertiser_url`
-- `https://www.facebook.com/<page_id>` quando `raw.page_id` existir
+- `extractEbookBriefing({ adKey, adPayload })` → JSON estruturado via tool calling do Gemini.
+- `generateEbookOutline({ briefing, chapterCount })` → `{ chapters: [{ title, bullets[] }] }`.
+- `generateEbookChapter({ ebookId, index, briefing, outline })` → markdown do capítulo (chamada por capítulo para evitar timeout).
+- `generateEbookCover({ ebookId, prompt, layout })` → URL pública da capa.
+- `saveEbook({ ... })` / `listEbooks()` / `getEbook(id)` / `deleteEbook(id)`.
 
-Atualizar/criar handlers para garantir validação clara:
+### Tabela `ebooks` (migration)
 
-- **`onOpenAd`** (Abrir anúncio / Facebook): já resolve via `resolveAdUrl`. Se `null`, exibir `toast.error("Link do anúncio não encontrado")` em vez do toast genérico do `openExternal`. Também passar o link como Facebook quando vier de `adLibraryId`.
-- **`onOpenProfile`** (novo, opcional via mesmo botão "Abrir anúncio" se não houver perfil dedicado — ver nota abaixo): usa `resolveProfileUrl`; sem link → `toast.error("Perfil do anunciante não encontrado")`.
-- **`onOpenExtension`**: já valida; trocar `toast.message` por `toast.error("Extensão não disponível para este anúncio")` para clareza.
-- **`onOpenChatGPT`**: se `headline` e `copy` estiverem vazios, `toast.error("Anúncio sem dados suficientes para análise")` e abortar.
+Campos: `id`, `user_id`, `source_ad_key`, `title`, `subtitle`, `niche`, `briefing` (jsonb), `outline` (jsonb), `chapters` (jsonb — array `{ title, markdown }`), `layout` (text: `classico|moderno|minimalista`), `cover_url`, `status` (`draft|ready`), timestamps. RLS: usuário só lê/escreve suas linhas.
 
-Nota sobre o botão de perfil: a coluna Ações atualmente tem `ExternalLink` (anúncio), `Puzzle` (extensão), `BookmarkCheck`, `Bot` (ChatGPT), `Rocket`, `CheckCircle2`, `Trash2`. Não existe botão dedicado de "Perfil". O usuário pediu validação para o botão de perfil; o plano é **adicionar uma entrada `Perfil` apenas dentro do prompt do ChatGPT** (link real do perfil quando existir) e **não criar um novo botão** para preservar o layout atual conforme as regras impostas em prompts anteriores ("não trocar o layout"). Se preferir um botão dedicado, posso incluir em uma segunda iteração.
+Bucket `ebook-covers` (público para leitura, escrita restrita ao dono via path `{user_id}/...`).
 
-### 3. Centralizar mensagens de erro no `openExternal`
+### PDF (cliente, `src/lib/ebook/pdf.ts`)
 
-Em `src/lib/external.ts`, manter o comportamento atual mas permitir mensagem customizada opcional:
-```ts
-openExternal(url, { errorMessage: "Link do anúncio não encontrado" })
-```
-Os call-sites na Central passam mensagens específicas para anúncio, perfil e extensão, garantindo o toast claro pedido.
+- Função `exportEbookPdf(ebook)` retorna `Blob`.
+- Templates por layout aplicam fontes embutidas (serif/sans), margens, cabeçalhos, paginação, estilo de capa (imagem full-bleed + título), sumário automático, separadores de capítulo.
+- Markdown renderizado com parser leve (`marked`) → blocos texto/heading/list desenhados em `pdf-lib`.
 
-### Arquivos afetados
-- `src/lib/external.ts` — assinatura opcional para mensagem de erro customizada.
-- `src/routes/_authenticated/central-mineracao.tsx` — `resolveProfileUrl`, prompt enriquecido em `onOpenChatGPT`, mensagens de erro específicas em `onOpenAd` / `onOpenExtension`.
+### Sidebar
 
-Sem mudanças no Apify, token, coleta, layout ou extensão.
+Adicionar item **Produtos → Criar Ebook** (`Book` icon) em `src/components/AppSidebar.tsx`, abaixo de Ofertas Escaladas. Sem mexer nos demais itens.
+
+### Arquivos novos
+
+- `src/routes/_authenticated/produtos.ebook.tsx` — UI stepper.
+- `src/lib/ebook.functions.ts` — server fns (Lovable AI).
+- `src/lib/ebook.server.ts` — helpers (prompts, parsing).
+- `src/lib/ebook/pdf.ts` — gerador PDF.
+- `src/lib/ebook/layouts.ts` — definição visual dos 3 layouts.
+- `supabase/migrations/<ts>_ebooks.sql` — tabela + RLS + bucket.
+
+### Arquivos editados
+
+- `src/components/AppSidebar.tsx` — novo item de menu.
+
+### Restrições respeitadas
+
+- Não toca em `/minerar`, `central-mineracao`, `collector.*`, `bridge.ts`, `extension/*`, Apify, token.
+- Lovable AI Gateway via server fn — chave nunca sai do backend.
+- Sem dependências Node-only (pdf-lib + marked rodam no browser; Gemini chamado apenas no Worker server).
+
+### Pontos de atenção / a confirmar
+
+1. **Idioma do ebook**: gerar sempre no idioma do anúncio fonte (detectado por `country`) ou sempre PT-BR? Plano padrão: idioma do anúncio com fallback PT-BR.
+2. **Comprimento padrão**: 6 capítulos × ~800 palavras (~30 páginas). Configurável no passo 3.
+3. **Custo IA**: cada ebook ≈ 8–10 chamadas Gemini Flash + 1 imagem. Plano usa Flash (mais barato) por padrão.
