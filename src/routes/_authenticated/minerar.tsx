@@ -82,9 +82,11 @@ function MinePage() {
 
   // Real ads from collected_ads (Supabase)
   const [collected, setCollected] = useState<CollectedAd[]>([]);
+  const [latestRunAds, setLatestRunAds] = useState<CollectedAd[]>([]);
   const [collectedLoading, setCollectedLoading] = useState(true);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 12;
+  const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
 
   const fetchCollected = async () => {
     setCollectedLoading(true);
@@ -96,6 +98,7 @@ function MinePage() {
         .limit(200);
       if (error) throw error;
       console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
+      console.log("[minerar] collected_ads rows:", data ?? []);
       setCollected((data ?? []) as CollectedAd[]);
     } catch (e) {
       console.error("[minerar] collected_ads fetch failed", e);
@@ -223,6 +226,11 @@ function MinePage() {
       const data = (await res.json()) as CollectorRunResult;
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
+      setCollectorDebug({
+        total: data.ads?.length ?? 0,
+        firstItem: data.ads?.[0] ?? null,
+        fields: data.ads?.[0] ? Object.keys(data.ads[0] as Record<string, unknown>) : [],
+      });
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
         id: a.adLibraryId || `${Date.now()}-${idx}`,
@@ -242,6 +250,7 @@ function MinePage() {
         score: a.score,
         created_at: a.createdAt || new Date().toISOString(),
       }));
+      setLatestRunAds(optimistic);
       setCollected((prev) => {
         const map = new Map<string, CollectedAd>();
         [...optimistic, ...prev].forEach((x) => {
@@ -270,8 +279,8 @@ function MinePage() {
         "extension",
       );
       setCollectorProgress(100);
-      setCollectorFound(data.ads?.length ?? ingested.length);
-      toast.success(`Mineração concluída: ${data.ads?.length ?? ingested.length} anúncios`);
+      setCollectorFound(optimistic.length || ingested.length);
+      toast.success(`Mineração concluída: ${optimistic.length || ingested.length} anúncios`);
       await fetchCollected();
       setPage(0);
     } catch (e) {
