@@ -28,6 +28,7 @@ import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authen
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 import { Route as AuthenticatedProdutosPlaybookNovoRouteImport } from './routes/_authenticated/produtos.playbook.novo'
 import { Route as AuthenticatedProdutosPlaybookIdRouteImport } from './routes/_authenticated/produtos.playbook.$id'
+import { Route as AuthenticatedProdutosPlaybookIdEditarRouteImport } from './routes/_authenticated/produtos.playbook.$id.editar'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -132,6 +133,12 @@ const AuthenticatedProdutosPlaybookIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
   } as any)
+const AuthenticatedProdutosPlaybookIdEditarRoute =
+  AuthenticatedProdutosPlaybookIdEditarRouteImport.update({
+    id: '/editar',
+    path: '/editar',
+    getParentRoute: () => AuthenticatedProdutosPlaybookIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,8 +157,9 @@ export interface FileRoutesByFullPath {
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
+  '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -170,8 +178,9 @@ export interface FileRoutesByTo {
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
+  '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -192,8 +201,9 @@ export interface FileRoutesById {
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
+  '/_authenticated/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
+    | '/produtos/playbook/$id/editar'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
+    | '/produtos/playbook/$id/editar'
   id:
     | '__root__'
     | '/'
@@ -257,6 +269,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/_authenticated/produtos/playbook/$id'
     | '/_authenticated/produtos/playbook/novo'
+    | '/_authenticated/produtos/playbook/$id/editar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -402,17 +415,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdRouteImport
       parentRoute: typeof AuthenticatedProdutosPlaybookRoute
     }
+    '/_authenticated/produtos/playbook/$id/editar': {
+      id: '/_authenticated/produtos/playbook/$id/editar'
+      path: '/editar'
+      fullPath: '/produtos/playbook/$id/editar'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdEditarRouteImport
+      parentRoute: typeof AuthenticatedProdutosPlaybookIdRoute
+    }
   }
 }
 
+interface AuthenticatedProdutosPlaybookIdRouteChildren {
+  AuthenticatedProdutosPlaybookIdEditarRoute: typeof AuthenticatedProdutosPlaybookIdEditarRoute
+}
+
+const AuthenticatedProdutosPlaybookIdRouteChildren: AuthenticatedProdutosPlaybookIdRouteChildren =
+  {
+    AuthenticatedProdutosPlaybookIdEditarRoute:
+      AuthenticatedProdutosPlaybookIdEditarRoute,
+  }
+
+const AuthenticatedProdutosPlaybookIdRouteWithChildren =
+  AuthenticatedProdutosPlaybookIdRoute._addFileChildren(
+    AuthenticatedProdutosPlaybookIdRouteChildren,
+  )
+
 interface AuthenticatedProdutosPlaybookRouteChildren {
-  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRoute
+  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   AuthenticatedProdutosPlaybookNovoRoute: typeof AuthenticatedProdutosPlaybookNovoRoute
 }
 
 const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookRouteChildren =
   {
-    AuthenticatedProdutosPlaybookIdRoute: AuthenticatedProdutosPlaybookIdRoute,
+    AuthenticatedProdutosPlaybookIdRoute:
+      AuthenticatedProdutosPlaybookIdRouteWithChildren,
     AuthenticatedProdutosPlaybookNovoRoute:
       AuthenticatedProdutosPlaybookNovoRoute,
   }
