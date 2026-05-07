@@ -17,6 +17,29 @@ import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
 import { miningRepo } from "@/lib/mining/repository";
 import type { CollectorRunResult } from "@/lib/collector/collector.types";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge as UIBadge } from "@/components/ui/badge";
+import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+type CollectedAd = {
+  id: string;
+  ad_library_id: string | null;
+  ad_url: string | null;
+  advertiser: string;
+  headline: string;
+  copy: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  creative_type: string | null;
+  platform: string;
+  country: string;
+  niche: string;
+  keyword: string | null;
+  score: number;
+  created_at: string;
+};
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
 
@@ -48,6 +71,40 @@ function MinePage() {
   const [collectorProgress, setCollectorProgress] = useState(0);
   const [collectorFound, setCollectorFound] = useState<number | null>(null);
   const signals = getAITrends().signals;
+
+  // Real ads from collected_ads (Supabase)
+  const [collected, setCollected] = useState<CollectedAd[]>([]);
+  const [collectedLoading, setCollectedLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 12;
+
+  const fetchCollected = async () => {
+    setCollectedLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("collected_ads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setCollected((data ?? []) as CollectedAd[]);
+    } catch (e) {
+      console.warn("[minerar] collected_ads fetch failed", e);
+    } finally {
+      setCollectedLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCollected();
+    const ch = supabase
+      .channel("collected_ads_minerar")
+      .on("postgres_changes", { event: "*", schema: "public", table: "collected_ads" }, () => fetchCollected())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, []);
 
   const load = async (opts?: { keyword?: string; niche?: string }) => {
     setLoading(true);
@@ -142,6 +199,8 @@ function MinePage() {
       setCollectorProgress(100);
       setCollectorFound(ingested.length);
       toast.success(`Mineração concluída: ${ingested.length} anúncios`);
+      await fetchCollected();
+      setPage(0);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha na mineração");
     } finally {
