@@ -25,6 +25,8 @@ export function createProvider(): CollectorProvider {
         ],
         count: Math.min(Math.max(input.limit ?? 20, 1), 100),
         "scrapePageAds.activeStatus": "active",
+        scrapeAdDetails: true,
+        scrapeAdvertiserPage: false,
       };
 
       const url = `${BASE}/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(
