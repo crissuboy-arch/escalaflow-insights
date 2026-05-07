@@ -1,13 +1,9 @@
-## Objetivo
-Permitir login com `cristianefsopt24@gmail.com` / `123456`.
+Plano direto para destravar seu acesso:
 
-## Ação
-1. Desativar a proteção contra senhas vazadas (HIBP) no backend de auth.
-2. Garantir que a senha da conta continua como `123456` (resetar de novo por garantia).
+1. Manter a proteção de senha vazada desligada, como você pediu, para aceitar `123456`.
+2. Confirmar a conta `cristianefsopt24@gmail.com` como verificada.
+3. Redefinir novamente a senha dessa conta para `123456`.
+4. Corrigir a tela de login que está gerando erro de hidratação por idioma diferente entre servidor e navegador, deixando o idioma inicial estável em português.
+5. Validar que a conta existe, está confirmada e que a tela de login não quebra antes de você entrar.
 
-## Como entrar
-- E-mail: `cristianefsopt24@gmail.com`
-- Senha: `123456`
-
-## Aviso
-`123456` é extremamente fraca. Recomendo trocar por uma senha forte assim que entrar.
+Observação: já confirmei que o backend está no ar e a conta está confirmada. O aviso de segurança existe porque você escolheu manter `123456`, mas isso não deve mais bloquear o login.
