@@ -16,7 +16,12 @@
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
-      "matches": ["https://www.facebook.com/ads/library/*"],
+      "matches": [
+        "https://www.facebook.com/*",
+        "https://facebook.com/*",
+        "https://www.facebook.com/ads/library/*",
+        "https://facebook.com/ads/library/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
