@@ -258,10 +258,22 @@ function MiningCenterPage() {
       | null
       | undefined ?? null;
   };
+  const resolveProfileUrl = (a: MinedAd): string | null => {
+    const raw = (a.raw ?? {}) as Record<string, unknown>;
+    const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string) : null);
+    const pageId = str("page_id");
+    const cands = [
+      str("page_url"),
+      str("profile_url"),
+      str("advertiser_url"),
+      pageId ? `https://www.facebook.com/${pageId}` : null,
+    ];
+    return cands.find((u) => typeof u === "string" && /^https?:\/\//i.test(u)) ?? null;
+  };
   const onOpenAd = (a: MinedAd) => {
     const url = resolveAdUrl(a);
     console.log("abrindo anúncio", url);
-    openExternal(url);
+    openExternal(url, { errorMessage: "Link do anúncio não encontrado" });
   };
   const onOpenExtension = (a: MinedAd) => {
     const raw = (a.raw ?? {}) as Record<string, unknown>;
@@ -273,23 +285,45 @@ function MiningCenterPage() {
     if (url && /^https?:\/\//i.test(url)) {
       openExternal(url);
     } else {
-      toast.message("Extensão não disponível");
+      toast.error("Extensão não disponível para este anúncio");
     }
   };
   const onOpenChatGPT = (a: MinedAd) => {
     console.log("abrindo chatgpt", a);
+    if (!a.headline && !a.copy) {
+      toast.error("Anúncio sem dados suficientes para análise");
+      return;
+    }
+    const raw = (a.raw ?? {}) as Record<string, unknown>;
+    const description =
+      a.description ?? (typeof raw.description === "string" ? (raw.description as string) : null);
+    const adUrl = resolveAdUrl(a);
+    const profileUrl = resolveProfileUrl(a);
+    const platforms =
+      a.platforms && a.platforms.length ? a.platforms.join(", ") : a.platform || "—";
+    const na = (v: unknown) => (v ? String(v) : "não disponível");
     const prompt = [
-      "Faça engenharia reversa do anúncio:",
+      "Faça engenharia reversa do anúncio abaixo e responda:",
+      "1) Big Idea  2) Avatar  3) Promessa & Mecanismo",
+      "4) Estrutura da copy  5) Gatilhos mentais  6) Como escalar",
       "",
+      "DADOS DO ANÚNCIO",
+      `Anunciante: ${a.advertiser || "—"}`,
       `Headline: ${a.headline || "—"}`,
       `Copy: ${a.copy || "—"}`,
       `CTA: ${a.cta || "—"}`,
-      `Nicho: ${a.niche || "—"}`,
-      `Plataforma: ${a.platform || "—"}`,
-      `Score: ${a.score ?? "—"}`,
+      description ? `Descrição: ${description}` : null,
+      `Nicho: ${a.niche || "—"} | País: ${a.country || "—"} | Plataforma: ${platforms}`,
+      `Score: ${a.score ?? "—"} | Tipo criativo: ${a.creativeType || "—"} | Início: ${a.startDate || "—"}`,
       "",
-      "1) Big Idea  2) Avatar  3) Estrutura  4) Gatilhos  5) Como escalar",
-    ].join("\n");
+      "LINKS REAIS",
+      `Anúncio: ${na(adUrl)}`,
+      `Criativo: ${na(a.creativeUrl)}`,
+      `Perfil: ${na(profileUrl)}`,
+      `Library ID: ${na(a.adLibraryId)}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
     rememberAdForAnalysis(toPersisted(a));
     openChatGPTWithPrompt(prompt);
   };
