@@ -10,13 +10,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
-import { rememberAdForAnalysis } from "@/lib/queries";
+import { fetchScaledAds, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { openExternal } from "@/lib/external";
 
 type Row = {
   id: string;
+  key: string;
   advertiser: string;
   headline: string;
+  copy: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url: string | null;
   platform: string;
   country: string;
   niche: string;
@@ -27,8 +32,13 @@ type Row = {
 };
 
 type Scaled = {
+  key: string;
   advertiser: string;
   headline: string;
+  copy: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url: string | null;
   platform: string;
   platforms: string[];
   country: string;
@@ -36,6 +46,8 @@ type Scaled = {
   score: number;
   count: number;
   created_at: string;
+  ad_library_id: string | null;
+  ad_url: string | null;
 };
 
 export const Route = createFileRoute("/_authenticated/ofertas-escaladas")({ component: ScaledPage });
