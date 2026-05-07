@@ -140,34 +140,36 @@ function ScaledPage() {
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const onAnalyze = (r: Scaled) => {
-    const row = rows.find((x) => x.advertiser === r.advertiser && x.headline === r.headline);
+    const row = rows.find((x) => x.key === r.key || (x.advertiser === r.advertiser && x.headline === r.headline));
     if (!row) return;
-    const key = row.ad_library_id || row.ad_url || row.id;
+    const key = row.key;
     rememberAdForAnalysis({
       key,
       ad_library_id: row.ad_library_id,
       ad_url: row.ad_url,
       advertiser: row.advertiser,
       headline: row.headline,
-      copy: null,
-      cta: null,
-      image_url: null,
-      video_url: null,
+      copy: row.copy,
+      cta: row.cta,
+      image_url: row.image_url,
+      video_url: row.video_url,
       platform: row.platform,
       country: row.country,
       niche: row.niche,
       score: row.score,
       created_at: row.created_at,
       saved_at: new Date().toISOString(),
+      scaled: true,
+      platforms: r.platforms,
+      repeatedCreativeCount: r.count,
     });
     navigate({ to: "/analise-ia", search: { ad: key } as never });
   };
 
   const onOpen = (r: Scaled) => {
-    const row = rows.find((x) => x.advertiser === r.advertiser && x.headline === r.headline);
     openExternal(
-      row?.ad_url,
-      row?.ad_library_id ? `https://www.facebook.com/ads/library/?id=${row.ad_library_id}` : null,
+      r.ad_url,
+      r.ad_library_id ? `https://www.facebook.com/ads/library/?id=${r.ad_library_id}` : null,
     );
   };
 
