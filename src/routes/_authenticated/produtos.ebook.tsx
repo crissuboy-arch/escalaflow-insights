@@ -353,7 +353,14 @@ function EbookPage() {
           <h1 className="text-3xl font-bold tracking-tight">Criar Ebook</h1>
           <p className="text-muted-foreground">Transforme um anúncio minerado em ebook pronto para venda.</p>
         </div>
+        {savedAt && (
+          <span className="ml-auto text-xs text-muted-foreground">
+            Rascunho salvo às {savedAt.toLocaleTimeString()}
+          </span>
+        )}
       </div>
+
+      <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
 
       {/* Stepper */}
       <div className="flex flex-wrap gap-2">
@@ -584,16 +591,21 @@ function EbookPage() {
                 <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
               </Button>
             </div>
-            <div className="space-y-3">
-              {chapters.map((c, i) => (
-                <details key={i} className="rounded-lg border border-border/60 p-3">
-                  <summary className="cursor-pointer text-sm font-semibold">
-                    {i + 1}. {c.title}
-                  </summary>
-                  <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{c.markdown}</pre>
-                </details>
-              ))}
-            </div>
+            {chapters.length > 0 && briefing && (
+              <EbookPreview
+                title={briefing.title}
+                subtitle={briefing.subtitle}
+                layout={layout}
+                coverUrl={coverUrl}
+                chapters={chapters}
+                onChange={(next) => {
+                  setChapters(next);
+                  saveDraft();
+                }}
+                onRegenerate={onRegenerateChapter}
+                regeneratingIndex={regeneratingIndex}
+              />
+            )}
           </CardContent>
         </Card>
       )}
