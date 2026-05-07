@@ -10,11 +10,13 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2 } from "lucide-react";
+import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar } from "lucide-react";
 import { fetchOffers, toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, type AITrends } from "@/lib/queries";
 import { OfferCard } from "@/components/OfferCard";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
+import { miningRepo } from "@/lib/mining/repository";
+import type { CollectorRunResult } from "@/lib/collector/collector.types";
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
 
@@ -42,6 +44,9 @@ function MinePage() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [trends, setTrends] = useState<AITrends | null>(null);
+  const [collecting, setCollecting] = useState(false);
+  const [collectorProgress, setCollectorProgress] = useState(0);
+  const [collectorFound, setCollectorFound] = useState<number | null>(null);
   const signals = getAITrends().signals;
 
   const load = async (opts?: { keyword?: string; niche?: string }) => {
@@ -89,6 +94,63 @@ function MinePage() {
     setAiLoading(true);
     setTrends(null);
     setTimeout(() => { setTrends(getAITrends()); setAiLoading(false); }, 1200);
+  };
+
+  const onCollectorMine = async () => {
+    if (!keyword.trim()) {
+      toast.error("Digite uma palavra-chave para minerar.");
+      return;
+    }
+    setCollecting(true);
+    setCollectorProgress(8);
+    setCollectorFound(null);
+    const tick = setInterval(() => {
+      setCollectorProgress((p) => (p < 88 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
+    }, 350);
+    try {
+      const res = await fetch("/api/collector/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          keyword,
+          country: country === "all" ? undefined : country,
+          niche: niche === "all" ? undefined : niche,
+          limit: quantity,
+        }),
+      });
+      const data = (await res.json()) as CollectorRunResult;
+      if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
+      const ingested = await miningRepo.ingestMany(
+        data.ads.map((a) => ({
+          headline: a.headline,
+          copy: a.copy,
+          platform: a.platform,
+          country: a.country,
+          niche: a.niche,
+          score: a.score,
+          adUrl: a.adUrl,
+          adLibraryId: a.adLibraryId,
+          analysisType: "manual",
+          creativeUrl: a.imageUrl || a.videoUrl,
+          creativeType: a.videoUrl ? "video" : "image",
+          advertiser: a.advertiser,
+          cta: a.cta,
+          createdAt: a.createdAt,
+        })),
+        "extension",
+      );
+      setCollectorProgress(100);
+      setCollectorFound(ingested.length);
+      toast.success(`Mineração concluída: ${ingested.length} anúncios`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha na mineração");
+    } finally {
+      clearInterval(tick);
+      setTimeout(() => {
+        setCollecting(false);
+        setCollectorProgress(0);
+      }, 1200);
+    }
   };
 
   return (
@@ -219,11 +281,38 @@ function MinePage() {
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{offers.length}</span> anúncios encontrados
             </p>
-            <Button onClick={() => load()} disabled={loading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-              {t("mine.submit")}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={onCollectorMine}
+                disabled={collecting}
+                variant="outline"
+                className="border-primary/40"
+              >
+                {collecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
+                Minerar com Motor de Coleta
+              </Button>
+              <Button onClick={() => load()} disabled={loading} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                {t("mine.submit")}
+              </Button>
+            </div>
           </div>
+          {collecting || collectorFound !== null ? (
+            <div className="md:col-span-2 lg:col-span-6">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>{collecting ? "Coletando anúncios em tempo real…" : "Coleta concluída"}</span>
+                <span>
+                  {collectorFound !== null ? `${collectorFound} salvos na Central` : `${collectorProgress}%`}
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${collectorProgress}%`, background: "var(--gradient-primary)" }}
+                />
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
