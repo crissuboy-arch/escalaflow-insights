@@ -349,7 +349,15 @@
       b.textContent = label;
       b.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
-        menu.classList.remove("open"); send(card, type);
+        menu.classList.remove("open");
+        const orig = anchor.textContent;
+        anchor.textContent = "⏳ enviando…";
+        anchor.style.opacity = "1";
+        anchor.style.pointerEvents = "none";
+        Promise.resolve(send(card, type)).finally(() => {
+          anchor.textContent = orig;
+          anchor.style.pointerEvents = "";
+        });
       });
       menu.appendChild(b);
       if (i < ACTIONS.length - 1) {
