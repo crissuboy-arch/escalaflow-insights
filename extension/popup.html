@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>EscalaFlow Miner</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; width: 320px; margin: 0; padding: 16px; background: #0b0f1a; color: #e6edf7; }
+    h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: -0.01em; }
+    p  { font-size: 12px; margin: 0 0 12px; color: #9aa6bd; }
+    label { display:block; font-size: 11px; color:#9aa6bd; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
+    input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #1f2a44; background: #0f1626; color: #e6edf7; font-size: 13px; box-sizing: border-box; }
+    button { width: 100%; margin-top: 12px; padding: 10px; border-radius: 8px; border: 0; background: linear-gradient(135deg,#3b82f6,#8b5cf6); color: white; font-weight: 600; font-size: 13px; cursor: pointer; }
+    button.secondary { background: #1f2a44; }
+    .row { display:flex; gap:8px; }
+    .row > * { flex:1; }
+    small { display:block; margin-top:10px; color:#6b7794; font-size: 11px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <h1>EscalaFlow Miner</h1>
+  <p>Captura anúncios do Facebook Ads Library e envia para a Central.</p>
+
+  <label for="endpoint">URL do EscalaFlow</label>
+  <input id="endpoint" type="url" placeholder="https://seu-app.lovable.app" />
+
+  <button id="capture">Minerar anúncio atual</button>
+  <button id="save" class="secondary">Salvar URL</button>
+
+  <small>Abra um anúncio na Facebook Ads Library e clique em "Minerar".</small>
+</body>
+<script src="popup.js"></script>
+</html>
