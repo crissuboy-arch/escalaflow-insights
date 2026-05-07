@@ -245,10 +245,24 @@ function MinePage() {
       const data = (await res.json()) as CollectorRunResult;
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
+      const adsArr = data.ads ?? [];
+      const sources: Record<string, number> = {};
+      let wImg = 0, wVid = 0, wNone = 0;
+      for (const a of adsArr) {
+        const ms = (a as unknown as { mediaSource?: string }).mediaSource ?? "none";
+        sources[ms] = (sources[ms] ?? 0) + 1;
+        if (a.videoUrl) wVid++;
+        else if (a.imageUrl) wImg++;
+        else wNone++;
+      }
       setCollectorDebug({
-        total: data.ads?.length ?? 0,
-        firstItem: data.ads?.[0] ?? null,
-        fields: data.ads?.[0] ? Object.keys(data.ads[0] as unknown as Record<string, unknown>) : [],
+        total: adsArr.length,
+        firstItem: adsArr[0] ?? null,
+        fields: adsArr[0] ? Object.keys(adsArr[0] as unknown as Record<string, unknown>) : [],
+        withImage: wImg,
+        withVideo: wVid,
+        withoutMedia: wNone,
+        mediaSources: sources,
       });
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
@@ -262,6 +276,7 @@ function MinePage() {
         image_url: a.imageUrl ?? null,
         video_url: a.videoUrl ?? null,
         creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
+        media_source: (a as unknown as { mediaSource?: string }).mediaSource,
         platform: a.platform,
         country: a.country,
         niche: a.niche,
