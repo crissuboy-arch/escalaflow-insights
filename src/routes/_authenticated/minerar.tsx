@@ -517,7 +517,7 @@ function MinePage() {
         </CardContent>
       </Card>
 
-      {loading ? (
+      {collected.length > 0 ? null : loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="overflow-hidden rounded-lg border border-border/60 bg-card">
