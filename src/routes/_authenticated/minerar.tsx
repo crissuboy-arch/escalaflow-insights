@@ -513,6 +513,12 @@ function MinePage() {
                 <span className="font-semibold">Total recebido: {collectorDebug.total}</span>
                 <span className="text-muted-foreground">Campos: {collectorDebug.fields.join(", ") || "nenhum"}</span>
               </div>
+              <div className="mb-2 flex flex-wrap items-center gap-3 text-muted-foreground">
+                <span>Com imagem: <b className="text-foreground">{collectorDebug.withImage}</b></span>
+                <span>Com vídeo: <b className="text-foreground">{collectorDebug.withVideo}</b></span>
+                <span>Sem mídia: <b className="text-foreground">{collectorDebug.withoutMedia}</b></span>
+                <span>Fontes: {Object.entries(collectorDebug.mediaSources).map(([k, v]) => `${k}=${v}`).join(", ") || "—"}</span>
+              </div>
               <pre className="max-h-48 overflow-auto rounded-md bg-background/70 p-3 text-[11px] leading-relaxed text-muted-foreground">
                 {JSON.stringify(collectorDebug.firstItem, null, 2)}
               </pre>
