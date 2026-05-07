@@ -17,7 +17,7 @@ export const Route = createFileRoute("/login")({ component: LoginPage });
 function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,12 +28,24 @@ function LoginPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // Demo mode: any email/password works
-    setTimeout(() => {
-      signIn(email || "demo@escalaflow.app");
-      setLoading(false);
+    try {
+      const { error } =
+        mode === "signin"
+          ? await signIn(email, password)
+          : await signUp(email, password, fullName);
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      if (mode === "signup") {
+        toast.success("Conta criada! Você já pode entrar.");
+        setMode("signin");
+        return;
+      }
       navigate({ to: "/dashboard" });
-    }, 300);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const google = () => {
