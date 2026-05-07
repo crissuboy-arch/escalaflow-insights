@@ -23,6 +23,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as AuthenticatedProdutosPlaybookRouteImport } from './routes/_authenticated/produtos.playbook'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 
@@ -100,6 +101,12 @@ const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   path: '/api/collector/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProdutosPlaybookRoute =
+  AuthenticatedProdutosPlaybookRouteImport.update({
+    id: '/produtos/playbook',
+    path: '/produtos/playbook',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedProdutosEbookRoute =
   AuthenticatedProdutosEbookRouteImport.update({
     id: '/produtos/ebook',
@@ -127,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
+  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesByTo {
@@ -144,6 +152,7 @@ export interface FileRoutesByTo {
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
+  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesById {
@@ -163,6 +172,7 @@ export interface FileRoutesById {
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
+  '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRouteTypes {
@@ -182,6 +192,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
+    | '/produtos/playbook'
     | '/api/collector/run'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -199,6 +210,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
+    | '/produtos/playbook'
     | '/api/collector/run'
   id:
     | '__root__'
@@ -217,6 +229,7 @@ export interface FileRouteTypes {
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
+    | '/_authenticated/produtos/playbook'
     | '/api/collector/run'
   fileRoutesById: FileRoutesById
 }
@@ -328,6 +341,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/produtos/playbook': {
+      id: '/_authenticated/produtos/playbook'
+      path: '/produtos/playbook'
+      fullPath: '/produtos/playbook'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/produtos/ebook': {
       id: '/_authenticated/produtos/ebook'
       path: '/produtos/ebook'
@@ -357,6 +377,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
+  AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -371,6 +392,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
+  AuthenticatedProdutosPlaybookRoute: AuthenticatedProdutosPlaybookRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -387,3 +409,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
