@@ -599,18 +599,24 @@ function MiningCenterPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                onClick={() =>
-                                  openExternal(
-                                    a.adUrl,
-                                    a.adLibraryId
-                                      ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}`
-                                      : null,
-                                  )
-                                }
+                                onClick={() => onOpenAd(a)}
                                 aria-label="Abrir anúncio"
                               >
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => onOpenExtension(a)}
+                                    aria-label="Abrir na extensão"
+                                  >
+                                    <Puzzle className="h-4 w-4 text-sky-500" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Abrir na extensão</TooltipContent>
+                              </Tooltip>
                               <Button
                                 size="icon"
                                 variant="ghost"
