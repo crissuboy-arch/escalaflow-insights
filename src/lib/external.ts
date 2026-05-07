@@ -10,6 +10,21 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
     toast.error("Link original não encontrado.");
     return false;
   }
+  // Anchor-click first: escapes most iframe sandbox restrictions and never
+  // gets a "popup blocked" treatment because it's a real user-gesture nav.
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return true;
+  } catch {
+    /* fall through */
+  }
   try {
     const w = window.open(url, "_blank", "noopener,noreferrer");
     if (w) {
@@ -19,20 +34,8 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
   } catch {
     /* ignore */
   }
-  // Fallback: anchor click (escapes some iframe blockers)
-  try {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return true;
-  } catch {
-    toast.error("Não foi possível abrir o link.");
-    return false;
-  }
+  toast.error("Não foi possível abrir o link.");
+  return false;
 }
 
 export async function openChatGPTWithPrompt(prompt: string): Promise<void> {
