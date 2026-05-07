@@ -487,7 +487,6 @@ function MinePage() {
         </CardContent>
       </Card>
 
-      {/* Resultados */}
       {/* Anúncios coletados (Motor de Coleta) */}
       <Card className="border-border/60">
         <CardContent className="p-6">
@@ -495,7 +494,7 @@ function MinePage() {
             <div className="flex items-center gap-2">
               <Radar className="h-4 w-4 text-primary" />
               <h2 className="font-semibold">Anúncios coletados</h2>
-              <Badge variant="outline" className="rounded-full">{collected.length}</Badge>
+              <Badge variant="outline" className="rounded-full">{visibleCollected.length}</Badge>
             </div>
             <Button size="sm" variant="ghost" onClick={fetchCollected}>
               <Loader2 className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`} />
@@ -503,8 +502,21 @@ function MinePage() {
             </Button>
           </div>
 
-          {collectedLoading && collected.length === 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {collectorDebug && (
+            <div className="mb-4 rounded-lg border border-border/60 bg-muted/30 p-4 text-xs">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="rounded-full">Debug temporário</Badge>
+                <span className="font-semibold">Total recebido: {collectorDebug.total}</span>
+                <span className="text-muted-foreground">Campos: {collectorDebug.fields.join(", ") || "nenhum"}</span>
+              </div>
+              <pre className="max-h-48 overflow-auto rounded-md bg-background/70 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                {JSON.stringify(collectorDebug.firstItem, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {collectedLoading && visibleCollected.length === 0 ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 8 }).map((_, i) => (
                 <div key={i} className="space-y-2 rounded-lg border border-border/60 p-3">
                   <Skeleton className="aspect-video w-full" />
@@ -513,7 +525,7 @@ function MinePage() {
                 </div>
               ))}
             </div>
-          ) : collected.length === 0 ? (
+          ) : visibleCollected.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <Radar className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
@@ -523,22 +535,26 @@ function MinePage() {
             </div>
           ) : (
             <>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {collected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleCollected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
+                  const key = a.ad_library_id || a.ad_url || a.id;
+                  const hasMedia = Boolean(a.video_url || a.image_url);
+                  return (
                   <motion.div
-                    key={a.id}
+                    key={key}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="group flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
+                    className="group flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
                   >
-                    <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
                       {a.video_url ? (
-                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline />
+                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline controls />
                       ) : a.image_url ? (
                         <img src={a.image_url} alt={a.headline} className="h-full w-full object-cover" loading="lazy" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
                           <ImageIcon className="h-8 w-8 opacity-40" />
+                          <span className="text-sm font-medium">sem mídia capturada</span>
                         </div>
                       )}
                       <div className="absolute left-2 top-2 flex gap-1">
@@ -551,34 +567,48 @@ function MinePage() {
                           {a.platform}
                         </UIBadge>
                       </div>
-                    </div>
-                    <div className="flex flex-1 flex-col gap-2 p-3">
-                      <p className="line-clamp-1 text-sm font-semibold">{a.advertiser}</p>
-                      <p className="line-clamp-2 text-xs text-muted-foreground">{a.headline || a.copy || "—"}</p>
-                      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Globe2 className="h-3 w-3" />{a.country}
-                          {a.cta && <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{a.cta}</span>}
+                      {!hasMedia && (
+                        <div className="absolute bottom-2 left-2 rounded-full bg-background/80 px-2 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+                          sem mídia capturada
                         </div>
-                        {a.ad_url && (
-                          <a
-                            href={a.ad_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                          >
-                            Ver <ExternalLink className="h-3 w-3" />
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col gap-3 p-4">
+                      <div>
+                        <p className="line-clamp-1 text-base font-semibold">{a.advertiser || "Anunciante não informado"}</p>
+                        <p className="mt-2 line-clamp-2 text-sm font-medium leading-snug">{a.headline || "Sem headline capturada"}</p>
+                        <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">{a.copy || "Sem copy capturada"}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary" className="rounded-full">{a.platform || "Plataforma não informada"}</Badge>
+                        <Badge variant="outline" className="rounded-full"><Globe2 className="mr-1 h-3 w-3" />{a.country || "—"}</Badge>
+                        {a.cta && <Badge variant="outline" className="rounded-full">{a.cta}</Badge>}
+                      </div>
+                      <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-2">
+                        <Button size="sm" onClick={() => onAnalyzeCollected(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+                          <Sparkles className="mr-1 h-3.5 w-3.5" /> Analisar com IA
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => onSaveCollected(a)}>
+                          <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> {savedIds.has(key) ? "Salvo" : "Salvar"}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => onFavoriteCollected(a)}>
+                          <Star className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`} /> Favoritar
+                        </Button>
+                        <Button size="sm" variant="ghost" asChild disabled={!a.ad_url}>
+                          <a href={a.ad_url || "#"} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
                           </a>
-                        )}
+                        </Button>
                       </div>
                     </div>
                   </motion.div>
-                ))}
+                  );
+                })}
               </div>
-              {collected.length > PAGE_SIZE && (
+              {visibleCollected.length > PAGE_SIZE && (
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    Página {page + 1} de {Math.ceil(collected.length / PAGE_SIZE)}
+                    Página {page + 1} de {Math.ceil(visibleCollected.length / PAGE_SIZE)}
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
@@ -587,7 +617,7 @@ function MinePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(page + 1) * PAGE_SIZE >= collected.length}
+                      disabled={(page + 1) * PAGE_SIZE >= visibleCollected.length}
                       onClick={() => setPage((p) => p + 1)}
                     >
                       Próxima
@@ -599,36 +629,6 @@ function MinePage() {
           )}
         </CardContent>
       </Card>
-
-      {collected.length > 0 ? null : loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="overflow-hidden rounded-lg border border-border/60 bg-card">
-              <div className="aspect-video shimmer bg-muted" />
-              <div className="space-y-2 p-4">
-                <div className="h-4 w-3/4 shimmer rounded bg-muted" />
-                <div className="h-3 w-full shimmer rounded bg-muted" />
-                <div className="h-8 w-full shimmer rounded bg-muted" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : offers.length === 0 ? (
-        <p className="py-12 text-center text-muted-foreground">{t("mine.noResults")}</p>
-      ) : (
-        <motion.div
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          initial="hidden"
-          animate="show"
-          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.04 } } }}
-        >
-          {offers.map((o) => (
-            <motion.div key={o.id} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
-              <OfferCard offer={o} saved={savedIds.has(o.id)} favorited={favIds.has(o.id)} onToggleSave={() => onSave(o.id)} />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
 
       {/* Dialog Minerar com IA */}
       <Dialog open={aiOpen} onOpenChange={setAiOpen}>
