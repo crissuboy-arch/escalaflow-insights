@@ -26,6 +26,8 @@ import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as AuthenticatedProdutosPlaybookRouteImport } from './routes/_authenticated/produtos.playbook'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
+import { Route as AuthenticatedProdutosPlaybookNovoRouteImport } from './routes/_authenticated/produtos.playbook.novo'
+import { Route as AuthenticatedProdutosPlaybookIdRouteImport } from './routes/_authenticated/produtos.playbook.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -118,6 +120,18 @@ const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
   path: '/oferta/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedProdutosPlaybookNovoRoute =
+  AuthenticatedProdutosPlaybookNovoRouteImport.update({
+    id: '/novo',
+    path: '/novo',
+    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
+  } as any)
+const AuthenticatedProdutosPlaybookIdRoute =
+  AuthenticatedProdutosPlaybookIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -134,8 +148,10 @@ export interface FileRoutesByFullPath {
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
+  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -152,8 +168,10 @@ export interface FileRoutesByTo {
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
+  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -172,8 +190,10 @@ export interface FileRoutesById {
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRoute
+  '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
+  '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -194,6 +214,8 @@ export interface FileRouteTypes {
     | '/produtos/ebook'
     | '/produtos/playbook'
     | '/api/collector/run'
+    | '/produtos/playbook/$id'
+    | '/produtos/playbook/novo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -212,6 +234,8 @@ export interface FileRouteTypes {
     | '/produtos/ebook'
     | '/produtos/playbook'
     | '/api/collector/run'
+    | '/produtos/playbook/$id'
+    | '/produtos/playbook/novo'
   id:
     | '__root__'
     | '/'
@@ -231,6 +255,8 @@ export interface FileRouteTypes {
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/produtos/playbook'
     | '/api/collector/run'
+    | '/_authenticated/produtos/playbook/$id'
+    | '/_authenticated/produtos/playbook/novo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -362,8 +388,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/produtos/playbook/novo': {
+      id: '/_authenticated/produtos/playbook/novo'
+      path: '/novo'
+      fullPath: '/produtos/playbook/novo'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookNovoRouteImport
+      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
+    }
+    '/_authenticated/produtos/playbook/$id': {
+      id: '/_authenticated/produtos/playbook/$id'
+      path: '/$id'
+      fullPath: '/produtos/playbook/$id'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdRouteImport
+      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
+    }
   }
 }
+
+interface AuthenticatedProdutosPlaybookRouteChildren {
+  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRoute
+  AuthenticatedProdutosPlaybookNovoRoute: typeof AuthenticatedProdutosPlaybookNovoRoute
+}
+
+const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookRouteChildren =
+  {
+    AuthenticatedProdutosPlaybookIdRoute: AuthenticatedProdutosPlaybookIdRoute,
+    AuthenticatedProdutosPlaybookNovoRoute:
+      AuthenticatedProdutosPlaybookNovoRoute,
+  }
+
+const AuthenticatedProdutosPlaybookRouteWithChildren =
+  AuthenticatedProdutosPlaybookRoute._addFileChildren(
+    AuthenticatedProdutosPlaybookRouteChildren,
+  )
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
@@ -377,7 +434,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
-  AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRoute
+  AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -392,7 +449,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
-  AuthenticatedProdutosPlaybookRoute: AuthenticatedProdutosPlaybookRoute,
+  AuthenticatedProdutosPlaybookRoute:
+    AuthenticatedProdutosPlaybookRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -409,3 +467,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
