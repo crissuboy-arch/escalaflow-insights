@@ -87,9 +87,10 @@ function MinePage() {
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
+      console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
       setCollected((data ?? []) as CollectedAd[]);
     } catch (e) {
-      console.warn("[minerar] collected_ads fetch failed", e);
+      console.error("[minerar] collected_ads fetch failed", e);
     } finally {
       setCollectedLoading(false);
     }
