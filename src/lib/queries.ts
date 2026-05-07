@@ -79,6 +79,8 @@ export const DEMO_ANALYSES: DemoAnalysis[] = DEMO_OFFERS.slice(0, 6).map((o) => 
 const SAVED_KEY = "escalaflow_saved";
 const FAV_KEY = "escalaflow_favs";
 const ANALYSES_KEY = "escalaflow_analyses";
+const SAVED_ADS_KEY = "escalaflow_saved_ads_v1";
+const FAV_ADS_KEY = "escalaflow_fav_ads_v1";
 const EVT = "escalaflow:change";
 
 function emitChange(scope: "saved" | "fav" | "analyses") {
@@ -104,6 +106,80 @@ const readSet = (key: string): Set<string> => {
 const writeSet = (key: string, s: Set<string>) => {
   if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify([...s]));
 };
+
+// ---------- Real collected-ad persistence (localStorage) ----------
+export interface PersistedAd {
+  key: string;
+  ad_library_id: string | null;
+  ad_url: string | null;
+  advertiser: string;
+  headline: string;
+  copy: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  platform: string;
+  country: string;
+  niche: string;
+  score: number;
+  created_at: string;
+  saved_at: string;
+}
+
+function readAdMap(key: string): Record<string, PersistedAd> {
+  try {
+    const raw = typeof window !== "undefined" ? localStorage.getItem(key) : null;
+    return raw ? (JSON.parse(raw) as Record<string, PersistedAd>) : {};
+  } catch {
+    return {};
+  }
+}
+function writeAdMap(key: string, m: Record<string, PersistedAd>) {
+  if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(m));
+}
+
+export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
+  const m = readAdMap(SAVED_ADS_KEY);
+  const existed = !!m[ad.key];
+  if (existed) delete m[ad.key];
+  else m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
+  writeAdMap(SAVED_ADS_KEY, m);
+  // mirror id-set for legacy callers
+  const s = readSet(SAVED_KEY);
+  if (existed) s.delete(ad.key); else s.add(ad.key);
+  writeSet(SAVED_KEY, s);
+  emitChange("saved");
+  console.log("offer saved", ad.key, !existed);
+  return !existed;
+}
+
+export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Promise<void> {
+  const m = readAdMap(FAV_ADS_KEY);
+  if (value) m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
+  else delete m[ad.key];
+  writeAdMap(FAV_ADS_KEY, m);
+  const f = readSet(FAV_KEY);
+  if (value) f.add(ad.key); else f.delete(ad.key);
+  writeSet(FAV_KEY, f);
+  emitChange("fav");
+  console.log("favorite saved", ad.key, value);
+}
+
+export async function fetchSavedAds(): Promise<PersistedAd[]> {
+  const m = readAdMap(SAVED_ADS_KEY);
+  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
+  console.log("saved offers loaded", list.length);
+  return list;
+}
+export async function fetchFavoriteAds(): Promise<PersistedAd[]> {
+  const m = readAdMap(FAV_ADS_KEY);
+  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
+  console.log("favorites loaded", list.length);
+  return list;
+}
+export function getPersistedAdByKey(key: string): PersistedAd | undefined {
+  return readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key];
+}
 
 export async function fetchOffers(filters?: {
   keyword?: string; niche?: string; country?: string; platform?: string; limit?: number;
