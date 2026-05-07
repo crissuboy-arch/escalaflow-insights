@@ -221,6 +221,7 @@ function MiningCenterPage() {
   };
 
   const onToggleFav = async (a: MinedAd) => {
+    console.log("favoritando", a.id);
     const persisted = toPersisted(a);
     const next = !favIds.has(persisted.key);
     await favoriteCollectedAd(persisted, next);
