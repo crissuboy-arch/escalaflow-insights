@@ -80,7 +80,7 @@ function MinePage() {
   const [collecting, setCollecting] = useState(false);
   const [collectorProgress, setCollectorProgress] = useState(0);
   const [collectorFound, setCollectorFound] = useState<number | null>(null);
-  const [collectorDebug, setCollectorDebug] = useState<CollectorDebug | null>(null);
+  const [, setCollectorDebug] = useState<CollectorDebug | null>(null);
   const signals = getAITrends().signals;
 
   // Real ads from collected_ads (Supabase)
