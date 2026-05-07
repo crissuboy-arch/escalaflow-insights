@@ -61,7 +61,7 @@ function PlaybookReaderPage() {
   useEffect(() => {
     (async () => {
       try {
-        const row = (await load({ data: { id } })) as Playbook;
+        const row = (await load({ data: { id } })) as unknown as Playbook;
         setPb(row);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Falha ao carregar");
