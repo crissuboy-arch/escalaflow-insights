@@ -139,6 +139,16 @@ function MinePage() {
   };
 
   const onAnalyzeCollected = async (ad: CollectedAd) => {
+    console.log("analysis payload", ad);
+    // also persist for analise-ia page lookup
+    await saveCollectedAd({
+      key: ad.ad_library_id || ad.ad_url || ad.id,
+      ad_library_id: ad.ad_library_id, ad_url: ad.ad_url,
+      advertiser: ad.advertiser, headline: ad.headline, copy: ad.copy, cta: ad.cta,
+      image_url: ad.image_url, video_url: ad.video_url,
+      platform: ad.platform, country: ad.country, niche: ad.niche,
+      score: ad.score, created_at: ad.created_at, saved_at: new Date().toISOString(),
+    }).catch(() => {});
     const [ingested] = await miningRepo.ingestMany([
       {
         headline: ad.headline || ad.advertiser,
