@@ -241,7 +241,8 @@ function MiningCenterPage() {
     await miningRepo.update(a.id, { favorite: next });
     setFavIds((s) => {
       const n = new Set(s);
-      next ? n.add(persisted.key) : n.delete(persisted.key);
+      if (next) n.add(persisted.key);
+      else n.delete(persisted.key);
       return n;
     });
   };
@@ -265,7 +266,8 @@ function MiningCenterPage() {
     const isSaved = await saveCollectedAd(persisted);
     setSavedIds((s) => {
       const n = new Set(s);
-      isSaved ? n.add(persisted.key) : n.delete(persisted.key);
+      if (isSaved) n.add(persisted.key);
+      else n.delete(persisted.key);
       return n;
     });
     toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
