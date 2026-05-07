@@ -41,12 +41,9 @@ function wrap(text: string, font: PDFFont, size: number, maxWidth: number): stri
 }
 
 // Minimal markdown parser: h1/h2/h3, bullets, paragraphs, bold strip
-interface Block {
-  type: "h1" | "h2" | "h3" | "p" | "li";
-  text: string;
-}
-function parseMd(md: string): Block[] {
-  const blocks: Block[] = [];
+type MdBlock = { type: "h1" | "h2" | "h3" | "p" | "li"; text: string };
+function parseMd(md: string): MdBlock[] {
+  const blocks: MdBlock[] = [];
   const lines = md.replace(/\r/g, "").split("\n");
   let buf: string[] = [];
   const flushP = () => {
@@ -184,7 +181,7 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
   });
 
   // ---- CHAPTERS ----
-  const drawBlock = (p: PDFPage, block: Block, yPos: number): { page: PDFPage; y: number } => {
+  const drawBlock = (p: PDFPage, block: MdBlock, yPos: number): { page: PDFPage; y: number } => {
     let cy = yPos;
     let cp = p;
     const next = (need: number) => {
@@ -300,7 +297,7 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
   });
 
   const bytes = await pdf.save();
-  return new Blob([bytes], { type: "application/pdf" });
+  return new Blob([bytes as BlobPart], { type: "application/pdf" });
 }
 
 async function fetchAsBytes(url: string): Promise<Uint8Array> {
@@ -329,5 +326,3 @@ async function embedImage(pdf: PDFDocument, bytes: Uint8Array, hint: string) {
     }
   }
 }
-
-type Block = ReturnType<typeof parseMd>[number];
