@@ -177,6 +177,34 @@ function MinePage() {
       });
       const data = (await res.json()) as CollectorRunResult;
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
+      console.log("collector results:", data.ads?.length ?? 0, data.ads);
+      // Optimistically merge returned ads into local state so UI updates instantly
+      const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
+        id: a.adLibraryId || `${Date.now()}-${idx}`,
+        ad_library_id: a.adLibraryId ?? null,
+        ad_url: a.adUrl ?? null,
+        advertiser: a.advertiser,
+        headline: a.headline,
+        copy: a.copy ?? null,
+        cta: a.cta ?? null,
+        image_url: a.imageUrl ?? null,
+        video_url: a.videoUrl ?? null,
+        creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
+        platform: a.platform,
+        country: a.country,
+        niche: a.niche,
+        keyword: keyword,
+        score: a.score,
+        created_at: a.createdAt || new Date().toISOString(),
+      }));
+      setCollected((prev) => {
+        const map = new Map<string, CollectedAd>();
+        [...optimistic, ...prev].forEach((x) => {
+          const key = x.ad_library_id || x.ad_url || x.id;
+          if (!map.has(key)) map.set(key, x);
+        });
+        return Array.from(map.values());
+      });
       const ingested = await miningRepo.ingestMany(
         data.ads.map((a) => ({
           headline: a.headline,
@@ -197,8 +225,8 @@ function MinePage() {
         "extension",
       );
       setCollectorProgress(100);
-      setCollectorFound(ingested.length);
-      toast.success(`Mineração concluída: ${ingested.length} anúncios`);
+      setCollectorFound(data.ads?.length ?? ingested.length);
+      toast.success(`Mineração concluída: ${data.ads?.length ?? ingested.length} anúncios`);
       await fetchCollected();
       setPage(0);
     } catch (e) {
