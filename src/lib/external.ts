@@ -7,11 +7,25 @@ import { toast } from "sonner";
 export function openExternal(...candidates: Array<string | null | undefined>): boolean {
   const url = candidates.find((u) => typeof u === "string" && /^https?:\/\//i.test(u));
   if (!url) {
-    toast.error("Link original não encontrado.");
+    toast.error("Link não encontrado");
     return false;
   }
-  // Anchor-click first: escapes most iframe sandbox restrictions and never
-  // gets a "popup blocked" treatment because it's a real user-gesture nav.
+  console.log("abrindo url externa", url);
+  // window.open first with noopener,noreferrer — escapes iframe and is the
+  // requested behaviour. Fallback to anchor click if popup is blocked.
+  try {
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (w) {
+      try {
+        w.opener = null;
+      } catch {
+        /* ignore */
+      }
+      return true;
+    }
+  } catch {
+    /* fall through */
+  }
   try {
     const a = document.createElement("a");
     a.href = url;
@@ -23,15 +37,6 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
     a.remove();
     return true;
   } catch {
-    /* fall through */
-  }
-  try {
-    const w = window.open(url, "_blank", "noopener,noreferrer");
-    if (w) {
-      w.opener = null;
-      return true;
-    }
-  } catch {
     /* ignore */
   }
   toast.error("Não foi possível abrir o link.");
@@ -39,12 +44,14 @@ export function openExternal(...candidates: Array<string | null | undefined>): b
 }
 
 export async function openChatGPTWithPrompt(prompt: string): Promise<void> {
-  const copyPromise = navigator.clipboard.writeText(prompt);
-  openExternal("https://chatgpt.com/");
+  let copied = false;
   try {
-    await copyPromise;
-    toast.success("Prompt copiado. Cole no ChatGPT.");
+    await navigator.clipboard.writeText(prompt);
+    copied = true;
   } catch {
-    toast.message("Abra o ChatGPT e cole seu prompt.");
+    /* clipboard may be unavailable */
   }
+  openExternal("https://chatgpt.com/");
+  if (copied) toast.success("Prompt copiado para o ChatGPT");
+  else toast.message("Abra o ChatGPT e cole seu prompt.");
 }

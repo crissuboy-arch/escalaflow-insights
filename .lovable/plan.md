@@ -1,47 +1,38 @@
-Plano cirúrgico para resolver sem tocar no Apify/coleta:
+Plano para corrigir definitivamente os botões da coluna **Ações** sem trocar layout, sem mexer na coleta Apify, token ou extensão:
 
-1. Corrigir abertura externa de verdade
-- Centralizar todos os botões externos em um único helper.
-- Usar somente `window.open(url, "_blank", "noopener,noreferrer")` para Facebook, anúncio, perfil, link original e ChatGPT.
-- ChatGPT abrirá apenas `https://chatgpt.com/` em nova aba; o prompt será copiado para clipboard antes/na mesma interação do clique.
-- Se não houver link real, mostrar exatamente: `Link original não encontrado.`
-- Remover qualquer caminho que tente navegar Facebook/ChatGPT dentro do preview/iframe.
+1. **Padronizar abertura externa**
+   - Ajustar `src/lib/external.ts` para validar URL e abrir sempre com `window.open(url, "_blank", "noopener,noreferrer")`.
+   - Usar mensagem padrão `Link não encontrado` quando nenhuma URL válida existir.
+   - Manter fallback seguro apenas se necessário, sem navegação dentro do iframe.
 
-2. Parar de depender do estado temporário da Central
-- Unificar favoritos, salvos e escalados em um storage persistente único baseado no anúncio real.
-- A chave do anúncio será estável: `ad_library_id -> ad_url -> id`, para não perder o item após refresh.
-- Ao favoritar/salvar/escalar, persistir o payload completo do anúncio real: anunciante, headline, copy, mídia, país, plataforma, score e links.
+2. **Mapear URLs reais do anúncio**
+   - Criar helper na Central para resolver o link nesta ordem:
+     - `ad.adUrl`
+     - `ad.libraryUrl` se existir no payload bruto/tipo flexível
+     - `ad.raw?.ad_snapshot_url`
+     - fallback por `ad.adLibraryId` para Facebook Ads Library.
+   - Antes de abrir, registrar `console.log("abrindo anúncio", url)`.
 
-3. Corrigir Favoritos
-- Ao clicar na estrela na Central, salvar o anúncio completo como favorito persistente.
-- Ao abrir `/favoritos`, carregar do storage persistente, não do estado da Central.
-- Após refresh, os cards continuam aparecendo.
-- Logar apenas no console: `saving favorite` e `loaded favorites`.
+3. **Corrigir ChatGPT**
+   - Gerar prompt automático com `headline`, `copy`, `CTA`, `nicho`, `plataforma` e `score`.
+   - Salvar o anúncio para análise com `rememberAdForAnalysis`.
+   - Copiar o prompt para o clipboard.
+   - Abrir `https://chatgpt.com` em nova aba.
+   - Mostrar toast exato: `Prompt copiado para o ChatGPT`.
+   - Registrar `console.log("abrindo chatgpt", ad)`.
 
-4. Corrigir Ofertas Salvas
-- Ao clicar salvar, persistir o anúncio completo.
-- `/ofertas-salvas` carregará a lista persistida no mount e em eventos de mudança.
-- Após refresh, os cards continuam aparecendo.
-- Logar apenas no console: `saving offer` e `loaded saved offers`.
+4. **Corrigir ações persistentes**
+   - **Enviar para Escala:** usar `scaleCollectedAd`, atualizar `scaledIds`, disparar contador via `subscribeChange`, toast `Oferta enviada para escala`, log `console.log("enviando para escala", ad.id)`.
+   - **Favoritar:** manter toggle true/false com `favoriteCollectedAd`, atualizar estado local e contador, log `console.log("favoritando", ad.id)`.
+   - **Salvar:** manter `saveCollectedAd`, persistir em localStorage, atualizar estado e contador, com toast claro.
 
-5. Corrigir Ofertas Escaladas
-- Ao clicar `Enviar para escala`, marcar `scaled=true` no anúncio real e persistir.
-- `/ofertas-escaladas` não usará mock: mostrará anúncios reais persistidos como escalados e também anúncios reais da tabela que tenham `score >= 80`, repetição ou mais de uma plataforma.
-- Após refresh, anúncios enviados para escala continuam aparecendo.
-- Logar apenas no console: `saving scaled` e `loaded scaled offers`.
+5. **Adicionar botão Extensão funcional sem alterar layout**
+   - Usar o botão de ação existente menos crítico/atual ou mapear o handler atual conforme o layout já presente.
+   - Se `extensionUrl` existir no anúncio/payload bruto, abrir em nova aba.
+   - Caso contrário, mostrar toast `Extensão não disponível`.
 
-6. Sidebar e renderização
-- Atualizar os contadores da sidebar com base no storage persistente, não em estado temporário.
-- Na Central e nas abas, exibir sempre o país real do item (`country`) salvo/coletado.
-- Não mostrar JSON/debug visual na interface.
-
-7. Remover pontos que causam confusão de mock
-- Revisar botões `manual/extensão`, `Teste de Importação` e fluxos demo da Central para não poluir Favoritos/Salvos/Escalados com dados falsos.
-- Manter os cards reais e não alterar a coleta Apify, token ou extensão.
-
-Validação após implementar:
-- Clicar em salvar, favoritar e enviar para escala em um anúncio real.
-- Atualizar a página.
-- Confirmar que `/favoritos`, `/ofertas-salvas` e `/ofertas-escaladas` ainda mostram os cards.
-- Confirmar no console os logs exigidos.
-- Confirmar que ChatGPT/Facebook abrem em nova aba, não dentro do preview.
+6. **Verificação final**
+   - Conferir que todos os handlers da coluna **Ações** chamam funções reais.
+   - Garantir que nenhum botão tente navegar dentro do iframe.
+   - Garantir que links inválidos não quebram a UI e exibem toast.
+   - Manter os cards/anúncios reais e o layout atual.
