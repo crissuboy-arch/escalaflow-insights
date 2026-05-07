@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import {
   Radio, Search, Star, Globe, Megaphone, Flame, ExternalLink,
-  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download, Rocket, Bot,
+  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download, Rocket, Bot, BookmarkCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
@@ -383,11 +383,16 @@ function MiningCenterPage() {
                 </TableHeader>
                 <TableBody>
                   <TooltipProvider delayDuration={200}>
-                    {filtered.map((a) => (
+                    {filtered.map((a) => {
+                      const key = getAdKey(a);
+                      const isFav = favIds.has(key) || a.favorite;
+                      const isSaved = savedIds.has(key);
+                      const isScaled = scaledIds.has(key) || a.scaled;
+                      return (
                       <TableRow key={a.id} className="group">
                         <TableCell>
                           <button onClick={() => onToggleFav(a)} aria-label="Favoritar">
-                            <Star className={`h-4 w-4 transition ${a.favorite ? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]" : "text-muted-foreground hover:text-foreground"}`} />
+                            <Star className={`h-4 w-4 transition ${isFav ? "fill-yellow-400 text-yellow-400 drop-shadow-[0_0_6px_rgba(250,204,21,0.7)]" : "text-muted-foreground hover:text-foreground"}`} />
                           </button>
                         </TableCell>
                         <TableCell className="max-w-[320px]">
@@ -431,8 +436,11 @@ function MiningCenterPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 opacity-70 transition group-hover:opacity-100">
-                            <Button size="icon" variant="ghost" onClick={() => openExternal(a.adUrl, a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null)}>
+                            <Button size="icon" variant="ghost" onClick={() => openExternal(a.adUrl, a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null)} aria-label="Abrir anúncio">
                               <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => onSave(a)} aria-label="Salvar oferta">
+                              <BookmarkCheck className={`h-4 w-4 ${isSaved ? "text-primary" : ""}`} />
                             </Button>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -445,10 +453,10 @@ function MiningCenterPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button size="icon" variant="ghost" onClick={() => onScale(a)} aria-label="Enviar para Escalada">
-                                  <Rocket className={`h-4 w-4 ${a.scaled ? "text-emerald-500" : "text-amber-500"}`} />
+                                  <Rocket className={`h-4 w-4 ${isScaled ? "text-emerald-500" : "text-amber-500"}`} />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>{a.scaled ? "Já escalado" : "Enviar para Escalada"}</TooltipContent>
+                              <TooltipContent>{isScaled ? "Já escalado" : "Enviar para Escalada"}</TooltipContent>
                             </Tooltip>
                             <Button size="icon" variant="ghost" onClick={() => onMarkReviewed(a)} aria-label="Marcar como revisado">
                               <CheckCircle2 className={`h-4 w-4 ${a.status === "reviewed" ? "text-emerald-500" : ""}`} />
@@ -459,7 +467,8 @@ function MiningCenterPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TooltipProvider>
                 </TableBody>
               </Table>
