@@ -582,6 +582,11 @@ function MinePage() {
                           sem mídia capturada
                         </div>
                       )}
+                      {a.media_source && a.media_source !== "none" && (
+                        <div className="absolute bottom-2 right-2 rounded-full bg-background/80 px-2 py-1 text-[10px] font-medium text-muted-foreground backdrop-blur">
+                          mídia: {a.media_source}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-4">
                       <div>
