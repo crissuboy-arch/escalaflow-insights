@@ -18,6 +18,13 @@ export const Route = createFileRoute("/_authenticated/importar-anuncio")({
     analysisType: typeof search.analysisType === "string" ? search.analysisType : undefined,
     createdAt: typeof search.createdAt === "string" ? search.createdAt : undefined,
     creativeUrl: typeof search.creativeUrl === "string" ? search.creativeUrl : undefined,
+    advertiser: typeof search.advertiser === "string" ? search.advertiser : undefined,
+    cta: typeof search.cta === "string" ? search.cta : undefined,
+    description: typeof search.description === "string" ? search.description : undefined,
+    adLibraryId: typeof search.adLibraryId === "string" ? search.adLibraryId : undefined,
+    startDate: typeof search.startDate === "string" ? search.startDate : undefined,
+    creativeType: typeof search.creativeType === "string" ? search.creativeType : undefined,
+    platforms: typeof search.platforms === "string" ? search.platforms : undefined,
   }),
 });
 
@@ -48,6 +55,13 @@ function ImportAdPage() {
         analysisType: search.analysisType,
         createdAt: search.createdAt,
         creativeUrl: search.creativeUrl,
+        advertiser: search.advertiser,
+        cta: search.cta,
+        description: search.description,
+        adLibraryId: search.adLibraryId,
+        startDate: search.startDate,
+        creativeType: search.creativeType,
+        platforms: search.platforms ? search.platforms.split(",").filter(Boolean) : undefined,
         raw: { via: "url-import" },
       };
       console.log("[importar-anuncio] ingest payload:", payload);

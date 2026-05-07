@@ -36,6 +36,16 @@ export interface MinedAd {
   source: "extension" | "manual" | "demo";
   status: MiningStatus;
   favorite: boolean;
+  // Extended capture fields
+  advertiser?: string;
+  cta?: string;
+  description?: string;
+  adLibraryId?: string;
+  startDate?: string;
+  creativeType?: string;
+  platforms?: string[];
+  tags?: string[];
+  scaled?: boolean;
   raw?: Record<string, unknown>; // any extra fields the extension sent
 }
 
@@ -52,5 +62,13 @@ export interface MiningIngestPayload {
   analysisType?: string;
   creativeUrl?: string;
   createdAt?: string;
+  advertiser?: string;
+  cta?: string;
+  description?: string;
+  adLibraryId?: string;
+  startDate?: string;
+  creativeType?: string;
+  platforms?: string[];
+  tags?: string[];
   raw?: Record<string, unknown>;
 }

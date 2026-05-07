@@ -49,6 +49,7 @@ function writeAll(rows: MinedAd[]) {
 function normalize(payload: MiningIngestPayload, source: MinedAd["source"]): MinedAd {
   const now = new Date().toISOString();
   const score = Math.max(0, Math.min(100, Math.round(payload.score ?? 0)));
+  const tags = Array.isArray(payload.tags) ? payload.tags : inferTags(payload);
   return {
     id: uid(),
     headline: payload.headline?.trim() || "(sem headline)",
@@ -65,8 +66,28 @@ function normalize(payload: MiningIngestPayload, source: MinedAd["source"]): Min
     source,
     status: "new",
     favorite: false,
+    advertiser: payload.advertiser,
+    cta: payload.cta,
+    description: payload.description,
+    adLibraryId: payload.adLibraryId,
+    startDate: payload.startDate,
+    creativeType: payload.creativeType,
+    platforms: payload.platforms,
+    tags,
+    scaled: false,
     raw: payload.raw,
   };
+}
+
+function inferTags(p: MiningIngestPayload): string[] {
+  const tags: string[] = [];
+  const score = p.score ?? 0;
+  if (score >= 90) tags.push("🔥 Hot");
+  else if (score >= 75) tags.push("⭐ Promissor");
+  if (p.analysisType && p.analysisType !== "manual") tags.push("🧠 IA");
+  if (p.creativeType === "video") tags.push("🎬 Vídeo");
+  if ((p.platforms?.length ?? 0) >= 3) tags.push("🌐 Multi");
+  return tags;
 }
 
 export const miningRepo: MiningRepository = {
@@ -75,14 +96,16 @@ export const miningRepo: MiningRepository = {
   },
   async ingest(payload, source = "extension") {
     const rows = readAll();
-    // Dedup by adUrl (preferred) or by headline+platform fallback
-    const dupe = rows.find((r) =>
-      (payload.adUrl && r.adUrl && r.adUrl === payload.adUrl) ||
-      (!payload.adUrl && r.headline === (payload.headline ?? "").trim() && r.platform === (payload.platform ?? "Other"))
-    );
-    if (dupe) {
-      return dupe;
-    }
+    // Dedup priority: adLibraryId → adUrl → headline+platform
+    const dupe = rows.find((r) => {
+      if (payload.adLibraryId && r.adLibraryId && r.adLibraryId === payload.adLibraryId) return true;
+      if (payload.adUrl && r.adUrl && r.adUrl === payload.adUrl) return true;
+      if (!payload.adLibraryId && !payload.adUrl &&
+          r.headline === (payload.headline ?? "").trim() &&
+          r.platform === (payload.platform ?? "Other")) return true;
+      return false;
+    });
+    if (dupe) return dupe;
     const ad = normalize(payload, source);
     rows.unshift(ad);
     writeAll(rows);
