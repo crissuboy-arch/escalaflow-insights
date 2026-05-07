@@ -62,15 +62,39 @@ function ScaledPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
+      const persisted = await fetchScaledAds();
       const { data } = await supabase
         .from("collected_ads")
-        .select("id,advertiser,headline,platform,country,niche,score,created_at,ad_library_id,ad_url")
+        .select("id,advertiser,headline,copy,cta,image_url,video_url,platform,country,niche,score,created_at,ad_library_id,ad_url")
         .order("created_at", { ascending: false })
         .limit(500);
-      setRows((data ?? []) as Row[]);
+      const dbRows = (data ?? []).map((r) => ({ ...r, key: r.ad_library_id || r.ad_url || r.id })) as Row[];
+      const persistedRows: Row[] = persisted.map((a: PersistedAd) => ({
+        id: a.key,
+        key: a.key,
+        advertiser: a.advertiser,
+        headline: a.headline,
+        copy: a.copy,
+        cta: a.cta,
+        image_url: a.image_url,
+        video_url: a.video_url,
+        platform: a.platform,
+        country: a.country,
+        niche: a.niche,
+        score: a.score,
+        created_at: a.created_at,
+        ad_library_id: a.ad_library_id,
+        ad_url: a.ad_url,
+      }));
+      const map = new Map<string, Row>();
+      [...persistedRows, ...dbRows].forEach((r) => { if (!map.has(r.key)) map.set(r.key, r); });
+      setRows(Array.from(map.values()));
       setLoading(false);
-    })();
+    };
+    load();
+    const unsub = subscribeChange((s) => { if (s === "scaled") load(); });
+    return unsub;
   }, []);
 
   const scaled: Scaled[] = useMemo(() => {
@@ -86,8 +110,13 @@ function ScaledPage() {
       const top = arr.reduce((a, b) => (b.score > a.score ? b : a));
       const platforms = Array.from(new Set(arr.map((x) => x.platform).filter(Boolean)));
       const item: Scaled = {
+        key: top.key,
         advertiser: top.advertiser,
         headline: top.headline,
+        copy: top.copy,
+        cta: top.cta,
+        image_url: top.image_url,
+        video_url: top.video_url,
         platform: top.platform,
         platforms,
         country: top.country,
@@ -95,6 +124,8 @@ function ScaledPage() {
         score: top.score,
         count: arr.length,
         created_at: top.created_at,
+        ad_library_id: top.ad_library_id,
+        ad_url: top.ad_url,
       };
       if (item.score >= 80 || item.count > 1 || item.platforms.length > 1) out.push(item);
     }
