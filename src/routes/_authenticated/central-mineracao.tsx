@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import {
   Radio, Search, Star, Globe, Megaphone, Flame, ExternalLink,
-  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff,
+  Sparkles, Trash2, RefreshCw, AlertCircle, CheckCircle2, Wifi, WifiOff, Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { miningRepo } from "@/lib/mining/repository";
@@ -100,6 +100,28 @@ function MiningCenterPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ConnectionPill connected={extensionConnected} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              fetch("/escalaflow-extension.zip")
+                .then((res) => {
+                  if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
+                  return res.blob();
+                })
+                .then((blob) => {
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = "escalaflow-extension.zip";
+                  a.click();
+                  URL.revokeObjectURL(a.href);
+                  toast.success("Download iniciado");
+                })
+                .catch((err) => toast.error(err.message));
+            }}
+          >
+            <Download className="mr-1 h-4 w-4" /> Baixar Extensão
+          </Button>
           <Button variant="outline" size="sm" onClick={refresh}>
             <RefreshCw className="mr-1 h-4 w-4" /> Atualizar
           </Button>
