@@ -53,6 +53,7 @@ export const Route = createFileRoute("/api/collector/run")({
               keyword,
               score: a.score,
               source: "collector",
+              raw: (a.raw ?? null) as never,
             }));
             const withId = rows.filter((r) => r.ad_library_id);
             const withoutId = rows.filter((r) => !r.ad_library_id);
