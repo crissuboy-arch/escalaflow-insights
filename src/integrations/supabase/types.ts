@@ -142,6 +142,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ebooks: {
+        Row: {
+          briefing: Json
+          chapters: Json
+          cover_url: string | null
+          created_at: string
+          id: string
+          layout: string
+          niche: string | null
+          outline: Json
+          source_ad_key: string | null
+          status: string
+          subtitle: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          briefing?: Json
+          chapters?: Json
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          layout?: string
+          niche?: string | null
+          outline?: Json
+          source_ad_key?: string | null
+          status?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          briefing?: Json
+          chapters?: Json
+          cover_url?: string | null
+          created_at?: string
+          id?: string
+          layout?: string
+          niche?: string | null
+          outline?: Json
+          source_ad_key?: string | null
+          status?: string
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mined_offers: {
         Row: {
           ads_count: number

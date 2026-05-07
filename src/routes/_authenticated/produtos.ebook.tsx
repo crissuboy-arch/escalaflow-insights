@@ -1,0 +1,523 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Loader2, BookOpen, Wand2, ImageIcon, FileDown, Check, ArrowLeft, ArrowRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchFavoriteAds, fetchSavedAds, fetchScaledAds, type PersistedAd } from "@/lib/queries";
+import {
+  extractEbookBriefing,
+  generateEbookOutline,
+  generateEbookChapter,
+  generateEbookCover,
+} from "@/lib/ebook.functions";
+import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
+import { exportEbookPdf } from "@/lib/ebook/pdf";
+
+export const Route = createFileRoute("/_authenticated/produtos/ebook")({
+  component: EbookPage,
+});
+
+type Briefing = {
+  title: string;
+  subtitle: string;
+  niche: string;
+  promise: string;
+  avatar: string;
+  pains: string[];
+  desires: string[];
+  uniqueMechanism: string;
+};
+type Outline = { title: string; bullets: string[] }[];
+type Chapter = { title: string; markdown: string };
+
+const STEPS = ["Anúncio", "Briefing", "Estrutura", "Layout & Capa", "Capítulos & PDF"];
+
+function EbookPage() {
+  const [step, setStep] = useState(0);
+  const [ads, setAds] = useState<PersistedAd[]>([]);
+  const [selectedAd, setSelectedAd] = useState<PersistedAd | null>(null);
+  const [briefing, setBriefing] = useState<Briefing | null>(null);
+  const [outline, setOutline] = useState<Outline>([]);
+  const [chapterCount, setChapterCount] = useState(6);
+  const [layout, setLayout] = useState<EbookLayout>("classico");
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [coverPrompt, setCoverPrompt] = useState("");
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  const fnExtract = useServerFn(extractEbookBriefing);
+  const fnOutline = useServerFn(generateEbookOutline);
+  const fnChapter = useServerFn(generateEbookChapter);
+  const fnCover = useServerFn(generateEbookCover);
+
+  useEffect(() => {
+    Promise.all([fetchFavoriteAds(), fetchSavedAds(), fetchScaledAds()]).then(([f, s, sc]) => {
+      const map = new Map<string, PersistedAd>();
+      [...f, ...s, ...sc].forEach((a) => map.set(a.key, a));
+      setAds(Array.from(map.values()));
+    });
+  }, []);
+
+  const goNext = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
+  const goBack = () => setStep((s) => Math.max(0, s - 1));
+
+  const onExtract = async () => {
+    if (!selectedAd) return;
+    setBusy("Analisando anúncio com IA…");
+    try {
+      const b = await fnExtract({
+        data: {
+          ad: {
+            headline: selectedAd.headline,
+            copy: selectedAd.copy ?? undefined,
+            cta: selectedAd.cta ?? undefined,
+            niche: selectedAd.niche,
+            country: selectedAd.country,
+            platform: selectedAd.platform,
+            advertiser: selectedAd.advertiser,
+            score: selectedAd.score,
+          },
+        },
+      });
+      setBriefing(b);
+      goNext();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar briefing");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onOutline = async () => {
+    if (!briefing) return;
+    setBusy("Gerando estrutura do ebook…");
+    try {
+      const o = await fnOutline({ data: { briefing, chapterCount } });
+      setOutline(o);
+      goNext();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar estrutura");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onCover = async () => {
+    if (!briefing) return;
+    setBusy("Gerando capa com IA…");
+    try {
+      const { dataUrl } = await fnCover({
+        data: { briefing, layout, customPrompt: coverPrompt || undefined },
+      });
+      // Try uploading to storage; fall back to data URL
+      try {
+        const { data: userRes } = await supabase.auth.getUser();
+        const uid = userRes.user?.id;
+        if (uid) {
+          const blob = await (await fetch(dataUrl)).blob();
+          const path = `${uid}/${crypto.randomUUID()}.png`;
+          const { error } = await supabase.storage.from("ebook-covers").upload(path, blob, {
+            contentType: "image/png",
+            upsert: false,
+          });
+          if (!error) {
+            const { data: pub } = supabase.storage.from("ebook-covers").getPublicUrl(path);
+            setCoverUrl(pub.publicUrl);
+          } else {
+            setCoverUrl(dataUrl);
+          }
+        } else {
+          setCoverUrl(dataUrl);
+        }
+      } catch {
+        setCoverUrl(dataUrl);
+      }
+      toast.success("Capa gerada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar capa");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onGenerateChapters = async () => {
+    if (!briefing || outline.length === 0) return;
+    setChapters([]);
+    setProgress({ done: 0, total: outline.length });
+    setBusy("Escrevendo capítulos…");
+    const acc: Chapter[] = [];
+    try {
+      for (let i = 0; i < outline.length; i++) {
+        const { markdown } = await fnChapter({
+          data: { briefing, chapter: outline[i], index: i, total: outline.length },
+        });
+        acc.push({ title: outline[i].title, markdown });
+        setChapters([...acc]);
+        setProgress({ done: i + 1, total: outline.length });
+      }
+      toast.success("Capítulos gerados");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha durante geração");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onExport = async () => {
+    if (!briefing || chapters.length === 0) {
+      toast.error("Gere os capítulos primeiro");
+      return;
+    }
+    setBusy("Gerando PDF…");
+    try {
+      const blob = await exportEbookPdf({
+        title: briefing.title,
+        subtitle: briefing.subtitle,
+        layout,
+        coverUrl,
+        chapters,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${briefing.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // persist
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (uid) {
+        await supabase.from("ebooks").insert({
+          user_id: uid,
+          source_ad_key: selectedAd?.key ?? null,
+          title: briefing.title,
+          subtitle: briefing.subtitle,
+          niche: briefing.niche,
+          briefing,
+          outline,
+          chapters,
+          layout,
+          cover_url: coverUrl,
+          status: "ready",
+        });
+      }
+      toast.success("PDF exportado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao exportar PDF");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const canNext = useMemo(() => {
+    if (step === 0) return !!selectedAd;
+    if (step === 1) return !!briefing;
+    if (step === 2) return outline.length > 0;
+    if (step === 3) return true;
+    return chapters.length > 0;
+  }, [step, selectedAd, briefing, outline, chapters]);
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-12 w-12 items-center justify-center rounded-2xl shadow-[var(--shadow-glow)]"
+          style={{ background: "var(--gradient-primary)" }}
+        >
+          <BookOpen className="h-6 w-6 text-white" />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Criar Ebook</h1>
+          <p className="text-muted-foreground">Transforme um anúncio minerado em ebook pronto para venda.</p>
+        </div>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex flex-wrap gap-2">
+        {STEPS.map((label, i) => (
+          <button
+            key={label}
+            onClick={() => i < step && setStep(i)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+              i === step
+                ? "bg-primary text-primary-foreground"
+                : i < step
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground"
+            }`}
+          >
+            {i + 1}. {label}
+          </button>
+        ))}
+      </div>
+
+      {busy && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="flex items-center gap-3 p-4 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>{busy}</span>
+            {progress.total > 0 && (
+              <span className="ml-auto text-xs text-muted-foreground">
+                {progress.done}/{progress.total}
+              </span>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step content */}
+      {step === 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Escolha o anúncio base</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ads.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum anúncio salvo, favoritado ou escalado. Vá em <strong>Minerar</strong> para coletar e marcar
+                anúncios primeiro.
+              </p>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {ads.map((a) => (
+                  <button
+                    key={a.key}
+                    onClick={() => setSelectedAd(a)}
+                    className={`rounded-lg border p-3 text-left transition hover:border-primary ${
+                      selectedAd?.key === a.key ? "border-primary bg-primary/5" : "border-border/60"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {a.image_url && (
+                        <img src={a.image_url} alt="" className="h-14 w-14 shrink-0 rounded object-cover" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{a.advertiser}</p>
+                        <p className="line-clamp-2 text-xs text-muted-foreground">{a.headline}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-[10px]">{a.platform}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{a.country}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{a.niche}</Badge>
+                          <Badge className="text-[10px]">Score {a.score}</Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Briefing extraído</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!briefing ? (
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Vamos extrair nicho, promessa, avatar, dores e mecanismo único do anúncio selecionado.
+                </p>
+                <Button onClick={onExtract} disabled={!!busy}>
+                  <Wand2 className="mr-2 h-4 w-4" /> Gerar briefing com IA
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Título" value={briefing.title} onChange={(v) => setBriefing({ ...briefing, title: v })} />
+                <Field label="Subtítulo" value={briefing.subtitle} onChange={(v) => setBriefing({ ...briefing, subtitle: v })} />
+                <Field label="Nicho" value={briefing.niche} onChange={(v) => setBriefing({ ...briefing, niche: v })} />
+                <Field label="Promessa" value={briefing.promise} onChange={(v) => setBriefing({ ...briefing, promise: v })} multiline />
+                <Field label="Avatar" value={briefing.avatar} onChange={(v) => setBriefing({ ...briefing, avatar: v })} multiline />
+                <Field label="Mecanismo único" value={briefing.uniqueMechanism} onChange={(v) => setBriefing({ ...briefing, uniqueMechanism: v })} multiline />
+                <Field label="Dores (uma por linha)" value={briefing.pains.join("\n")} onChange={(v) => setBriefing({ ...briefing, pains: v.split("\n").filter(Boolean) })} multiline />
+                <Field label="Desejos (um por linha)" value={briefing.desires.join("\n")} onChange={(v) => setBriefing({ ...briefing, desires: v.split("\n").filter(Boolean) })} multiline />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Estrutura do ebook</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Label>Capítulos</Label>
+              <Input
+                type="number"
+                min={3}
+                max={15}
+                value={chapterCount}
+                onChange={(e) => setChapterCount(Math.max(3, Math.min(15, Number(e.target.value) || 6)))}
+                className="w-24"
+              />
+              <Button onClick={onOutline} disabled={!!busy}>
+                <Wand2 className="mr-2 h-4 w-4" /> {outline.length ? "Regerar" : "Gerar"} estrutura
+              </Button>
+            </div>
+            {outline.length > 0 && (
+              <div className="space-y-3">
+                {outline.map((c, i) => (
+                  <div key={i} className="rounded-lg border border-border/60 p-3">
+                    <Input
+                      value={c.title}
+                      onChange={(e) => {
+                        const o = [...outline];
+                        o[i] = { ...o[i], title: e.target.value };
+                        setOutline(o);
+                      }}
+                      className="mb-2 font-semibold"
+                    />
+                    <Textarea
+                      value={c.bullets.join("\n")}
+                      onChange={(e) => {
+                        const o = [...outline];
+                        o[i] = { ...o[i], bullets: e.target.value.split("\n").filter(Boolean) };
+                        setOutline(o);
+                      }}
+                      rows={3}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 3 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Layout & capa</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              {(Object.values(LAYOUTS) as typeof LAYOUTS[EbookLayout][]).map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => setLayout(l.id)}
+                  className={`rounded-lg border p-4 text-left transition ${
+                    layout === l.id ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/50"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">{l.label}</p>
+                    {layout === l.id && <Check className="h-4 w-4 text-primary" />}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{l.description}</p>
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+              <div className="space-y-2">
+                <Label>Prompt da capa (opcional)</Label>
+                <Textarea
+                  rows={3}
+                  placeholder="Deixe vazio para gerar automaticamente a partir do briefing."
+                  value={coverPrompt}
+                  onChange={(e) => setCoverPrompt(e.target.value)}
+                />
+                <Button onClick={onCover} disabled={!!busy || !briefing}>
+                  <ImageIcon className="mr-2 h-4 w-4" /> Gerar capa com IA
+                </Button>
+              </div>
+              <div className="aspect-[2/3] overflow-hidden rounded-lg border border-border/60 bg-muted/30">
+                {coverUrl ? (
+                  <img src={coverUrl} alt="capa" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                    Sem capa
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 4 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Capítulos & exportar</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={onGenerateChapters} disabled={!!busy || outline.length === 0}>
+                <Wand2 className="mr-2 h-4 w-4" />
+                {chapters.length ? "Regerar capítulos" : "Gerar capítulos completos"}
+              </Button>
+              <Button
+                onClick={onExport}
+                disabled={!!busy || chapters.length === 0}
+                className="text-white"
+                style={{ background: "var(--gradient-primary)" }}
+              >
+                <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
+              </Button>
+            </div>
+            <div className="space-y-3">
+              {chapters.map((c, i) => (
+                <details key={i} className="rounded-lg border border-border/60 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold">
+                    {i + 1}. {c.title}
+                  </summary>
+                  <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{c.markdown}</pre>
+                </details>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={goBack} disabled={step === 0 || !!busy}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+        </Button>
+        {step < STEPS.length - 1 && (
+          <Button onClick={goNext} disabled={!canNext || !!busy}>
+            Próximo <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      {multiline ? (
+        <Textarea rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}

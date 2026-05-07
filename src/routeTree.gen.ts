@@ -23,6 +23,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 
 const LoginRoute = LoginRouteImport.update({
@@ -99,6 +100,12 @@ const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   path: '/api/collector/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProdutosEbookRoute =
+  AuthenticatedProdutosEbookRouteImport.update({
+    id: '/produtos/ebook',
+    path: '/produtos/ebook',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
   id: '/oferta/$id',
   path: '/oferta/$id',
@@ -119,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesByTo {
@@ -135,6 +143,7 @@ export interface FileRoutesByTo {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRoutesById {
@@ -153,6 +162,7 @@ export interface FileRoutesById {
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
+  '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
 }
 export interface FileRouteTypes {
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/api/ingest'
     | '/oferta/$id'
+    | '/produtos/ebook'
     | '/api/collector/run'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/api/ingest'
     | '/oferta/$id'
+    | '/produtos/ebook'
     | '/api/collector/run'
   id:
     | '__root__'
@@ -204,6 +216,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ofertas-salvas'
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
+    | '/_authenticated/produtos/ebook'
     | '/api/collector/run'
   fileRoutesById: FileRoutesById
 }
@@ -315,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/produtos/ebook': {
+      id: '/_authenticated/produtos/ebook'
+      path: '/produtos/ebook'
+      fullPath: '/produtos/ebook'
+      preLoaderRoute: typeof AuthenticatedProdutosEbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/oferta/$id': {
       id: '/_authenticated/oferta/$id'
       path: '/oferta/$id'
@@ -336,6 +356,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
+  AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -349,6 +370,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
+  AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
