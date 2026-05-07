@@ -26,4 +26,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     });
     return true; // async
   }
+  if (msg?.type === "ESCALA_CAPTURE") {
+    chrome.tabs.captureVisibleTab(null, { format: "png" }, (dataUrl) => {
+      sendResponse({ ok: !!dataUrl, dataUrl });
+    });
+    return true;
+  }
 });
