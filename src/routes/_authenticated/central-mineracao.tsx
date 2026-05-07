@@ -168,14 +168,15 @@ function MiningCenterPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return ads.filter((a) => {
+      const key = getAdKey(a);
       if (platform !== "all" && a.platform !== platform) return false;
       if (country !== "all" && a.country !== country) return false;
       if (status !== "all" && a.status !== status) return false;
-      if (favOnly && !a.favorite) return false;
+      if (favOnly && !a.favorite && !favIds.has(key)) return false;
       if (q && !`${a.headline} ${a.copy} ${a.niche}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [ads, search, platform, country, status, favOnly]);
+  }, [ads, search, platform, country, status, favOnly, favIds]);
 
   const onReceive = async () => {
     const present = await detectExtension();
