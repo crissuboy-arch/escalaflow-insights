@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runCollector } from "@/lib/collector/collector.service";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -31,10 +32,53 @@ export const Route = createFileRoute("/api/collector/run")({
           niche: body.niche ? String(body.niche) : undefined,
           limit: typeof body.limit === "number" ? body.limit : Number(body.limit) || 20,
         });
-        return Response.json(result, {
-          status: result.ok ? 200 : 502,
-          headers: cors,
-        });
+
+        // Persist real ads to Supabase (upsert by ad_library_id)
+        let saved = 0;
+        if (result.ok && result.ads.length) {
+          try {
+            const rows = result.ads.map((a) => ({
+              ad_library_id: a.adLibraryId ?? null,
+              ad_url: a.adUrl ?? null,
+              advertiser: a.advertiser,
+              headline: a.headline,
+              copy: a.copy,
+              cta: a.cta ?? null,
+              image_url: a.imageUrl ?? null,
+              video_url: a.videoUrl ?? null,
+              creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
+              platform: a.platform,
+              country: a.country,
+              niche: a.niche,
+              keyword,
+              score: a.score,
+              source: "collector",
+            }));
+            const withId = rows.filter((r) => r.ad_library_id);
+            const withoutId = rows.filter((r) => !r.ad_library_id);
+            if (withId.length) {
+              const { error, count } = await supabaseAdmin
+                .from("collected_ads")
+                .upsert(withId, { onConflict: "ad_library_id", count: "exact" });
+              if (error) console.error("[collector] upsert error:", error.message);
+              else saved += count ?? withId.length;
+            }
+            if (withoutId.length) {
+              const { error, count } = await supabaseAdmin
+                .from("collected_ads")
+                .insert(withoutId, { count: "exact" });
+              if (error) console.error("[collector] insert error:", error.message);
+              else saved += count ?? withoutId.length;
+            }
+          } catch (e) {
+            console.error("[collector] persistence failed:", e);
+          }
+        }
+
+        return Response.json(
+          { ...result, saved },
+          { status: result.ok ? 200 : 502, headers: cors },
+        );
       },
     },
   },

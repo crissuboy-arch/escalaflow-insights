@@ -18,6 +18,8 @@ import { miningRepo } from "@/lib/mining/repository";
 import { startExtensionBridge, detectExtension, seedDemoAds, insertTestAd } from "@/lib/mining/bridge";
 import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, Radar } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/central-mineracao")({ component: MiningCenterPage });
 
@@ -29,8 +31,81 @@ function MiningCenterPage() {
   const [country, setCountry] = useState("all");
   const [status, setStatus] = useState<MiningStatus | "all">("all");
   const [favOnly, setFavOnly] = useState(false);
+  const [mining, setMining] = useState(false);
+  const [keyword, setKeyword] = useState("");
 
-  const refresh = async () => setAds(await miningRepo.list());
+  const refresh = async () => {
+    const local = await miningRepo.list();
+    let remote: MinedAd[] = [];
+    try {
+      const { data } = await supabase
+        .from("collected_ads")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      remote = (data ?? []).map((r) => ({
+        id: `db_${r.id}`,
+        headline: r.headline ?? "",
+        copy: r.copy ?? "",
+        platform: r.platform ?? "Facebook",
+        country: r.country ?? "—",
+        niche: r.niche ?? "Geral",
+        score: r.score ?? 0,
+        adUrl: r.ad_url,
+        analysisType: "manual",
+        creativeUrl: r.image_url ?? r.video_url ?? null,
+        createdAt: r.created_at,
+        receivedAt: r.created_at,
+        source: "extension",
+        status: (r.status ?? "new") as MiningStatus,
+        favorite: !!r.favorite,
+        advertiser: r.advertiser,
+        cta: r.cta ?? undefined,
+        adLibraryId: r.ad_library_id ?? undefined,
+        creativeType: r.creative_type ?? undefined,
+        tags: [],
+      }));
+    } catch (e) {
+      console.warn("[central] supabase fetch failed", e);
+    }
+    // dedup local + remote by adLibraryId/adUrl
+    const seen = new Set<string>();
+    const merged = [...remote, ...local].filter((a) => {
+      const k = a.adLibraryId || a.adUrl || a.id;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    setAds(merged);
+  };
+
+  const onMineNow = async () => {
+    const kw = keyword.trim();
+    if (!kw) {
+      toast.error("Digite uma palavra-chave para minerar.");
+      return;
+    }
+    setMining(true);
+    try {
+      const res = await fetch("/api/collector/run", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          keyword: kw,
+          country: country === "all" ? undefined : country,
+          limit: 30,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
+      toast.success(`Mineração concluída — ${data.count} anúncios (${data.saved ?? 0} salvos)`);
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha na mineração");
+    } finally {
+      setMining(false);
+    }
+  };
 
   useEffect(() => {
     refresh();
@@ -109,6 +184,16 @@ function MiningCenterPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ConnectionPill connected={extensionConnected} />
+          <Input
+            placeholder="palavra-chave"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            className="h-9 w-44"
+          />
+          <Button onClick={onMineNow} disabled={mining} className="text-white" style={{ background: "var(--gradient-primary)" }}>
+            {mining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Radar className="mr-2 h-4 w-4" />}
+            Minerar Agora
+          </Button>
           <Button
             variant="outline"
             size="sm"
