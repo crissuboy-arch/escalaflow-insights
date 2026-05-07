@@ -135,7 +135,7 @@ function ScaledPage() {
         scaled: arr.some((x) => x.scaled),
         repeatedCreativeCount: Math.max(arr.length, ...arr.map((x) => x.repeatedCreativeCount ?? 0)),
       };
-      if (item.scaled || item.score >= 80 || item.repeatedCreativeCount > 1 || item.platforms.length > 1) out.push(item);
+      if (item.scaled || item.score >= 80 || (item.repeatedCreativeCount ?? 0) > 1 || item.platforms.length > 1) out.push(item);
     }
     return out.sort((a, b) => b.score - a.score || b.count - a.count);
   }, [rows]);
