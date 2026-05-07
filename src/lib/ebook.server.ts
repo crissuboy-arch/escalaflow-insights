@@ -39,14 +39,20 @@ function getKey() {
 }
 
 async function aiChat(body: Record<string, unknown>): Promise<unknown> {
+  const key = getKey();
+  const model = (body as { model?: string }).model;
+  console.log(
+    `[ebook.ai] gateway call model=${model ?? "?"} hasKey=${Boolean(key)} keyLen=${key?.length ?? 0}`,
+  );
   const res = await fetch(GATEWAY_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${getKey()}`,
+      Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
+  console.log(`[ebook.ai] gateway response status=${res.status}`);
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     if (res.status === 429) throw new Error("Limite de IA atingido. Tente novamente em alguns segundos.");
