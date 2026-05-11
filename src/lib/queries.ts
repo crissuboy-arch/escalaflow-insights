@@ -394,48 +394,44 @@ export async function fetchOffers(filters?: {
 }
 
 export async function fetchSaved(_userId: string) {
-  const saved = readSet(SAVED_KEY);
-  return DEMO_OFFERS.filter((o) => saved.has(o.id)).map((o) => ({
-    mined_offers: o,
-    offer_id: o.id,
-  }));
+  const list = await fetchSavedAds();
+  return list.map((a) => ({ mined_offers: a, offer_id: a.key }));
 }
 
-export async function fetchSavedIds(_userId: string): Promise<Set<string>> {
-  return readSet(SAVED_KEY);
+export async function fetchSavedIds(_userId?: string): Promise<Set<string>> {
+  if (_saved.size === 0) await fetchSavedAds();
+  return new Set(_saved.keys());
 }
 
 export async function fetchFavorites(_userId: string) {
-  const favs = readSet(FAV_KEY);
-  return DEMO_OFFERS.filter((o) => favs.has(o.id)).map((o) => ({
-    mined_offers: o,
-    offer_id: o.id,
-  }));
+  const list = await fetchFavoriteAds();
+  return list.map((a) => ({ mined_offers: a, offer_id: a.key }));
 }
 
 export async function fetchFavIds(_userId?: string): Promise<Set<string>> {
-  return readSet(FAV_KEY);
+  if (_fav.size === 0) await fetchFavoriteAds();
+  return new Set(_fav.keys());
 }
 
 export function getFavCount(): number {
-  return readSet(FAV_KEY).size;
+  return _fav.size;
 }
 
+// Legacy: demo offer toggles. These now no-op in persistence and just
+// toggle locally for the demo dashboard. Real ads use saveCollectedAd().
+const _demoSaved = new Set<string>();
+const _demoFav = new Set<string>();
 export async function toggleSaveOffer(_userId: string, offerId: string): Promise<boolean> {
-  const s = readSet(SAVED_KEY);
-  const isSaved = s.has(offerId);
-  if (isSaved) s.delete(offerId);
-  else s.add(offerId);
-  writeSet(SAVED_KEY, s);
+  const isSaved = _demoSaved.has(offerId);
+  if (isSaved) _demoSaved.delete(offerId);
+  else _demoSaved.add(offerId);
   emitChange("saved");
   return !isSaved;
 }
 
 export async function toggleFavorite(_userId: string, offerId: string, value: boolean) {
-  const f = readSet(FAV_KEY);
-  if (value) f.add(offerId);
-  else f.delete(offerId);
-  writeSet(FAV_KEY, f);
+  if (value) _demoFav.add(offerId);
+  else _demoFav.delete(offerId);
   emitChange("fav");
 }
 
