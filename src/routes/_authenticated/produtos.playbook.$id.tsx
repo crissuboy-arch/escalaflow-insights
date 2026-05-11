@@ -56,6 +56,7 @@ function PlaybookReaderPage() {
   const load = useServerFn(loadPlaybook);
   const scriptFn = useServerFn(generatePlaybookScript);
   const [pb, setPb] = useState<Playbook | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -64,7 +65,9 @@ function PlaybookReaderPage() {
         const row = (await load({ data: { id } })) as unknown as Playbook;
         setPb(row);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Falha ao carregar");
+        const msg = e instanceof Error ? e.message : "Falha ao carregar";
+        setLoadError(msg);
+        toast.error(msg);
       }
     })();
   }, [id, load]);
@@ -79,6 +82,17 @@ function PlaybookReaderPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [pb]);
 
+  if (loadError) {
+    return (
+      <div className="playbook-surface -m-4 flex min-h-[calc(100vh-3rem)] flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="text-sm text-muted-foreground">{loadError}</p>
+        <Button onClick={() => navigate({ to: "/produtos/playbook" })}>
+          <ChevronLeft className="mr-1 h-4 w-4" /> Voltar à biblioteca
+        </Button>
+      </div>
+    );
+  }
+
   if (!pb) {
     return (
       <div className="playbook-surface -m-4 flex min-h-[calc(100vh-3rem)] items-center justify-center">
@@ -87,7 +101,9 @@ function PlaybookReaderPage() {
     );
   }
 
-  const scenes = (pb.scenes ?? []).slice().sort((a, b) => a.order - b.order);
+  const scenes = (Array.isArray(pb.scenes) ? pb.scenes : [])
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const scene = scenes[idx];
 
   const exportPdf = async () => {
