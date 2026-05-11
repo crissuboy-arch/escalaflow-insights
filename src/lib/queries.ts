@@ -216,12 +216,7 @@ export const DEMO_ANALYSES: DemoAnalysis[] = DEMO_OFFERS.slice(0, 6).map((o) => 
   mined_offers: { advertiser_name: o.advertiser_name, niche: o.niche, image_url: o.image_url },
 }));
 
-const SAVED_KEY = "escalaflow_saved";
-const FAV_KEY = "escalaflow_favs";
 const ANALYSES_KEY = "escalaflow_analyses";
-const SAVED_ADS_KEY = "escalaflow_saved_ads_v1";
-const FAV_ADS_KEY = "escalaflow_fav_ads_v1";
-const SCALED_ADS_KEY = "escalaflow_scaled_ads_v1";
 const EVT = "escalaflow:change";
 
 function emitChange(scope: "saved" | "fav" | "analyses" | "scaled") {
@@ -236,19 +231,7 @@ export function subscribeChange(cb: (scope: "saved" | "fav" | "analyses" | "scal
   return () => window.removeEventListener(EVT, h);
 }
 
-const readSet = (key: string): Set<string> => {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(key) : null;
-    return new Set(raw ? JSON.parse(raw) : []);
-  } catch {
-    return new Set();
-  }
-};
-const writeSet = (key: string, s: Set<string>) => {
-  if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify([...s]));
-};
-
-// ---------- Real collected-ad persistence (localStorage) ----------
+// ---------- Real collected-ad persistence (Supabase: user_ad_actions) ----------
 export interface PersistedAd {
   key: string;
   ad_library_id: string | null;
@@ -268,18 +251,6 @@ export interface PersistedAd {
   scaled?: boolean;
   repeatedCreativeCount?: number;
   platforms?: string[];
-}
-
-function readAdMap(key: string): Record<string, PersistedAd> {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(key) : null;
-    return raw ? (JSON.parse(raw) as Record<string, PersistedAd>) : {};
-  } catch {
-    return {};
-  }
-}
-function writeAdMap(key: string, m: Record<string, PersistedAd>) {
-  if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(m));
 }
 
 function adInputFromPersisted(ad: PersistedAd) {
