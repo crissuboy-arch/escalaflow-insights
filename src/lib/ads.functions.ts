@@ -109,7 +109,7 @@ export const listAdActions = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    type Row = { created_at: string; ad_id: string; action: string; collected_ads: Record<string, unknown> };
+    type Row = { created_at: string; ad_id: string; action: string; collected_ads: Record<string, unknown> | null };
     let extras: Row[] = [];
     if (data.action === "scaled") {
       // Heuristic: also surface collected_ads with score >= 80
@@ -123,18 +123,24 @@ export const listAdActions = createServerFn({ method: "POST" })
         created_at: c.created_at,
         ad_id: c.id,
         action: "scaled",
-        collected_ads: c as Record<string, unknown>,
+        collected_ads: c as unknown as Record<string, unknown>,
       }));
     }
 
     const seen = new Set<string>();
     const out: Row[] = [];
-    for (const r of [...((rows ?? []) as unknown as Row[]), ...extras]) {
+    const merged = [...((rows ?? []) as unknown as Row[]), ...extras];
+    for (const r of merged) {
       if (!r.ad_id || seen.has(r.ad_id)) continue;
       seen.add(r.ad_id);
       out.push(r);
     }
-    return out;
+    return out as unknown as Array<{
+      created_at: string;
+      ad_id: string;
+      action: string;
+      collected_ads: Record<string, unknown> | null;
+    }>;
   });
 
 export const listAdActionKeys = createServerFn({ method: "GET" })
