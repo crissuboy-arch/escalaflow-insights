@@ -282,80 +282,87 @@ function writeAdMap(key: string, m: Record<string, PersistedAd>) {
   if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(m));
 }
 
+function adInputFromPersisted(ad: PersistedAd) {
+  return {
+    ad_library_id: ad.ad_library_id,
+    ad_url: ad.ad_url,
+    advertiser: ad.advertiser || "Anunciante",
+    headline: ad.headline || "",
+    copy: ad.copy,
+    cta: ad.cta,
+    image_url: ad.image_url,
+    video_url: ad.video_url,
+    platform: ad.platform || "Facebook",
+    country: ad.country || "—",
+    niche: ad.niche || "Geral",
+    score: ad.score ?? 0,
+  };
+}
+
 export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
-  console.log("saving offer", ad);
-  const m = readAdMap(SAVED_ADS_KEY);
-  const existed = !!m[ad.key];
-  if (existed) delete m[ad.key];
-  else m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  writeAdMap(SAVED_ADS_KEY, m);
-  // mirror id-set for legacy callers
-  const s = readSet(SAVED_KEY);
-  if (existed) s.delete(ad.key);
-  else s.add(ad.key);
-  writeSet(SAVED_KEY, s);
+  const existed = _saved.has(ad.key);
+  const next = !existed;
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "saved", value: next } });
+  } catch (e) {
+    console.error("[queries] saveCollectedAd failed", e);
+    throw e;
+  }
+  if (next) _saved.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
+  else _saved.delete(ad.key);
   emitChange("saved");
-  console.log("offer saved", ad.key, !existed);
-  return !existed;
+  return next;
 }
 
 export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Promise<void> {
-  console.log("saving favorite", ad);
-  const m = readAdMap(FAV_ADS_KEY);
-  if (value) m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  else delete m[ad.key];
-  writeAdMap(FAV_ADS_KEY, m);
-  const f = readSet(FAV_KEY);
-  if (value) f.add(ad.key);
-  else f.delete(ad.key);
-  writeSet(FAV_KEY, f);
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "favorite", value } });
+  } catch (e) {
+    console.error("[queries] favoriteCollectedAd failed", e);
+    throw e;
+  }
+  if (value) _fav.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
+  else _fav.delete(ad.key);
   emitChange("fav");
-  console.log("favorite saved", ad.key, value);
+}
+
+export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "scaled", value: true } });
+  } catch (e) {
+    console.error("[queries] scaleCollectedAd failed", e);
+    throw e;
+  }
+  _scaled.set(ad.key, { ...ad, scaled: true, saved_at: new Date().toISOString() });
+  emitChange("scaled");
 }
 
 export async function fetchSavedAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(SAVED_ADS_KEY);
-  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded saved offers", list.length);
+  const list = await fetchActionAds("saved");
+  _saved.clear();
+  list.forEach((a) => _saved.set(a.key, a));
   return list;
 }
 export async function fetchFavoriteAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(FAV_ADS_KEY);
-  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded favorites", list.length);
+  const list = await fetchActionAds("favorite");
+  _fav.clear();
+  list.forEach((a) => _fav.set(a.key, a));
   return list;
 }
-export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
-  console.log("saving scaled", ad);
-  const m = readAdMap(SCALED_ADS_KEY);
-  m[ad.key] = { ...ad, scaled: true, saved_at: new Date().toISOString() };
-  writeAdMap(SCALED_ADS_KEY, m);
-  emitChange("scaled");
-}
 export async function fetchScaledAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(SCALED_ADS_KEY);
-  const list = Object.values(m)
-    .filter(
-      (ad) =>
-        ad.scaled ||
-        ad.score >= 80 ||
-        (ad.repeatedCreativeCount ?? 0) > 1 ||
-        (ad.platforms?.length ?? 1) > 1,
-    )
-    .sort((a, b) => b.score - a.score || b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded scaled offers", list.length);
+  const list = await fetchActionAds("scaled");
+  _scaled.clear();
+  list.forEach((a) => _scaled.set(a.key, a));
   return list;
 }
 export function getSavedCount(): number {
-  return Object.keys(readAdMap(SAVED_ADS_KEY)).length;
+  return _saved.size;
 }
 export function getScaledCount(): number {
-  return Object.keys(readAdMap(SCALED_ADS_KEY)).length;
+  return _scaled.size;
 }
 export function getPersistedAdByKey(key: string): PersistedAd | undefined {
-  return (
-    readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key] ?? readAdMap(SCALED_ADS_KEY)[key]
-  );
+  return _saved.get(key) ?? _fav.get(key) ?? _scaled.get(key);
 }
 
 export async function fetchOffers(filters?: {
