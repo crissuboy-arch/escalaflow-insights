@@ -88,9 +88,9 @@ function PlaybookEditPage() {
   const reorder = (dir: -1 | 1) => {
     const j = sel + dir;
     if (j < 0 || j >= pb.scenes.length) return;
-    const next = pb.scenes.slice();
-    [next[sel], next[j]] = [next[j], next[sel]];
-    next.forEach((s, i) => (s.order = i));
+    const arr = pb.scenes.slice();
+    [arr[sel], arr[j]] = [arr[j], arr[sel]];
+    const next = arr.map((s, i) => ({ ...s, order: i }));
     setPb({ ...pb, scenes: next });
     setSel(j);
   };
@@ -112,8 +112,9 @@ function PlaybookEditPage() {
   };
   const removeScene = () => {
     if (!confirm("Excluir esta cena?")) return;
-    const next = pb.scenes.filter((_, i) => i !== sel);
-    next.forEach((s, i) => (s.order = i));
+    const next = pb.scenes
+      .filter((_, i) => i !== sel)
+      .map((s, i) => ({ ...s, order: i }));
     setPb({ ...pb, scenes: next });
     setSel(Math.max(0, sel - 1));
   };
