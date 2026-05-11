@@ -109,7 +109,8 @@ export const listAdActions = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    let extras: unknown[] = [];
+    type Row = { created_at: string; ad_id: string; action: string; collected_ads: Record<string, unknown> };
+    let extras: Row[] = [];
     if (data.action === "scaled") {
       // Heuristic: also surface collected_ads with score >= 80
       const { data: hot } = await supabaseAdmin
@@ -122,17 +123,13 @@ export const listAdActions = createServerFn({ method: "POST" })
         created_at: c.created_at,
         ad_id: c.id,
         action: "scaled",
-        collected_ads: c,
+        collected_ads: c as Record<string, unknown>,
       }));
     }
 
     const seen = new Set<string>();
-    const out: Array<{ created_at: string; ad_id: string; collected_ads: unknown }> = [];
-    for (const r of [...(rows ?? []), ...extras] as Array<{
-      created_at: string;
-      ad_id: string;
-      collected_ads: unknown;
-    }>) {
+    const out: Row[] = [];
+    for (const r of [...((rows ?? []) as unknown as Row[]), ...extras]) {
       if (!r.ad_id || seen.has(r.ad_id)) continue;
       seen.add(r.ad_id);
       out.push(r);
