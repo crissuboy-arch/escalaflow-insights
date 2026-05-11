@@ -151,6 +151,7 @@ export type Database = {
           created_at: string
           id: string
           layout: string
+          mode: string
           niche: string | null
           outline: Json
           source_ad_key: string | null
@@ -169,6 +170,7 @@ export type Database = {
           created_at?: string
           id?: string
           layout?: string
+          mode?: string
           niche?: string | null
           outline?: Json
           source_ad_key?: string | null
@@ -187,6 +189,7 @@ export type Database = {
           created_at?: string
           id?: string
           layout?: string
+          mode?: string
           niche?: string | null
           outline?: Json
           source_ad_key?: string | null
@@ -369,6 +372,38 @@ export type Database = {
           },
         ]
       }
+      user_ad_actions: {
+        Row: {
+          action: Database["public"]["Enums"]["ad_action"]
+          ad_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["ad_action"]
+          ad_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["ad_action"]
+          ad_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ad_actions_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "collected_ads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -404,6 +439,7 @@ export type Database = {
       }
     }
     Enums: {
+      ad_action: "saved" | "favorite" | "scaled"
       app_role: "admin" | "user"
       offer_status: "teste" | "validando" | "escalando" | "quente"
     }
@@ -533,6 +569,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ad_action: ["saved", "favorite", "scaled"],
       app_role: ["admin", "user"],
       offer_status: ["teste", "validando", "escalando", "quente"],
     },
