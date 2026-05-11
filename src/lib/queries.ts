@@ -1,17 +1,111 @@
-const ANALYZED_ADS_KEY = "escalaflow_analyzed_ads_v1";
+import { supabase } from "@/integrations/supabase/client";
+import { setAdAction } from "@/lib/ads.functions";
+
+// In-memory caches kept in sync with Supabase (user_ad_actions + collected_ads).
+// Per-tab cache; refreshed on initAdActionsCache() and on every action.
+const _saved = new Map<string, PersistedAd>();
+const _fav = new Map<string, PersistedAd>();
+const _scaled = new Map<string, PersistedAd>();
+const _analyzed = new Map<string, PersistedAd>();
+
+function rowToPersisted(row: Record<string, unknown>): PersistedAd {
+  const r = row as {
+    id: string;
+    ad_library_id: string | null;
+    ad_url: string | null;
+    advertiser: string;
+    headline: string;
+    copy: string | null;
+    cta: string | null;
+    image_url: string | null;
+    video_url: string | null;
+    platform: string;
+    country: string;
+    niche: string;
+    score: number;
+    created_at: string;
+  };
+  const key = r.ad_library_id || r.ad_url || r.id;
+  return {
+    key,
+    ad_library_id: r.ad_library_id,
+    ad_url: r.ad_url,
+    advertiser: r.advertiser,
+    headline: r.headline,
+    copy: r.copy,
+    cta: r.cta,
+    image_url: r.image_url,
+    video_url: r.video_url,
+    platform: r.platform,
+    country: r.country,
+    niche: r.niche,
+    score: r.score,
+    created_at: r.created_at,
+    saved_at: new Date().toISOString(),
+  };
+}
+
+async function fetchActionAds(action: "saved" | "favorite" | "scaled"): Promise<PersistedAd[]> {
+  const { data, error } = await supabase
+    .from("user_ad_actions")
+    .select("created_at, collected_ads(*)")
+    .eq("action", action)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[queries] fetchActionAds", action, error);
+    return [];
+  }
+  type Row = { created_at: string; collected_ads: Record<string, unknown> | null };
+  const rows = (data ?? []) as unknown as Row[];
+  const out: PersistedAd[] = [];
+  for (const r of rows) {
+    if (!r.collected_ads) continue;
+    const p = rowToPersisted(r.collected_ads);
+    p.saved_at = r.created_at;
+    out.push(p);
+  }
+  // Heuristic for scaled: also include collected_ads with score >= 80
+  if (action === "scaled") {
+    const { data: hot } = await supabase
+      .from("collected_ads")
+      .select("*")
+      .gte("score", 80)
+      .order("score", { ascending: false })
+      .limit(50);
+    const seen = new Set(out.map((a) => a.key));
+    for (const row of (hot ?? []) as Array<Record<string, unknown>>) {
+      const p = rowToPersisted(row);
+      if (seen.has(p.key)) continue;
+      seen.add(p.key);
+      p.scaled = true;
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+export async function initAdActionsCache(): Promise<void> {
+  const [s, f, sc] = await Promise.all([
+    fetchActionAds("saved"),
+    fetchActionAds("favorite"),
+    fetchActionAds("scaled"),
+  ]);
+  _saved.clear();
+  _fav.clear();
+  _scaled.clear();
+  s.forEach((a) => _saved.set(a.key, a));
+  f.forEach((a) => _fav.set(a.key, a));
+  sc.forEach((a) => _scaled.set(a.key, a));
+  emitChange("saved");
+  emitChange("fav");
+  emitChange("scaled");
+}
 
 export async function rememberAdForAnalysis(ad: PersistedAd): Promise<void> {
-  const m = readAdMap(ANALYZED_ADS_KEY);
-  m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  writeAdMap(ANALYZED_ADS_KEY, m);
+  _analyzed.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
 }
 export function getAnalyzedAdByKey(key: string): PersistedAd | undefined {
-  return (
-    readAdMap(ANALYZED_ADS_KEY)[key] ??
-    readAdMap(SAVED_ADS_KEY)[key] ??
-    readAdMap(FAV_ADS_KEY)[key] ??
-    readAdMap(SCALED_ADS_KEY)[key]
-  );
+  return _analyzed.get(key) ?? _saved.get(key) ?? _fav.get(key) ?? _scaled.get(key);
 }
 // Local demo data — no backend
 export interface DemoOffer {
