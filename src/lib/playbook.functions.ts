@@ -162,18 +162,21 @@ export const loadPlaybook = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: row, error } = await supabase.from("playbooks").select("*").eq("id", data.id).single();
     if (error) throw new Error(error.message);
-    const rawScenes = Array.isArray(row.scenes) ? row.scenes : [];
-    const scenes = rawScenes.map((s: Record<string, unknown>, i: number) => ({
-      id: String(s.id ?? crypto.randomUUID()),
-      order: typeof s.order === "number" ? s.order : i,
-      title: String(s.title ?? `Cena ${i + 1}`),
-      summary: String(s.summary ?? ""),
-      text: String(s.text ?? ""),
-      image_url: (s.image_url as string | null) ?? null,
-      balloons: Array.isArray(s.balloons) ? (s.balloons as string[]) : [],
-      exercise: String(s.exercise ?? ""),
-      practical_action: String(s.practical_action ?? ""),
-    }));
+    const rawScenes = Array.isArray(row.scenes) ? (row.scenes as unknown[]) : [];
+    const scenes = rawScenes.map((raw, i) => {
+      const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+      return {
+        id: String(s.id ?? crypto.randomUUID()),
+        order: typeof s.order === "number" ? s.order : i,
+        title: String(s.title ?? `Cena ${i + 1}`),
+        summary: String(s.summary ?? ""),
+        text: String(s.text ?? ""),
+        image_url: (typeof s.image_url === "string" ? s.image_url : null) as string | null,
+        balloons: Array.isArray(s.balloons) ? (s.balloons as string[]) : [],
+        exercise: String(s.exercise ?? ""),
+        practical_action: String(s.practical_action ?? ""),
+      };
+    });
     return {
       ...row,
       scenes,
