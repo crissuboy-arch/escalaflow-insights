@@ -109,7 +109,8 @@ export const listAdActions = createServerFn({ method: "POST" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
 
-    type Row = { created_at: string; ad_id: string; action: string; collected_ads: Record<string, unknown> | null };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type Row = { created_at: string; ad_id: string; action: string; collected_ads: Record<string, any> | null };
     let extras: Row[] = [];
     if (data.action === "scaled") {
       // Heuristic: also surface collected_ads with score >= 80
@@ -135,12 +136,7 @@ export const listAdActions = createServerFn({ method: "POST" })
       seen.add(r.ad_id);
       out.push(r);
     }
-    return out as unknown as Array<{
-      created_at: string;
-      ad_id: string;
-      action: string;
-      collected_ads: Record<string, unknown> | null;
-    }>;
+    return out;
   });
 
 export const listAdActionKeys = createServerFn({ method: "GET" })
