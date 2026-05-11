@@ -24,17 +24,54 @@ const AdInputSchema = z.object({
 });
 
 const SceneSchema = z.object({
-  id: z.string(),
-  order: z.number(),
-  title: z.string(),
-  summary: z.string().default(""),
-  text: z.string().default(""),
+  id: z.string().min(1).optional(),
+  order: z.number().optional(),
+  title: z.string().optional(),
+  summary: z.string().optional(),
+  text: z.string().optional(),
   image_url: z.string().nullable().optional(),
-  balloons: z.array(z.string()).default([]),
-  exercise: z.string().default(""),
-  practical_action: z.string().default(""),
+  balloons: z.array(z.string()).optional(),
+  exercise: z.string().optional(),
+  practical_action: z.string().optional(),
 });
 export type PlaybookScene = z.infer<typeof SceneSchema>;
+
+function normalizeScenes(input: unknown): Array<{
+  id: string;
+  order: number;
+  title: string;
+  summary: string;
+  text: string;
+  image_url: string | null;
+  balloons: string[];
+  exercise: string;
+  practical_action: string;
+}> {
+  const arr = Array.isArray(input) ? input : [];
+  const mapped = arr.map((raw, i) => {
+    const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const balloons = Array.isArray(s.balloons)
+      ? (s.balloons as unknown[]).map((b) => String(b ?? "").trim()).filter(Boolean)
+      : [];
+    const imageUrl =
+      typeof s.image_url === "string" && s.image_url.trim().length > 0 ? s.image_url.trim() : null;
+    const order = typeof s.order === "number" && Number.isFinite(s.order) ? s.order : i;
+    return {
+      id: typeof s.id === "string" && s.id.length > 0 ? s.id : crypto.randomUUID(),
+      order,
+      title: String(s.title ?? `Cena ${i + 1}`).trim() || `Cena ${i + 1}`,
+      summary: String(s.summary ?? "").trim(),
+      text: String(s.text ?? "").trim(),
+      image_url: imageUrl,
+      balloons,
+      exercise: String(s.exercise ?? "").trim(),
+      practical_action: String(s.practical_action ?? "").trim(),
+    };
+  });
+  // Sort by order then reassign sequential indices
+  mapped.sort((a, b) => a.order - b.order);
+  return mapped.map((s, i) => ({ ...s, order: i }));
+}
 
 const PlaybookPayloadSchema = z.object({
   title: z.string().min(1).max(300),
@@ -112,8 +149,13 @@ export const savePlaybook = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const scenes = normalizeScenes(data.payload.scenes);
+    const cover_url =
+      data.payload.cover_url ?? scenes.find((s) => s.image_url)?.image_url ?? null;
     const row = {
       ...data.payload,
+      scenes,
+      cover_url,
       user_id: userId,
       updated_at: new Date().toISOString(),
     } as never;
@@ -162,21 +204,7 @@ export const loadPlaybook = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: row, error } = await supabase.from("playbooks").select("*").eq("id", data.id).single();
     if (error) throw new Error(error.message);
-    const rawScenes = Array.isArray(row.scenes) ? (row.scenes as unknown[]) : [];
-    const scenes = rawScenes.map((raw, i) => {
-      const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-      return {
-        id: String(s.id ?? crypto.randomUUID()),
-        order: typeof s.order === "number" ? s.order : i,
-        title: String(s.title ?? `Cena ${i + 1}`),
-        summary: String(s.summary ?? ""),
-        text: String(s.text ?? ""),
-        image_url: (typeof s.image_url === "string" ? s.image_url : null) as string | null,
-        balloons: Array.isArray(s.balloons) ? (s.balloons as string[]) : [],
-        exercise: String(s.exercise ?? ""),
-        practical_action: String(s.practical_action ?? ""),
-      };
-    });
+    const scenes = normalizeScenes(row.scenes);
     return {
       ...row,
       scenes,
