@@ -3,20 +3,27 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Loader2, ArrowLeft, ArrowRight, Wand2, Check, Sparkles, ImageIcon } from "lucide-react";
+import { Loader2, ArrowLeft, ArrowRight, Wand2, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { fetchFavoriteAds, fetchSavedAds, fetchScaledAds, type PersistedAd } from "@/lib/queries";
+import {
+  fetchPlaybookAds,
+  buildLocalBriefing,
+  buildLocalOutline,
+  buildLocalSceneText,
+  type PlaybookAd,
+} from "@/lib/playbook/ads-source";
 import {
   extractPlaybookBriefing,
   generatePlaybookOutline,
   generatePlaybookSceneContent,
   generatePlaybookSceneImage,
   savePlaybook,
+  uploadPlaybookImage,
 } from "@/lib/playbook.functions";
 
 export const Route = createFileRoute("/_authenticated/produtos/playbook/novo")({
@@ -49,23 +56,26 @@ function NewPlaybookPage() {
   const sceneFn = useServerFn(generatePlaybookSceneContent);
   const imageFn = useServerFn(generatePlaybookSceneImage);
   const saveFn = useServerFn(savePlaybook);
+  const uploadFn = useServerFn(uploadPlaybookImage);
 
   const [step, setStep] = useState(0);
-  const [ads, setAds] = useState<PersistedAd[]>([]);
-  const [selectedAd, setSelectedAd] = useState<PersistedAd | null>(null);
+  const [ads, setAds] = useState<PlaybookAd[]>([]);
+  const [selectedAd, setSelectedAd] = useState<PlaybookAd | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [sceneCount, setSceneCount] = useState(7);
   const [outline, setOutline] = useState<Outline>([]);
   const [theme, setTheme] = useState<(typeof THEMES)[number]["id"]>("neon-roxo");
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [skipImages, setSkipImages] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [a, b, c] = await Promise.all([fetchScaledAds(), fetchSavedAds(), fetchFavoriteAds()]);
-      const map = new Map<string, PersistedAd>();
-      [...a, ...b, ...c].forEach((x) => map.set(x.key, x));
-      setAds(Array.from(map.values()));
+      try {
+        setAds(await fetchPlaybookAds());
+      } catch (e) {
+        console.warn(e);
+      }
     })();
   }, []);
 
@@ -87,11 +97,17 @@ function NewPlaybookPage() {
   );
 
   const onExtract = async () => {
-    if (!adInput) return;
+    if (!adInput || !selectedAd) return;
     setBusy("Gerando briefing…");
     try {
-      const b = await extractFn({ data: { ad: adInput } });
-      setBriefing(b);
+      try {
+        const b = await extractFn({ data: { ad: adInput } });
+        setBriefing(b);
+      } catch (err) {
+        console.warn("[playbook] briefing fallback", err);
+        setBriefing(buildLocalBriefing(selectedAd));
+        toast.warning("IA indisponível — usei estrutura base. Edite à vontade.");
+      }
       setStep(1);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao gerar briefing");
@@ -104,8 +120,14 @@ function NewPlaybookPage() {
     if (!briefing) return;
     setBusy("Estruturando cenas…");
     try {
-      const o = await outlineFn({ data: { briefing, sceneCount } });
-      setOutline(o);
+      try {
+        const o = await outlineFn({ data: { briefing, sceneCount } });
+        setOutline(o);
+      } catch (err) {
+        console.warn("[playbook] outline fallback", err);
+        setOutline(buildLocalOutline(briefing, sceneCount));
+        toast.warning("IA indisponível — gerei cenas base. Edite o conteúdo.");
+      }
       setStep(2);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao gerar cenas");
@@ -132,13 +154,34 @@ function NewPlaybookPage() {
       }[] = [];
       for (let i = 0; i < outline.length; i++) {
         const s = outline[i];
-        const content = await sceneFn({ data: { briefing, scene: s, index: i, total: outline.length } });
-        let img: string | null = null;
+        let content: { text: string; balloons: string[] };
         try {
-          const r = await imageFn({ data: { briefing, scene: { title: s.title, summary: s.summary }, theme } });
-          img = r.dataUrl;
-        } catch (e) {
-          console.warn("imagem falhou", e);
+          content = await sceneFn({ data: { briefing, scene: s, index: i, total: outline.length } });
+        } catch (err) {
+          console.warn("[playbook] scene content fallback", err);
+          content = buildLocalSceneText(s, briefing);
+        }
+        let img: string | null = null;
+        if (!skipImages) {
+          try {
+            const r = await imageFn({
+              data: { briefing, scene: { title: s.title, summary: s.summary }, theme },
+            });
+            const raw = r.dataUrl;
+            if (raw && raw.startsWith("data:")) {
+              try {
+                const up = await uploadFn({ data: { dataUrl: raw } });
+                img = up.url;
+              } catch (e) {
+                console.warn("[playbook] upload falhou, usando dataUrl", e);
+                img = raw;
+              }
+            } else if (raw) {
+              img = raw;
+            }
+          } catch (e) {
+            console.warn("imagem falhou", e);
+          }
         }
         scenes.push({
           id: crypto.randomUUID(),
@@ -236,6 +279,8 @@ function NewPlaybookPage() {
                 busy={busy}
                 onBack={() => setStep(3)}
                 onGenerate={onGenerate}
+                skipImages={skipImages}
+                setSkipImages={setSkipImages}
               />
             )}
           </CardContent>
@@ -273,9 +318,9 @@ function StepAd({
   onNext,
   busy,
 }: {
-  ads: PersistedAd[];
-  selected: PersistedAd | null;
-  onSelect: (a: PersistedAd) => void;
+  ads: PlaybookAd[];
+  selected: PlaybookAd | null;
+  onSelect: (a: PlaybookAd) => void;
   onNext: () => void;
   busy: string | null;
 }) {
@@ -287,7 +332,7 @@ function StepAd({
       </div>
       {ads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nenhum anúncio salvo. Vá ao minerador, salve/favorite e volte aqui.
+          Nenhum anúncio disponível. Rode uma mineração ou salve anúncios para começar.
         </div>
       ) : (
         <div className="grid max-h-[420px] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
@@ -302,8 +347,8 @@ function StepAd({
               }`}
             >
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-                {ad.image_url && (
-                  <img src={ad.image_url} alt={ad.advertiser} className="h-full w-full object-cover" />
+                {ad.imageUrl && (
+                  <img src={ad.imageUrl} alt={ad.advertiser} className="h-full w-full object-cover" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -474,12 +519,16 @@ function StepGenerate({
   busy,
   onBack,
   onGenerate,
+  skipImages,
+  setSkipImages,
 }: {
   outline: Outline;
   progress: { done: number; total: number };
   busy: string | null;
   onBack: () => void;
   onGenerate: () => void;
+  skipImages: boolean;
+  setSkipImages: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-4 text-center">
@@ -488,6 +537,15 @@ function StepGenerate({
       <p className="text-sm text-muted-foreground">
         Iremos criar texto, balões de insight e imagem para cada uma das {outline.length} cenas.
       </p>
+      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={skipImages}
+          onChange={(e) => setSkipImages(e.target.checked)}
+          className="h-4 w-4 accent-[var(--playbook-neon)]"
+        />
+        Pular geração de imagens (mais rápido)
+      </label>
       {busy && (
         <div className="mx-auto max-w-md">
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -505,7 +563,7 @@ function StepGenerate({
       <div className="flex justify-center gap-3 pt-2">
         <Button variant="outline" onClick={onBack} disabled={!!busy}><ArrowLeft className="mr-1 h-4 w-4" /> Voltar</Button>
         <Button onClick={onGenerate} disabled={!!busy} size="lg" style={{ background: "var(--gradient-playbook)" }} className="text-white shadow-[var(--shadow-neon)]">
-          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           {busy ?? "Gerar playbook completo"}
         </Button>
       </div>

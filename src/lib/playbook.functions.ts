@@ -184,3 +184,24 @@ export const setPlaybookStatus = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+export const uploadPlaybookImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { dataUrl: string; filename?: string }) =>
+    z.object({ dataUrl: z.string().min(20), filename: z.string().optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const m = data.dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+    if (!m) throw new Error("dataUrl inválido");
+    const mime = m[1];
+    const ext = mime.split("/")[1].replace("jpeg", "jpg");
+    const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage
+      .from("playbook-images")
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: pub } = supabase.storage.from("playbook-images").getPublicUrl(path);
+    return { url: pub.publicUrl };
+  });

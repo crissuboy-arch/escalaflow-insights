@@ -1,125 +1,80 @@
-# Módulo Playbook — Experiência interativa em cenas
+## Objetivo
 
-Criar um módulo **novo e independente** em `/produtos/playbook`, sem mexer no Ebook nem no minerador. A experiência é em **cenas** (não PDF-first), com biblioteca, leitor, modo edição e exportações.
+Fazer o módulo Playbook funcionar de ponta a ponta sem mexer no Ebook, Minerador ou Extensão. Foco em destravar fluxo, dados reais e fallbacks robustos.
 
-## 1. Rotas (TanStack Start)
+## Diagnóstico dos problemas atuais
 
-```text
-src/routes/_authenticated/
-  produtos.playbook.tsx              -> Biblioteca (lista de playbooks)
-  produtos.playbook.novo.tsx         -> Wizard de criação
-  produtos.playbook.$id.tsx          -> Leitor (modo leitura)
-  produtos.playbook.$id.editar.tsx   -> Modo edição
-```
+1. **Etapa 1 (escolher anúncio)** usa apenas `fetchSavedAds/fetchFavoriteAds/fetchScaledAds` que leem do `localStorage`. Quem nunca salvou nada vê lista vazia, mesmo com dados reais em `mined_offers` e `collected_ads`.
+2. **Server functions de IA** lançam `Error` quando `LOVABLE_API_KEY` falta, gateway dá 402/429 ou modelo não responde — sem fallback, o wizard trava.
+3. **Imagens remotas (URL http)** entram em `image_url` no DB; o exportador de carrossel usa Canvas e quebra com CORS quando a imagem não tem cabeçalho permissivo. Imagens grandes em `dataUrl` também podem estourar payload do `update` no Supabase.
+4. **Runtime error** `Failed to fetch dynamically imported module: virtual:tanstack-start-client-entry` indica HMR perdido após criação do módulo — restart do dev server resolve.
+5. **Editor**: ao reordenar/excluir, `pb.scenes` muta `s.order` direto no objeto state (mutação) — pode causar render inconsistente.
+6. **Leitor**: chama `loadPlaybook` sem checar se `scenes` veio nulo (ok hoje, mas falta proteção); dropdown export sem feedback quando não há cenas.
 
-Adicionar item "Playbook" no `AppSidebar` ao lado do Ebook.
+## Mudanças propostas
 
-## 2. Biblioteca (`/produtos/playbook`)
+### 1. Fonte de anúncios reais (etapa 1 do wizard)
 
-Grid de cards estilo premium:
-- capa em miniatura (16:9) com borda neon/dourada e glow
-- título forte, nicho como badge
-- contador "N cenas"
-- status: rascunho / publicado
-- ações: **Abrir** (leitor), **Editar**, **Publicar/Despublicar**, **Duplicar**, **Excluir**
-- CTA principal "+ Novo Playbook"
-- estado vazio com ilustração e CTA
+Criar `src/lib/playbook/ads-source.ts` (cliente) que combina, em ordem de preferência:
 
-Visual: fundo dark (gradiente roxo→azul via tokens novos), cards com `--shadow-glow`.
+- `mined_offers` (Supabase, leitura pública autenticada) — fonte principal usada pelo Ebook/Central de Mineração.
+- `collected_ads` (Supabase) — para detalhes de copy/cta quando existirem.
+- `fetchSavedAds/Favorite/Scaled` (localStorage) — apenas como complemento, deduplicado por chave.
 
-## 3. Wizard de criação (`/produtos/playbook/novo`)
+Normalizar para `PlaybookAd { id, advertiser, headline, copy, cta, platform, niche, country, score, imageUrl, videoUrl, adUrl, source }`. Deduplicação por `advertiser+headline`.
 
-Passos:
-1. **Escolher anúncio base** — listar anúncios reais de `mined_offers` + `collected_ads` + favoritos (reutilizar `fetchFavoriteAds/fetchSavedAds/fetchScaledAds`)
-2. **Briefing** — IA extrai: avatar, dor, desejo, promessa, mecanismo único (reutiliza padrão do `aiExtractBriefing`)
-3. **Estrutura em cenas** — IA gera N cenas (5–12) com título, resumo, exercício, ação prática
-4. **Estilo visual** — escolher tema (Neon Roxo, Dourado Editorial, Minimal Dark)
-5. **Gerar playbook** — para cada cena: gera texto longo, balões de insight, e imagem hero via Lovable AI (`google/gemini-2.5-flash-image`)
+`produtos.playbook.novo.tsx` passa a consumir essa função e mostra contador "X anúncios disponíveis". Sem dados reais cai numa tela explicando como minerar (não em mock).
 
-Cada passo salva rascunho automaticamente no Supabase.
+### 2. Server functions resilientes (`src/lib/playbook.server.ts`)
 
-## 4. Leitor (`/produtos/playbook/$id`)
+- Não jogar `Error` cru. Padronizar resposta `{ ok: true, data }` ou `{ ok: false, code: "NO_KEY"|"RATE_LIMIT"|"NO_CREDITS"|"AI_ERROR", message }`.
+- `aiExtractPlaybookBriefing` e `aiGenerateSceneOutline` ganham fallback determinístico: se `code !== ok`, geram briefing/outline a partir do próprio anúncio (regras locais) e marcam `isFallback: true`. Wizard mostra `toast.warning("IA indisponível — gerei estrutura base, edite à vontade")`.
+- `aiGenerateSceneImage` falha de forma branda: retorna `{ dataUrl: null }` em vez de throw. Cena fica com placeholder neon premium (já existe nos componentes).
+- Manter `model: google/gemini-3-flash-preview` (texto) e `google/gemini-3.1-flash-image-preview` (imagem).
 
-Layout cena-a-cena (full-screen-ish):
-- imagem/banner grande no topo
-- título da cena (display font)
-- texto explicativo (coluna legível)
-- balões de destaque flutuantes (insights)
-- seção "Sobre esta etapa" (exercício + ação prática)
-- footer fixo: ◀ Anterior · "Cena 3/10" (com dots) · Próximo ▶
-- atalhos: setas teclado, swipe mobile
-- transições com framer-motion (fade + slide)
-- botão "Editar" e menu "Exportar"
+### 3. Wizard `produtos.playbook.novo.tsx`
 
-## 5. Modo edição (`/produtos/playbook/$id/editar`)
+- Refletir o novo formato `{ ok, data, code }`.
+- Permitir avançar mesmo se a IA falhou (com aviso visível).
+- Botão "Pular geração de imagens" na etapa 4 para criar playbook só com texto (mais rápido).
+- Ao final: salvar via `savePlaybook`, navegar para `/produtos/playbook/$id`.
 
-Split: lista de cenas à esquerda, editor à direita.
-- editar título, texto (textarea/markdown leve), balões (lista editável)
-- trocar imagem (upload ou gerar com IA via prompt)
-- "Regenerar cena" (IA reescreve mantendo briefing)
-- reordenar cenas (drag)
-- "Salvar" + autosave + "Voltar ao leitor"
+### 4. Persistência de imagens (evitar payloads gigantes)
 
-## 6. Exportações
+Quando `imageFn` retorna `dataUrl` base64, fazer upload para o bucket `playbook-images` (já existe e é público) e salvar **apenas a URL pública** em `image_url`. Cria helper `uploadPlaybookImage` em `src/lib/playbook.functions.ts` (server function autenticada que recebe base64, decodifica e usa o supabase do contexto). Mantém compat: se já vier URL http, salva direto.
 
-Menu no leitor:
-- **PDF** — render simples (reaproveita pdf-lib do ebook em arquivo novo `playbook/pdf.ts`)
-- **Carrossel** — PNGs 1080×1350 por cena (canvas server-side ou html2canvas)
-- **Roteiro de vídeo** — IA converte cenas → script com narração + cortes
-- **Apresentação** — HTML standalone (download .html) ou .pptx via pptxgenjs
+### 5. Leitor `produtos.playbook.$id.tsx`
 
-Implementar PDF + Carrossel + Roteiro nesta entrega; "Apresentação" como botão "em breve" se faltar tempo.
+- Guard: se `scenes` vazio, mostrar CTA "Editar playbook" em vez de footer fantasma.
+- Contador "Cena X/Y" também visível em mobile.
+- Botão "Voltar para biblioteca" e "Editar" já existem — só validar.
 
-## 7. Dados (Supabase)
+### 6. Editor `produtos.playbook.$id.editar.tsx`
 
-Migration cria duas tabelas com RLS por `user_id`:
+- Eliminar mutação direta de `s.order` ao reordenar/remover (criar novos objetos com `.map((s,i)=>({...s, order:i}))`).
+- Botão "Adicionar balão" e "Remover balão" individuais (hoje só edita por textarea — manter, mas ok).
+- Validação leve antes de salvar (título não vazio).
 
-**playbooks**
-- id, user_id, title, niche, source_ad_key (text), avatar, promise, unique_mechanism, theme, cover_url, status (`draft|published`), created_at, updated_at
+### 7. Exports (PDF + Carrossel)
 
-**playbook_scenes**
-- id, playbook_id, order_index, title, image_url, text, balloons (jsonb[]), exercise, practical_action, created_at, updated_at
+- PDF: já usa `pdf-lib` + fetch da imagem; ok.
+- Carrossel (Canvas): para evitar CORS com URLs remotas, baixar a imagem via `fetch` em modo blob e desenhar via `createImageBitmap`. Se falhar, desenha gradiente neon com o título.
 
-RLS: select/insert/update/delete `auth.uid() = user_id` (em scenes via join: usar `user_id` denormalizado ou policy com EXISTS).
+### 8. Restart do dev server
 
-Trigger `updated_at` reaproveita `public.set_updated_at()`.
+Após as mudanças (sem instalar nada novo), garantir que o erro `virtual:tanstack-start-client-entry` suma com restart automático do HMR.
 
-## 8. Server functions
+## Arquivos afetados
 
-`src/lib/playbook.functions.ts` + `src/lib/playbook.server.ts`:
-- `extractPlaybookBriefing(ad)`
-- `generatePlaybookOutline(briefing, sceneCount)`
-- `generateSceneContent(briefing, scene, index, total)` → texto + balões
-- `generateSceneImage(briefing, scene, theme)` → data URL (upload p/ bucket `playbook-images`)
-- `generateScript(playbook)` → roteiro de vídeo
-- CRUD: `listPlaybooks`, `loadPlaybook`, `savePlaybook`, `saveScene`, `reorderScenes`, `deletePlaybook`, `publishPlaybook`
+- **Novo**: `src/lib/playbook/ads-source.ts`
+- **Editado**: `src/lib/playbook.server.ts`, `src/lib/playbook.functions.ts`, `src/routes/_authenticated/produtos.playbook.novo.tsx`, `src/routes/_authenticated/produtos.playbook.$id.tsx`, `src/routes/_authenticated/produtos.playbook.$id.editar.tsx`, `src/lib/playbook/carousel.ts`
+- **Não tocar**: módulo Ebook, Minerador, Central de Mineração, extensão.
 
-Todas com `requireSupabaseAuth`. Usa `LOVABLE_API_KEY` (já configurada).
+## Critérios de aceite
 
-## 9. Storage
-
-Novo bucket público `playbook-images` (capa + banners de cena), criado via migration.
-
-## 10. Design tokens
-
-Adicionar em `src/styles.css`:
-- `--playbook-bg`: gradiente roxo→azul escuro
-- `--playbook-neon`: ciano/violeta para bordas
-- `--playbook-gold`: dourado para acentos premium
-- `--shadow-neon`, `--shadow-gold`
-
-Fonte display distinta (ex.: "Space Grotesk" ou "Sora") via Google Fonts no `__root.tsx`, mantendo Inter como body.
-
-## Garantias
-
-- Ebook permanece intocado (nenhum arquivo de `src/lib/ebook*` ou `produtos.ebook.tsx` é editado).
-- Minerador permanece intocado.
-- Sem mocks: anúncios vêm de `mined_offers`/`collected_ads`/`saved_offers` reais; playbook persiste no Supabase.
-- Tipagem estrita, RLS em todas as tabelas, segredos só no server.
-
-## Entrega faseada (sugestão)
-
-Fase 1 (este passo): migration + biblioteca + wizard até "estrutura" + leitor com dados reais + modo edição básico.
-Fase 2: geração de imagens por cena + balões editáveis + exportação PDF/Carrossel/Roteiro.
-
-Confirma para eu implementar a Fase 1?
+- Abrir `/produtos/playbook/novo` lista anúncios reais de `mined_offers` + salvos.
+- Cada botão do fluxo (Gerar briefing, Estruturar cenas, Próximo, Anterior, Salvar, Abrir, Editar, Exportar PDF, Exportar Carrossel, Roteiro) responde sem travar.
+- Se a IA falhar, o wizard continua com estrutura local + toast de aviso.
+- Playbook salvo aparece na biblioteca; leitor abre com cenas e navegação anterior/próximo + contador.
+- Imagens grandes não estouram payload (upload para bucket).
+- Ebook e minerador continuam intactos.

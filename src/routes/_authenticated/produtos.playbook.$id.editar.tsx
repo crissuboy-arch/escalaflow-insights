@@ -13,6 +13,7 @@ import {
   savePlaybook,
   generatePlaybookSceneContent,
   generatePlaybookSceneImage,
+  uploadPlaybookImage,
 } from "@/lib/playbook.functions";
 
 export const Route = createFileRoute("/_authenticated/produtos/playbook/$id/editar")({
@@ -53,6 +54,7 @@ function PlaybookEditPage() {
   const save = useServerFn(savePlaybook);
   const sceneFn = useServerFn(generatePlaybookSceneContent);
   const imageFn = useServerFn(generatePlaybookSceneImage);
+  const uploadFn = useServerFn(uploadPlaybookImage);
 
   const [pb, setPb] = useState<Playbook | null>(null);
   const [sel, setSel] = useState(0);
@@ -88,9 +90,9 @@ function PlaybookEditPage() {
   const reorder = (dir: -1 | 1) => {
     const j = sel + dir;
     if (j < 0 || j >= pb.scenes.length) return;
-    const next = pb.scenes.slice();
-    [next[sel], next[j]] = [next[j], next[sel]];
-    next.forEach((s, i) => (s.order = i));
+    const arr = pb.scenes.slice();
+    [arr[sel], arr[j]] = [arr[j], arr[sel]];
+    const next = arr.map((s, i) => ({ ...s, order: i }));
     setPb({ ...pb, scenes: next });
     setSel(j);
   };
@@ -112,8 +114,9 @@ function PlaybookEditPage() {
   };
   const removeScene = () => {
     if (!confirm("Excluir esta cena?")) return;
-    const next = pb.scenes.filter((_, i) => i !== sel);
-    next.forEach((s, i) => (s.order = i));
+    const next = pb.scenes
+      .filter((_, i) => i !== sel)
+      .map((s, i) => ({ ...s, order: i }));
     setPb({ ...pb, scenes: next });
     setSel(Math.max(0, sel - 1));
   };
@@ -180,7 +183,16 @@ function PlaybookEditPage() {
       const r = await imageFn({
         data: { briefing, scene: { title: scene.title, summary: scene.summary }, theme: pb.theme },
       });
-      updScene({ image_url: r.dataUrl });
+      let url = r.dataUrl;
+      if (url && url.startsWith("data:")) {
+        try {
+          const up = await uploadFn({ data: { dataUrl: url } });
+          url = up.url;
+        } catch (e) {
+          console.warn("[playbook] upload falhou", e);
+        }
+      }
+      updScene({ image_url: url });
       toast.success("Imagem gerada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falhou");
