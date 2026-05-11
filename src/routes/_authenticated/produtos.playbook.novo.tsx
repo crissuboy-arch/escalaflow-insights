@@ -318,9 +318,9 @@ function StepAd({
   onNext,
   busy,
 }: {
-  ads: PersistedAd[];
-  selected: PersistedAd | null;
-  onSelect: (a: PersistedAd) => void;
+  ads: PlaybookAd[];
+  selected: PlaybookAd | null;
+  onSelect: (a: PlaybookAd) => void;
   onNext: () => void;
   busy: string | null;
 }) {
@@ -332,7 +332,7 @@ function StepAd({
       </div>
       {ads.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nenhum anúncio salvo. Vá ao minerador, salve/favorite e volte aqui.
+          Nenhum anúncio disponível. Rode uma mineração ou salve anúncios para começar.
         </div>
       ) : (
         <div className="grid max-h-[420px] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
@@ -347,8 +347,8 @@ function StepAd({
               }`}
             >
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-                {ad.image_url && (
-                  <img src={ad.image_url} alt={ad.advertiser} className="h-full w-full object-cover" />
+                {ad.imageUrl && (
+                  <img src={ad.imageUrl} alt={ad.advertiser} className="h-full w-full object-cover" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
@@ -519,12 +519,16 @@ function StepGenerate({
   busy,
   onBack,
   onGenerate,
+  skipImages,
+  setSkipImages,
 }: {
   outline: Outline;
   progress: { done: number; total: number };
   busy: string | null;
   onBack: () => void;
   onGenerate: () => void;
+  skipImages: boolean;
+  setSkipImages: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-4 text-center">
@@ -533,6 +537,15 @@ function StepGenerate({
       <p className="text-sm text-muted-foreground">
         Iremos criar texto, balões de insight e imagem para cada uma das {outline.length} cenas.
       </p>
+      <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={skipImages}
+          onChange={(e) => setSkipImages(e.target.checked)}
+          className="h-4 w-4 accent-[var(--playbook-neon)]"
+        />
+        Pular geração de imagens (mais rápido)
+      </label>
       {busy && (
         <div className="mx-auto max-w-md">
           <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -550,7 +563,7 @@ function StepGenerate({
       <div className="flex justify-center gap-3 pt-2">
         <Button variant="outline" onClick={onBack} disabled={!!busy}><ArrowLeft className="mr-1 h-4 w-4" /> Voltar</Button>
         <Button onClick={onGenerate} disabled={!!busy} size="lg" style={{ background: "var(--gradient-playbook)" }} className="text-white shadow-[var(--shadow-neon)]">
-          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ImageIcon className="mr-2 h-4 w-4" />}
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           {busy ?? "Gerar playbook completo"}
         </Button>
       </div>
