@@ -183,11 +183,11 @@ function PlaybookEditPage() {
       const r = await imageFn({
         data: { briefing, scene: { title: scene.title, summary: scene.summary }, theme: pb.theme },
       });
-      let url = r.dataUrl;
+      let url: string | null = r.dataUrl ?? null;
       if (url && url.startsWith("data:")) {
         try {
           const up = await uploadFn({ data: { dataUrl: url } });
-          url = up.url;
+          if (up.url) url = up.url;
         } catch (e) {
           console.warn("[playbook] upload falhou", e);
         }

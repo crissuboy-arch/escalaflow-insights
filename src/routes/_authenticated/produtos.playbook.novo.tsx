@@ -171,7 +171,7 @@ function NewPlaybookPage() {
             if (raw && raw.startsWith("data:")) {
               try {
                 const up = await uploadFn({ data: { dataUrl: raw } });
-                img = up.url;
+                img = up.url ?? raw;
               } catch (e) {
                 console.warn("[playbook] upload falhou, usando dataUrl", e);
                 img = raw;

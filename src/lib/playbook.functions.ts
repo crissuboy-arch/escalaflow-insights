@@ -112,7 +112,11 @@ export const savePlaybook = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const row = { ...data.payload, user_id: userId } as never;
+    const row = {
+      ...data.payload,
+      user_id: userId,
+      updated_at: new Date().toISOString(),
+    } as never;
     if (data.id) {
       const { data: out, error } = await supabase
         .from("playbooks")
@@ -158,7 +162,26 @@ export const loadPlaybook = createServerFn({ method: "POST" })
     const { supabase } = context;
     const { data: row, error } = await supabase.from("playbooks").select("*").eq("id", data.id).single();
     if (error) throw new Error(error.message);
-    return row;
+    const rawScenes = Array.isArray(row.scenes) ? (row.scenes as unknown[]) : [];
+    const scenes = rawScenes.map((raw, i) => {
+      const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+      return {
+        id: String(s.id ?? crypto.randomUUID()),
+        order: typeof s.order === "number" ? s.order : i,
+        title: String(s.title ?? `Cena ${i + 1}`),
+        summary: String(s.summary ?? ""),
+        text: String(s.text ?? ""),
+        image_url: (typeof s.image_url === "string" ? s.image_url : null) as string | null,
+        balloons: Array.isArray(s.balloons) ? (s.balloons as string[]) : [],
+        exercise: String(s.exercise ?? ""),
+        practical_action: String(s.practical_action ?? ""),
+      };
+    });
+    return {
+      ...row,
+      scenes,
+      briefing: row.briefing ?? {},
+    };
   });
 
 export const deletePlaybook = createServerFn({ method: "POST" })
@@ -193,7 +216,7 @@ export const uploadPlaybookImage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const m = data.dataUrl.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-    if (!m) throw new Error("dataUrl inválido");
+    if (!m) return { url: null as string | null };
     const mime = m[1];
     const ext = mime.split("/")[1].replace("jpeg", "jpg");
     const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
@@ -203,5 +226,5 @@ export const uploadPlaybookImage = createServerFn({ method: "POST" })
       .upload(path, bytes, { contentType: mime, upsert: false });
     if (error) throw new Error(error.message);
     const { data: pub } = supabase.storage.from("playbook-images").getPublicUrl(path);
-    return { url: pub.publicUrl };
+    return { url: pub.publicUrl as string | null };
   });
