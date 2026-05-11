@@ -24,7 +24,13 @@ import {
   SidebarMenuItem,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { getFavCount, getSavedCount, getScaledCount, subscribeChange } from "@/lib/queries";
+import {
+  getFavCount,
+  getSavedCount,
+  getScaledCount,
+  initAdActionsCache,
+  subscribeChange,
+} from "@/lib/queries";
 
 export function AppSidebar() {
   const { t } = useTranslation();
@@ -38,7 +44,7 @@ export function AppSidebar() {
       setSavedCount(getSavedCount());
       setScaledCount(getScaledCount());
     };
-    sync();
+    initAdActionsCache().finally(sync);
     return subscribeChange(sync);
   }, []);
   const items = [

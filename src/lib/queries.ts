@@ -1,17 +1,111 @@
-const ANALYZED_ADS_KEY = "escalaflow_analyzed_ads_v1";
+import { supabase } from "@/integrations/supabase/client";
+import { setAdAction } from "@/lib/ads.functions";
+
+// In-memory caches kept in sync with Supabase (user_ad_actions + collected_ads).
+// Per-tab cache; refreshed on initAdActionsCache() and on every action.
+const _saved = new Map<string, PersistedAd>();
+const _fav = new Map<string, PersistedAd>();
+const _scaled = new Map<string, PersistedAd>();
+const _analyzed = new Map<string, PersistedAd>();
+
+function rowToPersisted(row: Record<string, unknown>): PersistedAd {
+  const r = row as {
+    id: string;
+    ad_library_id: string | null;
+    ad_url: string | null;
+    advertiser: string;
+    headline: string;
+    copy: string | null;
+    cta: string | null;
+    image_url: string | null;
+    video_url: string | null;
+    platform: string;
+    country: string;
+    niche: string;
+    score: number;
+    created_at: string;
+  };
+  const key = r.ad_library_id || r.ad_url || r.id;
+  return {
+    key,
+    ad_library_id: r.ad_library_id,
+    ad_url: r.ad_url,
+    advertiser: r.advertiser,
+    headline: r.headline,
+    copy: r.copy,
+    cta: r.cta,
+    image_url: r.image_url,
+    video_url: r.video_url,
+    platform: r.platform,
+    country: r.country,
+    niche: r.niche,
+    score: r.score,
+    created_at: r.created_at,
+    saved_at: new Date().toISOString(),
+  };
+}
+
+async function fetchActionAds(action: "saved" | "favorite" | "scaled"): Promise<PersistedAd[]> {
+  const { data, error } = await supabase
+    .from("user_ad_actions")
+    .select("created_at, collected_ads(*)")
+    .eq("action", action)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[queries] fetchActionAds", action, error);
+    return [];
+  }
+  type Row = { created_at: string; collected_ads: Record<string, unknown> | null };
+  const rows = (data ?? []) as unknown as Row[];
+  const out: PersistedAd[] = [];
+  for (const r of rows) {
+    if (!r.collected_ads) continue;
+    const p = rowToPersisted(r.collected_ads);
+    p.saved_at = r.created_at;
+    out.push(p);
+  }
+  // Heuristic for scaled: also include collected_ads with score >= 80
+  if (action === "scaled") {
+    const { data: hot } = await supabase
+      .from("collected_ads")
+      .select("*")
+      .gte("score", 80)
+      .order("score", { ascending: false })
+      .limit(50);
+    const seen = new Set(out.map((a) => a.key));
+    for (const row of (hot ?? []) as Array<Record<string, unknown>>) {
+      const p = rowToPersisted(row);
+      if (seen.has(p.key)) continue;
+      seen.add(p.key);
+      p.scaled = true;
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+export async function initAdActionsCache(): Promise<void> {
+  const [s, f, sc] = await Promise.all([
+    fetchActionAds("saved"),
+    fetchActionAds("favorite"),
+    fetchActionAds("scaled"),
+  ]);
+  _saved.clear();
+  _fav.clear();
+  _scaled.clear();
+  s.forEach((a) => _saved.set(a.key, a));
+  f.forEach((a) => _fav.set(a.key, a));
+  sc.forEach((a) => _scaled.set(a.key, a));
+  emitChange("saved");
+  emitChange("fav");
+  emitChange("scaled");
+}
 
 export async function rememberAdForAnalysis(ad: PersistedAd): Promise<void> {
-  const m = readAdMap(ANALYZED_ADS_KEY);
-  m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  writeAdMap(ANALYZED_ADS_KEY, m);
+  _analyzed.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
 }
 export function getAnalyzedAdByKey(key: string): PersistedAd | undefined {
-  return (
-    readAdMap(ANALYZED_ADS_KEY)[key] ??
-    readAdMap(SAVED_ADS_KEY)[key] ??
-    readAdMap(FAV_ADS_KEY)[key] ??
-    readAdMap(SCALED_ADS_KEY)[key]
-  );
+  return _analyzed.get(key) ?? _saved.get(key) ?? _fav.get(key) ?? _scaled.get(key);
 }
 // Local demo data — no backend
 export interface DemoOffer {
@@ -122,12 +216,7 @@ export const DEMO_ANALYSES: DemoAnalysis[] = DEMO_OFFERS.slice(0, 6).map((o) => 
   mined_offers: { advertiser_name: o.advertiser_name, niche: o.niche, image_url: o.image_url },
 }));
 
-const SAVED_KEY = "escalaflow_saved";
-const FAV_KEY = "escalaflow_favs";
 const ANALYSES_KEY = "escalaflow_analyses";
-const SAVED_ADS_KEY = "escalaflow_saved_ads_v1";
-const FAV_ADS_KEY = "escalaflow_fav_ads_v1";
-const SCALED_ADS_KEY = "escalaflow_scaled_ads_v1";
 const EVT = "escalaflow:change";
 
 function emitChange(scope: "saved" | "fav" | "analyses" | "scaled") {
@@ -142,19 +231,7 @@ export function subscribeChange(cb: (scope: "saved" | "fav" | "analyses" | "scal
   return () => window.removeEventListener(EVT, h);
 }
 
-const readSet = (key: string): Set<string> => {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(key) : null;
-    return new Set(raw ? JSON.parse(raw) : []);
-  } catch {
-    return new Set();
-  }
-};
-const writeSet = (key: string, s: Set<string>) => {
-  if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify([...s]));
-};
-
-// ---------- Real collected-ad persistence (localStorage) ----------
+// ---------- Real collected-ad persistence (Supabase: user_ad_actions) ----------
 export interface PersistedAd {
   key: string;
   ad_library_id: string | null;
@@ -176,92 +253,87 @@ export interface PersistedAd {
   platforms?: string[];
 }
 
-function readAdMap(key: string): Record<string, PersistedAd> {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(key) : null;
-    return raw ? (JSON.parse(raw) as Record<string, PersistedAd>) : {};
-  } catch {
-    return {};
-  }
-}
-function writeAdMap(key: string, m: Record<string, PersistedAd>) {
-  if (typeof window !== "undefined") localStorage.setItem(key, JSON.stringify(m));
+function adInputFromPersisted(ad: PersistedAd) {
+  return {
+    ad_library_id: ad.ad_library_id,
+    ad_url: ad.ad_url,
+    advertiser: ad.advertiser || "Anunciante",
+    headline: ad.headline || "",
+    copy: ad.copy,
+    cta: ad.cta,
+    image_url: ad.image_url,
+    video_url: ad.video_url,
+    platform: ad.platform || "Facebook",
+    country: ad.country || "—",
+    niche: ad.niche || "Geral",
+    score: ad.score ?? 0,
+  };
 }
 
 export async function saveCollectedAd(ad: PersistedAd): Promise<boolean> {
-  console.log("saving offer", ad);
-  const m = readAdMap(SAVED_ADS_KEY);
-  const existed = !!m[ad.key];
-  if (existed) delete m[ad.key];
-  else m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  writeAdMap(SAVED_ADS_KEY, m);
-  // mirror id-set for legacy callers
-  const s = readSet(SAVED_KEY);
-  if (existed) s.delete(ad.key);
-  else s.add(ad.key);
-  writeSet(SAVED_KEY, s);
+  const existed = _saved.has(ad.key);
+  const next = !existed;
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "saved", value: next } });
+  } catch (e) {
+    console.error("[queries] saveCollectedAd failed", e);
+    throw e;
+  }
+  if (next) _saved.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
+  else _saved.delete(ad.key);
   emitChange("saved");
-  console.log("offer saved", ad.key, !existed);
-  return !existed;
+  return next;
 }
 
 export async function favoriteCollectedAd(ad: PersistedAd, value: boolean): Promise<void> {
-  console.log("saving favorite", ad);
-  const m = readAdMap(FAV_ADS_KEY);
-  if (value) m[ad.key] = { ...ad, saved_at: new Date().toISOString() };
-  else delete m[ad.key];
-  writeAdMap(FAV_ADS_KEY, m);
-  const f = readSet(FAV_KEY);
-  if (value) f.add(ad.key);
-  else f.delete(ad.key);
-  writeSet(FAV_KEY, f);
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "favorite", value } });
+  } catch (e) {
+    console.error("[queries] favoriteCollectedAd failed", e);
+    throw e;
+  }
+  if (value) _fav.set(ad.key, { ...ad, saved_at: new Date().toISOString() });
+  else _fav.delete(ad.key);
   emitChange("fav");
-  console.log("favorite saved", ad.key, value);
+}
+
+export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
+  try {
+    await setAdAction({ data: { ad: adInputFromPersisted(ad), action: "scaled", value: true } });
+  } catch (e) {
+    console.error("[queries] scaleCollectedAd failed", e);
+    throw e;
+  }
+  _scaled.set(ad.key, { ...ad, scaled: true, saved_at: new Date().toISOString() });
+  emitChange("scaled");
 }
 
 export async function fetchSavedAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(SAVED_ADS_KEY);
-  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded saved offers", list.length);
+  const list = await fetchActionAds("saved");
+  _saved.clear();
+  list.forEach((a) => _saved.set(a.key, a));
   return list;
 }
 export async function fetchFavoriteAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(FAV_ADS_KEY);
-  const list = Object.values(m).sort((a, b) => b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded favorites", list.length);
+  const list = await fetchActionAds("favorite");
+  _fav.clear();
+  list.forEach((a) => _fav.set(a.key, a));
   return list;
 }
-export async function scaleCollectedAd(ad: PersistedAd): Promise<void> {
-  console.log("saving scaled", ad);
-  const m = readAdMap(SCALED_ADS_KEY);
-  m[ad.key] = { ...ad, scaled: true, saved_at: new Date().toISOString() };
-  writeAdMap(SCALED_ADS_KEY, m);
-  emitChange("scaled");
-}
 export async function fetchScaledAds(): Promise<PersistedAd[]> {
-  const m = readAdMap(SCALED_ADS_KEY);
-  const list = Object.values(m)
-    .filter(
-      (ad) =>
-        ad.scaled ||
-        ad.score >= 80 ||
-        (ad.repeatedCreativeCount ?? 0) > 1 ||
-        (ad.platforms?.length ?? 1) > 1,
-    )
-    .sort((a, b) => b.score - a.score || b.saved_at.localeCompare(a.saved_at));
-  console.log("loaded scaled offers", list.length);
+  const list = await fetchActionAds("scaled");
+  _scaled.clear();
+  list.forEach((a) => _scaled.set(a.key, a));
   return list;
 }
 export function getSavedCount(): number {
-  return Object.keys(readAdMap(SAVED_ADS_KEY)).length;
+  return _saved.size;
 }
 export function getScaledCount(): number {
-  return Object.keys(readAdMap(SCALED_ADS_KEY)).length;
+  return _scaled.size;
 }
 export function getPersistedAdByKey(key: string): PersistedAd | undefined {
-  return (
-    readAdMap(SAVED_ADS_KEY)[key] ?? readAdMap(FAV_ADS_KEY)[key] ?? readAdMap(SCALED_ADS_KEY)[key]
-  );
+  return _saved.get(key) ?? _fav.get(key) ?? _scaled.get(key);
 }
 
 export async function fetchOffers(filters?: {
@@ -293,48 +365,44 @@ export async function fetchOffers(filters?: {
 }
 
 export async function fetchSaved(_userId: string) {
-  const saved = readSet(SAVED_KEY);
-  return DEMO_OFFERS.filter((o) => saved.has(o.id)).map((o) => ({
-    mined_offers: o,
-    offer_id: o.id,
-  }));
+  const list = await fetchSavedAds();
+  return list.map((a) => ({ mined_offers: a, offer_id: a.key }));
 }
 
-export async function fetchSavedIds(_userId: string): Promise<Set<string>> {
-  return readSet(SAVED_KEY);
+export async function fetchSavedIds(_userId?: string): Promise<Set<string>> {
+  if (_saved.size === 0) await fetchSavedAds();
+  return new Set(_saved.keys());
 }
 
 export async function fetchFavorites(_userId: string) {
-  const favs = readSet(FAV_KEY);
-  return DEMO_OFFERS.filter((o) => favs.has(o.id)).map((o) => ({
-    mined_offers: o,
-    offer_id: o.id,
-  }));
+  const list = await fetchFavoriteAds();
+  return list.map((a) => ({ mined_offers: a, offer_id: a.key }));
 }
 
 export async function fetchFavIds(_userId?: string): Promise<Set<string>> {
-  return readSet(FAV_KEY);
+  if (_fav.size === 0) await fetchFavoriteAds();
+  return new Set(_fav.keys());
 }
 
 export function getFavCount(): number {
-  return readSet(FAV_KEY).size;
+  return _fav.size;
 }
 
+// Legacy: demo offer toggles. These now no-op in persistence and just
+// toggle locally for the demo dashboard. Real ads use saveCollectedAd().
+const _demoSaved = new Set<string>();
+const _demoFav = new Set<string>();
 export async function toggleSaveOffer(_userId: string, offerId: string): Promise<boolean> {
-  const s = readSet(SAVED_KEY);
-  const isSaved = s.has(offerId);
-  if (isSaved) s.delete(offerId);
-  else s.add(offerId);
-  writeSet(SAVED_KEY, s);
+  const isSaved = _demoSaved.has(offerId);
+  if (isSaved) _demoSaved.delete(offerId);
+  else _demoSaved.add(offerId);
   emitChange("saved");
   return !isSaved;
 }
 
 export async function toggleFavorite(_userId: string, offerId: string, value: boolean) {
-  const f = readSet(FAV_KEY);
-  if (value) f.add(offerId);
-  else f.delete(offerId);
-  writeSet(FAV_KEY, f);
+  if (value) _demoFav.add(offerId);
+  else _demoFav.delete(offerId);
   emitChange("fav");
 }
 
