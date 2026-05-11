@@ -19,7 +19,18 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return out;
 }
 
-async function loadImg(url: string): Promise<HTMLImageElement | null> {
+async function loadImg(url: string): Promise<ImageBitmap | HTMLImageElement | null> {
+  // Try fetch + createImageBitmap (handles CORS/blob safely)
+  try {
+    const r = await fetch(url, { mode: "cors" });
+    if (r.ok) {
+      const blob = await r.blob();
+      return await createImageBitmap(blob);
+    }
+  } catch {
+    /* fallthrough */
+  }
+  // Fallback to Image element with crossOrigin (works for data: URLs)
   return new Promise((res) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
