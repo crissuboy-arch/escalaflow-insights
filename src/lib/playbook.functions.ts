@@ -7,6 +7,7 @@ import {
   aiGenerateSceneContent,
   aiGenerateSceneImage,
   aiGenerateVideoScript,
+  aiGeneratePlaybookStrategy,
   PlaybookBriefingSchema,
   SceneOutlineSchema,
   type PlaybookBriefing,
@@ -255,4 +256,38 @@ export const uploadPlaybookImage = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const { data: pub } = supabase.storage.from("playbook-images").getPublicUrl(path);
     return { url: pub.publicUrl as string | null };
+  });
+
+export const generatePlaybookStrategy = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: row, error } = await supabase
+      .from("playbooks")
+      .select("briefing")
+      .eq("id", data.id)
+      .eq("user_id", userId)
+      .single();
+    if (error) throw new Error(error.message);
+    const existing = (row?.briefing ?? {}) as Record<string, unknown>;
+    const briefing = PlaybookBriefingSchema.parse({
+      title: typeof existing.title === "string" ? existing.title : "Playbook",
+      niche: typeof existing.niche === "string" ? existing.niche : "geral",
+      promise: typeof existing.promise === "string" ? existing.promise : "",
+      avatar: typeof existing.avatar === "string" ? existing.avatar : "",
+      uniqueMechanism:
+        typeof existing.uniqueMechanism === "string" ? existing.uniqueMechanism : "",
+      pains: Array.isArray(existing.pains) ? (existing.pains as string[]) : [],
+      desires: Array.isArray(existing.desires) ? (existing.desires as string[]) : [],
+    });
+    const strategy = await aiGeneratePlaybookStrategy(briefing);
+    const merged = { ...existing, strategy };
+    const { error: upErr } = await supabase
+      .from("playbooks")
+      .update({ briefing: merged as never, updated_at: new Date().toISOString() } as never)
+      .eq("id", data.id)
+      .eq("user_id", userId);
+    if (upErr) throw new Error(upErr.message);
+    return { strategy };
   });

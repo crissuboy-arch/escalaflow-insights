@@ -167,11 +167,25 @@ export const updateProject = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: PatchSchema }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { supabase, userId } = context;
+    const patch = { ...data.patch } as Record<string, unknown>;
+    // Merge meta in-place to avoid overwriting fields written by other modules
+    // (copy, sales-page, creatives all persist into projects.meta).
+    if (patch.meta && typeof patch.meta === "object") {
+      const { data: row } = await supabase
+        .from("projects")
+        .select("meta")
+        .eq("id", data.id)
+        .eq("user_id", userId)
+        .single();
+      const existing = (row?.meta ?? {}) as Record<string, unknown>;
+      patch.meta = { ...existing, ...(patch.meta as Record<string, unknown>) };
+    }
+    const { error } = await supabase
       .from("projects")
-      .update(data.patch as never)
+      .update({ ...patch, updated_at: new Date().toISOString() } as never)
       .eq("id", data.id)
-      .eq("user_id", context.userId);
+      .eq("user_id", userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

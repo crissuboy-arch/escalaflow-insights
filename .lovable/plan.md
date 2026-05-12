@@ -1,121 +1,63 @@
-# Página de Venda + Criativos — geradores completos
+# Fase 1 — Correções Críticas EscalaFlow
 
-Implementar dois módulos no padrão dual-mode já estabelecido (`DualModeHub` + `StandaloneBriefingForm` + server fn discriminada `kind: project | standalone`).
+Foco: deixar a esteira atual estável **sem adicionar módulos novos**. Nada de tocar em ebook avançado, criativos 40 formatos, upload de PDF, escala ou auth-roles agora — esses entram nas próximas fases.
 
----
+## 1. Playbook (prioridade #1)
 
-## 1. Página de Venda — Gerador Mestre (projeto + avulso)
+Sintomas reportados: botão gerar não responde, abrir em nova aba quebra, exportar não funciona, geração trava.
 
-### 1.1 Server
-- `src/lib/sales-page.server.ts`
-  - Reusa o helper `aiChat` (mesmo pattern de `copy.server.ts`).
-  - `SalesPageSchema` (zod) com blocos: hero, headline, subheadline, lead, dor, mecanismo, beneficios[], objecoes[{q,a}], depoimentos[{nome,texto}], oferta, bonus[], garantia, faq[{q,a}], cta, estruturaVisual.
-  - `aiGenerateSalesPage(ctx)` → 1 chamada `google/gemini-3-flash-preview`, `response_format: json_object`.
-  - `buildExternalPrompts(page, ctx)` → devolve `{ lovable, googleAiStudio, v0, claude }` (4 prompts prontos para colar em ferramentas externas; cada um com instruções específicas do destino — Lovable pede React+Tailwind, V0 pede shadcn, Google AI Studio pede HTML+Tailwind único, Claude pede design system descritivo).
+Vou auditar e corrigir nesta ordem:
 
-### 1.2 Server function
-- `src/lib/sales-page.functions.ts`
-  - `generateSalesPage` com `discriminatedUnion("kind")` igual a `copy.functions.ts`:
-    - `kind: "project"` → carrega `projects.briefing` + `projects.meta.copy` (se existir, usa headline/promessa da copy), grava em `projects.meta.salesPage = { page, prompts }`.
-    - `kind: "standalone"` → usa `StandaloneBriefing`, devolve sem persistir.
+1. **`/produtos/playbook/novo`** — verificar o submit do wizard: garantir que `aiExtractPlaybookBriefing` e `aiGenerateSceneOutline` (server fns) sejam invocados via `useServerFn` (não chamada direta) e que erros de IA virem toast em vez de loader infinito.
+2. **`/produtos/playbook/$id`** — garantir loader gateado por `_authenticated` (já está), tratar `notFoundComponent` e `errorComponent`, e trocar qualquer `window.open` quebrado por `<Link to="..." target="_blank">` tipado.
+3. **Geração de cenas** — `aiGenerateSceneContent` e `aiGenerateSceneImage`: capturar `429`/`402` do gateway e mostrar mensagem clara; persistir resultado parcial após cada cena (UPDATE em `playbooks.scenes`) para não perder progresso.
+4. **Exportações** — corrigir export PDF (`src/lib/playbook/pdf.ts`) e adicionar export DOCX usando `docx` (já em uso no ebook). Botão "Copiar conteúdo" copiando markdown completo do playbook.
+5. **Conteúdos faltando do escopo** (Big Idea, Promessa, Mecanismo Único, Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos, Escala) — estender `PlaybookBriefingSchema` no server e o prompt do `aiExtractPlaybookBriefing` para retornar TODOS esses campos em um JSON estruturado, salvos em `playbooks.briefing`. UI nova: aba "Estratégia" no `/produtos/playbook/$id` renderizando cada bloco em `Card` com botão "Copiar".
 
-### 1.3 UI
-- `src/components/pipeline/SalesPageResult.tsx`
-  - Renderiza cada bloco em `Card`s (Hero/Headline → Dor → Mecanismo → Benefícios → Objeções → Prova → Oferta → Bônus → Garantia → FAQ → CTA), cada um com botão `Copiar`.
-  - Seção "Estrutura Visual" em `pre`.
-  - Seção destacada **"Prompts para IA externa"** com 4 botões grandes:
-    - Copiar Prompt Lovable
-    - Copiar Prompt Google AI Studio
-    - Copiar Prompt V0
-    - Copiar Prompt Claude
-  - Botão "Exportar DOCX" usando `docx` (já no projeto via ebook).
-- `src/routes/_authenticated/pagina-venda.tsx`
-  - Substitui `<StandaloneSoon>` por `<StandalonePage />` que monta `StandaloneBriefingForm module="pagina-venda"` + chama `generateSalesPage({ kind:"standalone" })` + renderiza `SalesPageResult`.
-- `src/routes/_authenticated/projetos.$id.tsx`
-  - Aba "Página": botão **"Gerar página com IA"** chama `generateSalesPage({ kind:"project", projectId })` e renderiza o mesmo `SalesPageResult`. Se `meta.salesPage` já existir, mostra resultado salvo + botão "Regenerar".
+## 2. Rotas, Loaders e Botões Mortos
 
----
+Varredura sistemática de `src/routes/_authenticated/*` procurando:
 
-## 2. Criativos & Anúncios — esteira 6 passos (modo avulso)
+- Rotas que usam `useState(true)` para loading sem `finally` → adicionar try/catch/finally.
+- `useQuery` sem `errorComponent`/`notFoundComponent` na rota → adicionar os dois em todas as rotas com loader.
+- Botões `<Button>` sem `onClick` ou com handler vazio → conectar à server fn correta ou remover.
+- `<Link to="...">` apontando para rotas inexistentes → tipar com `routeTree` (já é gerado, vai falhar em build se quebrado) e corrigir destinos.
 
-Modo projeto continua usando o grid atual `PipelineHub` (sem mudança nesta rodada).
+Rotas suspeitas a auditar: `radar`, `central-mineracao`, `analise-ia`, `favoritos`, `ofertas-escaladas`, `escala`, `checkout`, `pagina-venda`, `criativos`, `copy`. As 4 últimas hoje renderizam `StandaloneSoon` em modo avulso — vou manter o placeholder mas garantir que **modo projeto** funciona e o picker de modo não fica preso.
 
-### 2.1 Catálogo
-- `src/lib/ads/catalog.ts`
-  - `PLATFORMS` = TikTok · Instagram · Facebook · Pinterest · Shorts · Marketplace · Amazon · Shopee
-  - `OBJECTIVES` = CTR · Conversão · Viralização · Branding · Remarketing · Escala
-  - `ADS_FORMATS` = 18 itens `{ id, name, description, emocao, anguloPadrao }` (Native Notes, Portal de Notícias, Cupom Fiscal, POV Ebook, Super Headline, Problema vs Solução, Post X, Oferta Direta Mockup, Ebook Promo, Ebook Depoimento, Procura-se, Traço a Lápis, Price Anchor, Before/After, Checklist, Micro Aula, Manchete Jornal, Comparativo Método).
-  - `DIMENSIONS` = ['1:1','4:5','9:16'].
+## 3. Salvar / Recuperar Projeto
 
-### 2.2 Server
-- `src/lib/ads.server.ts` (novo, separado do `ads.functions.ts` existente)
-  - `aiChat` reutilizado.
-  - `CreativeSchema` = `{ hook, headline, cta, copy, visualPrompt, estrutura, emocao, angulo }`.
-  - `aiGenerateCreative({ briefing, platform, objective, formatId, dimension, variation? })` — prompt customizado por formato/plataforma (TikTok = pede ritmo + falas/Cuts; estática = pede composição visual). Retorna 1 criativo.
-  - `aiGenerateCreativeVariations(...)` retorna 3 variações em uma chamada.
+- `src/lib/project.functions.ts`: revisar `saveProject`/`getProject`/`listProjects`. Garantir `updated_at = now()` em todo update e que `meta` (jsonb) faz merge em vez de overwrite (problema comum que apaga `meta.copy` ao salvar `meta.salesPage`).
+- Adicionar autosave no `/projetos/$id` (debounce 1.5s) usando `useMutation` + toast silencioso.
+- Botões: **Duplicar**, **Excluir** (com `AlertDialog` de confirmação), **Exportar** (JSON do projeto) — os dois primeiros já podem existir parcialmente; vou completar.
 
-### 2.3 Server function
-- `src/lib/ads-creative.functions.ts`
-  - `generateCreative` com `discriminatedUnion("kind")` (project | standalone) + `platform`, `objective`, `formatId`, `dimension`.
-    - Modo projeto: lê `projects.meta.copy + briefing` para enriquecer contexto e dá `push` em `projects.meta.creatives[]`.
-    - Modo avulso: só retorna.
-  - `generateCreativeVariations` mesmo input, retorna `creative[]`.
+## 4. Remover Branding Lovable da UI
 
-### 2.4 UI — Stepper
-- `src/components/pipeline/Stepper.tsx` — header com 6 bolinhas + labels, click navega para passos já preenchidos.
-- `src/components/pipeline/CreativeWizard.tsx` (modo avulso):
-  1. **Origem**: já resolvido pelo `ModePicker` do hub — entra direto no passo 2.
-  2. **Plataforma**: grid de cards.
-  3. **Objetivo**: grid.
-  4. **Formato**: grid filtrável (busca + categoria) sobre `ADS_FORMATS`.
-  5. **Briefing**: `StandaloneBriefingForm module="criativos"`.
-  6. **Resultado**: card grande com hook/headline/cta/copy/visualPrompt/estrutura/emoção/ângulo + botões **Gerar variações**, **Favoritar** (localStorage), **Copiar prompt visual**, **Exportar** (txt). Permite voltar para o passo 4 e trocar de formato sem perder briefing.
-- Estado em `useState` com `?step=N&platform=…&objective=…&formatId=…` na URL para sobreviver a refresh (validateSearch).
-- `src/routes/_authenticated/criativos.tsx` — substitui `<StandaloneSoon>` por `<CreativeWizard />`.
+- `src/routes/__root.tsx` linha 43: trocar `twitter:site` de `@Lovable` para `@EscalaFlow`.
+- Remover qualquer footer/watermark Lovable se presente em layouts (varredura `rg "lovable" src/components/`).
+- **Não tocar** em `src/integrations/lovable/index.ts` (auto-gerado, é o auth provider — funcional, não é branding visível).
+- Garantir favicon e título do `<head>` 100% EscalaFlow (já estão).
 
----
+Observação: a marca "lovable.app" no domínio e o badge de publicação são controlados pela plataforma, não por código — a remoção do badge requer plano Pro via `publish_settings` (informo o usuário se relevante, não bloqueio a fase).
 
-## 3. Detalhes técnicos
+## 5. Validação Final da Fase
 
-- **IA**: `google/gemini-3-flash-preview` em ambos, `response_format: json_object`, `temperature: 0.85` para criativos.
-- **Persistência**:
-  - Página/projeto → `projects.meta.salesPage`.
-  - Criativos/projeto → `projects.meta.creatives[]` (append).
-  - Avulso → só localStorage para o briefing; resultados ficam em memória da sessão.
-- **Sem migrations**.
-- **Auth**: `requireSupabaseAuth` em todas as server fns (mesmo no modo avulso).
-- **Tema**: tokens de `src/styles.css`, mesmo glow/glass do hub atual.
-- **Mobile**: stepper colapsa em accordion < md; grids `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`.
-- **Sem quebrar**: `PipelineHub` continua funcionando para o modo projeto dos demais módulos.
+- `bun run build` limpo (sem warnings de rota inexistente).
+- Smoke test manual via `browser--navigate_to_sandbox` em: `/dashboard`, `/projetos`, `/projetos/<id>`, `/produtos/playbook`, `/produtos/playbook/novo`, `/produtos/playbook/<id>`, `/copy`, `/pagina-venda`, `/criativos`, `/checkout`, `/escala`.
+- Verificar console limpo (sem erros vermelhos) e nenhum loader infinito após 10s.
 
----
+## Detalhes técnicos
 
-## 4. Arquivos novos
-```
-src/lib/sales-page.server.ts
-src/lib/sales-page.functions.ts
-src/lib/ads/catalog.ts
-src/lib/ads.server.ts
-src/lib/ads-creative.functions.ts
-src/components/pipeline/SalesPageResult.tsx
-src/components/pipeline/Stepper.tsx
-src/components/pipeline/CreativeWizard.tsx
-src/components/pipeline/CreativeCard.tsx
-```
+- **Não** mexer em: schema do banco (sem migrations nesta fase), `src/integrations/supabase/*`, `src/integrations/lovable/index.ts`, ebook avançado, criativos 40 formatos.
+- **Padrão de erro IA**: todo `handler` que chama `aiChat` envolto em try/catch retornando `{ ok: false, error: string }` discriminado, e a UI mostra `toast.error(error)` em vez de quebrar.
+- **Padrão de server fn**: manter `discriminatedUnion("kind")` projeto/avulso já adotado; nada novo aqui.
 
-## 5. Arquivos editados
-```
-src/routes/_authenticated/pagina-venda.tsx     (StandaloneSoon → StandalonePage)
-src/routes/_authenticated/criativos.tsx        (StandaloneSoon → CreativeWizard)
-src/routes/_authenticated/projetos.$id.tsx     (aba "Página" + aba "Criativos" chamam server fns reais)
-```
+## Fora desta fase (próximas)
 
----
+- Fase 2: Playbook completo "versão longa" e prompt-set externo.
+- Fase 3: Ebook IA premium + upload PDF + análise IA do PDF.
+- Fase 4: Criativos 40 formatos com tooltip e exports externos.
+- Fase 5: Página de Venda 10 dobras + Checkout completo + Escala do Produto.
+- Fase 6: Auth roles admin/user e hardening RLS.
 
-## 6. Ordem de entrega
-
-Tudo nesta rodada:
-1. Página de Venda (server + UI + projeto + avulso + 4 prompts + DOCX).
-2. Criativos esteira 6 passos (catalog + server + wizard + variações).
-
-Confirma para eu seguir?
+Confirma para eu executar a Fase 1?

@@ -14,6 +14,9 @@ import {
   FileText,
   Images,
   Film,
+  Copy,
+  FileType2,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +26,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { loadPlaybook, generatePlaybookScript } from "@/lib/playbook.functions";
+import {
+  loadPlaybook,
+  generatePlaybookScript,
+  generatePlaybookStrategy,
+} from "@/lib/playbook.functions";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/produtos/playbook/$id")({
   component: PlaybookReaderPage,
@@ -55,9 +69,11 @@ function PlaybookReaderPage() {
   const navigate = useNavigate();
   const load = useServerFn(loadPlaybook);
   const scriptFn = useServerFn(generatePlaybookScript);
+  const strategyFn = useServerFn(generatePlaybookStrategy);
   const [pb, setPb] = useState<Playbook | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+  const [generatingStrategy, setGeneratingStrategy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -114,6 +130,56 @@ function PlaybookReaderPage() {
     const { exportPlaybookCarousel } = await import("@/lib/playbook/carousel");
     await exportPlaybookCarousel(pb.title, scenes);
   };
+  const exportDocx = async () => {
+    try {
+      toast.loading("Gerando DOCX…", { id: "docx" });
+      const { exportPlaybookDocx } = await import("@/lib/playbook/docx");
+      await exportPlaybookDocx(pb.title, scenes);
+      toast.success("DOCX baixado", { id: "docx" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falhou", { id: "docx" });
+    }
+  };
+  const copyAll = async () => {
+    const md = [
+      `# ${pb.title}`,
+      pb.niche ? `Nicho: ${pb.niche}\n` : "",
+      ...scenes.map(
+        (s, i) =>
+          `## Cena ${i + 1}: ${s.title}\n\n${s.text}\n\n${
+            s.balloons.length ? s.balloons.map((b) => `- ${b}`).join("\n") + "\n\n" : ""
+          }${s.exercise ? `**Exercício:** ${s.exercise}\n\n` : ""}${
+            s.practical_action ? `**Ação prática:** ${s.practical_action}\n` : ""
+          }`,
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(md);
+      toast.success("Conteúdo copiado");
+    } catch {
+      toast.error("Falha ao copiar");
+    }
+  };
+  const strategy = (pb.briefing as Record<string, unknown>)?.strategy as
+    | Record<string, unknown>
+    | undefined;
+  const onGenerateStrategy = async () => {
+    setGeneratingStrategy(true);
+    try {
+      const r = await strategyFn({ data: { id } });
+      setPb({
+        ...pb,
+        briefing: { ...(pb.briefing as Record<string, unknown>), strategy: r.strategy },
+      });
+      toast.success("Estratégia gerada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar estratégia");
+    } finally {
+      setGeneratingStrategy(false);
+    }
+  };
   const exportScript = async () => {
     try {
       toast.loading("Gerando roteiro…", { id: "script" });
@@ -149,6 +215,49 @@ function PlaybookReaderPage() {
             {pb.niche && <Badge variant="outline" className="text-[10px]">{pb.niche}</Badge>}
           </div>
           <div className="flex gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Wand2 className="mr-1 h-3.5 w-3.5" /> Estratégia
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+                <SheetHeader>
+                  <SheetTitle>Estratégia completa</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  {!strategy ? (
+                    <div className="space-y-4 text-sm text-muted-foreground">
+                      <p>
+                        Gere a estratégia completa: Big Idea, Promessa, Mecanismo,
+                        Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL,
+                        Página, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos e
+                        Plano de Escala.
+                      </p>
+                      <Button
+                        disabled={generatingStrategy}
+                        onClick={onGenerateStrategy}
+                        className="w-full text-white"
+                        style={{ background: "var(--gradient-playbook)" }}
+                      >
+                        {generatingStrategy ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Wand2 className="mr-2 h-4 w-4" />
+                        )}
+                        Gerar estratégia com IA
+                      </Button>
+                    </div>
+                  ) : (
+                    <StrategyView
+                      strategy={strategy}
+                      onRegenerate={onGenerateStrategy}
+                      busy={generatingStrategy}
+                    />
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
             <Button asChild variant="outline" size="sm">
               <Link to="/produtos/playbook/$id/editar" params={{ id }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
@@ -162,8 +271,10 @@ function PlaybookReaderPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={exportPdf}><FileText className="mr-2 h-4 w-4" /> PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportDocx}><FileType2 className="mr-2 h-4 w-4" /> DOCX</DropdownMenuItem>
                 <DropdownMenuItem onClick={exportCarousel}><Images className="mr-2 h-4 w-4" /> Carrossel (PNG)</DropdownMenuItem>
                 <DropdownMenuItem onClick={exportScript}><Film className="mr-2 h-4 w-4" /> Roteiro de vídeo</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyAll}><Copy className="mr-2 h-4 w-4" /> Copiar conteúdo</DropdownMenuItem>
                 <DropdownMenuItem disabled>Apresentação (em breve)</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -266,6 +377,91 @@ function PlaybookReaderPage() {
           </div>
         </footer>
       )}
+    </div>
+  );
+}
+
+function CopyLine({ text }: { text: string }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-[10px]"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          toast.success("Copiado");
+        } catch {
+          toast.error("Falha ao copiar");
+        }
+      }}
+    >
+      <Copy className="mr-1 h-3 w-3" /> Copiar
+    </Button>
+  );
+}
+
+function Block({ title, children, copyText }: { title: string; children: React.ReactNode; copyText: string }) {
+  return (
+    <section className="rounded-xl border border-border/40 bg-card/40 p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--playbook-neon)]">
+          {title}
+        </h4>
+        <CopyLine text={copyText} />
+      </div>
+      <div className="text-sm text-foreground/90">{children}</div>
+    </section>
+  );
+}
+
+function StrategyView({
+  strategy,
+  onRegenerate,
+  busy,
+}: {
+  strategy: Record<string, unknown>;
+  onRegenerate: () => void;
+  busy: boolean;
+}) {
+  const str = (k: string) => (typeof strategy[k] === "string" ? (strategy[k] as string) : "");
+  const arr = (k: string) =>
+    Array.isArray(strategy[k]) ? (strategy[k] as unknown[]).map(String) : [];
+  const list = (items: string[]) => (
+    <ul className="list-disc space-y-1 pl-5">
+      {items.map((it, i) => (
+        <li key={i}>{it}</li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" disabled={busy} onClick={onRegenerate}>
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+          Regenerar
+        </Button>
+      </div>
+      {str("bigIdea") && <Block title="Big Idea" copyText={str("bigIdea")}>{str("bigIdea")}</Block>}
+      {str("promise") && <Block title="Promessa" copyText={str("promise")}>{str("promise")}</Block>}
+      {str("uniqueMechanism") && <Block title="Mecanismo Único" copyText={str("uniqueMechanism")}>{str("uniqueMechanism")}</Block>}
+      {str("avatar") && <Block title="Avatar" copyText={str("avatar")}>{str("avatar")}</Block>}
+      {arr("pains").length > 0 && <Block title="Dores" copyText={arr("pains").join("\n")}>{list(arr("pains"))}</Block>}
+      {arr("desires").length > 0 && <Block title="Desejos" copyText={arr("desires").join("\n")}>{list(arr("desires"))}</Block>}
+      {arr("objections").length > 0 && <Block title="Objeções" copyText={arr("objections").join("\n")}>{list(arr("objections"))}</Block>}
+      {arr("mentalTriggers").length > 0 && <Block title="Gatilhos Mentais" copyText={arr("mentalTriggers").join("\n")}>{list(arr("mentalTriggers"))}</Block>}
+      {arr("headlines").length > 0 && <Block title="Headlines" copyText={arr("headlines").join("\n")}>{list(arr("headlines"))}</Block>}
+      {str("vslStructure") && <Block title="Estrutura VSL" copyText={str("vslStructure")}><pre className="whitespace-pre-wrap text-xs">{str("vslStructure")}</pre></Block>}
+      {str("pageStructure") && <Block title="Estrutura da Página" copyText={str("pageStructure")}><pre className="whitespace-pre-wrap text-xs">{str("pageStructure")}</pre></Block>}
+      {str("funnel") && <Block title="Funil" copyText={str("funnel")}><pre className="whitespace-pre-wrap text-xs">{str("funnel")}</pre></Block>}
+      {str("offer") && <Block title="Oferta" copyText={str("offer")}>{str("offer")}</Block>}
+      {arr("bonuses").length > 0 && <Block title="Bônus" copyText={arr("bonuses").join("\n")}>{list(arr("bonuses"))}</Block>}
+      {str("stack") && <Block title="Stack de Valor" copyText={str("stack")}>{str("stack")}</Block>}
+      {str("cta") && <Block title="CTA" copyText={str("cta")}>{str("cta")}</Block>}
+      {arr("scripts").length > 0 && <Block title="Scripts" copyText={arr("scripts").join("\n\n---\n\n")}>{list(arr("scripts"))}</Block>}
+      {arr("angles").length > 0 && <Block title="Ângulos Criativos" copyText={arr("angles").join("\n")}>{list(arr("angles"))}</Block>}
+      {str("scale") && <Block title="Plano de Escala" copyText={str("scale")}><pre className="whitespace-pre-wrap text-xs">{str("scale")}</pre></Block>}
     </div>
   );
 }
