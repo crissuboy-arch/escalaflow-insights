@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProductIdentity, SizeSpec } from "./ebook/niches";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -163,18 +164,24 @@ export async function aiExtractBriefing(ad: AdInput): Promise<Briefing> {
 export async function aiGenerateOutline(
   briefing: Briefing,
   chapterCount: number,
+  opts?: { identity?: ProductIdentity; tone?: string },
 ): Promise<OutlineChapter[]> {
+  const identity = opts?.identity;
+  const toneHint = opts?.tone ? `Tom: ${opts.tone}.` : "";
+  const identityHint = identity?.author
+    ? `Voz do autor "${identity.author}"${identity.brand ? ` (${identity.brand})` : ""}. ${toneHint}`
+    : toneHint;
   const data = (await aiChat({
     model: "google/gemini-3-flash-preview",
     messages: [
       {
         role: "system",
         content:
-          "Você cria estruturas (sumários) de ebooks vendáveis. Sempre responda via ferramenta `outline`.",
+          "Você cria estruturas (sumários) de ebooks vendáveis com narrativa progressiva (gancho → desenvolvimento → virada → prova → fechamento). Sempre responda via ferramenta `outline`.",
       },
       {
         role: "user",
-        content: `Briefing: ${JSON.stringify(briefing)}\n\nCrie um sumário com EXATAMENTE ${chapterCount} capítulos (sem intro/conclusão separados). Cada capítulo: título curto e 3-5 bullets do que será coberto.`,
+        content: `Briefing: ${JSON.stringify(briefing)}\n\n${identityHint}\nCrie um sumário com EXATAMENTE ${chapterCount} capítulos (sem intro/conclusão separados). Cada capítulo: título curto, magnético (sem números) e 3-5 bullets do que será coberto.`,
       },
     ],
     tools: [
@@ -220,7 +227,28 @@ export async function aiGenerateChapter(
   chapter: OutlineChapter,
   index: number,
   total: number,
+  opts?: { identity?: ProductIdentity; size?: SizeSpec; tone?: string },
 ): Promise<string> {
+  const size = opts?.size;
+  const wordsTarget = size?.wordsPerChapter ?? 800;
+  const extras = size?.extras;
+  const identity = opts?.identity;
+  const toneLine = opts?.tone ? `Tom desejado: ${opts.tone}.` : "";
+  const identityLine = identity?.author
+    ? `Assine a voz como "${identity.author}"${identity.brand ? ` da editora "${identity.brand}"` : ""}. Mantenha consistência ao longo do livro.`
+    : "";
+  const extrasLine = extras
+    ? [
+        extras.storytelling ? "Abra com um mini-storytelling de 1 parágrafo (cena viva, sensorial)." : "",
+        extras.examples ? "Inclua pelo menos 1 bloco `## Exemplo` com caso prático." : "",
+        extras.exercises ? "Inclua 1 bloco `## Exercício` com passo a passo aplicável hoje." : "",
+        extras.faq ? "Inclua 1 bloco `## FAQ` com 2 perguntas frequentes e respostas curtas." : "",
+        extras.bonus ? "Encerre com 1 bloco `## Bônus` (insight extra ou hack)." : "",
+      ]
+        .filter(Boolean)
+        .join("\n- ")
+    : "";
+  const wordsLine = `Escreva entre ${Math.max(400, wordsTarget - 200)} e ${wordsTarget + 200} palavras.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     const data = (await aiChat({
       model: "google/gemini-3-flash-preview",
@@ -228,11 +256,11 @@ export async function aiGenerateChapter(
         {
           role: "system",
           content:
-            "Você escreve capítulos de ebook em Markdown. Tom profissional, parágrafos claros, exemplos práticos, listas quando ajudar. NÃO repita o título do capítulo no corpo. 600-1000 palavras.",
+            "Você é um autor profissional de ebooks vendáveis. Escreva em Markdown com voz humana, frases curtas alternadas com parágrafos médios, storytelling quando pedido. Evite bullets puros — narre. NÃO repita o título do capítulo no corpo. Sempre entregue conteúdo denso, original e útil.",
         },
         {
           role: "user",
-          content: `Briefing: ${JSON.stringify(briefing)}\n\nCapítulo ${index + 1} de ${total}: "${chapter.title}"\nTópicos a cobrir:\n- ${chapter.bullets.join("\n- ")}\n\nEscreva o conteúdo completo do capítulo em Markdown.`,
+          content: `Briefing: ${JSON.stringify(briefing)}\n${identityLine}\n${toneLine}\n\nCapítulo ${index + 1} de ${total}: "${chapter.title}"\nTópicos a cobrir:\n- ${chapter.bullets.join("\n- ")}\n\n${wordsLine}\n${extrasLine ? `Blocos obrigatórios:\n- ${extrasLine}` : ""}\n\nEntregue o capítulo completo em Markdown, com gancho de abertura, desenvolvimento, prova/exemplo, e fechamento que conecta com o próximo capítulo.`,
         },
       ],
     })) as any;
@@ -240,6 +268,65 @@ export async function aiGenerateChapter(
     if (typeof text === "string" && text.trim().length > 80) return text;
   }
   throw new Error("Capítulo vazio após 2 tentativas");
+}
+
+export interface BookExtras {
+  introduction: string;
+  conclusion: string;
+  aboutAuthor: string;
+  bonus: string;
+}
+
+export async function aiGenerateBookExtras(
+  briefing: Briefing,
+  identity?: ProductIdentity,
+): Promise<BookExtras> {
+  const data = (await aiChat({
+    model: "google/gemini-3-flash-preview",
+    messages: [
+      {
+        role: "system",
+        content:
+          "Você escreve seções complementares de ebooks profissionais. Sempre responda via ferramenta `extras`.",
+      },
+      {
+        role: "user",
+        content: `Briefing: ${JSON.stringify(briefing)}\nIdentidade: ${JSON.stringify(identity ?? {})}\n\nGere: introdução (1 página, com gancho), conclusão (1 página, chamando para ação), seção sobre o autor (1 parágrafo), e página de bônus (1 lista de 3 bônus). Markdown.`,
+      },
+    ],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "extras",
+          description: "Seções extras do ebook",
+          parameters: {
+            type: "object",
+            properties: {
+              introduction: { type: "string" },
+              conclusion: { type: "string" },
+              aboutAuthor: { type: "string" },
+              bonus: { type: "string" },
+            },
+            required: ["introduction", "conclusion", "aboutAuthor", "bonus"],
+            additionalProperties: false,
+          },
+        },
+      },
+    ],
+    tool_choice: { type: "function", function: { name: "extras" } },
+  })) as any;
+  const args =
+    data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ??
+    data?.choices?.[0]?.message?.content ??
+    "{}";
+  const parsed = safeParseToolArgs(args) as Partial<BookExtras>;
+  return {
+    introduction: String(parsed.introduction ?? ""),
+    conclusion: String(parsed.conclusion ?? ""),
+    aboutAuthor: String(parsed.aboutAuthor ?? ""),
+    bonus: String(parsed.bonus ?? ""),
+  };
 }
 
 export async function aiGenerateCover(
