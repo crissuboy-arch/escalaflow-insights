@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
@@ -52,6 +53,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
+  id: '/storybook',
+  path: '/storybook',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
   id: '/radar',
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/storybook': typeof AuthenticatedStorybookRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/storybook': typeof AuthenticatedStorybookRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
@@ -232,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
+  '/_authenticated/storybook': typeof AuthenticatedStorybookRoute
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/projetos'
     | '/radar'
+    | '/storybook'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/projetos'
     | '/radar'
+    | '/storybook'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ofertas-salvas'
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
+    | '/_authenticated/storybook'
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
@@ -358,6 +370,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ingest'
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/storybook': {
+      id: '/_authenticated/storybook'
+      path: '/storybook'
+      fullPath: '/storybook'
+      preLoaderRoute: typeof AuthenticatedStorybookRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/radar': {
       id: '/_authenticated/radar'
@@ -561,6 +580,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
+  AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
   AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -579,6 +599,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
+  AuthenticatedStorybookRoute: AuthenticatedStorybookRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
   AuthenticatedProdutosPlaybookRoute:
