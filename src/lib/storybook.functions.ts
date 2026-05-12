@@ -30,7 +30,7 @@ interface StoryMeta {
     badges?: string[];
     author?: string;
   };
-  shorts?: Array<{ chapterId: string; data: unknown }>;
+  shorts?: Array<{ chapterId: string; data: object }>;
   audiobook?: {
     voice?: string;
     speed?: number;
