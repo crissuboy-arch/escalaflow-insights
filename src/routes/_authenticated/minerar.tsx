@@ -509,7 +509,7 @@ function MinePage() {
           </div>
           <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{visibleCollected.length}</span> anúncios coletados
+              <span className="font-semibold text-foreground">{filtered.length}</span> de {visibleCollected.length} anúncios
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
