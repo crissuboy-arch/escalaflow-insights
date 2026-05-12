@@ -13,7 +13,7 @@ import {
   dominantPromises,
 } from "@/lib/mining/radar";
 import type { CollectorAd } from "@/lib/collector/collector.types";
-import { openExternal } from "@/lib/external";
+import { openAdLink } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/radar")({
   component: RadarPage,
@@ -203,12 +203,12 @@ function RadarPage() {
                         variant="ghost"
                         className="shrink-0"
                         onClick={() =>
-                          openExternal(
-                            g.sample.adUrl,
-                            g.sample.adLibraryId
-                              ? `https://www.facebook.com/ads/library/?id=${g.sample.adLibraryId}`
-                              : null,
-                          )
+                          openAdLink({
+                            adUrl: g.sample.adUrl,
+                            adLibraryId: g.sample.adLibraryId,
+                            advertiser: g.sample.advertiser,
+                            headline: g.sample.headline,
+                          })
                         }
                       >
                         <ExternalLink className="h-3.5 w-3.5" />

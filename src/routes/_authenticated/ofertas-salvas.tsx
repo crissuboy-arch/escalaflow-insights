@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search } from "lucide-react";
 import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
-import { openExternal } from "@/lib/external";
+import { openAdLink } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/ofertas-salvas")({ component: SavedPage });
 
@@ -86,10 +86,12 @@ function SavedPage() {
                       size="sm"
                       variant="ghost"
                       className="col-span-2"
-                      onClick={() => openExternal(
-                        a.ad_url,
-                        a.ad_library_id ? `https://www.facebook.com/ads/library/?id=${a.ad_library_id}` : null,
-                      )}
+                      onClick={() => openAdLink({
+                        adUrl: a.ad_url,
+                        adLibraryId: a.ad_library_id,
+                        advertiser: a.advertiser,
+                        headline: a.headline,
+                      })}
                     >
                       <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
                     </Button>

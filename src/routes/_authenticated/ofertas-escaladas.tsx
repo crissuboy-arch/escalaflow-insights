@@ -23,7 +23,7 @@ import {
   subscribeChange,
   type PersistedAd,
 } from "@/lib/queries";
-import { openExternal } from "@/lib/external";
+import { openAdLink } from "@/lib/external";
 
 type Row = {
   id: string;
@@ -214,10 +214,12 @@ function ScaledPage() {
   };
 
   const onOpen = (r: Scaled) => {
-    openExternal(
-      r.ad_url,
-      r.ad_library_id ? `https://www.facebook.com/ads/library/?id=${r.ad_library_id}` : null,
-    );
+    openAdLink({
+      adUrl: r.ad_url,
+      adLibraryId: r.ad_library_id,
+      advertiser: r.advertiser,
+      headline: r.headline,
+    });
   };
 
   return (
