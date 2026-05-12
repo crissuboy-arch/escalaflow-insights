@@ -795,6 +795,11 @@ function EbookPage() {
                 <Wand2 className="mr-2 h-4 w-4" />
                 {chapters.length ? "Regerar capítulos" : "Gerar capítulos completos"}
               </Button>
+              {mode === "premium" && chapters.length > 0 && (
+                <Button onClick={onGenerateAllChapterImages} disabled={!!busy} variant="outline">
+                  <ImageIcon className="mr-2 h-4 w-4" /> Gerar imagens dos capítulos
+                </Button>
+              )}
               <Button
                 onClick={onExport}
                 disabled={!!busy || chapters.length === 0}
@@ -803,7 +808,36 @@ function EbookPage() {
               >
                 <FileDown className="mr-2 h-4 w-4" /> Exportar PDF
               </Button>
+              {mode === "kdp" && (
+                <>
+                  <Button onClick={onExportDocx} disabled={!!busy || chapters.length === 0} variant="outline">
+                    <FileDown className="mr-2 h-4 w-4" /> DOCX
+                  </Button>
+                  <Button onClick={onExportEpub} disabled={!!busy || chapters.length === 0} variant="outline">
+                    <FileDown className="mr-2 h-4 w-4" /> EPUB
+                  </Button>
+                </>
+              )}
             </div>
+            {mode === "premium" && chapters.length > 0 && (
+              <div className="grid gap-2 md:grid-cols-2">
+                {chapters.map((c, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-lg border border-border/60 p-2">
+                    <div className="h-12 w-20 shrink-0 overflow-hidden rounded bg-muted">
+                      {c.imageUrl ? (
+                        <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">sem img</div>
+                      )}
+                    </div>
+                    <p className="line-clamp-2 flex-1 text-xs">{c.title}</p>
+                    <Button size="sm" variant="ghost" onClick={() => onGenerateChapterImage(i)} disabled={imageBusyIndex === i}>
+                      {imageBusyIndex === i ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             {chapters.length > 0 && briefing && (
               <EbookPreview
                 title={briefing.title}
