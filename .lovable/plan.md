@@ -1,118 +1,121 @@
-# Esteira Dual-Mode (Projeto + Produto Avulso)
+# Página de Venda + Criativos — geradores completos
 
-Tornar todos os 5 módulos da esteira (Copy, Criativos, Página, Checkout, Escala) utilizáveis **sem obrigar criação prévia de projeto**, mantendo 100% do fluxo atual baseado em `projects.meta`.
-
----
-
-## 1. Padrão arquitetural
-
-### 1.1 Componente `ModePicker`
-Novo componente reutilizável `src/components/pipeline/ModePicker.tsx` exibido no topo de cada hub:
-- Dois cards grandes: **"Usar Projeto Existente"** vs **"Produto Avulso"**.
-- Estado em URL (`?source=project|standalone`) para sobreviver a refresh.
-- Quando "project": mostra grid atual do `PipelineHub`.
-- Quando "standalone": mostra `StandaloneForm` específico do módulo.
-
-### 1.2 Briefing avulso compartilhado
-Novo `src/lib/standalone/briefing.ts` define o schema mínimo reusado por todos:
-```ts
-StandaloneBriefing = {
-  productName, productType, description, niche,
-  audience, promise, price?, platform?, link?, tone?
-}
-```
-Persistência opcional: salvar em `localStorage` (`escalaflow:standalone:<module>`) + botão **"Salvar como Projeto"** que chama `createProject` com `meta.briefingAvulso = ...` e migra o conteúdo gerado para `projects.meta.<module>`.
-
-### 1.3 Server fns aceitam `source` discriminado
-Cada server fn de geração recebe:
-```ts
-input: { source: { kind: 'project', projectId } } 
-     | { source: { kind: 'standalone', briefing: StandaloneBriefing } }
-```
-Quando `kind=project`: lê `projects.meta` (briefing, copy, avatar…).
-Quando `kind=standalone`: usa o briefing direto. Resultado retorna pro cliente; persistência só ocorre se houver projeto.
+Implementar dois módulos no padrão dual-mode já estabelecido (`DualModeHub` + `StandaloneBriefingForm` + server fn discriminada `kind: project | standalone`).
 
 ---
 
-## 2. Módulo a módulo
+## 1. Página de Venda — Gerador Mestre (projeto + avulso)
 
-### 2.1 Copy de Vendas (`/copy`)
-- Server fn `aiGenerateCopy` (Lovable AI Gateway, `google/gemini-3-flash-preview`).
-- Output: headline, sub, big idea, mecanismo, bullets, benefícios, CTA, objeções, ângulos.
-- UI: wizard 1 tela; render markdown + botão "Copiar tudo" + DOCX.
+### 1.1 Server
+- `src/lib/sales-page.server.ts`
+  - Reusa o helper `aiChat` (mesmo pattern de `copy.server.ts`).
+  - `SalesPageSchema` (zod) com blocos: hero, headline, subheadline, lead, dor, mecanismo, beneficios[], objecoes[{q,a}], depoimentos[{nome,texto}], oferta, bonus[], garantia, faq[{q,a}], cta, estruturaVisual.
+  - `aiGenerateSalesPage(ctx)` → 1 chamada `google/gemini-3-flash-preview`, `response_format: json_object`.
+  - `buildExternalPrompts(page, ctx)` → devolve `{ lovable, googleAiStudio, v0, claude }` (4 prompts prontos para colar em ferramentas externas; cada um com instruções específicas do destino — Lovable pede React+Tailwind, V0 pede shadcn, Google AI Studio pede HTML+Tailwind único, Claude pede design system descritivo).
 
-### 2.2 Criativos & Anúncios (`/criativos`) — esteira 6 passos
-Stepper visual:
-1. Origem (projeto/avulso)
-2. Plataforma (TikTok, IG, FB, Pinterest, Shorts, Marketplace, Amazon, Shopee)
-3. Objetivo (CTR, Conversão, Viral, Branding, Remarketing, Escala)
-4. Formato (catálogo `ADS_FORMATS` — Native Notes, Portal, Cupom Fiscal, POV, Super Headline, etc.)
-5. Geração IA → `{ hook, headline, cta, copy, visualPrompt, estrutura, emocao, angulo }`
-6. Ações: variações, favoritar, copiar prompt, exportar
-Persistência: `projects.meta.creatives[]` (modo projeto) ou histórico local (avulso).
+### 1.2 Server function
+- `src/lib/sales-page.functions.ts`
+  - `generateSalesPage` com `discriminatedUnion("kind")` igual a `copy.functions.ts`:
+    - `kind: "project"` → carrega `projects.briefing` + `projects.meta.copy` (se existir, usa headline/promessa da copy), grava em `projects.meta.salesPage = { page, prompts }`.
+    - `kind: "standalone"` → usa `StandaloneBriefing`, devolve sem persistir.
 
-### 2.3 Página de Venda (`/pagina-venda`) — Gerador Mestre
-- **NÃO** renderiza HTML; gera estrutura textual + 4 prompts prontos.
-- Output: Hero, Headline, Sub, Dor, Mecanismo, Benefícios, Objeções, Depoimentos, Oferta, Garantia, FAQ, CTA, estrutura visual.
-- Botões: **Copiar Prompt Lovable / Google AI Studio / V0 / Claude** + Export DOCX.
+### 1.3 UI
+- `src/components/pipeline/SalesPageResult.tsx`
+  - Renderiza cada bloco em `Card`s (Hero/Headline → Dor → Mecanismo → Benefícios → Objeções → Prova → Oferta → Bônus → Garantia → FAQ → CTA), cada um com botão `Copiar`.
+  - Seção "Estrutura Visual" em `pre`.
+  - Seção destacada **"Prompts para IA externa"** com 4 botões grandes:
+    - Copiar Prompt Lovable
+    - Copiar Prompt Google AI Studio
+    - Copiar Prompt V0
+    - Copiar Prompt Claude
+  - Botão "Exportar DOCX" usando `docx` (já no projeto via ebook).
+- `src/routes/_authenticated/pagina-venda.tsx`
+  - Substitui `<StandaloneSoon>` por `<StandalonePage />` que monta `StandaloneBriefingForm module="pagina-venda"` + chama `generateSalesPage({ kind:"standalone" })` + renderiza `SalesPageResult`.
+- `src/routes/_authenticated/projetos.$id.tsx`
+  - Aba "Página": botão **"Gerar página com IA"** chama `generateSalesPage({ kind:"project", projectId })` e renderiza o mesmo `SalesPageResult`. Se `meta.salesPage` já existir, mostra resultado salvo + botão "Regenerar".
 
-### 2.4 Checkout & Oferta (`/checkout`)
-IA gera: oferta, stack de valor, bônus, garantia, order bump, upsell, downsell, preço âncora, CTA, urgência.
-Saídas formatadas para **Kiwify · Hotmart · Stripe** (campos prontos para colar) + prompt genérico.
+---
 
-### 2.5 Escala do Produto (`/escala`) — "Missão Completa"
-Painel cinematográfico:
-- Checklist ✅ Ebook · Copy · Criativos · Página · Checkout (lê `projects.meta`).
-- Em modo avulso: pula checklist, vai direto para **Sugestões de Escala IA**.
-- Server fn `aiSuggestScale` retorna: anúncios sugeridos, hooks, ideias de escalada, canais ideais, perfis de influenciadores, formatos que mais convertem, plano de conteúdo 7d, próximos passos.
+## 2. Criativos & Anúncios — esteira 6 passos (modo avulso)
+
+Modo projeto continua usando o grid atual `PipelineHub` (sem mudança nesta rodada).
+
+### 2.1 Catálogo
+- `src/lib/ads/catalog.ts`
+  - `PLATFORMS` = TikTok · Instagram · Facebook · Pinterest · Shorts · Marketplace · Amazon · Shopee
+  - `OBJECTIVES` = CTR · Conversão · Viralização · Branding · Remarketing · Escala
+  - `ADS_FORMATS` = 18 itens `{ id, name, description, emocao, anguloPadrao }` (Native Notes, Portal de Notícias, Cupom Fiscal, POV Ebook, Super Headline, Problema vs Solução, Post X, Oferta Direta Mockup, Ebook Promo, Ebook Depoimento, Procura-se, Traço a Lápis, Price Anchor, Before/After, Checklist, Micro Aula, Manchete Jornal, Comparativo Método).
+  - `DIMENSIONS` = ['1:1','4:5','9:16'].
+
+### 2.2 Server
+- `src/lib/ads.server.ts` (novo, separado do `ads.functions.ts` existente)
+  - `aiChat` reutilizado.
+  - `CreativeSchema` = `{ hook, headline, cta, copy, visualPrompt, estrutura, emocao, angulo }`.
+  - `aiGenerateCreative({ briefing, platform, objective, formatId, dimension, variation? })` — prompt customizado por formato/plataforma (TikTok = pede ritmo + falas/Cuts; estática = pede composição visual). Retorna 1 criativo.
+  - `aiGenerateCreativeVariations(...)` retorna 3 variações em uma chamada.
+
+### 2.3 Server function
+- `src/lib/ads-creative.functions.ts`
+  - `generateCreative` com `discriminatedUnion("kind")` (project | standalone) + `platform`, `objective`, `formatId`, `dimension`.
+    - Modo projeto: lê `projects.meta.copy + briefing` para enriquecer contexto e dá `push` em `projects.meta.creatives[]`.
+    - Modo avulso: só retorna.
+  - `generateCreativeVariations` mesmo input, retorna `creative[]`.
+
+### 2.4 UI — Stepper
+- `src/components/pipeline/Stepper.tsx` — header com 6 bolinhas + labels, click navega para passos já preenchidos.
+- `src/components/pipeline/CreativeWizard.tsx` (modo avulso):
+  1. **Origem**: já resolvido pelo `ModePicker` do hub — entra direto no passo 2.
+  2. **Plataforma**: grid de cards.
+  3. **Objetivo**: grid.
+  4. **Formato**: grid filtrável (busca + categoria) sobre `ADS_FORMATS`.
+  5. **Briefing**: `StandaloneBriefingForm module="criativos"`.
+  6. **Resultado**: card grande com hook/headline/cta/copy/visualPrompt/estrutura/emoção/ângulo + botões **Gerar variações**, **Favoritar** (localStorage), **Copiar prompt visual**, **Exportar** (txt). Permite voltar para o passo 4 e trocar de formato sem perder briefing.
+- Estado em `useState` com `?step=N&platform=…&objective=…&formatId=…` na URL para sobreviver a refresh (validateSearch).
+- `src/routes/_authenticated/criativos.tsx` — substitui `<StandaloneSoon>` por `<CreativeWizard />`.
 
 ---
 
 ## 3. Detalhes técnicos
 
-- **Sem migrations**: tudo cabe em `projects.meta` (jsonb) ou localStorage no modo avulso.
-- **IA**: `google/gemini-3-flash-preview` por padrão; `gpt-5-mini` para textos longos (página/copy completas) com `streamText`.
-- **Auth**: server fns usam `requireSupabaseAuth` (mesmo no modo avulso — apenas não persistem em DB).
-- **Tema**: tokens de `src/styles.css`, glow/glass igual ao StoryBook hub.
-- **Mobile**: stepper colapsa em accordion < md.
-- **Rotas**: reusar arquivos existentes em `src/routes/_authenticated/{copy,criativos,pagina-venda,checkout,escala}.tsx` — só trocar conteúdo de `PipelineHub` por novo `<DualModeHub>`.
+- **IA**: `google/gemini-3-flash-preview` em ambos, `response_format: json_object`, `temperature: 0.85` para criativos.
+- **Persistência**:
+  - Página/projeto → `projects.meta.salesPage`.
+  - Criativos/projeto → `projects.meta.creatives[]` (append).
+  - Avulso → só localStorage para o briefing; resultados ficam em memória da sessão.
+- **Sem migrations**.
+- **Auth**: `requireSupabaseAuth` em todas as server fns (mesmo no modo avulso).
+- **Tema**: tokens de `src/styles.css`, mesmo glow/glass do hub atual.
+- **Mobile**: stepper colapsa em accordion < md; grids `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`.
+- **Sem quebrar**: `PipelineHub` continua funcionando para o modo projeto dos demais módulos.
 
 ---
 
 ## 4. Arquivos novos
-
 ```
-src/components/pipeline/
-  ModePicker.tsx            (cards Projeto vs Avulso)
-  DualModeHub.tsx           (substitui PipelineHub nos 5 hubs)
-  StandaloneBriefingForm.tsx
-  Stepper.tsx               (usado em criativos)
-
-src/lib/standalone/
-  briefing.ts               (schema + storage local)
-
-src/lib/copy.server.ts + copy.functions.ts
-src/lib/ads.server.ts (estende ads.functions.ts)
-src/lib/ads/catalog.ts      (18 formatos)
-src/lib/sales-page.server.ts + sales-page.functions.ts
-src/lib/checkout.server.ts + checkout.functions.ts
-src/lib/scale.server.ts + scale.functions.ts
+src/lib/sales-page.server.ts
+src/lib/sales-page.functions.ts
+src/lib/ads/catalog.ts
+src/lib/ads.server.ts
+src/lib/ads-creative.functions.ts
+src/components/pipeline/SalesPageResult.tsx
+src/components/pipeline/Stepper.tsx
+src/components/pipeline/CreativeWizard.tsx
+src/components/pipeline/CreativeCard.tsx
 ```
 
 ## 5. Arquivos editados
-- `src/routes/_authenticated/{copy,criativos,pagina-venda,checkout,escala}.tsx` (passam a usar `DualModeHub`)
-- `src/routes/_authenticated/projetos.$id.tsx` (abas já existem; passam a chamar as mesmas server fns no modo `kind:'project'`)
-- `src/components/PipelineHub.tsx` (mantido — usado dentro do `DualModeHub` quando `source=project`)
+```
+src/routes/_authenticated/pagina-venda.tsx     (StandaloneSoon → StandalonePage)
+src/routes/_authenticated/criativos.tsx        (StandaloneSoon → CreativeWizard)
+src/routes/_authenticated/projetos.$id.tsx     (aba "Página" + aba "Criativos" chamam server fns reais)
+```
 
 ---
 
 ## 6. Ordem de entrega
 
-1. Infra dual-mode (`ModePicker`, `DualModeHub`, `StandaloneBriefingForm`, schemas).
-2. **Copy** ponta-a-ponta (modo projeto + avulso) — valida o padrão.
-3. **Criativos** esteira 6 passos.
-4. **Página** Gerador Mestre + 4 prompts.
-5. **Checkout** + saídas Kiwify/Hotmart/Stripe.
-6. **Escala** Missão Completa + Sugestões IA.
+Tudo nesta rodada:
+1. Página de Venda (server + UI + projeto + avulso + 4 prompts + DOCX).
+2. Criativos esteira 6 passos (catalog + server + wizard + variações).
 
-Confirma para eu seguir nessa ordem (passo 1 + 2 já nesta rodada)?
+Confirma para eu seguir?
