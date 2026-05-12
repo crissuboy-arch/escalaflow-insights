@@ -614,6 +614,22 @@ function EbookPage() {
 
   const showHub = !entryStarted && !ebookId && !briefing && !selectedAd;
 
+  const onCreateNew = () => {
+    setEntryStarted(false);
+    setSelectedAd(null);
+    setBriefing(null);
+    setOutline([]);
+    setChapters([]);
+    setCoverUrl(null);
+    setEbookId(null);
+    setStep(0);
+    try {
+      window.history.replaceState({}, "", `/produtos/ebook`);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center gap-3">
@@ -624,18 +640,46 @@ function EbookPage() {
           <BookOpen className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Criar Ebook</h1>
-          <p className="text-muted-foreground">Transforme um anúncio minerado em ebook pronto para venda.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Ebook Engine</h1>
+          <p className="text-muted-foreground">Crie ebooks vendáveis a partir de anúncios, do zero ou direto pela IA.</p>
         </div>
-        {savedAt && (
-          <span className="ml-auto text-xs text-muted-foreground">
-            Rascunho salvo às {savedAt.toLocaleTimeString()}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {savedAt && (
+            <span className="text-xs text-muted-foreground">
+              Salvo {savedAt.toLocaleTimeString()}
+            </span>
+          )}
+          {!showHub && (
+            <Button onClick={onCreateNew} className="text-white" style={{ background: "var(--gradient-primary)" }}>
+              <Sparkles className="mr-2 h-4 w-4" /> Criar Novo Ebook
+            </Button>
+          )}
+        </div>
       </div>
 
-      <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+      {showHub && (
+        <>
+          <EbookHub
+            onUseMined={onHubMined}
+            onScratch={onHubScratch}
+            onAiGenerate={onHubAi}
+            busy={!!busy}
+          />
+          {drafts.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">Continuar onde parou</h2>
+              <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+            </div>
+          )}
+        </>
+      )}
 
+      {!showHub && (
+        <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+      )}
+
+      {!showHub && (
+        <>
       {/* Stepper */}
       <div className="flex flex-wrap gap-2">
         {STEPS.map((label, i) => (
