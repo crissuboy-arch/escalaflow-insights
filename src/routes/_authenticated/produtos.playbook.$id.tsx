@@ -380,3 +380,88 @@ function PlaybookReaderPage() {
     </div>
   );
 }
+
+function CopyLine({ text }: { text: string }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-6 px-2 text-[10px]"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          toast.success("Copiado");
+        } catch {
+          toast.error("Falha ao copiar");
+        }
+      }}
+    >
+      <Copy className="mr-1 h-3 w-3" /> Copiar
+    </Button>
+  );
+}
+
+function Block({ title, children, copyText }: { title: string; children: React.ReactNode; copyText: string }) {
+  return (
+    <section className="rounded-xl border border-border/40 bg-card/40 p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--playbook-neon)]">
+          {title}
+        </h4>
+        <CopyLine text={copyText} />
+      </div>
+      <div className="text-sm text-foreground/90">{children}</div>
+    </section>
+  );
+}
+
+function StrategyView({
+  strategy,
+  onRegenerate,
+  busy,
+}: {
+  strategy: Record<string, unknown>;
+  onRegenerate: () => void;
+  busy: boolean;
+}) {
+  const str = (k: string) => (typeof strategy[k] === "string" ? (strategy[k] as string) : "");
+  const arr = (k: string) =>
+    Array.isArray(strategy[k]) ? (strategy[k] as unknown[]).map(String) : [];
+  const list = (items: string[]) => (
+    <ul className="list-disc space-y-1 pl-5">
+      {items.map((it, i) => (
+        <li key={i}>{it}</li>
+      ))}
+    </ul>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" disabled={busy} onClick={onRegenerate}>
+          {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+          Regenerar
+        </Button>
+      </div>
+      {str("bigIdea") && <Block title="Big Idea" copyText={str("bigIdea")}>{str("bigIdea")}</Block>}
+      {str("promise") && <Block title="Promessa" copyText={str("promise")}>{str("promise")}</Block>}
+      {str("uniqueMechanism") && <Block title="Mecanismo Único" copyText={str("uniqueMechanism")}>{str("uniqueMechanism")}</Block>}
+      {str("avatar") && <Block title="Avatar" copyText={str("avatar")}>{str("avatar")}</Block>}
+      {arr("pains").length > 0 && <Block title="Dores" copyText={arr("pains").join("\n")}>{list(arr("pains"))}</Block>}
+      {arr("desires").length > 0 && <Block title="Desejos" copyText={arr("desires").join("\n")}>{list(arr("desires"))}</Block>}
+      {arr("objections").length > 0 && <Block title="Objeções" copyText={arr("objections").join("\n")}>{list(arr("objections"))}</Block>}
+      {arr("mentalTriggers").length > 0 && <Block title="Gatilhos Mentais" copyText={arr("mentalTriggers").join("\n")}>{list(arr("mentalTriggers"))}</Block>}
+      {arr("headlines").length > 0 && <Block title="Headlines" copyText={arr("headlines").join("\n")}>{list(arr("headlines"))}</Block>}
+      {str("vslStructure") && <Block title="Estrutura VSL" copyText={str("vslStructure")}><pre className="whitespace-pre-wrap text-xs">{str("vslStructure")}</pre></Block>}
+      {str("pageStructure") && <Block title="Estrutura da Página" copyText={str("pageStructure")}><pre className="whitespace-pre-wrap text-xs">{str("pageStructure")}</pre></Block>}
+      {str("funnel") && <Block title="Funil" copyText={str("funnel")}><pre className="whitespace-pre-wrap text-xs">{str("funnel")}</pre></Block>}
+      {str("offer") && <Block title="Oferta" copyText={str("offer")}>{str("offer")}</Block>}
+      {arr("bonuses").length > 0 && <Block title="Bônus" copyText={arr("bonuses").join("\n")}>{list(arr("bonuses"))}</Block>}
+      {str("stack") && <Block title="Stack de Valor" copyText={str("stack")}>{str("stack")}</Block>}
+      {str("cta") && <Block title="CTA" copyText={str("cta")}>{str("cta")}</Block>}
+      {arr("scripts").length > 0 && <Block title="Scripts" copyText={arr("scripts").join("\n\n---\n\n")}>{list(arr("scripts"))}</Block>}
+      {arr("angles").length > 0 && <Block title="Ângulos Criativos" copyText={arr("angles").join("\n")}>{list(arr("angles"))}</Block>}
+      {str("scale") && <Block title="Plano de Escala" copyText={str("scale")}><pre className="whitespace-pre-wrap text-xs">{str("scale")}</pre></Block>}
+    </div>
+  );
+}
