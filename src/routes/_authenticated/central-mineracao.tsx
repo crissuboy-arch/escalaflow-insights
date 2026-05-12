@@ -48,7 +48,7 @@ import type { MinedAd, MiningStatus } from "@/lib/mining/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Radar } from "lucide-react";
-import { openExternal, openChatGPTWithPrompt } from "@/lib/external";
+import { openExternal, openChatGPTWithPrompt, openAdLink } from "@/lib/external";
 import {
   favoriteCollectedAd,
   fetchFavoriteAds,
@@ -272,8 +272,15 @@ function MiningCenterPage() {
   };
   const onOpenAd = (a: MinedAd) => {
     const url = resolveAdUrl(a);
+    const profileUrl = resolveProfileUrl(a);
     console.log("abrindo anúncio", url);
-    openExternal(url, { errorMessage: "Link do anúncio não encontrado" });
+    openAdLink({
+      adUrl: url,
+      adLibraryId: a.adLibraryId,
+      profileUrl,
+      advertiser: a.advertiser,
+      headline: a.headline,
+    });
   };
   const onOpenExtension = (a: MinedAd) => {
     const raw = (a.raw ?? {}) as Record<string, unknown>;
