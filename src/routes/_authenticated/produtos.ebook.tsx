@@ -547,6 +547,73 @@ function EbookPage() {
     return chapters.length > 0;
   }, [step, selectedAd, briefing, outline, chapters]);
 
+  // Hub flow handlers
+  const onHubMined = () => {
+    setEntryStarted(true);
+    setStep(0);
+  };
+
+  const emptyBriefing = (): Briefing => ({
+    title: "",
+    subtitle: "",
+    niche: "",
+    promise: "",
+    avatar: "",
+    pains: [],
+    desires: [],
+    uniqueMechanism: "",
+  });
+
+  const onHubScratch = (category: EbookCategory) => {
+    setEntryStarted(true);
+    if (category === "Playbook") {
+      setStyle("playbook");
+      setMode("playbook");
+    } else if (category === "Amazon/KDP") {
+      setStyle("amazon-kdp");
+      setLayout("classico");
+      setMode("kdp");
+    } else if (category === "Infantil") {
+      setStyle("infantil");
+      setMode("premium");
+    }
+    const b = emptyBriefing();
+    b.niche = category;
+    setBriefing(b);
+    setStep(1);
+  };
+
+  const onHubAi = async (input: AiKickstart) => {
+    setEntryStarted(true);
+    setBusy("Gerando estrutura com IA…");
+    try {
+      // Build briefing locally from form (no extra AI call needed)
+      const b: Briefing = {
+        title: input.niche,
+        subtitle: input.promise.slice(0, 120),
+        niche: input.niche,
+        promise: input.promise,
+        avatar: input.audience,
+        pains: [],
+        desires: [],
+        uniqueMechanism: input.style,
+      };
+      setBriefing(b);
+      setChapterCount(input.chapterCount);
+      const o = await fnOutline({ data: { briefing: b, chapterCount: input.chapterCount } });
+      setOutline(o);
+      setStep(2);
+      toast.success("Estrutura gerada");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao gerar estrutura"));
+      setStep(1);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const showHub = !entryStarted && !ebookId && !briefing && !selectedAd;
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center gap-3">
