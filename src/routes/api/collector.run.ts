@@ -53,7 +53,17 @@ export const Route = createFileRoute("/api/collector/run")({
               keyword,
               score: a.score,
               source: "collector",
-              raw: (a.raw ?? null) as never,
+              raw: {
+                ...(a.raw && typeof a.raw === "object" ? (a.raw as Record<string, unknown>) : { original: a.raw ?? null }),
+                enriched: {
+                  tags: a.tags ?? [],
+                  subniche: a.subniche ?? null,
+                  promise: a.promise ?? null,
+                  mechanism: a.mechanism ?? null,
+                  emotion: a.emotion ?? null,
+                  scaleLevel: a.scaleLevel ?? null,
+                },
+              } as never,
             }));
             const withId = rows.filter((r) => r.ad_library_id);
             const withoutId = rows.filter((r) => !r.ad_library_id);

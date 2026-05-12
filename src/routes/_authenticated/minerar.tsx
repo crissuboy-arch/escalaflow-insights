@@ -21,7 +21,7 @@ import { Badge as UIBadge } from "@/components/ui/badge";
 import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkCheck, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { openExternal } from "@/lib/external";
-import { CATEGORY_LIST, type CategoryId } from "@/lib/mining/keywords";
+import { CATEGORY_LIST, KEYWORD_CATEGORIES, type CategoryId } from "@/lib/mining/keywords";
 
 type CollectedAd = {
   id: string;
@@ -41,6 +41,11 @@ type CollectedAd = {
   score: number;
   created_at: string;
   media_source?: string;
+  tags?: string[];
+  subniche?: string | null;
+  scale_level?: "cold" | "warming" | "hot" | "scaled" | null;
+  promise?: string | null;
+  emotion?: string | null;
 };
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
@@ -55,6 +60,8 @@ function MinePage() {
   const [platform, setPlatform] = useState("all");
   const [quantity, setQuantity] = useState(20);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
+  const [scaleFilter, setScaleFilter] = useState<"all" | "cold" | "warming" | "hot" | "scaled">("all");
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [aiOpen, setAiOpen] = useState(false);
@@ -73,6 +80,43 @@ function MinePage() {
   const PAGE_SIZE = 12;
   const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
 
+  const categoryKeywordsLower = activeCategory
+    ? KEYWORD_CATEGORIES[activeCategory].keywords.map((k) => k.toLowerCase())
+    : null;
+
+  const filtered = visibleCollected.filter((a) => {
+    if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
+    if (tagFilters.size && !(a.tags ?? []).some((t) => tagFilters.has(t))) return false;
+    if (categoryKeywordsLower) {
+      const tagsLower = (a.tags ?? []).map((t) => t.toLowerCase());
+      const hay = `${a.headline} ${a.copy ?? ""}`.toLowerCase();
+      const hit = tagsLower.some((t) => categoryKeywordsLower.includes(t)) ||
+        categoryKeywordsLower.some((kw) => hay.includes(kw));
+      if (!hit) return false;
+    }
+    return true;
+  });
+
+  const availableTags = (() => {
+    const counts = new Map<string, number>();
+    for (const a of visibleCollected) {
+      for (const t of a.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((x, y) => y[1] - x[1])
+      .slice(0, 20)
+      .map(([t]) => t);
+  })();
+
+  const toggleTagFilter = (t: string) => {
+    setTagFilters((s) => {
+      const n = new Set(s);
+      if (n.has(t)) n.delete(t); else n.add(t);
+      return n;
+    });
+    setPage(0);
+  };
+
   const fetchCollected = async () => {
     setCollectedLoading(true);
     try {
@@ -84,7 +128,19 @@ function MinePage() {
       if (error) throw error;
       console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
       console.log("[minerar] collected_ads rows:", data ?? []);
-      setCollected((data ?? []) as CollectedAd[]);
+      const enriched = (data ?? []).map((row) => {
+        const r = row as unknown as { raw?: { enriched?: Record<string, unknown> } };
+        const e = r.raw?.enriched ?? {};
+        return {
+          ...(row as object),
+          tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
+          subniche: (e.subniche as string | null | undefined) ?? null,
+          scale_level: (e.scaleLevel as CollectedAd["scale_level"]) ?? null,
+          promise: (e.promise as string | null | undefined) ?? null,
+          emotion: (e.emotion as string | null | undefined) ?? null,
+        } as CollectedAd;
+      });
+      setCollected(enriched);
     } catch (e) {
       console.error("[minerar] collected_ads fetch failed", e);
     } finally {
@@ -251,6 +307,11 @@ function MinePage() {
         keyword: keyword,
         score: a.score,
         created_at: a.createdAt || new Date().toISOString(),
+        tags: a.tags,
+        subniche: a.subniche ?? null,
+        scale_level: a.scaleLevel ?? null,
+        promise: a.promise ?? null,
+        emotion: a.emotion ?? null,
       }));
       setLatestRunAds(optimistic);
       setCollected((prev) => {
@@ -446,9 +507,53 @@ function MinePage() {
             </Label>
             <Slider value={[quantity]} min={4} max={100} step={1} onValueChange={(v) => setQuantity(v[0])} className="mt-3" />
           </div>
+          <div className="md:col-span-2">
+            <Label>Nível de escala</Label>
+            <Select value={scaleFilter} onValueChange={(v) => { setScaleFilter(v as typeof scaleFilter); setPage(0); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="cold">Cold</SelectItem>
+                <SelectItem value="warming">Warming</SelectItem>
+                <SelectItem value="hot">Hot</SelectItem>
+                <SelectItem value="scaled">Scaled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {availableTags.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-6">
+              <Label>Tags detectadas</Label>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {availableTags.map((t) => {
+                  const active = tagFilters.has(t);
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => toggleTagFilter(t)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                        active
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+                {tagFilters.size > 0 && (
+                  <button
+                    onClick={() => { setTagFilters(new Set()); setPage(0); }}
+                    className="rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                  >
+                    limpar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{visibleCollected.length}</span> anúncios coletados
+              <span className="font-semibold text-foreground">{filtered.length}</span> de {visibleCollected.length} anúncios
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -492,7 +597,7 @@ function MinePage() {
             <div className="flex items-center gap-2">
               <Radar className="h-4 w-4 text-primary" />
               <h2 className="font-semibold">Anúncios coletados</h2>
-              <Badge variant="outline" className="rounded-full">{visibleCollected.length}</Badge>
+              <Badge variant="outline" className="rounded-full">{filtered.length}</Badge>
             </div>
             <Button size="sm" variant="ghost" onClick={fetchCollected}>
               <Loader2 className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`} />
@@ -520,12 +625,28 @@ function MinePage() {
                 <span className="mx-1 font-semibold text-foreground">Minerar com Motor de Coleta</span>.
               </p>
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <Radar className="h-10 w-10 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhum anúncio com os filtros atuais.</p>
+              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); }}>
+                Limpar filtros
+              </Button>
+            </div>
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {visibleCollected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
+                {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
                   const key = a.ad_library_id || a.ad_url || a.id;
                   const hasMedia = Boolean(a.video_url || a.image_url);
+                  const scaleStyles: Record<NonNullable<CollectedAd["scale_level"]>, { label: string; cls: string; gradient?: boolean }> = {
+                    cold:    { label: "Cold",    cls: "bg-muted text-muted-foreground" },
+                    warming: { label: "Warming", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+                    hot:     { label: "Hot",     cls: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
+                    scaled:  { label: "Scaled",  cls: "text-primary-foreground border-transparent", gradient: true },
+                  };
+                  const scale = a.scale_level ? scaleStyles[a.scale_level] : null;
+                  const tags = a.tags ?? [];
                   return (
                   <motion.div
                     key={key}
@@ -572,6 +693,28 @@ function MinePage() {
                         <Badge variant="outline" className="rounded-full"><Globe2 className="mr-1 h-3 w-3" />{a.country || "—"}</Badge>
                         {a.cta && <Badge variant="outline" className="rounded-full">{a.cta}</Badge>}
                       </div>
+                      {(a.subniche || scale || tags.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {a.subniche && (
+                            <Badge variant="secondary" className="rounded-full text-[10px]">{a.subniche}</Badge>
+                          )}
+                          {scale && (
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full text-[10px] ${scale.cls}`}
+                              style={scale.gradient ? { background: "var(--gradient-primary)" } : undefined}
+                            >
+                              {scale.label}
+                            </Badge>
+                          )}
+                          {tags.slice(0, 3).map((t) => (
+                            <Badge key={t} variant="outline" className="rounded-full text-[10px]">{t}</Badge>
+                          ))}
+                          {tags.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-2">
                         <Button size="sm" onClick={() => onAnalyzeCollected(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
                           <Sparkles className="mr-1 h-3.5 w-3.5" /> Analisar com IA
@@ -598,10 +741,10 @@ function MinePage() {
                   );
                 })}
               </div>
-              {visibleCollected.length > PAGE_SIZE && (
+              {filtered.length > PAGE_SIZE && (
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    Página {page + 1} de {Math.ceil(visibleCollected.length / PAGE_SIZE)}
+                    Página {page + 1} de {Math.ceil(filtered.length / PAGE_SIZE)}
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
@@ -610,7 +753,7 @@ function MinePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(page + 1) * PAGE_SIZE >= visibleCollected.length}
+                      disabled={(page + 1) * PAGE_SIZE >= filtered.length}
                       onClick={() => setPage((p) => p + 1)}
                     >
                       Próxima
