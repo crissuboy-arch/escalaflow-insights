@@ -28,6 +28,13 @@ export interface CollectorAd {
   createdAt: string;
   startDate?: string;
   mediaSource?: "image" | "video-thumb" | "card-image" | "deep-find" | "none";
+  // Enrichment
+  tags?: string[];
+  subniche?: string;
+  promise?: string;
+  mechanism?: string;
+  emotion?: string;
+  scaleLevel?: "cold" | "warming" | "hot" | "scaled";
   raw?: unknown;
 }
 
