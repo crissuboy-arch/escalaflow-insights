@@ -270,6 +270,11 @@ function MinePage() {
         keyword: keyword,
         score: a.score,
         created_at: a.createdAt || new Date().toISOString(),
+        tags: a.tags,
+        subniche: a.subniche ?? null,
+        scale_level: a.scaleLevel ?? null,
+        promise: a.promise ?? null,
+        emotion: a.emotion ?? null,
       }));
       setLatestRunAds(optimistic);
       setCollected((prev) => {
