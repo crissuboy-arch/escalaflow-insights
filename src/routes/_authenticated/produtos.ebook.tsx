@@ -75,6 +75,19 @@ async function errMsg(e: unknown, fallback: string): Promise<string> {
   return fallback;
 }
 
+function slug(s: string) {
+  return s.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 80) || "ebook";
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function EbookPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
