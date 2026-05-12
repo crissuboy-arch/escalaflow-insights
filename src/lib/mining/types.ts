@@ -33,7 +33,7 @@ export interface MinedAd {
   creativeUrl: string | null; // image / video thumbnail
   createdAt: string; // ISO timestamp
   receivedAt: string; // ISO timestamp on ingest
-  source: "extension" | "manual" | "demo";
+  source: "extension" | "manual";
   status: MiningStatus;
   favorite: boolean;
   // Extended capture fields
