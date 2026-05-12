@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="referrer" content="no-referrer" />
+<title>Abrindo link…</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0b10;color:#e6e6ea;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:24px;text-align:center}
+  .spinner{width:36px;height:36px;border-radius:50%;border:3px solid #2a2a36;border-top-color:#7c5cff;animation:s 1s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+  a{color:#a78bfa;text-decoration:none;word-break:break-all}
+  .btn{margin-top:8px;padding:10px 16px;border-radius:10px;background:#7c5cff;color:#fff;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="spinner"></div>
+  <p>Abrindo link em uma nova janela…</p>
+  <p id="fallback" style="display:none">Se nada acontecer, clique abaixo:</p>
+  <a id="link" class="btn" rel="noopener noreferrer">Abrir link</a>
+</div>
+<script>
+(function(){
+  try {
+    var qs = new URLSearchParams(location.search);
+    var url = qs.get('url') || '';
+    if (!/^https?:\/\//i.test(url)) {
+      document.body.innerHTML = '<div class="wrap"><p>Link inválido.</p></div>';
+      return;
+    }
+    var a = document.getElementById('link');
+    a.href = url;
+    a.textContent = 'Abrir ' + url;
+    document.getElementById('fallback').style.display = 'block';
+    // Try immediate redirect (top-level tab, no iframe sandbox here)
+    setTimeout(function(){ try { location.replace(url); } catch(e){} }, 50);
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
