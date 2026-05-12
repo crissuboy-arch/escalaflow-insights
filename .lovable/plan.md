@@ -1,119 +1,86 @@
 ## Objetivo
 
-Transformar o Minerador num sistema de inteligência de mercado: nichos categorizados, biblioteca expandida de palavras-chave, tags automáticas, score evoluído, base para "Radar de Oportunidade" e remoção definitiva de mocks/debug. Sem mudanças visuais drásticas — só evolução do que já existe.
+Tornar a inteligência do Minerador (tags, subniche, nível de escala) visível para o usuário e adicionar uma página **Radar de Oportunidade** que consome `radar.ts` sobre os anúncios já minerados.
 
-## 1. Biblioteca de palavras-chave categorizada
+## 1. Persistir o enrichment em `collected_ads.raw`
 
-Criar `src/lib/mining/keywords.ts` exportando:
+`src/routes/api/collector.run.ts` hoje salva só `a.raw`. Trocar por um objeto que mescla o payload bruto com os campos enriquecidos:
 
 ```ts
-export const KEYWORD_CATEGORIES = {
-  dinheiro:     { label: "Dinheiro",     emoji: "💰", keywords: [...] },
-  ia:           { label: "IA",           emoji: "🤖", keywords: [...] },
-  automacao:    { label: "Automação",    emoji: "⚙️", keywords: [...] },
-  infoproduto:  { label: "Infoproduto",  emoji: "📚", keywords: [...] },
-  tiktok:       { label: "TikTok",       emoji: "🎵", keywords: [...] },
-  instagram:    { label: "Instagram",    emoji: "📸", keywords: [...] },
-  ebook:        { label: "Ebook",        emoji: "📖", keywords: [...] },
-  playbook:     { label: "Playbook",     emoji: "🎬", keywords: [...] },
-  plr:          { label: "PLR",          emoji: "🧩", keywords: [...] },
-  fisico:       { label: "Produto físico", emoji: "📦", keywords: [...] },
-  emagrecimento:{ label: "Emagrecimento", emoji: "🔥", keywords: [...] },
-  beleza:       { label: "Beleza",        emoji: "💄", keywords: [...] },
-  branding:     { label: "Branding",      emoji: "🎨", keywords: [...] },
-  saas:         { label: "SaaS",          emoji: "🧠", keywords: [...] },
-  apps:         { label: "Apps",          emoji: "📱", keywords: [...] },
-  whatsapp:     { label: "WhatsApp",      emoji: "💬", keywords: [...] },
-  figurinhas:   { label: "Figurinhas",    emoji: "🌟", keywords: [...] },
-  cursos:       { label: "Cursos",        emoji: "🎓", keywords: [...] },
-  lowTicket:    { label: "Low ticket",    emoji: "🪙", keywords: [...] },
-  highTicket:   { label: "High ticket",   emoji: "💎", keywords: [...] },
-  rendaExtra:   { label: "Renda extra",   emoji: "📈", keywords: [...] },
-  copy:         { label: "Copy/Headlines", emoji: "✍️", keywords: [...] },
-} as const;
+raw: {
+  ...(a.raw && typeof a.raw === "object" ? a.raw : { original: a.raw }),
+  enriched: {
+    tags: a.tags ?? [],
+    subniche: a.subniche ?? null,
+    promise: a.promise ?? null,
+    mechanism: a.mechanism ?? null,
+    emotion: a.emotion ?? null,
+    scaleLevel: a.scaleLevel ?? null,
+  },
+}
 ```
 
-Cada `keywords[]` recebe a lista que o usuário forneceu, mais variações já existentes. Helpers exportados:
-- `allKeywords()` — lista única ordenada
-- `categoryOf(keyword)` — devolve o(s) ID(s) da categoria
-- `inferTagsFromText(text)` — varre copy/headline e devolve tags (nicho, subnicho, emoção)
+Sem migração: a coluna já é `jsonb`.
 
-## 2. UI do Minerador (`src/routes/_authenticated/minerar.tsx`)
+## 2. Expor enrichment no `minerar.tsx`
 
-- Substituir `QUICK_TAGS` simples por **chips agrupados por categoria** (acordeão/scroller horizontal). Categoria selecionada mostra suas palavras-chave; clicar numa keyword preenche o input.
-- Selector "Categoria" no painel de filtros (além do Nicho atual). Categoria escolhida → filtra anúncios listados por `niche`/`tags` que casem.
-- Remover toda renderização de debug: bloco `CollectorDebug`, JSON cru, `media_source` em badge de UI (manter só em `console.log`).
-- Manter o botão "Minerar com IA" e fluxo atual; só passa a usar nova lib de keywords para sugerir termos.
+- Estender o `type CollectedAd` local com `tags?: string[]`, `subniche?: string | null`, `scale_level?: "cold"|"warming"|"hot"|"scaled" | null`, `promise?: string | null`, `emotion?: string | null`.
+- Em `fetchCollected` e no `optimistic` mapper de `onCollectorMine`, ler de `row.raw?.enriched` (e do próprio `CollectorAd` para o caso otimista).
+- **Cards**: abaixo da linha de plataforma/country/CTA, renderizar:
+  - Badge `subniche` (variant `secondary`).
+  - Badge colorido de `scale_level` com mapping → label/cor: `cold` cinza, `warming` azul, `hot` laranja, `scaled` gradiente primary.
+  - Até 3 chips de `tags` (`variant="outline"`, rounded-full, font-size 10px). Botão "+N" se houver mais.
 
-## 3. Tags automáticas + score evoluído
+## 3. Filtros novos no painel `Filtros principais`
 
-Em `src/lib/collector/collector.normalizer.ts`:
+Adicionar dois controles antes da linha de ação (mantendo grid de 6 colunas em lg):
 
-- Nova função `enrich(ad, ctx)` chamada antes do `out.push`, que calcula:
-  - `niche`, `subniche` via `categoryOf` + `inferTagsFromText`
-  - `promise` (regex em headline/copy: "ganhe", "perca", "descubra", "sem", "em X dias")
-  - `mechanism` (palavras-chave: "método", "fórmula", "framework", "blueprint", "hack")
-  - `emotion` (medo / desejo / urgência / curiosidade / prova social)
-  - `scaleLevel`: `cold | warming | hot | scaled` derivado do score final
-- `inferScore` evolui para considerar:
-  - repetição criativa (mesmo `advertiser+headline` ou imagem) → bônus
-  - tempo ativo (`startDate` → dias) → bônus progressivo
-  - presença de CTA forte (lista de CTAs) → bônus
-  - multi-plataforma (≥3) → bônus (já existe)
-  - vídeo → bônus (já existe)
-  - emoções dominantes detectadas → bônus
-  - máximo 99
-- Tipos novos em `collector.types.ts`: `tags: string[]`, `subniche?`, `promise?`, `mechanism?`, `emotion?`, `scaleLevel?`.
-- Persistir tudo em `collected_ads.raw` (já é `jsonb`) e nas colunas existentes — sem migração de schema agora. Migração futura adicionará colunas próprias quando o Radar precisar de queries.
+- `Select` "Nível de escala" com opções `Todos / Cold / Warming / Hot / Scaled`. Estado `scaleFilter`.
+- Chips de tag dinâmicos: derivar `availableTags` = união de `tags` dos `visibleCollected` (top 20 por frequência). Renderizar como chips selecionáveis (multi). Estado `tagFilters: Set<string>`.
 
-## 4. Dedup mais forte (sem repetidos)
+Aplicar filtros antes de paginar:
 
-No service e no fetch de listagem:
-- Chave de dedup: `adLibraryId` → `adUrl` → hash de `advertiser|headline|primeira-imagem`.
-- No `minerar.tsx`, ao renderizar `visibleCollected`, aplicar `Map` por chave de dedup antes do `.slice(page*PAGE_SIZE, ...)`.
+```ts
+const filtered = visibleCollected.filter((a) => {
+  if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
+  if (tagFilters.size && !a.tags?.some((t) => tagFilters.has(t))) return false;
+  return true;
+});
+```
 
-## 5. Remoção de mocks e fallbacks fake
+E usar `filtered` no contador, no `slice` paginado e no estado vazio. O `activeCategory` (já existente) também passa a filtrar via `tags.includes(<keyword>)` quando uma categoria está ativa — usando `KEYWORD_CATEGORIES[activeCategory].keywords`.
 
-- `src/lib/mining/bridge.ts`: remover `seedDemoAds` e `insertTestAd` (e qualquer botão que chame).
-- Remover constantes `DEMO_*` e o source `"demo"` do `MinedAd["source"]`.
-- Procurar usos com `rg "seedDemoAds|insertTestAd|is_demo.*true"` e limpar callers (botões "Teste de importação", banners "modo demo").
-- `central-mineracao.tsx` e `analise-ia.tsx`: deixar de listar registros com `is_demo = true` por padrão.
+## 4. Página `/radar` — Radar de Oportunidade
 
-## 6. Base para "Radar de Oportunidade"
+Criar `src/routes/_authenticated/radar.tsx`:
 
-Apenas o esqueleto agora (sem nova rota visual ainda):
-- `src/lib/mining/radar.ts` com funções puras sobre uma lista de `CollectedAd`:
-  - `hotNiches(ads)` — nichos com mais entradas nos últimos 7 dias
-  - `repeatedCreatives(ads)` — agrupa por hash de imagem/headline
-  - `scalingCreatives(ads)` — score crescente + multi-plataforma + tempo ativo
-  - `dominantPromises(ads)` / `saturatedProducts(ads)` / `trends(ads)`
-- Cobertura de testes manuais via `console`. UI dedicada vem em iteração futura — fora deste escopo.
+- Carregar até 500 anúncios de `collected_ads` (mesma query do Minerador), mapear para `CollectorAd` (incluindo `raw.enriched`) e passar para os helpers de `src/lib/mining/radar.ts`.
+- Layout: 2 colunas em `lg`, 1 em mobile.
+  - **Card "Nichos quentes (7d)"**: lista `hotNiches(ads, 7)`. Cada linha: nome do nicho + barra horizontal proporcional ao count + número.
+  - **Card "Criativos repetidos"**: `repeatedCreatives(ads)`. Cada item: thumbnail (do `sample.imageUrl/videoThumbnail`), advertiser, headline truncada, badge `xN repetições`, botão "Abrir anúncio" (`openExternal` com `sample.adUrl`).
+  - **Card "Promessas dominantes"** e **"Criativos escalando"**: secundários, mais compactos (lista simples). Render somente se array não vazio.
+- Header com `Radar` icon + contador "X anúncios analisados" e botão "Atualizar" (re-fetch).
+- Estado vazio: ícone `Radar` + texto "Nenhum dado suficiente. Minere mais anúncios primeiro." com link para `/minerar`.
+- `errorComponent` e `notFoundComponent` mínimos no `createFileRoute` por consistência.
 
-## 7. Limpeza geral
+## 5. Sidebar
 
-- `setCollectorDebug` e estado `CollectorDebug` saem do componente; só `console.log` permanece.
-- `mediaSource` deixa de aparecer como Badge na UI.
-- Remover `inferTags` antigo de `mining/repository.ts` em favor do novo `inferTagsFromText` (repository chama o helper).
+`src/components/AppSidebar.tsx`: adicionar item "Radar" (ícone `Radar` da lucide) logo após "Minerar". Sem badge/contador.
 
 ## Arquivos afetados
 
-Novos:
-- `src/lib/mining/keywords.ts`
-- `src/lib/mining/radar.ts`
-
 Editados:
-- `src/lib/collector/collector.types.ts` (novos campos)
-- `src/lib/collector/collector.normalizer.ts` (enrich + score evoluído)
-- `src/lib/mining/repository.ts` (usar `inferTagsFromText`)
-- `src/lib/mining/bridge.ts` (remover demo/test)
-- `src/routes/_authenticated/minerar.tsx` (categorias, tags, sem debug)
-- `src/routes/_authenticated/central-mineracao.tsx` e `analise-ia.tsx` (esconder is_demo)
+- `src/routes/api/collector.run.ts` (raw com enriched)
+- `src/routes/_authenticated/minerar.tsx` (tipo, leitura do raw, badges, filtros)
+- `src/components/AppSidebar.tsx` (item Radar)
 
-Sem migrações de banco neste passo.
+Novos:
+- `src/routes/_authenticated/radar.tsx`
 
-## Fora de escopo (iterações futuras)
+Sem migração de banco. Sem mudanças em `radar.ts` / `keywords.ts` / `collector.normalizer.ts`.
 
-- Página `/radar` visual.
-- Colunas dedicadas em `collected_ads` para `tags`, `emotion`, `scale_level`.
-- Detecção de imagens duplicadas via perceptual hash.
-- IA real classificando emoção/promessa (hoje é heurística por regex/keywords).
+## Fora de escopo
+
+- Colunas dedicadas em `collected_ads` para `tags`/`scale_level` (continua em `raw.enriched`).
+- Backfill do enrichment para anúncios já existentes (a próxima mineração já popula; antigos aparecem sem badges).
+- Detecção visual de duplicados por hash de imagem (ainda usa `advertiser|headline|media`).
