@@ -597,7 +597,7 @@ function MinePage() {
             <div className="flex items-center gap-2">
               <Radar className="h-4 w-4 text-primary" />
               <h2 className="font-semibold">Anúncios coletados</h2>
-              <Badge variant="outline" className="rounded-full">{visibleCollected.length}</Badge>
+              <Badge variant="outline" className="rounded-full">{filtered.length}</Badge>
             </div>
             <Button size="sm" variant="ghost" onClick={fetchCollected}>
               <Loader2 className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`} />
@@ -625,12 +625,28 @@ function MinePage() {
                 <span className="mx-1 font-semibold text-foreground">Minerar com Motor de Coleta</span>.
               </p>
             </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-center">
+              <Radar className="h-10 w-10 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhum anúncio com os filtros atuais.</p>
+              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); }}>
+                Limpar filtros
+              </Button>
+            </div>
           ) : (
             <>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {visibleCollected.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
+                {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
                   const key = a.ad_library_id || a.ad_url || a.id;
                   const hasMedia = Boolean(a.video_url || a.image_url);
+                  const scaleStyles: Record<NonNullable<CollectedAd["scale_level"]>, { label: string; cls: string; gradient?: boolean }> = {
+                    cold:    { label: "Cold",    cls: "bg-muted text-muted-foreground" },
+                    warming: { label: "Warming", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+                    hot:     { label: "Hot",     cls: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
+                    scaled:  { label: "Scaled",  cls: "text-primary-foreground border-transparent", gradient: true },
+                  };
+                  const scale = a.scale_level ? scaleStyles[a.scale_level] : null;
+                  const tags = a.tags ?? [];
                   return (
                   <motion.div
                     key={key}
@@ -677,6 +693,28 @@ function MinePage() {
                         <Badge variant="outline" className="rounded-full"><Globe2 className="mr-1 h-3 w-3" />{a.country || "—"}</Badge>
                         {a.cta && <Badge variant="outline" className="rounded-full">{a.cta}</Badge>}
                       </div>
+                      {(a.subniche || scale || tags.length > 0) && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {a.subniche && (
+                            <Badge variant="secondary" className="rounded-full text-[10px]">{a.subniche}</Badge>
+                          )}
+                          {scale && (
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full text-[10px] ${scale.cls}`}
+                              style={scale.gradient ? { background: "var(--gradient-primary)" } : undefined}
+                            >
+                              {scale.label}
+                            </Badge>
+                          )}
+                          {tags.slice(0, 3).map((t) => (
+                            <Badge key={t} variant="outline" className="rounded-full text-[10px]">{t}</Badge>
+                          ))}
+                          {tags.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-2">
                         <Button size="sm" onClick={() => onAnalyzeCollected(a)} className="text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
                           <Sparkles className="mr-1 h-3.5 w-3.5" /> Analisar com IA
@@ -703,10 +741,10 @@ function MinePage() {
                   );
                 })}
               </div>
-              {visibleCollected.length > PAGE_SIZE && (
+              {filtered.length > PAGE_SIZE && (
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    Página {page + 1} de {Math.ceil(visibleCollected.length / PAGE_SIZE)}
+                    Página {page + 1} de {Math.ceil(filtered.length / PAGE_SIZE)}
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
@@ -715,7 +753,7 @@ function MinePage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={(page + 1) * PAGE_SIZE >= visibleCollected.length}
+                      disabled={(page + 1) * PAGE_SIZE >= filtered.length}
                       onClick={() => setPage((p) => p + 1)}
                     >
                       Próxima
