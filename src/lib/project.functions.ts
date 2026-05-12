@@ -185,11 +185,7 @@ export const deleteProject = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-async function ensureBriefing(
-  supabase: ReturnType<typeof requireSupabaseAuth> extends never ? never : any,
-  userId: string,
-  id: string,
-) {
+async function ensureBriefing(supabase: any, userId: string, id: string) {
   const { data, error } = await supabase
     .from("projects")
     .select("*")
