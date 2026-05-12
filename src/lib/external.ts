@@ -1,16 +1,20 @@
 import { toast } from "sonner";
 
 /**
- * Opens a URL in a new browser tab, escaping the Lovable preview iframe.
- * Accepts a list of candidate URLs and uses the first valid one.
+ * Opens a URL in a real new browser tab, escaping the Lovable preview iframe.
  *
- * Strategy (in order, all inside the user gesture):
- *  1. Synthetic <a target="_blank" rel="noopener noreferrer"> click — most
- *     reliable inside sandboxed iframes when allow-popups is granted.
- *  2. window.top.open — escapes the iframe when same-origin allows.
- *  3. window.open — last resort.
- *  4. Copy URL to clipboard + error toast.
+ * Why an interstitial: when window.open is called from a sandboxed iframe
+ * (Lovable preview), the new tab can inherit sandbox flags / COOP relations,
+ * which makes sites like Facebook fail with ERR_BLOCKED_BY_RESPONSE. We open
+ * a same-origin /go.html page instead — that page is a top-level document on
+ * our own origin, with no sandbox, and it then redirects to the real URL.
  */
+function buildGoUrl(target: string): string {
+  const origin =
+    typeof window !== "undefined" && window.location ? window.location.origin : "";
+  return `${origin}/go.html?url=${encodeURIComponent(target)}`;
+}
+
 export function openExternal(
   ...args: Array<string | null | undefined | { errorMessage?: string }>
 ): boolean {
@@ -29,10 +33,13 @@ export function openExternal(
     return false;
   }
 
-  // 1) Synthetic anchor click — escapes iframe sandbox most reliably.
+  const goUrl = buildGoUrl(url);
+
+  // 1) Synthetic anchor click to a same-origin redirector — most reliable
+  //    way to open a real top-level tab from inside a sandboxed iframe.
   try {
     const a = document.createElement("a");
-    a.href = url;
+    a.href = goUrl;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
     a.style.display = "none";
@@ -44,23 +51,15 @@ export function openExternal(
     /* fall through */
   }
 
-  // 2) Try the top frame (may throw cross-origin — silence).
+  // 2) window.open fallback (still through the redirector).
   try {
-    const w = window.top?.open?.(url, "_blank", "noopener,noreferrer");
+    const w = window.open(goUrl, "_blank", "noopener,noreferrer");
     if (w) return true;
   } catch {
     /* fall through */
   }
 
-  // 3) Plain window.open as last resort.
-  try {
-    const w = window.open(url, "_blank", "noopener,noreferrer");
-    if (w) return true;
-  } catch {
-    /* fall through */
-  }
-
-  // 4) Nothing worked — copy URL to clipboard so the user can paste it.
+  // 3) Last resort — copy URL so the user can paste it manually.
   try {
     void navigator.clipboard?.writeText(url);
     toast.error("Permita popups para abrir links externos. URL copiada.");
