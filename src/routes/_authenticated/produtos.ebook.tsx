@@ -795,30 +795,54 @@ function EbookPage() {
             <CardTitle>Modo & estrutura do ebook</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              {MODES.map((m) => {
-                const Icon = m.icon;
-                const active = mode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setMode(m.id);
-                      if (m.id === "playbook") onPlaybookMode();
-                    }}
-                    className={`rounded-lg border p-4 text-left transition ${
-                      active ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/50"
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">{m.label}</span>
-                      {active && <Check className="ml-auto h-4 w-4 text-primary" />}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{m.description}</p>
-                  </button>
-                );
-              })}
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Estilo visual</Label>
+              <div className="grid gap-2 md:grid-cols-3 lg:grid-cols-5">
+                {STYLES.map((s) => {
+                  const active = style === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setStyle(s.id);
+                        setMode(styleToMode(s.id));
+                        setLayout(styleToLayout(s.id));
+                        if (s.id === "playbook") onPlaybookMode();
+                      }}
+                      className={`rounded-lg border p-3 text-left transition ${
+                        active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold">{s.label}</span>
+                        {active && <Check className="ml-auto h-3 w-3 text-primary" />}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{s.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Paleta</Label>
+              <div className="flex flex-wrap gap-2">
+                {PALETTES.map((p) => {
+                  const active = palette === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPalette(p.id)}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
+                        active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                      }`}
+                    >
+                      <span className={`h-3 w-3 rounded-full ${p.swatch}`} />
+                      {p.label}
+                      {active && <Check className="h-3 w-3 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <Label>Capítulos</Label>
