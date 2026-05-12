@@ -13,6 +13,7 @@ import {
   BookOpen,
   Sparkle,
   Radar,
+  FolderKanban,
 } from "lucide-react";
 import {
   Sidebar,
@@ -57,7 +58,8 @@ export function AppSidebar() {
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
     { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
-    { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
+    { to: "/projetos", label: "Projetos", icon: FolderKanban },
+    { to: "/produtos/ebook", label: "Editor Ebook", icon: BookOpen },
     { to: "/produtos/playbook", label: "Playbook", icon: Sparkle },
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ] as { to: string; label: string; icon: typeof LayoutDashboard; badge?: number }[];

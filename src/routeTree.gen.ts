@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
+import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
@@ -25,6 +26,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
 import { Route as AuthenticatedProdutosPlaybookRouteImport } from './routes/_authenticated/produtos.playbook'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
@@ -54,6 +56,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
 const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
   id: '/radar',
   path: '/radar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProjetosRoute = AuthenticatedProjetosRouteImport.update({
+  id: '/projetos',
+  path: '/projetos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOfertasSalvasRoute =
@@ -117,6 +124,11 @@ const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   path: '/api/collector/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedProjetosIdRoute = AuthenticatedProjetosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedProjetosRoute,
+} as any)
 const AuthenticatedProdutosPlaybookRoute =
   AuthenticatedProdutosPlaybookRouteImport.update({
     id: '/produtos/playbook',
@@ -166,11 +178,13 @@ export interface FileRoutesByFullPath {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
+  '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -189,11 +203,13 @@ export interface FileRoutesByTo {
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
+  '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -214,11 +230,13 @@ export interface FileRoutesById {
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
+  '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -239,11 +257,13 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/projetos'
     | '/radar'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
+    | '/projetos/$id'
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
@@ -262,11 +282,13 @@ export interface FileRouteTypes {
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/projetos'
     | '/radar'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
+    | '/projetos/$id'
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
@@ -286,11 +308,13 @@ export interface FileRouteTypes {
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
+    | '/_authenticated/projetos'
     | '/_authenticated/radar'
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/produtos/playbook'
+    | '/_authenticated/projetos/$id'
     | '/api/collector/run'
     | '/_authenticated/produtos/playbook/$id'
     | '/_authenticated/produtos/playbook/novo'
@@ -340,6 +364,13 @@ declare module '@tanstack/react-router' {
       path: '/radar'
       fullPath: '/radar'
       preLoaderRoute: typeof AuthenticatedRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/projetos': {
+      id: '/_authenticated/projetos'
+      path: '/projetos'
+      fullPath: '/projetos'
+      preLoaderRoute: typeof AuthenticatedProjetosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/ofertas-salvas': {
@@ -419,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/projetos/$id': {
+      id: '/_authenticated/projetos/$id'
+      path: '/$id'
+      fullPath: '/projetos/$id'
+      preLoaderRoute: typeof AuthenticatedProjetosIdRouteImport
+      parentRoute: typeof AuthenticatedProjetosRoute
+    }
     '/_authenticated/produtos/playbook': {
       id: '/_authenticated/produtos/playbook'
       path: '/produtos/playbook'
@@ -464,6 +502,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedProjetosRouteChildren {
+  AuthenticatedProjetosIdRoute: typeof AuthenticatedProjetosIdRoute
+}
+
+const AuthenticatedProjetosRouteChildren: AuthenticatedProjetosRouteChildren = {
+  AuthenticatedProjetosIdRoute: AuthenticatedProjetosIdRoute,
+}
+
+const AuthenticatedProjetosRouteWithChildren =
+  AuthenticatedProjetosRoute._addFileChildren(
+    AuthenticatedProjetosRouteChildren,
+  )
+
 interface AuthenticatedProdutosPlaybookIdRouteChildren {
   AuthenticatedProdutosPlaybookIdEditarRoute: typeof AuthenticatedProdutosPlaybookIdEditarRoute
 }
@@ -508,6 +559,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
+  AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
@@ -525,6 +577,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
+  AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,

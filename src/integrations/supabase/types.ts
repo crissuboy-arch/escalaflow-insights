@@ -154,6 +154,7 @@ export type Database = {
           mode: string
           niche: string | null
           outline: Json
+          project_id: string | null
           source_ad_key: string | null
           status: string
           step: number
@@ -173,6 +174,7 @@ export type Database = {
           mode?: string
           niche?: string | null
           outline?: Json
+          project_id?: string | null
           source_ad_key?: string | null
           status?: string
           step?: number
@@ -192,6 +194,7 @@ export type Database = {
           mode?: string
           niche?: string | null
           outline?: Json
+          project_id?: string | null
           source_ad_key?: string | null
           status?: string
           step?: number
@@ -258,6 +261,7 @@ export type Database = {
           created_at: string
           id: string
           niche: string | null
+          project_id: string | null
           promise: string | null
           scenes: Json
           source_ad_key: string | null
@@ -276,6 +280,7 @@ export type Database = {
           created_at?: string
           id?: string
           niche?: string | null
+          project_id?: string | null
           promise?: string | null
           scenes?: Json
           source_ad_key?: string | null
@@ -294,6 +299,7 @@ export type Database = {
           created_at?: string
           id?: string
           niche?: string | null
+          project_id?: string | null
           promise?: string | null
           scenes?: Json
           source_ad_key?: string | null
@@ -337,6 +343,63 @@ export type Database = {
           preferred_language?: string
           theme?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          briefing: Json
+          cover_url: string | null
+          created_at: string
+          ebook_id: string | null
+          id: string
+          meta: Json
+          mode: string
+          niche: string | null
+          outline: Json
+          playbook_id: string | null
+          source_ad_key: string | null
+          status: string
+          step: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          briefing?: Json
+          cover_url?: string | null
+          created_at?: string
+          ebook_id?: string | null
+          id?: string
+          meta?: Json
+          mode?: string
+          niche?: string | null
+          outline?: Json
+          playbook_id?: string | null
+          source_ad_key?: string | null
+          status?: string
+          step?: number
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          briefing?: Json
+          cover_url?: string | null
+          created_at?: string
+          ebook_id?: string | null
+          id?: string
+          meta?: Json
+          mode?: string
+          niche?: string | null
+          outline?: Json
+          playbook_id?: string | null
+          source_ad_key?: string | null
+          status?: string
+          step?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
