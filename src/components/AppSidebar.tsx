@@ -12,6 +12,7 @@ import {
   Radio,
   BookOpen,
   Sparkle,
+  Radar,
 } from "lucide-react";
 import {
   Sidebar,
@@ -50,6 +51,7 @@ export function AppSidebar() {
   const items = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
+    { to: "/radar", label: "Radar", icon: Radar },
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
