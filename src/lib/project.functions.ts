@@ -35,7 +35,7 @@ const KickstartSchema = z.object({
   chapterCount: z.number().min(3).max(15).default(6),
 });
 
-const ModeSchema = z.enum(["pdf", "premium", "kdp", "playbook", "combo"]);
+const ModeSchema = z.enum(["pdf", "premium", "kdp", "playbook", "combo", "story"]);
 export type ProjectMode = z.infer<typeof ModeSchema>;
 
 const CreateInputSchema = z.object({
