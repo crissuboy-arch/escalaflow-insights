@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getAnalyzedAdByKey, fetchSavedAds, fetchFavoriteAds, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { ArrowLeft, Sparkles, Target, Heart, Lightbulb, Users, Brain, Layers, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
-import { openExternal } from "@/lib/external";
+import { openAdLink } from "@/lib/external";
 
 export const Route = createFileRoute("/_authenticated/analise-ia")({
   component: AIPage,
@@ -118,10 +118,12 @@ function AIPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => openExternal(
-                          selected.ad_url,
-                          selected.ad_library_id ? `https://www.facebook.com/ads/library/?id=${selected.ad_library_id}` : null,
-                        )}
+                        onClick={() => openAdLink({
+                          adUrl: selected.ad_url,
+                          adLibraryId: selected.ad_library_id,
+                          advertiser: selected.advertiser,
+                          headline: selected.headline,
+                        })}
                       >
                         <ExternalLink className="mr-1 h-3 w-3" /> Abrir anúncio
                       </Button>
