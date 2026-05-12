@@ -45,7 +45,7 @@ export function PipelineHub({
 
   useEffect(() => {
     let alive = true;
-    list({ data: undefined as never })
+    list()
       .then((r) => alive && setRows(r as Row[]))
       .catch(() => alive && setRows([]))
       .finally(() => alive && setLoading(false));
