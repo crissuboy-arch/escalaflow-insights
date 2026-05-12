@@ -200,3 +200,88 @@ export async function aiGenerateVideoScript(briefing: PlaybookBriefing, scenes: 
   if (typeof text !== "string" || !text.trim()) throw new Error("Roteiro vazio");
   return text;
 }
+
+// === Estratégia completa do Playbook ===========================
+
+export const PlaybookStrategySchema = z.object({
+  bigIdea: z.string(),
+  promise: z.string(),
+  uniqueMechanism: z.string(),
+  avatar: z.string(),
+  pains: z.array(z.string()),
+  desires: z.array(z.string()),
+  objections: z.array(z.string()),
+  mentalTriggers: z.array(z.string()),
+  headlines: z.array(z.string()),
+  vslStructure: z.string(),
+  pageStructure: z.string(),
+  funnel: z.string(),
+  offer: z.string(),
+  bonuses: z.array(z.string()),
+  stack: z.string(),
+  cta: z.string(),
+  scripts: z.array(z.string()),
+  angles: z.array(z.string()),
+  scale: z.string(),
+});
+export type PlaybookStrategy = z.infer<typeof PlaybookStrategySchema>;
+
+export async function aiGeneratePlaybookStrategy(
+  briefing: PlaybookBriefing,
+): Promise<PlaybookStrategy> {
+  const data = (await aiChat({
+    model: "google/gemini-3-flash-preview",
+    messages: [
+      {
+        role: "system",
+        content:
+          "Você é estrategista sênior de marketing direto. Gera estratégias completas de lançamento em PT-BR. Devolva via ferramenta `strategy`.",
+      },
+      {
+        role: "user",
+        content: `Briefing do produto:\n${JSON.stringify(briefing, null, 2)}\n\nGere a estratégia completa: bigIdea, promise (refinada), uniqueMechanism (refinado), avatar (descrição rica), pains (5), desires (5), objections (5), mentalTriggers (6, ex: escassez, prova, autoridade…), headlines (8 variações fortes), vslStructure (markdown com blocos numerados Hook→Problema→Mecanismo→Prova→Oferta→CTA), pageStructure (markdown com 10 dobras), funnel (descreva funil completo: tráfego, captura, VSL, oferta, OB, upsell, downsell), offer (oferta principal completa), bonuses (4 bônus), stack (stack de valor empilhado), cta (CTA principal), scripts (3 scripts curtos: Reels, WhatsApp, e-mail), angles (5 ângulos criativos), scale (plano de escala em 30/60/90 dias).`,
+      },
+    ],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "strategy",
+          parameters: {
+            type: "object",
+            properties: {
+              bigIdea: { type: "string" },
+              promise: { type: "string" },
+              uniqueMechanism: { type: "string" },
+              avatar: { type: "string" },
+              pains: { type: "array", items: { type: "string" } },
+              desires: { type: "array", items: { type: "string" } },
+              objections: { type: "array", items: { type: "string" } },
+              mentalTriggers: { type: "array", items: { type: "string" } },
+              headlines: { type: "array", items: { type: "string" } },
+              vslStructure: { type: "string" },
+              pageStructure: { type: "string" },
+              funnel: { type: "string" },
+              offer: { type: "string" },
+              bonuses: { type: "array", items: { type: "string" } },
+              stack: { type: "string" },
+              cta: { type: "string" },
+              scripts: { type: "array", items: { type: "string" } },
+              angles: { type: "array", items: { type: "string" } },
+              scale: { type: "string" },
+            },
+            required: [
+              "bigIdea","promise","uniqueMechanism","avatar","pains","desires","objections",
+              "mentalTriggers","headlines","vslStructure","pageStructure","funnel","offer",
+              "bonuses","stack","cta","scripts","angles","scale",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+    ],
+    tool_choice: { type: "function", function: { name: "strategy" } },
+  })) as any;
+  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
+  return PlaybookStrategySchema.parse(JSON.parse(args));
+}
