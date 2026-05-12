@@ -215,6 +215,49 @@ function PlaybookReaderPage() {
             {pb.niche && <Badge variant="outline" className="text-[10px]">{pb.niche}</Badge>}
           </div>
           <div className="flex gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Wand2 className="mr-1 h-3.5 w-3.5" /> Estratégia
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+                <SheetHeader>
+                  <SheetTitle>Estratégia completa</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6">
+                  {!strategy ? (
+                    <div className="space-y-4 text-sm text-muted-foreground">
+                      <p>
+                        Gere a estratégia completa: Big Idea, Promessa, Mecanismo,
+                        Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL,
+                        Página, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos e
+                        Plano de Escala.
+                      </p>
+                      <Button
+                        disabled={generatingStrategy}
+                        onClick={onGenerateStrategy}
+                        className="w-full text-white"
+                        style={{ background: "var(--gradient-playbook)" }}
+                      >
+                        {generatingStrategy ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Wand2 className="mr-2 h-4 w-4" />
+                        )}
+                        Gerar estratégia com IA
+                      </Button>
+                    </div>
+                  ) : (
+                    <StrategyView
+                      strategy={strategy}
+                      onRegenerate={onGenerateStrategy}
+                      busy={generatingStrategy}
+                    />
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
             <Button asChild variant="outline" size="sm">
               <Link to="/produtos/playbook/$id/editar" params={{ id }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
@@ -228,8 +271,10 @@ function PlaybookReaderPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={exportPdf}><FileText className="mr-2 h-4 w-4" /> PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportDocx}><FileType2 className="mr-2 h-4 w-4" /> DOCX</DropdownMenuItem>
                 <DropdownMenuItem onClick={exportCarousel}><Images className="mr-2 h-4 w-4" /> Carrossel (PNG)</DropdownMenuItem>
                 <DropdownMenuItem onClick={exportScript}><Film className="mr-2 h-4 w-4" /> Roteiro de vídeo</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyAll}><Copy className="mr-2 h-4 w-4" /> Copiar conteúdo</DropdownMenuItem>
                 <DropdownMenuItem disabled>Apresentação (em breve)</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
