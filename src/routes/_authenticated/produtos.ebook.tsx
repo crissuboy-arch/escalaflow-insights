@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Loader2, BookOpen, Wand2, ImageIcon, FileDown, Check, ArrowLeft, ArrowRight } from "lucide-react";
+import { Loader2, BookOpen, Wand2, ImageIcon, FileDown, Check, ArrowLeft, ArrowRight, Sparkles, FileText, BookMarked } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFavoriteAds, fetchSavedAds, fetchScaledAds, type PersistedAd } from "@/lib/queries";
 import {
   extractEbookBriefing,
   generateEbookOutline,
   generateEbookChapter,
+  generateEbookChapterImage,
   generateEbookCover,
   saveEbookDraft,
   listEbookDrafts,
@@ -24,10 +25,17 @@ import {
 } from "@/lib/ebook.functions";
 import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
+import { exportEbookDocx } from "@/lib/ebook/docx";
+import { exportEbookEpub } from "@/lib/ebook/epub";
 import { EbookPreview } from "@/components/ebook/EbookPreview";
 import { DraftList, type DraftRow } from "@/components/ebook/DraftList";
 
 export const Route = createFileRoute("/_authenticated/produtos/ebook")({
+  beforeLoad: async () => {
+    // Ensure Supabase session is hydrated before any authenticated fns run.
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw redirect({ to: "/login" });
+  },
   component: EbookPage,
 });
 
@@ -42,9 +50,16 @@ type Briefing = {
   uniqueMechanism: string;
 };
 type Outline = { title: string; bullets: string[] }[];
-type Chapter = { title: string; markdown: string };
+type Chapter = { title: string; markdown: string; imageUrl?: string | null };
+type EbookMode = "kdp" | "premium" | "playbook";
 
-const STEPS = ["Anúncio", "Briefing", "Estrutura", "Layout & Capa", "Capítulos & PDF"];
+const STEPS = ["Anúncio", "Briefing", "Modo & Estrutura", "Layout & Capa", "Capítulos & Exportar"];
+
+const MODES: { id: EbookMode; label: string; icon: typeof BookOpen; description: string }[] = [
+  { id: "kdp", label: "Amazon/KDP", icon: FileText, description: "PDF, DOCX e EPUB com sumário, capítulos limpos e layout profissional para publicar." },
+  { id: "premium", label: "Premium Visual", icon: Sparkles, description: "Imagem por capítulo gerada por IA, layouts modernos estilo Canva/Gamma." },
+  { id: "playbook", label: "Playbook Interativo", icon: BookMarked, description: "Cenas, storytelling, narrativa visual. Abre o construtor de Playbooks." },
+];
 
 async function errMsg(e: unknown, fallback: string): Promise<string> {
   if (e instanceof Error) return e.message || fallback;
@@ -61,12 +76,14 @@ async function errMsg(e: unknown, fallback: string): Promise<string> {
 }
 
 function EbookPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [ads, setAds] = useState<PersistedAd[]>([]);
   const [selectedAd, setSelectedAd] = useState<PersistedAd | null>(null);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [outline, setOutline] = useState<Outline>([]);
   const [chapterCount, setChapterCount] = useState(6);
+  const [mode, setMode] = useState<EbookMode>("kdp");
   const [layout, setLayout] = useState<EbookLayout>("classico");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
@@ -77,10 +94,12 @@ function EbookPage() {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [imageBusyIndex, setImageBusyIndex] = useState<number | null>(null);
 
   const fnExtract = useServerFn(extractEbookBriefing);
   const fnOutline = useServerFn(generateEbookOutline);
   const fnChapter = useServerFn(generateEbookChapter);
+  const fnChapterImg = useServerFn(generateEbookChapterImage);
   const fnCover = useServerFn(generateEbookCover);
   const fnSave = useServerFn(saveEbookDraft);
   const fnList = useServerFn(listEbookDrafts);
@@ -105,10 +124,7 @@ function EbookPage() {
   };
 
   useEffect(() => {
-    // Wait for Supabase session to hydrate before calling auth-protected fns
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) refreshDrafts();
-    });
+    refreshDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -128,15 +144,83 @@ function EbookPage() {
         status: overrides?.status ?? "draft",
         step: overrides?.step ?? step,
         chapter_count: chapterCount,
+        mode,
       };
       const { id } = await fnSave({ data: { id: ebookId ?? undefined, payload } });
+      const isNew = !ebookId;
       setEbookId(id);
+      if (isNew) {
+        // Persist URL so refresh resumes the same draft.
+        navigate({ to: "/produtos/ebook", search: { id } as never, replace: true });
+        try {
+          window.history.replaceState({}, "", `/produtos/ebook?id=${id}`);
+        } catch {
+          /* ignore */
+        }
+      }
       setSavedAt(new Date());
       refreshDrafts();
     } catch (e) {
       console.error("saveDraft", e);
     }
   };
+
+  // Debounced autosave on any meaningful change
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!briefing && !selectedAd) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      saveDraft();
+    }, 1500);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [briefing, outline, chapters, layout, coverUrl, chapterCount, mode]);
+
+  // Local backup so a refresh before the first remote save doesn't lose work
+  useEffect(() => {
+    if (!briefing && !selectedAd) return;
+    const key = `ebook-draft:${ebookId ?? "new"}`;
+    try {
+      localStorage.setItem(
+        key,
+        JSON.stringify({ step, mode, layout, briefing, outline, chapters, chapterCount, coverUrl, ebookId }),
+      );
+    } catch {
+      /* ignore quota */
+    }
+  }, [step, mode, layout, briefing, outline, chapters, chapterCount, coverUrl, ebookId, selectedAd]);
+
+  // Restore from URL ?id=... or local backup
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlId = params.get("id");
+    if (urlId) {
+      onResumeDraft(urlId);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem("ebook-draft:new");
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d?.briefing) {
+          setBriefing(d.briefing);
+          setOutline(d.outline ?? []);
+          setChapters(d.chapters ?? []);
+          setLayout(d.layout ?? "classico");
+          setCoverUrl(d.coverUrl ?? null);
+          setChapterCount(d.chapterCount ?? 6);
+          setMode(d.mode ?? "kdp");
+          setStep(d.step ?? 0);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onResumeDraft = async (id: string) => {
     setBusy("Carregando rascunho…");
@@ -149,12 +233,18 @@ function EbookPage() {
       setLayout((row.layout as EbookLayout) ?? "classico");
       setCoverUrl((row.cover_url as string | null) ?? null);
       setChapterCount((row.chapter_count as number) ?? 6);
+      setMode(((row.mode as EbookMode) ?? "kdp") as EbookMode);
       const adKey = row.source_ad_key as string | null;
       if (adKey) {
         const ad = ads.find((a) => a.key === adKey) ?? null;
         setSelectedAd(ad);
       }
       setStep(((row.step as number) ?? 0) as number);
+      try {
+        window.history.replaceState({}, "", `/produtos/ebook?id=${id}`);
+      } catch {
+        /* ignore */
+      }
       toast.success("Rascunho retomado");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao carregar rascunho");
@@ -319,12 +409,7 @@ function EbookPage() {
         coverUrl,
         chapters,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${briefing.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${slug(briefing.title)}.pdf`);
 
       await saveDraft({ status: "ready" });
       toast.success("PDF exportado");
@@ -332,6 +417,93 @@ function EbookPage() {
       toast.error(await errMsg(e, "Falha ao exportar PDF"));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const onExportDocx = async () => {
+    if (!briefing || chapters.length === 0) return toast.error("Gere os capítulos primeiro");
+    setBusy("Gerando DOCX…");
+    try {
+      const blob = await exportEbookDocx({
+        title: briefing.title,
+        subtitle: briefing.subtitle,
+        coverUrl,
+        chapters,
+      });
+      downloadBlob(blob, `${slug(briefing.title)}.docx`);
+      await saveDraft({ status: "ready" });
+      toast.success("DOCX exportado");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao exportar DOCX"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onExportEpub = async () => {
+    if (!briefing || chapters.length === 0) return toast.error("Gere os capítulos primeiro");
+    setBusy("Gerando EPUB…");
+    try {
+      const blob = await exportEbookEpub({
+        title: briefing.title,
+        subtitle: briefing.subtitle,
+        coverUrl,
+        chapters,
+      });
+      downloadBlob(blob, `${slug(briefing.title)}.epub`);
+      await saveDraft({ status: "ready" });
+      toast.success("EPUB exportado");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao exportar EPUB"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onGenerateChapterImage = async (i: number) => {
+    if (!briefing || !outline[i]) return;
+    setImageBusyIndex(i);
+    try {
+      const { dataUrl } = await fnChapterImg({
+        data: { briefing, chapter: outline[i], layout },
+      });
+      const next = chapters.map((c, idx) => (idx === i ? { ...c, imageUrl: dataUrl } : c));
+      setChapters(next);
+      toast.success(`Imagem do capítulo ${i + 1} gerada`);
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao gerar imagem"));
+    } finally {
+      setImageBusyIndex(null);
+    }
+  };
+
+  const onGenerateAllChapterImages = async () => {
+    if (!briefing) return;
+    setBusy("Gerando imagens dos capítulos…");
+    setProgress({ done: 0, total: chapters.length });
+    const next = [...chapters];
+    for (let i = 0; i < next.length; i++) {
+      try {
+        const { dataUrl } = await fnChapterImg({
+          data: { briefing, chapter: outline[i] ?? { title: next[i].title, bullets: [] }, layout },
+        });
+        next[i] = { ...next[i], imageUrl: dataUrl };
+        setChapters([...next]);
+      } catch (e) {
+        console.warn(`[ebook] image ch${i} failed`, e);
+      }
+      setProgress({ done: i + 1, total: next.length });
+    }
+    setBusy(null);
+    toast.success("Imagens prontas");
+  };
+
+  const onPlaybookMode = () => {
+    // Hand off to existing Playbook builder, prefilled with the same ad.
+    if (selectedAd) {
+      navigate({ to: "/produtos/playbook/novo", search: { adKey: selectedAd.key } as never });
+    } else {
+      navigate({ to: "/produtos/playbook/novo" });
     }
   };
 
@@ -477,9 +649,34 @@ function EbookPage() {
       {step === 2 && (
         <Card>
           <CardHeader>
-            <CardTitle>Estrutura do ebook</CardTitle>
+            <CardTitle>Modo & estrutura do ebook</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              {MODES.map((m) => {
+                const Icon = m.icon;
+                const active = mode === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      setMode(m.id);
+                      if (m.id === "playbook") onPlaybookMode();
+                    }}
+                    className={`rounded-lg border p-4 text-left transition ${
+                      active ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="mb-2 flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-primary" />
+                      <span className="font-semibold">{m.label}</span>
+                      {active && <Check className="ml-auto h-4 w-4 text-primary" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{m.description}</p>
+                  </button>
+                );
+              })}
+            </div>
             <div className="flex items-center gap-3">
               <Label>Capítulos</Label>
               <Input
