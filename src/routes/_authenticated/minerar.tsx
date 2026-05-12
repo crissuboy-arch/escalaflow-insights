@@ -371,26 +371,45 @@ function MinePage() {
         </CardContent>
       </Card>
 
-      {/* Filtros rápidos */}
-      <div className="flex flex-wrap gap-2">
-        {QUICK_TAGS.map((tag) => {
-          const active = activeTag === tag;
-          return (
-            <motion.button
-              key={tag}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => onTagClick(tag)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                active
-                  ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
-                  : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
-              }`}
-              style={active ? { background: "var(--gradient-primary)" } : undefined}
-            >
-              {tag}
-            </motion.button>
-          );
-        })}
+      {/* Categorias de inteligência */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_LIST.map((c) => {
+            const active = activeCategory === c.id;
+            return (
+              <motion.button
+                key={c.id}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => onCategoryClick(c.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  active
+                    ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
+                    : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
+                }`}
+                style={active ? { background: "var(--gradient-primary)" } : undefined}
+              >
+                <span className="mr-1">{c.emoji}</span>{c.label}
+              </motion.button>
+            );
+          })}
+        </div>
+        {activeCategory && (
+          <div className="flex flex-wrap gap-1.5 rounded-lg border border-border/60 bg-card/60 p-3">
+            {(CATEGORY_LIST.find((c) => c.id === activeCategory)?.keywords ?? []).map((kw) => (
+              <button
+                key={kw}
+                onClick={() => onKeywordChip(kw)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  keyword === kw
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
+                }`}
+              >
+                {kw}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filtros principais */}
