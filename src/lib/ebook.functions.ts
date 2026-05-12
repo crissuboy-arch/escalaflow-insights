@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   aiExtractBriefing,
   aiGenerateChapter,
+  aiGenerateChapterImage,
   aiGenerateCover,
   aiGenerateOutline,
   BriefingSchema,
@@ -110,7 +111,40 @@ export const generateEbookCover = createServerFn({ method: "POST" })
     }
   });
 
-const ChapterSchema = z.object({ title: z.string(), markdown: z.string() });
+export const generateEbookChapterImage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: {
+      briefing: Briefing;
+      chapter: { title: string; bullets: string[] };
+      layout: string;
+    }) =>
+      z
+        .object({
+          briefing: BriefingSchema,
+          chapter: OutlineChapterSchema,
+          layout: z.enum(["classico", "moderno", "minimalista"]),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const dataUrl = await aiGenerateChapterImage(
+        data.briefing,
+        data.chapter,
+        data.layout,
+      );
+      return { dataUrl };
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar imagem do capítulo");
+    }
+  });
+
+const ChapterSchema = z.object({
+  title: z.string(),
+  markdown: z.string(),
+  imageUrl: z.string().nullable().optional(),
+});
 const DraftPayloadSchema = z.object({
   source_ad_key: z.string().nullable().optional(),
   title: z.string().min(1).max(300),
@@ -124,6 +158,7 @@ const DraftPayloadSchema = z.object({
   status: z.enum(["draft", "ready"]).default("draft"),
   step: z.number().min(0).max(10).default(0),
   chapter_count: z.number().min(3).max(15).default(6),
+  mode: z.enum(["kdp", "premium", "playbook"]).default("kdp"),
 });
 
 export const saveEbookDraft = createServerFn({ method: "POST" })

@@ -13,7 +13,7 @@ export interface EbookPdfInput {
   author?: string;
   layout: EbookLayout;
   coverUrl?: string | null;
-  chapters: { title: string; markdown: string }[];
+  chapters: { title: string; markdown: string; imageUrl?: string | null }[];
 }
 
 const PAGE = { w: 595.28, h: 841.89 }; // A4 portrait
@@ -275,6 +275,29 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
       y -= spec.headingSize + 10;
     }
     y -= 12;
+    if (ch.imageUrl) {
+      try {
+        const bytes = await fetchAsBytes(ch.imageUrl);
+        const img = await embedImage(pdf, bytes, ch.imageUrl);
+        if (img) {
+          const targetW = contentW;
+          const targetH = Math.min(targetW * (img.height / img.width), 240);
+          if (y - targetH < margin) {
+            page = pdf.addPage([PAGE.w, PAGE.h]);
+            y = PAGE.h - margin;
+          }
+          page.drawImage(img, {
+            x: margin,
+            y: y - targetH,
+            width: targetW,
+            height: targetH,
+          });
+          y -= targetH + 14;
+        }
+      } catch (e) {
+        console.warn("[ebook] chapter image failed", e);
+      }
+    }
     const blocks = parseMd(ch.markdown);
     for (const b of blocks) {
       const r = drawBlock(page, b, y);
