@@ -16,14 +16,19 @@ import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
+import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenticated/pagina-venda'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
 import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
+import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
+import { Route as AuthenticatedCopyRouteImport } from './routes/_authenticated/copy'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated/checkout'
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
@@ -70,6 +75,12 @@ const AuthenticatedProjetosRoute = AuthenticatedProjetosRouteImport.update({
   path: '/projetos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPaginaVendaRoute =
+  AuthenticatedPaginaVendaRouteImport.update({
+    id: '/pagina-venda',
+    path: '/pagina-venda',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedOfertasSalvasRoute =
   AuthenticatedOfertasSalvasRouteImport.update({
     id: '/ofertas-salvas',
@@ -104,9 +115,24 @@ const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
   path: '/favoritos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
+  id: '/escala',
+  path: '/escala',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCriativosRoute = AuthenticatedCriativosRouteImport.update({
+  id: '/criativos',
+  path: '/criativos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCopyRoute = AuthenticatedCopyRouteImport.update({
+  id: '/copy',
+  path: '/copy',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedConfiguracoesRoute =
@@ -115,6 +141,11 @@ const AuthenticatedConfiguracoesRoute =
     path: '/configuracoes',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedCentralMineracaoRoute =
   AuthenticatedCentralMineracaoRouteImport.update({
     id: '/central-mineracao',
@@ -183,14 +214,19 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/copy': typeof AuthenticatedCopyRoute
+  '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
@@ -210,14 +246,19 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
+  '/checkout': typeof AuthenticatedCheckoutRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/copy': typeof AuthenticatedCopyRoute
+  '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
@@ -239,14 +280,19 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/analise-ia': typeof AuthenticatedAnaliseIaRoute
   '/_authenticated/central-mineracao': typeof AuthenticatedCentralMineracaoRoute
+  '/_authenticated/checkout': typeof AuthenticatedCheckoutRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/_authenticated/copy': typeof AuthenticatedCopyRoute
+  '/_authenticated/criativos': typeof AuthenticatedCriativosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/link-externo': typeof AuthenticatedLinkExternoRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
+  '/_authenticated/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
@@ -268,14 +314,19 @@ export interface FileRouteTypes {
     | '/login'
     | '/analise-ia'
     | '/central-mineracao'
+    | '/checkout'
     | '/configuracoes'
+    | '/copy'
+    | '/criativos'
     | '/dashboard'
+    | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
     | '/link-externo'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/pagina-venda'
     | '/projetos'
     | '/radar'
     | '/storybook'
@@ -295,14 +346,19 @@ export interface FileRouteTypes {
     | '/login'
     | '/analise-ia'
     | '/central-mineracao'
+    | '/checkout'
     | '/configuracoes'
+    | '/copy'
+    | '/criativos'
     | '/dashboard'
+    | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
     | '/link-externo'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
+    | '/pagina-venda'
     | '/projetos'
     | '/radar'
     | '/storybook'
@@ -323,14 +379,19 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/analise-ia'
     | '/_authenticated/central-mineracao'
+    | '/_authenticated/checkout'
     | '/_authenticated/configuracoes'
+    | '/_authenticated/copy'
+    | '/_authenticated/criativos'
     | '/_authenticated/dashboard'
+    | '/_authenticated/escala'
     | '/_authenticated/favoritos'
     | '/_authenticated/importar-anuncio'
     | '/_authenticated/link-externo'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
+    | '/_authenticated/pagina-venda'
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
     | '/_authenticated/storybook'
@@ -405,6 +466,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjetosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/pagina-venda': {
+      id: '/_authenticated/pagina-venda'
+      path: '/pagina-venda'
+      fullPath: '/pagina-venda'
+      preLoaderRoute: typeof AuthenticatedPaginaVendaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/ofertas-salvas': {
       id: '/_authenticated/ofertas-salvas'
       path: '/ofertas-salvas'
@@ -447,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/escala': {
+      id: '/_authenticated/escala'
+      path: '/escala'
+      fullPath: '/escala'
+      preLoaderRoute: typeof AuthenticatedEscalaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -454,11 +529,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/criativos': {
+      id: '/_authenticated/criativos'
+      path: '/criativos'
+      fullPath: '/criativos'
+      preLoaderRoute: typeof AuthenticatedCriativosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/copy': {
+      id: '/_authenticated/copy'
+      path: '/copy'
+      fullPath: '/copy'
+      preLoaderRoute: typeof AuthenticatedCopyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
       fullPath: '/configuracoes'
       preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/checkout': {
+      id: '/_authenticated/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof AuthenticatedCheckoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/central-mineracao': {
@@ -604,14 +700,19 @@ const AuthenticatedProdutosPlaybookRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
   AuthenticatedCentralMineracaoRoute: typeof AuthenticatedCentralMineracaoRoute
+  AuthenticatedCheckoutRoute: typeof AuthenticatedCheckoutRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
+  AuthenticatedCopyRoute: typeof AuthenticatedCopyRoute
+  AuthenticatedCriativosRoute: typeof AuthenticatedCriativosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedLinkExternoRoute: typeof AuthenticatedLinkExternoRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
+  AuthenticatedPaginaVendaRoute: typeof AuthenticatedPaginaVendaRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
@@ -623,14 +724,19 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnaliseIaRoute: AuthenticatedAnaliseIaRoute,
   AuthenticatedCentralMineracaoRoute: AuthenticatedCentralMineracaoRoute,
+  AuthenticatedCheckoutRoute: AuthenticatedCheckoutRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
+  AuthenticatedCopyRoute: AuthenticatedCopyRoute,
+  AuthenticatedCriativosRoute: AuthenticatedCriativosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedLinkExternoRoute: AuthenticatedLinkExternoRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
+  AuthenticatedPaginaVendaRoute: AuthenticatedPaginaVendaRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,

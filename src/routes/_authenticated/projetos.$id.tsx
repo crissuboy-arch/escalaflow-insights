@@ -16,6 +16,11 @@ import {
   Loader2,
   Sparkles,
   Wand2,
+  PenLine,
+  Megaphone,
+  LayoutTemplate,
+  ShoppingCart,
+  Rocket,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -30,6 +35,9 @@ export const Route = createFileRoute("/_authenticated/projetos/$id")({
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/login" });
   },
+  validateSearch: (s: Record<string, unknown>) => ({
+    tab: typeof s.tab === "string" ? (s.tab as string) : undefined,
+  }),
   component: ProjectWorkspace,
 });
 
@@ -60,6 +68,7 @@ type Project = {
 
 function ProjectWorkspace() {
   const { id } = Route.useParams();
+  const search = Route.useSearch() as { tab?: string };
   const navigate = useNavigate();
   const load = useServerFn(loadProject);
   const update = useServerFn(updateProject);
@@ -69,6 +78,7 @@ function ProjectWorkspace() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | "ebook" | "playbook" | "combo">(null);
+  const initialTab = (search.tab && ["briefing","estrutura","ebook","playbook","copy","criativos","pagina","checkout","escala","exportar"].includes(search.tab)) ? search.tab : "briefing";
 
   async function refresh() {
     try {
@@ -197,12 +207,17 @@ function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs defaultValue="briefing">
-        <TabsList>
+      <Tabs defaultValue={initialTab}>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="briefing">Briefing</TabsTrigger>
           <TabsTrigger value="estrutura">Estrutura</TabsTrigger>
           <TabsTrigger value="ebook">Ebook</TabsTrigger>
           <TabsTrigger value="playbook">Playbook</TabsTrigger>
+          <TabsTrigger value="copy"><PenLine className="mr-1 h-3.5 w-3.5" />Copy</TabsTrigger>
+          <TabsTrigger value="criativos"><Megaphone className="mr-1 h-3.5 w-3.5" />Criativos</TabsTrigger>
+          <TabsTrigger value="pagina"><LayoutTemplate className="mr-1 h-3.5 w-3.5" />Página</TabsTrigger>
+          <TabsTrigger value="checkout"><ShoppingCart className="mr-1 h-3.5 w-3.5" />Checkout</TabsTrigger>
+          <TabsTrigger value="escala"><Rocket className="mr-1 h-3.5 w-3.5" />Escala</TabsTrigger>
           <TabsTrigger value="exportar">Exportar</TabsTrigger>
         </TabsList>
 
@@ -375,7 +390,70 @@ function ProjectWorkspace() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="copy">
+          <PlaceholderModule
+            icon={PenLine}
+            title="Copy de Vendas"
+            description="O gerador de copy completa (headline, big idea, mecanismo, oferta, stack, garantia, FAQ, CTA) chega na próxima fase. Os dados serão salvos em meta.copy deste projeto."
+          />
+        </TabsContent>
+        <TabsContent value="criativos">
+          <PlaceholderModule
+            icon={Megaphone}
+            title="Criativos & Anúncios"
+            description="18 formatos virais com prompt visual em 1:1, 4:5 e 9:16 chegam na Fase 2. Cada criativo gerado fica em meta.creatives[]."
+          />
+        </TabsContent>
+        <TabsContent value="pagina">
+          <PlaceholderModule
+            icon={LayoutTemplate}
+            title="Página de Venda"
+            description="Estrutura em blocos (Hero, Dor, Promessa, Mecanismo, Benefícios, Prova, Oferta, Bônus, Garantia, FAQ, CTA) editáveis e exportáveis em HTML."
+          />
+        </TabsContent>
+        <TabsContent value="checkout">
+          <PlaceholderModule
+            icon={ShoppingCart}
+            title="Checkout & Oferta"
+            description="Configuração de preço, preço âncora, bônus, order bump, upsell, downsell, garantia e link Kiwify/Hotmart/Stripe."
+          />
+        </TabsContent>
+        <TabsContent value="escala">
+          <PlaceholderModule
+            icon={Rocket}
+            title="Escala do Produto"
+            description="Checklist final, ideias de anúncios e próximos passos de tráfego — disponível assim que cada etapa anterior estiver concluída."
+          />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function PlaceholderModule({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card className="overflow-hidden border-border/60">
+      <CardContent className="space-y-4 p-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold">{title}</p>
+            <p className="text-xs text-muted-foreground">Em construção (Fase 2 da esteira)</p>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
