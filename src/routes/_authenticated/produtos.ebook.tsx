@@ -345,7 +345,13 @@ function EbookPage() {
     setBusy("Gerando capa com IA…");
     try {
       const { dataUrl } = await fnCover({
-        data: { briefing, layout, customPrompt: coverPrompt || undefined },
+        data: {
+          briefing,
+          layout,
+          customPrompt: coverPrompt || undefined,
+          style,
+          palette,
+        },
       });
       // Try uploading to storage; fall back to data URL
       try {
