@@ -1,220 +1,151 @@
-## Objetivo
+## StoryBook Engine AI — Fase 1
 
-Transformar o Ebook Engine num gerador completo de produtos digitais vendáveis. Tudo é construído por cima da entidade `Project` que já existe — sem refazer mineração, exporters base ou playbook engine.
+Motor completo de geração de histórias virais, romances e ficção seriada, reusando a entidade `projects` existente (`mode='story'`). Sem novas tabelas. Sem APIs externas pagas: TikTok e Audiobook entregam **prompts e roteiros copiáveis**.
 
 ---
 
-## 1. Metadados do Produto
+## 1. Arquitetura
 
-Adicionar bloco "Identidade do Produto" no workspace (`/projetos/:id`, aba Briefing). Persistir em `projects.meta.identity`:
+- **Reuso total** de `projects`: `mode = 'story'`, todo o estado vive em `projects.meta.story` (jsonb).
+- **Nenhuma migração**: `projects.meta.story` guarda planejamento, personagens, estrutura, capítulos, capa, shorts, audiobook.
+- Capítulos longos vão em `projects.outline` (estrutura) e `projects.briefing.chapters` (texto), mesmo padrão dos ebooks.
+- Exportadores reusam `src/lib/ebook/{pdf,docx,epub,html}.ts` adaptando o mapper de capítulos.
 
-```ts
-identity: {
-  author: string;
-  brand: string;        // marca/editora
-  instagram: string;
-  copyright: string;    // ex: "© 2026 Autor"
-  subtitle: string;
-  category: string;     // dropdown (presets de nicho)
-  language: "pt" | "en" | "es";
-  shortDescription: string;
-  logoUrl?: string;     // upload em bucket ebook-covers/logos/
+```text
+projects.meta.story = {
+  planning: { type, subniche, audience, language, chapters, ending,
+              intensity, hotLevel, tone, title, subtitle },
+  characters: [{ id, role, name, age, look, personality, trauma,
+                 desires, fears, style, quotes, refImageUrl, visualPrompts:{pixar,real,anime} }],
+  structure: { synopsis, bigIdea, plotTwist, hooks[], cliffhangers[], journey[], outline[] },
+  chapters: [{ id, title, body, words, status }],
+  cover: { style, prompts:{dalle,midjourney,leonardo,gemini}, author, badges[] },
+  shorts: [{ chapterId, pov, hook, script, caption, cta, hashtags[], scenePrompts[] }],
+  audiobook: { voice, speed, mood, soundtrack, scriptSSML },
+  step: 1..8
 }
 ```
 
-Esses campos são injetados em:
-- capa (footer/header)
-- página de copyright do PDF/EPUB/DOCX
-- metadados EPUB (`dc:creator`, `dc:publisher`, `dc:language`, `dc:rights`)
-- header/footer do KDP
+## 2. Rotas (TanStack)
 
-Sem migração nova: tudo cabe em `projects.meta` (jsonb).
-
-## 2. Controle de Tamanho
-
-Novo seletor "Tamanho do produto" no briefing:
+Tudo sob `_authenticated`:
 
 ```text
-20 / 30 / 60 / 80 / 100 / 120 / 150 páginas
+src/routes/_authenticated/
+  storybook.tsx                  # Hub (lista + criar)
+  storybook.$id.tsx              # Workspace com 8 abas (Outlet)
+  storybook.$id.planejamento.tsx
+  storybook.$id.personagens.tsx
+  storybook.$id.estrutura.tsx
+  storybook.$id.capitulos.tsx
+  storybook.$id.capa.tsx
+  storybook.$id.shorts.tsx
+  storybook.$id.audiobook.tsx
+  storybook.$id.exportar.tsx
 ```
 
-Salvo em `projects.meta.size.targetPages`. A camada de IA mapeia páginas → orçamento de geração:
+Sidebar (`AppSidebar.tsx`) ganha grupo **"StoryBook Engine"** com sub-itens:
+- StoryBook Engine (`/storybook`)
+- Romance Engine → `/storybook?preset=romance`
+- TikTok Story → `/storybook?preset=tiktok`
+- Drama AI → `/storybook?preset=drama`
+- Personagens → aba global no workspace ativo
+- Audiobook IA → idem
+
+Os 4 últimos são filtros/atalhos do mesmo motor.
+
+## 3. Server functions (novo arquivo)
+
+`src/lib/storybook.functions.ts` + `src/lib/storybook.server.ts`:
 
 ```text
-páginas | capítulos | palavras/cap | extras
-20      | 5         | ~600         | —
-30      | 6         | ~750         | exemplos
-60      | 8         | ~1100        | exemplos + exercícios
-80      | 10        | ~1200        | + FAQ
-100     | 12        | ~1300        | + bônus
-120     | 14        | ~1400        | + storytelling
-150     | 16        | ~1500        | + bônus extras + estudos de caso
+createStory({ planning })            -> cria project mode=story
+updateStoryStep({ id, step, patch }) -> merge em meta.story
+aiGenerateCharacters({ id, count })
+aiGenerateStructure({ id })
+aiGenerateChapter({ id, chapterIndex, action })
+   action: generate | regenerate | expand | shorten |
+           more-emotion | more-tension | more-romance |
+           more-humor | more-dialogue
+aiGenerateCoverPrompts({ id })
+aiGenerateShorts({ id, chapterId })       -> POV/hook/script/legenda/CTA/hashtags/cenas
+aiGenerateAudiobookScript({ id, chapterId }) -> texto narrado + marcas SSML-like
+exportStory({ id, format })               -> pdf|docx|epub|html|txt|kindle(epub-kindle)|wattpad(txt formatado)
 ```
 
-`aiGenerateOutline` recebe `targetPages` e devolve outline com `chapterCount` calculado. `aiGenerateChapter` recebe `wordsTarget` e `extras: { examples, exercises, faq, bonus, storytelling }` para enriquecer cada capítulo.
+Tudo via Lovable AI Gateway (`google/gemini-3-flash-preview` default; `gpt-5-mini` para capítulos longos). Capítulos são gerados **em streaming** quando possível, salvos por chunk em `meta.story.chapters[i].body`.
 
-## 3. Tipos de Produto (modos)
+## 4. Catálogos (constantes)
 
-Estender `projects.mode` para aceitar:
+`src/lib/storybook/catalog.ts`:
 
-```text
-ebook | apostila | planner | planilha | playbook | kit
-```
+- `STORY_TYPES`: 15 tipos (Romance CEO, Dark, Máfia Italiana, Traficante, CEO/Empregada, Casamento por Contrato, Gravidez Inesperada, Mãe Solo, Cristão, Segunda Chance, Fantasia Romântica, Lobisomem, Vampiro, Bilionário Obsessivo, Inimigos→Amantes).
+- `SUBNICHES`: 13 (CEO frio, chefe do morro, favela luxury, mafioso possessivo, bad boy, policial infiltrado, milionário arrogante, amor proibido, vingança, obsessão, traição, ciúmes, revenge romance).
+- `HOT_LEVELS`: soft, sensual, picante, explícito.
+- `CHAPTER_COUNTS`: 20/30/60/80/100/120/150.
+- `COVER_STYLES`: 10 (Dark Romance, CEO Luxury, Favela Luxury, Máfia Italiana, Neon Romance, Cristão, Minimalista, Cinemático, Anime, Hot).
+- `BADGES`: bestseller, hot, viral TikTok.
+- `VOICES`: feminina-doce, feminina-grave, masculina-grave, masculina-jovem, emocional, narrador-classico.
 
-Cada tipo tem seu pipeline:
+Cada item carrega `promptHint` para injetar nos prompts de IA.
 
-- **ebook**: já existe, só ganha metadados/tamanho.
-- **apostila**: como ebook, com tom didático (módulos, atividades, gabarito ao final). Reusa `ebook.server` com `style: "apostila"`.
-- **planner**: novo gerador `planner.server.ts` (ver §4).
-- **planilha**: novo gerador `spreadsheet.server.ts` (ver §5).
-- **playbook**: já existe.
-- **kit**: orquestrador que dispara ebook + playbook + planner + checklist + copy + mockup em paralelo (ver §6).
+## 5. UI — identidade visual
 
-Hub `/projetos` ganha 6 cards de tipo (ou um seletor visual no fluxo "do zero"). O modo já aparece no header do projeto.
+Reusa tokens existentes (`src/styles.css`). Componentes novos:
 
-## 4. Planner
+- `src/components/storybook/StoryHub.tsx` — grid de cards premium (criar do zero / by preset / continuar).
+- `src/components/storybook/StepNav.tsx` — barra horizontal com 8 etapas, glow neon na etapa ativa, scroll horizontal no mobile.
+- `src/components/storybook/CharacterCard.tsx` — glassmorphism, avatar, traços, frases.
+- `src/components/storybook/ChapterEditor.tsx` — textarea + toolbar (regerar/expandir/encurtar/+emoção/+tensão/+romance/+humor/+diálogo) + contador (palavras / páginas estimadas / minutos de leitura).
+- `src/components/storybook/CoverPromptPanel.tsx` — abas DALL·E / Midjourney / Leonardo / Gemini com botão copiar.
+- `src/components/storybook/ShortsPanel.tsx` — cards de shorts por capítulo.
+- `src/components/storybook/AudiobookPanel.tsx` — seletor de voz/velocidade/trilha + script SSML copiável + nota "TTS externo".
+- `src/components/storybook/ExportPanel.tsx` — botões PDF/DOCX/EPUB/Kindle/Wattpad/TXT.
 
-Novo módulo `src/lib/planner.server.ts` + `planner/pdf.ts`. Templates:
+Mobile-first: `StepNav` vira scroll-x com snap; toolbars colapsam em sheets; cards 1-coluna < 768px.
 
-```text
-hábitos | calendário | metas | financeiro | emagrecimento | estudos | rotina
-```
+## 6. Exportadores
 
-Cada template define páginas modulares (capa → instruções → trackers → semanas → revisão). Geração:
+- PDF/DOCX/EPUB/HTML: adaptam input para `{ title, subtitle, author, chapters: [{title, body}] }` e chamam exporters existentes.
+- **Kindle**: variante do EPUB com manifesto compatível (`epub.ts` já é EPUB3; só renomear `.epub` e adicionar guia "Send to Kindle").
+- **Wattpad**: texto puro, capítulos separados por `***`, copyright no topo — gerado em memória.
+- **TXT**: dump de capítulos.
 
-1. IA preenche títulos, frases motivacionais, exemplos de hábito por nicho.
-2. `planner/pdf.ts` (pdf-lib) monta páginas A4 com grids/tabelas pré-desenhados — não é texto corrido, é layout fixo com placeholders preenchidos.
+Sem `.zip` nessa fase (não pedido).
 
-Saída: PDF imprimível + DOCX simples.
+## 7. Fluxo de criação
 
-## 5. Planilhas
+1. `/storybook` → card "Nova história" abre dialog com `planning` mínimo (título, tipo, capítulos, idioma).
+2. `createStory` cria project, redireciona para `/storybook/:id/planejamento`.
+3. Cada etapa salva via `updateStoryStep` ao avançar; botão "Gerar com IA" disponível por etapa.
+4. Capítulos: gera N em background, mostra progresso por capítulo; usuário pode editar cada um.
+5. Capa/Shorts/Audiobook: geram prompts/roteiros copiáveis (sem TTS/imagem real).
+6. Exportar: dropdown de formato → download direto.
 
-Novo módulo `src/lib/spreadsheet.server.ts`. Templates:
+## 8. Entregáveis
 
-```text
-financeiro | vendas | dieta | tráfego | leads | CRM
-```
+1. `src/lib/storybook/catalog.ts`
+2. `src/lib/storybook.functions.ts` + `src/lib/storybook.server.ts`
+3. `src/lib/storybook/exporters.ts` (mapper p/ exporters existentes + Wattpad/TXT/Kindle)
+4. 9 arquivos de rota em `src/routes/_authenticated/storybook*`
+5. 8 componentes em `src/components/storybook/`
+6. Update em `src/components/AppSidebar.tsx` (novo grupo)
+7. Tipo `mode='story'` aceito em validators de `project.functions.ts`
 
-Geração via `xlsx` (já é leve, edge-compat): cria workbook com abas, fórmulas, dropdowns e formatação básica. IA preenche apenas cabeçalhos, descrições e linhas-exemplo do nicho. Saída: `.xlsx` + cópia `.csv` por aba.
+## 9. Fora desta fase
 
-Adicionar `xlsx` como dependência.
+- Playbook Engine, Copy Engine, Ads Creative Engine (40 formatos), App Builder, Andrômeda Dash AI — ficam para fases 2+.
+- TTS real, geração de imagem de capa real, geração de vídeo TikTok — só prompts.
+- Upload de referência visual: aceita upload no bucket `ebook-covers/refs/` e exibe, mas não roda visão computacional.
 
-## 6. Kit Completo
+## 10. Validação
 
-`generateProjectKit({ id })` no `project.functions.ts`. Em paralelo:
-
-```text
-ebook (mode=premium)
-playbook
-planner (template baseado no nicho)
-checklist (markdown 1 página, gera PDF)
-copy (3 textos: VSL curta, headline, bio Instagram)
-mockup (capa renderizada em 3 ângulos via composição CSS→PNG no client)
-```
-
-Resultado vai numa nova aba "Kit" do workspace, com download `.zip` único.
-
-## 7. Exportações
-
-Aba **Exportar** ganha botões:
-
-```text
-[ DOCX ] [ PDF ] [ PDF Amazon KDP ] [ EPUB ] [ HTML ] [ Link Playbook ] [ Baixar Kit (.zip) ]
-```
-
-- DOCX/PDF/EPUB: já existem em `src/lib/ebook/`.
-- **PDF Amazon KDP**: variante do PDF com trim 6×9", margens KDP, sem links externos, fontes embutidas. Novo arquivo `src/lib/ebook/pdf-kdp.ts` (deriva do `pdf.ts`).
-- **HTML**: novo `src/lib/ebook/html.ts` — single-file HTML standalone (CSS embutido, imagens base64). Bom para preview/landing.
-- **Link Playbook**: já existe (`/p/:projectId`).
-- **Kit .zip**: usa `jszip` (já necessário para o kit) reunindo todos os artefatos.
-
-Adicionar `jszip` como dependência.
-
-## 8. IA — qualidade do conteúdo
-
-Refinar prompts em `ebook.server.ts`:
-
-- novo system prompt com diretrizes de storytelling (gancho, conflito, virada, prova, CTA por capítulo)
-- exigir tom humano, frases curtas + parágrafos médios alternados
-- proibir bullets puros — exigir narrativa
-- pedir profundidade proporcional a `wordsTarget`
-- injetar `identity` (autor, marca) para voz consistente
-- pedir blocos opcionais por capítulo: `## Exemplo`, `## Exercício`, `## FAQ`, `## Bônus` — controlados pelo `extras`
-- nova função `aiGenerateBookExtras(briefing)` para gerar: introdução, conclusão, sobre o autor, página de bônus, índice — chamadas no momento da exportação
-
-## 9. Presets de Nicho
-
-Novo `src/lib/ebook/niches.ts`:
-
-```ts
-export const NICHES = [
-  { id: "low-ticket", label: "Low Ticket", style: "premium", palette: "preto", tone: "direto/persuasivo" },
-  { id: "manicure", label: "Manicure", style: "feminino", palette: "rosa", tone: "amigável" },
-  { id: "emagrecimento", ... },
-  { id: "romance", ... },
-  { id: "dark-romance", ... },
-  { id: "gangster", ... },
-  { id: "renda-extra", ... },
-  { id: "ia", ... },
-  { id: "figurinhas", ... },
-  { id: "tiktok", ... },
-  { id: "canva", ... },
-  { id: "planner-feminino", ... },
-  { id: "cristao", ... },
-  { id: "marketing", ... },
-  { id: "solda", ... },
-  { id: "receitas", ... },
-];
-```
-
-Cada preset injeta `style`, `palette`, `tone` e um seed de briefing (avatar, dores, desejos, mecanismo padrão). Aparece no hub "Criar do Zero" e no kickstart IA como dropdown principal.
-
-## 10. UI do Workspace
-
-Aba **Briefing** vira 4 seções colapsáveis:
-
-```text
-1. Conceito (título, nicho, promessa, avatar) — já existe
-2. Identidade (autor, marca, IG, copyright, logo, idioma)  — novo
-3. Formato (tipo de produto, tamanho, estilo, paleta)      — novo+existente
-4. IA (gerar/refinar briefing, gerar capa)                 — já existe
-```
-
-Header do projeto:
-
-```text
-[ Gerar Ebook ] [ Gerar Playbook ] [ Gerar Planner ] [ Gerar Planilha ] [ Gerar Kit Completo ] [ Exportar ]
-```
-
-Botões habilitam conforme `mode` ou ficam todos disponíveis em modo `kit`.
-
-## 11. Entregáveis
-
-1. Migração: nenhuma (tudo em `projects.meta`); só `xlsx` e `jszip` como deps.
-2. `src/lib/ebook/niches.ts` (presets)
-3. `src/lib/ebook/html.ts`, `src/lib/ebook/pdf-kdp.ts` (exporters)
-4. `src/lib/planner.server.ts` + `src/lib/planner/pdf.ts`
-5. `src/lib/spreadsheet.server.ts`
-6. `src/lib/kit.server.ts` (orquestrador) + zip util
-7. Update em `project.functions.ts`: `generateProjectPlanner`, `generateProjectSpreadsheet`, `generateProjectKit`, validators de `mode`
-8. Update em `ebook.server.ts`: prompts refinados, `targetPages`/`extras`, `aiGenerateBookExtras`
-9. UI: seções de identidade/formato no Briefing tab; novos botões no header; nova aba "Kit"; presets de nicho no hub
-
-## 12. Fora de Escopo
-
-- Marketplace/venda dos produtos
-- DALL·E/Stability reais (segue só Gemini para capa/cenas)
-- Editor WYSIWYG por capítulo
-- Mockups 3D reais (mockup é composição CSS→PNG)
-- Tradução automática multi-idioma de conteúdo já gerado
-
-## 13. Validação
-
-- Briefing salva metadados e logo aparece na capa do PDF
-- Selecionar "100 páginas" gera ~12 capítulos com FAQ + bônus
-- "Gerar Planner" produz PDF A4 imprimível com grids preenchidos
-- "Gerar Planilha" baixa `.xlsx` com fórmulas funcionando
-- "Gerar Kit Completo" entrega `.zip` com ebook + playbook + planner + checklist + copy + mockup
-- Preset "dark-romance" pré-preenche tom, paleta e estilo automaticamente
-- Export HTML abre standalone sem dependências externas
-- KDP PDF respeita 6×9" com margens corretas
+- Criar história "Romance Dark / CEO frio / 30 capítulos" → wizard salva em `meta.story`.
+- Gerar 3 personagens → cards aparecem com traços e prompts visuais Pixar/Real/Anime.
+- Gerar estrutura → sinopse + 30 itens de outline.
+- Gerar capítulo 1 → texto > 800 palavras, contador atualiza.
+- "Mais tensão" no capítulo 1 → texto regenera mantendo plot.
+- Gerar prompts de capa → 4 prompts distintos copiáveis.
+- Gerar shorts do cap. 1 → POV + hook + 60s script + hashtags.
+- Exportar EPUB → arquivo abre no Calibre com todos os capítulos.
+- Mobile 375px: navegação entre etapas funciona, editor utilizável, cards empilham.

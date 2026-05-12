@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
@@ -26,6 +27,7 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
 import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
 import { Route as AuthenticatedProdutosPlaybookRouteImport } from './routes/_authenticated/produtos.playbook'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
@@ -52,6 +54,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
+  id: '/storybook',
+  path: '/storybook',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
   id: '/radar',
@@ -124,6 +131,12 @@ const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   path: '/api/collector/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedStorybookIdRoute =
+  AuthenticatedStorybookIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedStorybookRoute,
+  } as any)
 const AuthenticatedProjetosIdRoute = AuthenticatedProjetosIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -180,11 +193,13 @@ export interface FileRoutesByFullPath {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
+  '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -205,11 +220,13 @@ export interface FileRoutesByTo {
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
+  '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -232,11 +249,13 @@ export interface FileRoutesById {
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
+  '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
+  '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
@@ -259,11 +278,13 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/projetos'
     | '/radar'
+    | '/storybook'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
     | '/projetos/$id'
+    | '/storybook/$id'
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
@@ -284,11 +305,13 @@ export interface FileRouteTypes {
     | '/ofertas-salvas'
     | '/projetos'
     | '/radar'
+    | '/storybook'
     | '/api/ingest'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
     | '/projetos/$id'
+    | '/storybook/$id'
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
@@ -310,11 +333,13 @@ export interface FileRouteTypes {
     | '/_authenticated/ofertas-salvas'
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
+    | '/_authenticated/storybook'
     | '/api/ingest'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/produtos/playbook'
     | '/_authenticated/projetos/$id'
+    | '/_authenticated/storybook/$id'
     | '/api/collector/run'
     | '/_authenticated/produtos/playbook/$id'
     | '/_authenticated/produtos/playbook/novo'
@@ -358,6 +383,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ingest'
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/storybook': {
+      id: '/_authenticated/storybook'
+      path: '/storybook'
+      fullPath: '/storybook'
+      preLoaderRoute: typeof AuthenticatedStorybookRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/radar': {
       id: '/_authenticated/radar'
@@ -450,6 +482,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/storybook/$id': {
+      id: '/_authenticated/storybook/$id'
+      path: '/$id'
+      fullPath: '/storybook/$id'
+      preLoaderRoute: typeof AuthenticatedStorybookIdRouteImport
+      parentRoute: typeof AuthenticatedStorybookRoute
+    }
     '/_authenticated/projetos/$id': {
       id: '/_authenticated/projetos/$id'
       path: '/$id'
@@ -515,6 +554,20 @@ const AuthenticatedProjetosRouteWithChildren =
     AuthenticatedProjetosRouteChildren,
   )
 
+interface AuthenticatedStorybookRouteChildren {
+  AuthenticatedStorybookIdRoute: typeof AuthenticatedStorybookIdRoute
+}
+
+const AuthenticatedStorybookRouteChildren: AuthenticatedStorybookRouteChildren =
+  {
+    AuthenticatedStorybookIdRoute: AuthenticatedStorybookIdRoute,
+  }
+
+const AuthenticatedStorybookRouteWithChildren =
+  AuthenticatedStorybookRoute._addFileChildren(
+    AuthenticatedStorybookRouteChildren,
+  )
+
 interface AuthenticatedProdutosPlaybookIdRouteChildren {
   AuthenticatedProdutosPlaybookIdEditarRoute: typeof AuthenticatedProdutosPlaybookIdEditarRoute
 }
@@ -561,6 +614,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
+  AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
   AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -579,6 +633,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
+  AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
   AuthenticatedProdutosPlaybookRoute:
