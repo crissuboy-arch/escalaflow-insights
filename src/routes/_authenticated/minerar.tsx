@@ -60,6 +60,8 @@ function MinePage() {
   const [platform, setPlatform] = useState("all");
   const [quantity, setQuantity] = useState(20);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
+  const [scaleFilter, setScaleFilter] = useState<"all" | "cold" | "warming" | "hot" | "scaled">("all");
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [aiOpen, setAiOpen] = useState(false);
@@ -89,7 +91,19 @@ function MinePage() {
       if (error) throw error;
       console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
       console.log("[minerar] collected_ads rows:", data ?? []);
-      setCollected((data ?? []) as CollectedAd[]);
+      const enriched = (data ?? []).map((row) => {
+        const r = row as unknown as { raw?: { enriched?: Record<string, unknown> } };
+        const e = r.raw?.enriched ?? {};
+        return {
+          ...(row as object),
+          tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
+          subniche: (e.subniche as string | null | undefined) ?? null,
+          scale_level: (e.scaleLevel as CollectedAd["scale_level"]) ?? null,
+          promise: (e.promise as string | null | undefined) ?? null,
+          emotion: (e.emotion as string | null | undefined) ?? null,
+        } as CollectedAd;
+      });
+      setCollected(enriched);
     } catch (e) {
       console.error("[minerar] collected_ads fetch failed", e);
     } finally {
