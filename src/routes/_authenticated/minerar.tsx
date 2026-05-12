@@ -21,7 +21,7 @@ import { Badge as UIBadge } from "@/components/ui/badge";
 import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkCheck, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { openExternal } from "@/lib/external";
-import { CATEGORY_LIST, type CategoryId } from "@/lib/mining/keywords";
+import { CATEGORY_LIST, KEYWORD_CATEGORIES, type CategoryId } from "@/lib/mining/keywords";
 
 type CollectedAd = {
   id: string;
@@ -41,6 +41,11 @@ type CollectedAd = {
   score: number;
   created_at: string;
   media_source?: string;
+  tags?: string[];
+  subniche?: string | null;
+  scale_level?: "cold" | "warming" | "hot" | "scaled" | null;
+  promise?: string | null;
+  emotion?: string | null;
 };
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
