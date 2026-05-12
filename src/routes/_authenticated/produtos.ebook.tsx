@@ -108,6 +108,9 @@ function EbookPage() {
   const [chapterCount, setChapterCount] = useState(6);
   const [mode, setMode] = useState<EbookMode>("kdp");
   const [layout, setLayout] = useState<EbookLayout>("classico");
+  const [style, setStyle] = useState<EbookStyle>("clean");
+  const [palette, setPalette] = useState<EbookPalette>("minimalista");
+  const [entryStarted, setEntryStarted] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
