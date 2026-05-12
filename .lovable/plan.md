@@ -1,137 +1,118 @@
+# Esteira Dual-Mode (Projeto + Produto Avulso)
 
-# EscalaFlow — Esteira Completa de Produtos Digitais
-
-Objetivo: transformar o app numa esteira linear **Minerar → Radar → Análise IA → Projeto → Ebook → Playbook → Copy → Criativos → Página → Checkout → Escala**, mantendo tudo que já existe e adicionando os módulos faltantes.
-
-Tudo persistido em `projects` (campo `meta` jsonb já existente) — sem novas tabelas. Cada projeto vira o "dossiê" do produto, agregando ebook, playbook, copy, criativos, página, checkout e escala.
+Tornar todos os 5 módulos da esteira (Copy, Criativos, Página, Checkout, Escala) utilizáveis **sem obrigar criação prévia de projeto**, mantendo 100% do fluxo atual baseado em `projects.meta`.
 
 ---
 
-## Fase 1 — Reorganização + Persistência + Esqueleto da Esteira
+## 1. Padrão arquitetural
 
-### 1.1 Menu lateral (AppSidebar.tsx)
-Reordenar exatamente nesta ordem, mantendo badges atuais:
+### 1.1 Componente `ModePicker`
+Novo componente reutilizável `src/components/pipeline/ModePicker.tsx` exibido no topo de cada hub:
+- Dois cards grandes: **"Usar Projeto Existente"** vs **"Produto Avulso"**.
+- Estado em URL (`?source=project|standalone`) para sobreviver a refresh.
+- Quando "project": mostra grid atual do `PipelineHub`.
+- Quando "standalone": mostra `StandaloneForm` específico do módulo.
+
+### 1.2 Briefing avulso compartilhado
+Novo `src/lib/standalone/briefing.ts` define o schema mínimo reusado por todos:
+```ts
+StandaloneBriefing = {
+  productName, productType, description, niche,
+  audience, promise, price?, platform?, link?, tone?
+}
+```
+Persistência opcional: salvar em `localStorage` (`escalaflow:standalone:<module>`) + botão **"Salvar como Projeto"** que chama `createProject` com `meta.briefingAvulso = ...` e migra o conteúdo gerado para `projects.meta.<module>`.
+
+### 1.3 Server fns aceitam `source` discriminado
+Cada server fn de geração recebe:
+```ts
+input: { source: { kind: 'project', projectId } } 
+     | { source: { kind: 'standalone', briefing: StandaloneBriefing } }
+```
+Quando `kind=project`: lê `projects.meta` (briefing, copy, avatar…).
+Quando `kind=standalone`: usa o briefing direto. Resultado retorna pro cliente; persistência só ocorre se houver projeto.
+
+---
+
+## 2. Módulo a módulo
+
+### 2.1 Copy de Vendas (`/copy`)
+- Server fn `aiGenerateCopy` (Lovable AI Gateway, `google/gemini-3-flash-preview`).
+- Output: headline, sub, big idea, mecanismo, bullets, benefícios, CTA, objeções, ângulos.
+- UI: wizard 1 tela; render markdown + botão "Copiar tudo" + DOCX.
+
+### 2.2 Criativos & Anúncios (`/criativos`) — esteira 6 passos
+Stepper visual:
+1. Origem (projeto/avulso)
+2. Plataforma (TikTok, IG, FB, Pinterest, Shorts, Marketplace, Amazon, Shopee)
+3. Objetivo (CTR, Conversão, Viral, Branding, Remarketing, Escala)
+4. Formato (catálogo `ADS_FORMATS` — Native Notes, Portal, Cupom Fiscal, POV, Super Headline, etc.)
+5. Geração IA → `{ hook, headline, cta, copy, visualPrompt, estrutura, emocao, angulo }`
+6. Ações: variações, favoritar, copiar prompt, exportar
+Persistência: `projects.meta.creatives[]` (modo projeto) ou histórico local (avulso).
+
+### 2.3 Página de Venda (`/pagina-venda`) — Gerador Mestre
+- **NÃO** renderiza HTML; gera estrutura textual + 4 prompts prontos.
+- Output: Hero, Headline, Sub, Dor, Mecanismo, Benefícios, Objeções, Depoimentos, Oferta, Garantia, FAQ, CTA, estrutura visual.
+- Botões: **Copiar Prompt Lovable / Google AI Studio / V0 / Claude** + Export DOCX.
+
+### 2.4 Checkout & Oferta (`/checkout`)
+IA gera: oferta, stack de valor, bônus, garantia, order bump, upsell, downsell, preço âncora, CTA, urgência.
+Saídas formatadas para **Kiwify · Hotmart · Stripe** (campos prontos para colar) + prompt genérico.
+
+### 2.5 Escala do Produto (`/escala`) — "Missão Completa"
+Painel cinematográfico:
+- Checklist ✅ Ebook · Copy · Criativos · Página · Checkout (lê `projects.meta`).
+- Em modo avulso: pula checklist, vai direto para **Sugestões de Escala IA**.
+- Server fn `aiSuggestScale` retorna: anúncios sugeridos, hooks, ideias de escalada, canais ideais, perfis de influenciadores, formatos que mais convertem, plano de conteúdo 7d, próximos passos.
+
+---
+
+## 3. Detalhes técnicos
+
+- **Sem migrations**: tudo cabe em `projects.meta` (jsonb) ou localStorage no modo avulso.
+- **IA**: `google/gemini-3-flash-preview` por padrão; `gpt-5-mini` para textos longos (página/copy completas) com `streamText`.
+- **Auth**: server fns usam `requireSupabaseAuth` (mesmo no modo avulso — apenas não persistem em DB).
+- **Tema**: tokens de `src/styles.css`, glow/glass igual ao StoryBook hub.
+- **Mobile**: stepper colapsa em accordion < md.
+- **Rotas**: reusar arquivos existentes em `src/routes/_authenticated/{copy,criativos,pagina-venda,checkout,escala}.tsx` — só trocar conteúdo de `PipelineHub` por novo `<DualModeHub>`.
+
+---
+
+## 4. Arquivos novos
 
 ```
-1  Dashboard               /dashboard
-2  Minerar Ofertas         /minerar
-3  Radar                   /radar
-4  Central de Mineração    /central-mineracao
-5  Ofertas Salvas          /ofertas-salvas
-6  Ofertas Escaladas       /ofertas-escaladas
-7  Análise IA              /analise-ia
-8  Favoritos               /favoritos
-9  Projetos                /projetos
-10 Criar Ebook             /produtos/ebook
-11 Criar Playbook          /produtos/playbook
-12 Copy de Vendas          /copy           (NOVO)
-13 Criativos & Anúncios    /criativos      (NOVO)
-14 Página de Venda         /pagina-venda   (NOVO)
-15 Checkout & Oferta       /checkout       (NOVO)
-16 Escala do Produto       /escala         (NOVO)
-17 Configurações           /configuracoes
+src/components/pipeline/
+  ModePicker.tsx            (cards Projeto vs Avulso)
+  DualModeHub.tsx           (substitui PipelineHub nos 5 hubs)
+  StandaloneBriefingForm.tsx
+  Stepper.tsx               (usado em criativos)
+
+src/lib/standalone/
+  briefing.ts               (schema + storage local)
+
+src/lib/copy.server.ts + copy.functions.ts
+src/lib/ads.server.ts (estende ads.functions.ts)
+src/lib/ads/catalog.ts      (18 formatos)
+src/lib/sales-page.server.ts + sales-page.functions.ts
+src/lib/checkout.server.ts + checkout.functions.ts
+src/lib/scale.server.ts + scale.functions.ts
 ```
 
-Agrupar visualmente em 3 seções com `SidebarGroupLabel`:
-- **Mineração** (1–8)
-- **Esteira do Produto** (9–16)
-- **Conta** (17)
-
-Remover do header da preview qualquer chip de debug remanescente.
-
-### 1.2 Persistência (correção do "some ao atualizar")
-- Auditar `src/lib/queries.ts` + `initAdActionsCache`: garantir que `getFavCount/getSavedCount/getScaledCount` leem do Supabase (`saved_offers`, `user_ad_actions`) na montagem **e** revalidam após mutação.
-- Trocar qualquer `localStorage`-only por leitura via `useQuery` com `staleTime: 0` no mount do `__root`/`AppSidebar`.
-- Em `OfferCard` e ações de salvar/favoritar/escalar: invalidar query e disparar `subscribeChange` após `await` da mutação (não otimisticamente sem fallback).
-
-### 1.3 Modelo "Projeto = produto"
-Estender `ModeSchema` em `src/lib/project.functions.ts` para aceitar tipo de produto:
-```
-type: ebook | playbook | curso | planner | apostila | pack | app | fisico | romance
-status: ideia | validado | em_criacao | pronto | publicado | escalando
-```
-Salvos em `projects.meta.product = { type, status, files[], links[], history[] }`.
-
-`/projetos/$id` ganha abas: **Visão geral · Ebook · Playbook · Copy · Criativos · Página · Checkout · Escala** — cada aba lê/escreve em `projects.meta.<modulo>`.
-
-### 1.4 Scaffold das 5 rotas novas
-Criar arquivos com layout dark premium (mesmo padrão do StoryBook hub) já funcionando como hub + listagem por projeto:
-- `src/routes/_authenticated/copy.tsx`
-- `src/routes/_authenticated/criativos.tsx`
-- `src/routes/_authenticated/pagina-venda.tsx`
-- `src/routes/_authenticated/checkout.tsx`
-- `src/routes/_authenticated/escala.tsx`
-
-Cada hub: lista projetos do usuário + botão "Abrir esteira do projeto" → leva para `/projetos/$id` com aba certa pré-selecionada via `?tab=copy` etc.
+## 5. Arquivos editados
+- `src/routes/_authenticated/{copy,criativos,pagina-venda,checkout,escala}.tsx` (passam a usar `DualModeHub`)
+- `src/routes/_authenticated/projetos.$id.tsx` (abas já existem; passam a chamar as mesmas server fns no modo `kind:'project'`)
+- `src/components/PipelineHub.tsx` (mantido — usado dentro do `DualModeHub` quando `source=project`)
 
 ---
 
-## Fase 2 — Módulos de Conteúdo (Copy, Criativos, Página, Checkout)
+## 6. Ordem de entrega
 
-### 2.1 Copy de Vendas (`src/lib/copy.server.ts` + `copy.functions.ts`)
-Wizard 8 passos (Produto → Público → Promessa → Método → Avatar → Expert → Oferta → Garantia/FAQ).
-Server fn `aiGenerateCopy` (Lovable AI Gateway, `google/gemini-3-flash-preview`) gera em uma chamada streaming:
-headline, subheadline, big idea, mecanismo único, oferta, stack de valor, bônus, garantia, FAQ, CTA, copy completa.
-Persistir em `projects.meta.copy`. Exportação DOCX (já temos lib `docx` no projeto pelo ebook) + botão "Copiar tudo".
+1. Infra dual-mode (`ModePicker`, `DualModeHub`, `StandaloneBriefingForm`, schemas).
+2. **Copy** ponta-a-ponta (modo projeto + avulso) — valida o padrão.
+3. **Criativos** esteira 6 passos.
+4. **Página** Gerador Mestre + 4 prompts.
+5. **Checkout** + saídas Kiwify/Hotmart/Stripe.
+6. **Escala** Missão Completa + Sugestões IA.
 
-### 2.2 Criativos & Anúncios (`src/lib/ads/`)
-Catálogo `ADS_FORMATS` com 18 formatos solicitados (Native Notes, Problema vs Solução, Portal de Notícias, Post X, Oferta Direta Mockup, Ebook Promo, Ebook Depoimento, Procura-se, Traço a Lápis, Price Anchor, Before/After, Checklist, Micro Aula, Super Headline, Cupom Fiscal, POV Ebook na Mão, Manchete Jornal, Comparativo Método).
-Cada formato: `{ id, name, description, fields[], promptTemplate, dimensions: ['1:1','4:5','9:16'] }`.
-Server fn `aiGenerateCreative({projectId, formatId, dimension})` retorna `{ headline, body, cta, visualPrompt }`. UI em grid de cards com botão "Copiar prompt" e seletor de dimensão. Persiste em `projects.meta.creatives[]`.
-
-### 2.3 Página de Venda (`src/lib/sales-page.server.ts`)
-Gera estrutura por seções (Hero, Dor, Promessa, Mecanismo, Benefícios, Prova, Oferta, Bônus, Garantia, FAQ, CTA). Reusa dados de `meta.copy` se existir. Saída editável bloco-a-bloco + export HTML/Markdown + preview iframe.
-
-### 2.4 Checkout & Oferta (form puro, sem IA)
-Formulário em `projects.meta.checkout`: preço, preço âncora, bônus[], order bump, upsell, downsell, garantia, link Kiwify/Hotmart/Stripe. Validação Zod. Render preview tipo "card de checkout".
-
----
-
-## Fase 3 — Esteira final (Escala) + Melhorias Ebook/Playbook
-
-### 3.1 Escala do Produto (`/escala` + aba do projeto)
-Painel cinematográfico que lê `projects.meta` e mostra checklist:
-- ✅/⬜ Ebook criado · Playbook criado · Copy criada · Criativos (≥3) · Página criada · Checkout configurado
-- Barra de progresso "Pronto para escalar"
-- Card "Ideias de anúncios" → server fn que sugere 5 ângulos baseados em `meta.copy.bigIdea`
-- Card "Próximos passos de tráfego" (Meta Ads, TikTok, Google) com checklist
-- Status: ideia → validado → em_criacao → pronto → publicado → escalando (toggle)
-
-### 3.2 Melhorias Ebook (sem quebrar fluxo existente)
-3 origens de criação no hub `/produtos/ebook`:
-1. **A partir de oferta minerada** (já existe via `source_ad_key`)
-2. **Briefing manual** (form completo)
-3. **IA do zero** (só nicho + tipo, IA preenche o resto)
-
-Adicionar tipos: tradicional, KDP, emagrecimento, receita, infantil, romance, apostila, planner, guia, workbook, playbook complementar.
-Campos novos: nome do autor, bio, idioma, tom de escrita, problema, solução. Páginas: 20/30/60/80/100/120/150. Export DOCX além do PDF.
-
-### 3.3 Melhorias Playbook
-Mesmas 3 origens (anúncio / a partir de ebook criado / do zero com IA).
-Catálogo de tipos expandido: estratégico, passo a passo, romance interativo, história em capítulos, quadrinho digital, receita, fitness, beleza, negócios, IA, infoproduto, infantil, drama/romance popular (CEO×empregada, traficante, amor proibido, superação feminina).
-Saída: capa, episódios/cenas, texto interativo, prompt visual por cena, navegação tipo livro, link compartilhável (`/p/$slug` público), export.
-
-### 3.4 Radar enriquecido
-Filtros adicionais em `/radar`: tipo de produto (low ticket, infoproduto, físico, beleza, emagrecimento, IA, curso, app, planner, apostila, figurinha, livro digital, romance digital). Reusa `mined_offers` + filtro client-side por `niche/keyword` mapeados.
-
----
-
-## Detalhes técnicos
-
-- **Sem migrations**: tudo cabe em `projects.meta` (jsonb). Apenas estendemos `ModeSchema` no zod do server fn.
-- **IA**: 100% via Lovable AI Gateway (`LOVABLE_API_KEY` já configurado), modelos `gemini-3-flash-preview` (rápido) e `gpt-5-mini` (textos longos).
-- **Streaming**: usar `streamText` do AI SDK nas gerações longas (copy, página).
-- **Auth**: todas as server fn novas usam `requireSupabaseAuth`.
-- **Tema**: continuar usando tokens de `src/styles.css` (nada de cores hard-coded). Glow neon + glass nos novos hubs, igual StoryBook.
-- **Mobile**: grids `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`, sidebar `collapsible="icon"` já cobre.
-- **Routes type-safe**: criar arquivos antes de qualquer `<Link to=...>`. `routeTree.gen.ts` é regenerado automaticamente.
-
----
-
-## Entrega sugerida (ordem de PRs)
-
-1. **Fase 1** (menu + persistência + scaffold das 5 rotas + tabs no /projetos/$id) — pronto para testar a navegação completa.
-2. **Fase 2** (Copy + Criativos + Página + Checkout funcionais com IA).
-3. **Fase 3** (Escala + upgrades Ebook/Playbook + filtros Radar).
-
-Confirma que sigo nessa ordem (Fase 1 já nesta rodada) ou prefere outro recorte?
+Confirma para eu seguir nessa ordem (passo 1 + 2 já nesta rodada)?
