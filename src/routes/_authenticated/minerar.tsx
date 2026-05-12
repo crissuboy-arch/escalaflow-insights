@@ -507,6 +507,50 @@ function MinePage() {
             </Label>
             <Slider value={[quantity]} min={4} max={100} step={1} onValueChange={(v) => setQuantity(v[0])} className="mt-3" />
           </div>
+          <div className="md:col-span-2">
+            <Label>Nível de escala</Label>
+            <Select value={scaleFilter} onValueChange={(v) => { setScaleFilter(v as typeof scaleFilter); setPage(0); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="cold">Cold</SelectItem>
+                <SelectItem value="warming">Warming</SelectItem>
+                <SelectItem value="hot">Hot</SelectItem>
+                <SelectItem value="scaled">Scaled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {availableTags.length > 0 && (
+            <div className="md:col-span-2 lg:col-span-6">
+              <Label>Tags detectadas</Label>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {availableTags.map((t) => {
+                  const active = tagFilters.has(t);
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => toggleTagFilter(t)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                        active
+                          ? "border-primary/60 bg-primary/15 text-primary"
+                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+                {tagFilters.size > 0 && (
+                  <button
+                    onClick={() => { setTagFilters(new Set()); setPage(0); }}
+                    className="rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
+                  >
+                    limpar
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{filtered.length}</span> de {visibleCollected.length} anúncios
