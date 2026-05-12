@@ -14,6 +14,11 @@ import {
   Sparkle,
   Radar,
   FolderKanban,
+  Megaphone,
+  PenLine,
+  LayoutTemplate,
+  ShoppingCart,
+  Rocket,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,7 +54,8 @@ export function AppSidebar() {
     initAdActionsCache().finally(sync);
     return subscribeChange(sync);
   }, []);
-  const items = [
+  type Item = { to: string; label: string; icon: typeof LayoutDashboard; badge?: number };
+  const mineracao: Item[] = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
     { to: "/radar", label: "Radar", icon: Radar },
@@ -58,11 +64,25 @@ export function AppSidebar() {
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
     { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
+  ];
+  const esteira: Item[] = [
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
-    { to: "/produtos/ebook", label: "Editor Ebook", icon: BookOpen },
-    { to: "/produtos/playbook", label: "Playbook", icon: Sparkle },
+    { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
+    { to: "/produtos/playbook", label: "Criar Playbook", icon: Sparkle },
+    { to: "/copy", label: "Copy de Vendas", icon: PenLine },
+    { to: "/criativos", label: "Criativos & Anúncios", icon: Megaphone },
+    { to: "/pagina-venda", label: "Página de Venda", icon: LayoutTemplate },
+    { to: "/checkout", label: "Checkout & Oferta", icon: ShoppingCart },
+    { to: "/escala", label: "Escala do Produto", icon: Rocket },
+  ];
+  const conta: Item[] = [
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
-  ] as { to: string; label: string; icon: typeof LayoutDashboard; badge?: number }[];
+  ];
+  const groups: { label: string; items: Item[] }[] = [
+    { label: "Mineração", items: mineracao },
+    { label: "Esteira do Produto", items: esteira },
+    { label: "Conta", items: conta },
+  ];
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
@@ -79,28 +99,30 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((it) => (
-                <SidebarMenuItem key={it.to}>
-                  <SidebarMenuButton asChild isActive={path === it.to}>
-                    <Link to={it.to} className="flex items-center gap-3">
-                      <it.icon className="h-4 w-4" />
-                      <span className="flex-1">{it.label}</span>
-                      {it.badge ? (
-                        <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden">
-                          {it.badge}
-                        </span>
-                      ) : null}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {groups.map((g) => (
+          <SidebarGroup key={g.label}>
+            <SidebarGroupLabel>{g.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {g.items.map((it) => (
+                  <SidebarMenuItem key={it.to}>
+                    <SidebarMenuButton asChild isActive={path === it.to}>
+                      <Link to={it.to} className="flex items-center gap-3">
+                        <it.icon className="h-4 w-4" />
+                        <span className="flex-1">{it.label}</span>
+                        {it.badge ? (
+                          <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden">
+                            {it.badge}
+                          </span>
+                        ) : null}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
     </Sidebar>
   );
