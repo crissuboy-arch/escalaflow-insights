@@ -89,12 +89,14 @@ export const generateEbookChapter = createServerFn({ method: "POST" })
 export const generateEbookCover = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (d: { briefing: Briefing; layout: string; customPrompt?: string }) =>
+    (d: { briefing: Briefing; layout: string; customPrompt?: string; style?: string; palette?: string }) =>
       z
         .object({
           briefing: BriefingSchema,
           layout: z.enum(["classico", "moderno", "minimalista"]),
           customPrompt: z.string().max(2000).optional(),
+          style: z.string().max(60).optional(),
+          palette: z.string().max(60).optional(),
         })
         .parse(d),
   )
@@ -104,6 +106,8 @@ export const generateEbookCover = createServerFn({ method: "POST" })
         data.briefing,
         data.layout,
         data.customPrompt,
+        data.style,
+        data.palette,
       );
       return { dataUrl };
     } catch (e) {

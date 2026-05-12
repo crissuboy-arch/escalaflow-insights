@@ -246,15 +246,20 @@ export async function aiGenerateCover(
   briefing: Briefing,
   layout: string,
   customPrompt?: string,
+  style?: string,
+  palette?: string,
 ): Promise<string> {
   const styleByLayout: Record<string, string> = {
     classico: "estilo editorial clássico, tipografia serif elegante, paleta sóbria com dourado",
     moderno: "estilo moderno funcional, blocos de cor vibrantes, sans-serif geométrico",
     minimalista: "estilo minimalista suíço, muito espaço em branco, helvetica, grid rígido",
   };
+  const styleHint = style ? ` Estilo: ${style}.` : "";
+  const paletteHint = palette ? ` Paleta de cores: ${palette}.` : "";
   const prompt =
     customPrompt?.trim() ||
-    `Capa de ebook profissional. Título "${briefing.title}". Subtítulo "${briefing.subtitle}". Nicho: ${briefing.niche}. ${styleByLayout[layout] ?? ""}. Sem rostos humanos, alta qualidade, formato vertical 1024x1536.`;
+    `Capa de ebook profissional. Título "${briefing.title}". Subtítulo "${briefing.subtitle}". Nicho: ${briefing.niche}. ${styleByLayout[layout] ?? ""}.${styleHint}${paletteHint} Sem rostos humanos, alta qualidade, formato vertical 1024x1536.`;
+  // TODO: futuro fallback DALL·E (requer OPENAI_API_KEY) e Stability.
   const data = (await aiChat({
     model: "google/gemini-3.1-flash-image-preview",
     messages: [{ role: "user", content: prompt }],

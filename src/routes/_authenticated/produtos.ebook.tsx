@@ -24,11 +24,21 @@ import {
   deleteEbookDraft,
 } from "@/lib/ebook.functions";
 import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
+import {
+  STYLES,
+  PALETTES,
+  styleToMode,
+  styleToLayout,
+  type EbookStyle,
+  type EbookPalette,
+  type EbookCategory,
+} from "@/lib/ebook/styles";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
 import { exportEbookDocx } from "@/lib/ebook/docx";
 import { exportEbookEpub } from "@/lib/ebook/epub";
 import { EbookPreview } from "@/components/ebook/EbookPreview";
 import { DraftList, type DraftRow } from "@/components/ebook/DraftList";
+import { EbookHub, type AiKickstart } from "@/components/ebook/EbookHub";
 
 export const Route = createFileRoute("/_authenticated/produtos/ebook")({
   beforeLoad: async () => {
@@ -98,6 +108,9 @@ function EbookPage() {
   const [chapterCount, setChapterCount] = useState(6);
   const [mode, setMode] = useState<EbookMode>("kdp");
   const [layout, setLayout] = useState<EbookLayout>("classico");
+  const [style, setStyle] = useState<EbookStyle>("clean");
+  const [palette, setPalette] = useState<EbookPalette>("minimalista");
+  const [entryStarted, setEntryStarted] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -332,7 +345,13 @@ function EbookPage() {
     setBusy("Gerando capa com IA…");
     try {
       const { dataUrl } = await fnCover({
-        data: { briefing, layout, customPrompt: coverPrompt || undefined },
+        data: {
+          briefing,
+          layout,
+          customPrompt: coverPrompt || undefined,
+          style,
+          palette,
+        },
       });
       // Try uploading to storage; fall back to data URL
       try {
@@ -528,6 +547,89 @@ function EbookPage() {
     return chapters.length > 0;
   }, [step, selectedAd, briefing, outline, chapters]);
 
+  // Hub flow handlers
+  const onHubMined = () => {
+    setEntryStarted(true);
+    setStep(0);
+  };
+
+  const emptyBriefing = (): Briefing => ({
+    title: "",
+    subtitle: "",
+    niche: "",
+    promise: "",
+    avatar: "",
+    pains: [],
+    desires: [],
+    uniqueMechanism: "",
+  });
+
+  const onHubScratch = (category: EbookCategory) => {
+    setEntryStarted(true);
+    if (category === "Playbook") {
+      setStyle("playbook");
+      setMode("playbook");
+    } else if (category === "Amazon/KDP") {
+      setStyle("amazon-kdp");
+      setLayout("classico");
+      setMode("kdp");
+    } else if (category === "Infantil") {
+      setStyle("infantil");
+      setMode("premium");
+    }
+    const b = emptyBriefing();
+    b.niche = category;
+    setBriefing(b);
+    setStep(1);
+  };
+
+  const onHubAi = async (input: AiKickstart) => {
+    setEntryStarted(true);
+    setBusy("Gerando estrutura com IA…");
+    try {
+      // Build briefing locally from form (no extra AI call needed)
+      const b: Briefing = {
+        title: input.niche,
+        subtitle: input.promise.slice(0, 120),
+        niche: input.niche,
+        promise: input.promise,
+        avatar: input.audience,
+        pains: [],
+        desires: [],
+        uniqueMechanism: input.style,
+      };
+      setBriefing(b);
+      setChapterCount(input.chapterCount);
+      const o = await fnOutline({ data: { briefing: b, chapterCount: input.chapterCount } });
+      setOutline(o);
+      setStep(2);
+      toast.success("Estrutura gerada");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao gerar estrutura"));
+      setStep(1);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const showHub = !entryStarted && !ebookId && !briefing && !selectedAd;
+
+  const onCreateNew = () => {
+    setEntryStarted(false);
+    setSelectedAd(null);
+    setBriefing(null);
+    setOutline([]);
+    setChapters([]);
+    setCoverUrl(null);
+    setEbookId(null);
+    setStep(0);
+    try {
+      window.history.replaceState({}, "", `/produtos/ebook`);
+    } catch {
+      /* ignore */
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center gap-3">
@@ -538,18 +640,46 @@ function EbookPage() {
           <BookOpen className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Criar Ebook</h1>
-          <p className="text-muted-foreground">Transforme um anúncio minerado em ebook pronto para venda.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Ebook Engine</h1>
+          <p className="text-muted-foreground">Crie ebooks vendáveis a partir de anúncios, do zero ou direto pela IA.</p>
         </div>
-        {savedAt && (
-          <span className="ml-auto text-xs text-muted-foreground">
-            Rascunho salvo às {savedAt.toLocaleTimeString()}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          {savedAt && (
+            <span className="text-xs text-muted-foreground">
+              Salvo {savedAt.toLocaleTimeString()}
+            </span>
+          )}
+          {!showHub && (
+            <Button onClick={onCreateNew} className="text-white" style={{ background: "var(--gradient-primary)" }}>
+              <Sparkles className="mr-2 h-4 w-4" /> Criar Novo Ebook
+            </Button>
+          )}
+        </div>
       </div>
 
-      <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+      {showHub && (
+        <>
+          <EbookHub
+            onUseMined={onHubMined}
+            onScratch={onHubScratch}
+            onAiGenerate={onHubAi}
+            busy={!!busy}
+          />
+          {drafts.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted-foreground">Continuar onde parou</h2>
+              <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+            </div>
+          )}
+        </>
+      )}
 
+      {!showHub && (
+        <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
+      )}
+
+      {!showHub && (
+        <>
       {/* Stepper */}
       <div className="flex flex-wrap gap-2">
         {STEPS.map((label, i) => (
@@ -665,30 +795,54 @@ function EbookPage() {
             <CardTitle>Modo & estrutura do ebook</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              {MODES.map((m) => {
-                const Icon = m.icon;
-                const active = mode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      setMode(m.id);
-                      if (m.id === "playbook") onPlaybookMode();
-                    }}
-                    className={`rounded-lg border p-4 text-left transition ${
-                      active ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/50"
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-primary" />
-                      <span className="font-semibold">{m.label}</span>
-                      {active && <Check className="ml-auto h-4 w-4 text-primary" />}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{m.description}</p>
-                  </button>
-                );
-              })}
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Estilo visual</Label>
+              <div className="grid gap-2 md:grid-cols-3 lg:grid-cols-5">
+                {STYLES.map((s) => {
+                  const active = style === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        setStyle(s.id);
+                        setMode(styleToMode(s.id));
+                        setLayout(styleToLayout(s.id));
+                        if (s.id === "playbook") onPlaybookMode();
+                      }}
+                      className={`rounded-lg border p-3 text-left transition ${
+                        active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold">{s.label}</span>
+                        {active && <Check className="ml-auto h-3 w-3 text-primary" />}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{s.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Paleta</Label>
+              <div className="flex flex-wrap gap-2">
+                {PALETTES.map((p) => {
+                  const active = palette === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setPalette(p.id)}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs transition ${
+                        active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                      }`}
+                    >
+                      <span className={`h-3 w-3 rounded-full ${p.swatch}`} />
+                      {p.label}
+                      {active && <Check className="h-3 w-3 text-primary" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <Label>Capítulos</Label>
@@ -867,6 +1021,8 @@ function EbookPage() {
           </Button>
         )}
       </div>
+        </>
+      )}
     </motion.div>
   );
 }
