@@ -80,6 +80,43 @@ function MinePage() {
   const PAGE_SIZE = 12;
   const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
 
+  const categoryKeywordsLower = activeCategory
+    ? KEYWORD_CATEGORIES[activeCategory].keywords.map((k) => k.toLowerCase())
+    : null;
+
+  const filtered = visibleCollected.filter((a) => {
+    if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
+    if (tagFilters.size && !(a.tags ?? []).some((t) => tagFilters.has(t))) return false;
+    if (categoryKeywordsLower) {
+      const tagsLower = (a.tags ?? []).map((t) => t.toLowerCase());
+      const hay = `${a.headline} ${a.copy ?? ""}`.toLowerCase();
+      const hit = tagsLower.some((t) => categoryKeywordsLower.includes(t)) ||
+        categoryKeywordsLower.some((kw) => hay.includes(kw));
+      if (!hit) return false;
+    }
+    return true;
+  });
+
+  const availableTags = (() => {
+    const counts = new Map<string, number>();
+    for (const a of visibleCollected) {
+      for (const t of a.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .sort((x, y) => y[1] - x[1])
+      .slice(0, 20)
+      .map(([t]) => t);
+  })();
+
+  const toggleTagFilter = (t: string) => {
+    setTagFilters((s) => {
+      const n = new Set(s);
+      if (n.has(t)) n.delete(t); else n.add(t);
+      return n;
+    });
+    setPage(0);
+  };
+
   const fetchCollected = async () => {
     setCollectedLoading(true);
     try {
