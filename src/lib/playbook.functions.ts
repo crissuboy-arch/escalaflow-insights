@@ -7,6 +7,7 @@ import {
   aiGenerateSceneContent,
   aiGenerateSceneImage,
   aiGenerateVideoScript,
+  aiGeneratePlaybookStrategy,
   PlaybookBriefingSchema,
   SceneOutlineSchema,
   type PlaybookBriefing,
