@@ -14,6 +14,9 @@ import {
   FileText,
   Images,
   Film,
+  Copy,
+  FileType2,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +26,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { loadPlaybook, generatePlaybookScript } from "@/lib/playbook.functions";
+import {
+  loadPlaybook,
+  generatePlaybookScript,
+  generatePlaybookStrategy,
+} from "@/lib/playbook.functions";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/produtos/playbook/$id")({
   component: PlaybookReaderPage,
@@ -55,9 +69,11 @@ function PlaybookReaderPage() {
   const navigate = useNavigate();
   const load = useServerFn(loadPlaybook);
   const scriptFn = useServerFn(generatePlaybookScript);
+  const strategyFn = useServerFn(generatePlaybookStrategy);
   const [pb, setPb] = useState<Playbook | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
+  const [generatingStrategy, setGeneratingStrategy] = useState(false);
 
   useEffect(() => {
     (async () => {
