@@ -130,6 +130,56 @@ function PlaybookReaderPage() {
     const { exportPlaybookCarousel } = await import("@/lib/playbook/carousel");
     await exportPlaybookCarousel(pb.title, scenes);
   };
+  const exportDocx = async () => {
+    try {
+      toast.loading("Gerando DOCX…", { id: "docx" });
+      const { exportPlaybookDocx } = await import("@/lib/playbook/docx");
+      await exportPlaybookDocx(pb.title, scenes);
+      toast.success("DOCX baixado", { id: "docx" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falhou", { id: "docx" });
+    }
+  };
+  const copyAll = async () => {
+    const md = [
+      `# ${pb.title}`,
+      pb.niche ? `Nicho: ${pb.niche}\n` : "",
+      ...scenes.map(
+        (s, i) =>
+          `## Cena ${i + 1}: ${s.title}\n\n${s.text}\n\n${
+            s.balloons.length ? s.balloons.map((b) => `- ${b}`).join("\n") + "\n\n" : ""
+          }${s.exercise ? `**Exercício:** ${s.exercise}\n\n` : ""}${
+            s.practical_action ? `**Ação prática:** ${s.practical_action}\n` : ""
+          }`,
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(md);
+      toast.success("Conteúdo copiado");
+    } catch {
+      toast.error("Falha ao copiar");
+    }
+  };
+  const strategy = (pb.briefing as Record<string, unknown>)?.strategy as
+    | Record<string, unknown>
+    | undefined;
+  const onGenerateStrategy = async () => {
+    setGeneratingStrategy(true);
+    try {
+      const r = await strategyFn({ data: { id } });
+      setPb({
+        ...pb,
+        briefing: { ...(pb.briefing as Record<string, unknown>), strategy: r.strategy },
+      });
+      toast.success("Estratégia gerada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar estratégia");
+    } finally {
+      setGeneratingStrategy(false);
+    }
+  };
   const exportScript = async () => {
     try {
       toast.loading("Gerando roteiro…", { id: "script" });
