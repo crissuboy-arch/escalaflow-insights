@@ -24,11 +24,21 @@ import {
   deleteEbookDraft,
 } from "@/lib/ebook.functions";
 import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
+import {
+  STYLES,
+  PALETTES,
+  styleToMode,
+  styleToLayout,
+  type EbookStyle,
+  type EbookPalette,
+  type EbookCategory,
+} from "@/lib/ebook/styles";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
 import { exportEbookDocx } from "@/lib/ebook/docx";
 import { exportEbookEpub } from "@/lib/ebook/epub";
 import { EbookPreview } from "@/components/ebook/EbookPreview";
 import { DraftList, type DraftRow } from "@/components/ebook/DraftList";
+import { EbookHub, type AiKickstart } from "@/components/ebook/EbookHub";
 
 export const Route = createFileRoute("/_authenticated/produtos/ebook")({
   beforeLoad: async () => {
