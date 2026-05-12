@@ -1,0 +1,57 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { aiGenerateCopy, SalesCopySchema, type CopyContext } from "./copy.server";
+import { StandaloneBriefingSchema } from "./standalone/briefing";
+
+const InputSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("project"), projectId: z.string().uuid() }),
+  z.object({ kind: z.literal("standalone"), briefing: StandaloneBriefingSchema }),
+]);
+
+export const generateSalesCopy = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof InputSchema>) => InputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    let ctx: CopyContext;
+    let projectRow: { id: string; meta: Record<string, unknown> | null } | null = null;
+
+    if (data.kind === "project") {
+      const { data: row, error } = await supabase
+        .from("projects")
+        .select("id, title, niche, briefing, meta")
+        .eq("id", data.projectId)
+        .eq("user_id", userId)
+        .single();
+      if (error) throw new Error(error.message);
+      projectRow = { id: row.id as string, meta: (row.meta ?? {}) as Record<string, unknown> };
+      const b = (row.briefing ?? {}) as Record<string, unknown>;
+      ctx = {
+        productName: (b.title as string) || (row.title as string) || "Produto",
+        productType: (b.type as string) || "infoproduto",
+        description: (b.subtitle as string) || "",
+        niche: (row.niche as string) || (b.niche as string) || "",
+        audience: (b.avatar as string) || "",
+        promise: (b.promise as string) || "",
+        uniqueMechanism: (b.uniqueMechanism as string) || "",
+        pains: Array.isArray(b.pains) ? (b.pains as string[]) : [],
+        desires: Array.isArray(b.desires) ? (b.desires as string[]) : [],
+      };
+    } else {
+      ctx = { ...data.briefing };
+    }
+
+    const copy = await aiGenerateCopy(ctx);
+
+    if (projectRow) {
+      const meta = { ...(projectRow.meta ?? {}), copy };
+      await supabase
+        .from("projects")
+        .update({ meta: meta as never })
+        .eq("id", projectRow.id);
+    }
+
+    return { copy: SalesCopySchema.parse(copy) };
+  });
