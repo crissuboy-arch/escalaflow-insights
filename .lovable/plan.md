@@ -1,117 +1,119 @@
-# Auditoria EscaleFlow — estabilizar antes de criar novas features
+## Objetivo
 
-Objetivo: corrigir os fluxos quebrados que já existem, sem mexer em design e sem inventar funcionalidade nova. Cada bloco abaixo é uma tarefa fechada — vamos atacar em ordem.
+Transformar o Minerador num sistema de inteligência de mercado: nichos categorizados, biblioteca expandida de palavras-chave, tags automáticas, score evoluído, base para "Radar de Oportunidade" e remoção definitiva de mocks/debug. Sem mudanças visuais drásticas — só evolução do que já existe.
 
-## 0. Achados da exploração (o que está realmente quebrado)
+## 1. Biblioteca de palavras-chave categorizada
 
-- `/api/collector/run` recebe `keyword/country/niche/limit` mas **ignora `platform`** e usa `limit` em vez de `quantity`. Por isso filtros parecem sem efeito.
-- `minerar.tsx` mostra `latestRunAds` quando existe, mas se a coleta retorna 0 cai pro `collected` global → parece "sempre os mesmos anúncios".
-- "Salvos / Favoritos / Escaladas" estão **100% em localStorage** (`escalaflow_saved_ads_v1`, `..._fav_ads_v1`, `..._scaled_ads_v1`). Nada vai pro banco → some entre dispositivos / abas / sessões e o contador da sidebar diverge da página.
-- Tabela `saved_offers` existe no Supabase mas guarda só `offer_id`/`is_favorite` apontando pra `mined_offers` antigo, não pra `collected_ads`. Não tem tabela de "scaled".
-- `central-mineracao.tsx`, `analise-ia.tsx` etc. usam `window.open` em alguns botões mas misturam com navegação interna; precisa padronizar via `openExternal`.
-- `seedDemoAds` / `insertTestAd` em `mining/bridge.ts` ainda injetam mock no mesmo repositório dos reais.
-- Debug visual ainda aparece em `minerar.tsx` (`CollectorDebug`, JSON cru de coleta).
-- Playbook hoje só tem o caminho "com anúncio". Não existe "do zero".
-- Ebook não tem separação de modo (KDP / Visual / Clean).
+Criar `src/lib/mining/keywords.ts` exportando:
 
-## 1. Minerador (`/minerar` + `/api/collector/run`)
+```ts
+export const KEYWORD_CATEGORIES = {
+  dinheiro:     { label: "Dinheiro",     emoji: "💰", keywords: [...] },
+  ia:           { label: "IA",           emoji: "🤖", keywords: [...] },
+  automacao:    { label: "Automação",    emoji: "⚙️", keywords: [...] },
+  infoproduto:  { label: "Infoproduto",  emoji: "📚", keywords: [...] },
+  tiktok:       { label: "TikTok",       emoji: "🎵", keywords: [...] },
+  instagram:    { label: "Instagram",    emoji: "📸", keywords: [...] },
+  ebook:        { label: "Ebook",        emoji: "📖", keywords: [...] },
+  playbook:     { label: "Playbook",     emoji: "🎬", keywords: [...] },
+  plr:          { label: "PLR",          emoji: "🧩", keywords: [...] },
+  fisico:       { label: "Produto físico", emoji: "📦", keywords: [...] },
+  emagrecimento:{ label: "Emagrecimento", emoji: "🔥", keywords: [...] },
+  beleza:       { label: "Beleza",        emoji: "💄", keywords: [...] },
+  branding:     { label: "Branding",      emoji: "🎨", keywords: [...] },
+  saas:         { label: "SaaS",          emoji: "🧠", keywords: [...] },
+  apps:         { label: "Apps",          emoji: "📱", keywords: [...] },
+  whatsapp:     { label: "WhatsApp",      emoji: "💬", keywords: [...] },
+  figurinhas:   { label: "Figurinhas",    emoji: "🌟", keywords: [...] },
+  cursos:       { label: "Cursos",        emoji: "🎓", keywords: [...] },
+  lowTicket:    { label: "Low ticket",    emoji: "🪙", keywords: [...] },
+  highTicket:   { label: "High ticket",   emoji: "💎", keywords: [...] },
+  rendaExtra:   { label: "Renda extra",   emoji: "📈", keywords: [...] },
+  copy:         { label: "Copy/Headlines", emoji: "✍️", keywords: [...] },
+} as const;
+```
 
-- Enviar `platform` e `quantity` no POST e respeitar no `runCollector` (`CollectorRunInput` ganha `platform`, `quantity`).
-- Ao iniciar coleta: limpar `latestRunAds`, mostrar loading, e ao final substituir a grade só pelos resultados desta run (não cair no `collected` global se vier 0 — mostrar estado vazio claro).
-- Garantir persistência em `collected_ads` com `keyword/country/niche/platform` corretos (já existe upsert, só faltou `platform` no payload de entrada).
-- Logs (apenas console):
-  - `console.log("mining params", { keyword, niche, country, platform, quantity })`
-  - `console.log("mining results", results.length)`
-- Remover `CollectorDebug` da tela.
+Cada `keywords[]` recebe a lista que o usuário forneceu, mais variações já existentes. Helpers exportados:
+- `allKeywords()` — lista única ordenada
+- `categoryOf(keyword)` — devolve o(s) ID(s) da categoria
+- `inferTagsFromText(text)` — varre copy/headline e devolve tags (nicho, subnicho, emoção)
 
-## 2. Central de Mineração (`/central-mineracao`)
+## 2. UI do Minerador (`src/routes/_authenticated/minerar.tsx`)
 
-- Padronizar TODOS os botões externos via `openExternal(url)` que faz `window.open(url, "_blank", "noopener,noreferrer")`.
-- "Abrir no Facebook / Anúncio original": se `ad_url` ausente → `toast("Link original não encontrado")`, sem abrir nada.
-- "Enviar para ChatGPT":
-  1. montar prompt,
-  2. `navigator.clipboard.writeText(prompt)`,
-  3. abrir `https://chatgpt.com` em aba nova,
-  4. `toast.success("Prompt copiado. Cole no ChatGPT.")`.
-- Nunca tentar embutir Facebook/ChatGPT em iframe.
-- Botões "salvar / favoritar / enviar para escala" passam a usar a persistência do bloco 3.
+- Substituir `QUICK_TAGS` simples por **chips agrupados por categoria** (acordeão/scroller horizontal). Categoria selecionada mostra suas palavras-chave; clicar numa keyword preenche o input.
+- Selector "Categoria" no painel de filtros (além do Nicho atual). Categoria escolhida → filtra anúncios listados por `niche`/`tags` que casem.
+- Remover toda renderização de debug: bloco `CollectorDebug`, JSON cru, `media_source` em badge de UI (manter só em `console.log`).
+- Manter o botão "Minerar com IA" e fluxo atual; só passa a usar nova lib de keywords para sugerir termos.
 
-## 3. Persistência real (Salvos / Favoritos / Escaladas)
+## 3. Tags automáticas + score evoluído
 
-Migração no Supabase para virar fonte única:
+Em `src/lib/collector/collector.normalizer.ts`:
 
-- Nova tabela `user_ad_actions` (`user_id`, `ad_id` → `collected_ads.id`, `action` enum `saved|favorite|scaled`, `created_at`, unique(`user_id,ad_id,action`)).
-- RLS: dono lê/escreve só as próprias linhas.
-- Reescrever `queries.ts`:
-  - `saveCollectedAd / favoriteCollectedAd / scaleCollectedAd` viram upsert/delete em `user_ad_actions`.
-  - `fetchSavedAds / fetchFavoriteAds / fetchScaledAds` fazem join com `collected_ads`.
-  - Manter assinatura `PersistedAd` para não quebrar UI.
-  - `subscribeChange` continua via realtime (`postgres_changes` em `user_ad_actions`).
-- Critério de "escalada": linha em `user_ad_actions` com `action='scaled'` **ou** `collected_ads.score >= 80` **ou** criativo repetido (mesmo `image_url`/`video_url` em ≥2 linhas) **ou** mesmo `ad_library_id` em ≥2 plataformas.
-- Sidebar lê o mesmo `fetch*` → contador sempre coerente.
-- `seedDemoAds` desabilitado por padrão; só roda atrás de flag `?demo=1`.
+- Nova função `enrich(ad, ctx)` chamada antes do `out.push`, que calcula:
+  - `niche`, `subniche` via `categoryOf` + `inferTagsFromText`
+  - `promise` (regex em headline/copy: "ganhe", "perca", "descubra", "sem", "em X dias")
+  - `mechanism` (palavras-chave: "método", "fórmula", "framework", "blueprint", "hack")
+  - `emotion` (medo / desejo / urgência / curiosidade / prova social)
+  - `scaleLevel`: `cold | warming | hot | scaled` derivado do score final
+- `inferScore` evolui para considerar:
+  - repetição criativa (mesmo `advertiser+headline` ou imagem) → bônus
+  - tempo ativo (`startDate` → dias) → bônus progressivo
+  - presença de CTA forte (lista de CTAs) → bônus
+  - multi-plataforma (≥3) → bônus (já existe)
+  - vídeo → bônus (já existe)
+  - emoções dominantes detectadas → bônus
+  - máximo 99
+- Tipos novos em `collector.types.ts`: `tags: string[]`, `subniche?`, `promise?`, `mechanism?`, `emotion?`, `scaleLevel?`.
+- Persistir tudo em `collected_ads.raw` (já é `jsonb`) e nas colunas existentes — sem migração de schema agora. Migração futura adicionará colunas próprias quando o Radar precisar de queries.
 
-## 4. Análise IA (`/analise-ia`)
+## 4. Dedup mais forte (sem repetidos)
 
-- Receber `adId` real via query param e carregar de `collected_ads`.
-- Rodar IA real (Lovable AI, modelo já usado pelo Ebook) e gerar: Big Idea, promessa, público, dores, desejos, mecanismo único, objeções, gatilhos, estrutura da oferta, ideias de criativos, próximos passos.
-- Persistir em `ai_analyses` (já existe).
-- Botões fixos no topo: Voltar, Abrir anúncio original (`openExternal`), Copiar análise, "Criar Ebook a partir deste anúncio", "Criar Playbook a partir deste anúncio" (passam `?adId=` para `/produtos/ebook` e `/produtos/playbook/novo`).
+No service e no fetch de listagem:
+- Chave de dedup: `adLibraryId` → `adUrl` → hash de `advertiser|headline|primeira-imagem`.
+- No `minerar.tsx`, ao renderizar `visibleCollected`, aplicar `Map` por chave de dedup antes do `.slice(page*PAGE_SIZE, ...)`.
 
-## 5. Playbook — dois caminhos
+## 5. Remoção de mocks e fallbacks fake
 
-- Em `/produtos/playbook/novo`, primeira etapa vira escolha:
-  - **A) Com anúncio minerado** → fluxo atual (lista de `collected_ads/mined_offers`).
-  - **B) Do zero** → categoria (Romance, Gangster, HQ, Infantil, Receita, Emagrecimento, Negócios, Fé, Marketing, Curso, Manual, Playbook estratégico) + tema, público, estilo, qtd cenas, tom, objetivo.
-- Caminho B alimenta `extractPlaybookBriefing` com um "ad sintético" derivado dos campos do form (mesmo schema `PlaybookBriefing`, sem mudar o resto do pipeline).
-- `playbooks.source_ad_key` = `null` quando do zero; `briefing.mode = "scratch"|"ad"` para o leitor diferenciar.
-- Não mexer no leitor/editor agora.
+- `src/lib/mining/bridge.ts`: remover `seedDemoAds` e `insertTestAd` (e qualquer botão que chame).
+- Remover constantes `DEMO_*` e o source `"demo"` do `MinedAd["source"]`.
+- Procurar usos com `rg "seedDemoAds|insertTestAd|is_demo.*true"` e limpar callers (botões "Teste de importação", banners "modo demo").
+- `central-mineracao.tsx` e `analise-ia.tsx`: deixar de listar registros com `is_demo = true` por padrão.
 
-## 6. Ebook — três modos (estrutural, sem polir design)
+## 6. Base para "Radar de Oportunidade"
 
-- Adicionar campo `mode` em `ebooks` (`kdp|visual|clean`, default `kdp`) via migração.
-- Wizard ganha uma etapa de seleção de modo logo após o briefing.
-- `ebook.server.ts` recebe `mode` e ajusta apenas o prompt de geração (capítulos longos vs blocos visuais vs editorial limpo). Layout/PDF fica como está por enquanto.
-- Garantir fluxo ponta-a-ponta funcionando: base → briefing → estrutura → modo → gerar capítulos → preview/export atual.
+Apenas o esqueleto agora (sem nova rota visual ainda):
+- `src/lib/mining/radar.ts` com funções puras sobre uma lista de `CollectedAd`:
+  - `hotNiches(ads)` — nichos com mais entradas nos últimos 7 dias
+  - `repeatedCreatives(ads)` — agrupa por hash de imagem/headline
+  - `scalingCreatives(ads)` — score crescente + multi-plataforma + tempo ativo
+  - `dominantPromises(ads)` / `saturatedProducts(ads)` / `trends(ads)`
+- Cobertura de testes manuais via `console`. UI dedicada vem em iteração futura — fora deste escopo.
 
-## 7. Limpeza de debug visual
+## 7. Limpeza geral
 
-- Remover blocos de JSON cru, `CollectorDebug`, badges de "demo" misturadas, e qualquer `<pre>{JSON.stringify(...)}` da UI.
-- Substituir por `console.log/console.warn` quando o dado for útil pra dev.
+- `setCollectorDebug` e estado `CollectorDebug` saem do componente; só `console.log` permanece.
+- `mediaSource` deixa de aparecer como Badge na UI.
+- Remover `inferTags` antigo de `mining/repository.ts` em favor do novo `inferTagsFromText` (repository chama o helper).
 
-## 8. Página `/diagnostico`
+## Arquivos afetados
 
-- Rota nova só de leitura, dentro de `_authenticated`.
-- Roda checks reais (não mock):
-  - **Minerador**: POST de teste em `/api/collector/run` com keyword fixa e `limit=1`; OK se `result.ok && saved>=0`.
-  - **Central**: existe pelo menos 1 linha em `collected_ads`? `openExternal` disponível? clipboard disponível?
-  - **Persistência**: insert+delete numa linha de teste em `user_ad_actions`.
-  - **Ebook**: `listEbooks` responde sem erro.
-  - **Playbook**: `listPlaybooks` responde sem erro.
-- Cada item: `OK` (verde) / `ERRO` (vermelho, com mensagem) / `PENDENTE` (cinza, quando depende de ação do usuário, ex.: extensão).
+Novos:
+- `src/lib/mining/keywords.ts`
+- `src/lib/mining/radar.ts`
 
-## Ordem de execução proposta
+Editados:
+- `src/lib/collector/collector.types.ts` (novos campos)
+- `src/lib/collector/collector.normalizer.ts` (enrich + score evoluído)
+- `src/lib/mining/repository.ts` (usar `inferTagsFromText`)
+- `src/lib/mining/bridge.ts` (remover demo/test)
+- `src/routes/_authenticated/minerar.tsx` (categorias, tags, sem debug)
+- `src/routes/_authenticated/central-mineracao.tsx` e `analise-ia.tsx` (esconder is_demo)
 
-1. Bloco 1 (Minerador) — destrava o resto.
-2. Bloco 3 (Persistência) — migração + reescrita `queries.ts`.
-3. Bloco 2 (Central) — depende de 1 e 3.
-4. Bloco 7 (limpeza debug) — junto, é barato.
-5. Bloco 4 (Análise IA).
-6. Bloco 6 (Ebook modos) — só schema + prompt.
-7. Bloco 5 (Playbook do zero).
-8. Bloco 8 (`/diagnostico`).
+Sem migrações de banco neste passo.
 
-## Detalhes técnicos
+## Fora de escopo (iterações futuras)
 
-- Migração SQL nova: `user_ad_actions` + RLS + índice `(user_id, action)`; coluna `mode` em `ebooks`.
-- `CollectorRunInput` ganha `platform?: string; quantity?: number` (mantém `limit` como alias).
-- Realtime: habilitar `user_ad_actions` na publicação `supabase_realtime`.
-- Nada de mexer em `src/integrations/supabase/client.ts` nem em `routeTree.gen.ts`.
-- Sem novas dependências.
-
-## Fora de escopo deste plano
-
-- Redesign visual de qualquer tela.
-- Exportação avançada (DOCX/EPUB) do Ebook.
-- Extensão Chrome (mantém como está, só não polui mais o repositório de reais).
-- Novas integrações (Stripe, e-mail, etc.).
+- Página `/radar` visual.
+- Colunas dedicadas em `collected_ads` para `tags`, `emotion`, `scale_level`.
+- Detecção de imagens duplicadas via perceptual hash.
+- IA real classificando emoção/promessa (hoje é heurística por regex/keywords).
