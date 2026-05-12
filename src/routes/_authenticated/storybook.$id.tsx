@@ -167,7 +167,7 @@ function StorybookWorkspace() {
     setBusy("export-" + format);
     try {
       let blob: Blob;
-      let ext = format;
+      let ext: string = format;
       if (format === "pdf") {
         const { exportEbookPdf } = await import("@/lib/ebook/pdf");
         blob = await exportEbookPdf({
