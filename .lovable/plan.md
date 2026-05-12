@@ -1,86 +1,74 @@
-## Objetivo
+# Corrigir abertura de links externos (Facebook / ChatGPT / perfis)
 
-Tornar a inteligência do Minerador (tags, subniche, nível de escala) visível para o usuário e adicionar uma página **Radar de Oportunidade** que consome `radar.ts` sobre os anúncios já minerados.
+## Diagnóstico
 
-## 1. Persistir o enrichment em `collected_ads.raw`
+O problema não está nos call sites — todos já passam pelo helper `openExternal` em `src/lib/external.ts`. O problema é o **ambiente do preview**: o app roda dentro de um iframe do Lovable, então `window.open(url, "_blank")` chamado a partir do `window` interno às vezes:
 
-`src/routes/api/collector.run.ts` hoje salva só `a.raw`. Trocar por um objeto que mescla o payload bruto com os campos enriquecidos:
+- abre uma popup que herda o sandbox do iframe (cross-origin para Facebook/ChatGPT é bloqueada),
+- ou é silenciosamente ignorada por bloqueador de popup,
+- ou é interpretada como navegação dentro do iframe.
 
-```ts
-raw: {
-  ...(a.raw && typeof a.raw === "object" ? a.raw : { original: a.raw }),
-  enriched: {
-    tags: a.tags ?? [],
-    subniche: a.subniche ?? null,
-    promise: a.promise ?? null,
-    mechanism: a.mechanism ?? null,
-    emotion: a.emotion ?? null,
-    scaleLevel: a.scaleLevel ?? null,
-  },
-}
+A correção definitiva é **delegar a abertura para o top frame** e usar um `<a target="_blank">` com clique sintético, que é o método que escapa do sandbox do iframe de preview de forma mais confiável (mantendo o gesto do usuário).
+
+## Mudanças
+
+### 1. `src/lib/external.ts` — reescrever o helper
+
+Nova ordem de tentativas, todas dentro do mesmo gesto de clique:
+
+1. Criar um `<a href={url} target="_blank" rel="noopener noreferrer">` invisível, anexar ao `document.body`, `.click()`, remover. Esta é a forma mais robusta dentro de iframes.
+2. Se falhar (try/catch), tentar `window.top?.open(url, "_blank", "noopener,noreferrer")` (pode lançar por cross-origin — silenciar).
+3. Se ainda falhar, tentar `window.open(url, "_blank", "noopener,noreferrer")`.
+4. Se nada abrir, `toast.error("Permita popups para abrir links externos.")` e copiar a URL para o clipboard como fallback.
+
+Continua aceitando lista de candidatos (`adUrl`, `snapshot.page_profile_uri`, `advertiserUrl`, `facebookUrl`, `instagramUrl`) e usando o primeiro `https?://` válido.
+
+### 2. `openChatGPTWithPrompt`
+
+Comportamento exigido:
+
+1. `await navigator.clipboard.writeText(prompt)` (com fallback `document.execCommand("copy")` via `<textarea>` se Clipboard API não disponível dentro do iframe).
+2. Chamar o novo `openExternal("https://chatgpt.com/")`.
+3. `toast.success("Prompt copiado")` no sucesso da cópia, senão `toast.message("Abra o ChatGPT e cole seu prompt.")`.
+
+### 3. Call sites do Facebook — garantir lista completa de fallbacks
+
+Auditar e padronizar a ordem de candidatos do FB em todos os botões "Abrir anúncio" / "Perfil anunciante":
+
+```
+openExternal(
+  ad.adUrl,
+  ad.snapshot?.page_profile_uri,
+  ad.advertiserUrl,
+  ad.facebookUrl,
+  ad.instagramUrl,
+  ad.ad_library_id ? `https://www.facebook.com/ads/library/?id=${ad.ad_library_id}` : null,
+  { errorMessage: "Link do anúncio não encontrado" },
+)
 ```
 
-Sem migração: a coluna já é `jsonb`.
+Arquivos atingidos (apenas a lista de candidatos, sem mudar layout):
 
-## 2. Expor enrichment no `minerar.tsx`
-
-- Estender o `type CollectedAd` local com `tags?: string[]`, `subniche?: string | null`, `scale_level?: "cold"|"warming"|"hot"|"scaled" | null`, `promise?: string | null`, `emotion?: string | null`.
-- Em `fetchCollected` e no `optimistic` mapper de `onCollectorMine`, ler de `row.raw?.enriched` (e do próprio `CollectorAd` para o caso otimista).
-- **Cards**: abaixo da linha de plataforma/country/CTA, renderizar:
-  - Badge `subniche` (variant `secondary`).
-  - Badge colorido de `scale_level` com mapping → label/cor: `cold` cinza, `warming` azul, `hot` laranja, `scaled` gradiente primary.
-  - Até 3 chips de `tags` (`variant="outline"`, rounded-full, font-size 10px). Botão "+N" se houver mais.
-
-## 3. Filtros novos no painel `Filtros principais`
-
-Adicionar dois controles antes da linha de ação (mantendo grid de 6 colunas em lg):
-
-- `Select` "Nível de escala" com opções `Todos / Cold / Warming / Hot / Scaled`. Estado `scaleFilter`.
-- Chips de tag dinâmicos: derivar `availableTags` = união de `tags` dos `visibleCollected` (top 20 por frequência). Renderizar como chips selecionáveis (multi). Estado `tagFilters: Set<string>`.
-
-Aplicar filtros antes de paginar:
-
-```ts
-const filtered = visibleCollected.filter((a) => {
-  if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
-  if (tagFilters.size && !a.tags?.some((t) => tagFilters.has(t))) return false;
-  return true;
-});
-```
-
-E usar `filtered` no contador, no `slice` paginado e no estado vazio. O `activeCategory` (já existente) também passa a filtrar via `tags.includes(<keyword>)` quando uma categoria está ativa — usando `KEYWORD_CATEGORIES[activeCategory].keywords`.
-
-## 4. Página `/radar` — Radar de Oportunidade
-
-Criar `src/routes/_authenticated/radar.tsx`:
-
-- Carregar até 500 anúncios de `collected_ads` (mesma query do Minerador), mapear para `CollectorAd` (incluindo `raw.enriched`) e passar para os helpers de `src/lib/mining/radar.ts`.
-- Layout: 2 colunas em `lg`, 1 em mobile.
-  - **Card "Nichos quentes (7d)"**: lista `hotNiches(ads, 7)`. Cada linha: nome do nicho + barra horizontal proporcional ao count + número.
-  - **Card "Criativos repetidos"**: `repeatedCreatives(ads)`. Cada item: thumbnail (do `sample.imageUrl/videoThumbnail`), advertiser, headline truncada, badge `xN repetições`, botão "Abrir anúncio" (`openExternal` com `sample.adUrl`).
-  - **Card "Promessas dominantes"** e **"Criativos escalando"**: secundários, mais compactos (lista simples). Render somente se array não vazio.
-- Header com `Radar` icon + contador "X anúncios analisados" e botão "Atualizar" (re-fetch).
-- Estado vazio: ícone `Radar` + texto "Nenhum dado suficiente. Minere mais anúncios primeiro." com link para `/minerar`.
-- `errorComponent` e `notFoundComponent` mínimos no `createFileRoute` por consistência.
-
-## 5. Sidebar
-
-`src/components/AppSidebar.tsx`: adicionar item "Radar" (ícone `Radar` da lucide) logo após "Minerar". Sem badge/contador.
-
-## Arquivos afetados
-
-Editados:
-- `src/routes/api/collector.run.ts` (raw com enriched)
-- `src/routes/_authenticated/minerar.tsx` (tipo, leitura do raw, badges, filtros)
-- `src/components/AppSidebar.tsx` (item Radar)
-
-Novos:
+- `src/routes/_authenticated/minerar.tsx` (botão Abrir e botão Perfil)
 - `src/routes/_authenticated/radar.tsx`
+- `src/routes/_authenticated/central-mineracao.tsx`
+- `src/routes/_authenticated/favoritos.tsx`
+- `src/routes/_authenticated/ofertas-salvas.tsx`
+- `src/routes/_authenticated/ofertas-escaladas.tsx`
+- `src/routes/_authenticated/analise-ia.tsx`
 
-Sem migração de banco. Sem mudanças em `radar.ts` / `keywords.ts` / `collector.normalizer.ts`.
+### 4. ChatGPT call sites
+
+Verificar que todos os botões "Enviar para ChatGPT" / "Abrir no ChatGPT" usam `openChatGPTWithPrompt(prompt)` e não `openExternal` direto. Hoje só `central-mineracao.tsx` usa; conferir se outras telas precisam.
 
 ## Fora de escopo
 
-- Colunas dedicadas em `collected_ads` para `tags`/`scale_level` (continua em `raw.enriched`).
-- Backfill do enrichment para anúncios já existentes (a próxima mineração já popula; antigos aparecem sem badges).
-- Detecção visual de duplicados por hash de imagem (ainda usa `advertiser|headline|media`).
+- Não mexer na extensão (`extension/`).
+- Não mexer em layout/estilos.
+- Não mexer em lógica de negócio dos cards.
+
+## Validação
+
+- Testar no preview do Lovable: clicar "Abrir" em Favoritos, Salvas, Escaladas, Minerar, Radar — deve abrir o Facebook em aba real.
+- Clicar "Enviar para ChatGPT" — deve abrir `chatgpt.com` em aba nova com toast "Prompt copiado".
+- Testar também na URL publicada (fora do iframe) para garantir que não regredimos.
