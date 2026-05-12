@@ -607,24 +607,16 @@ function MiningCenterPage() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Badge
-                                  variant={
-                                    a.source === "extension"
-                                      ? "default"
-                                      : a.source === "demo"
-                                        ? "outline"
-                                        : "secondary"
-                                  }
+                                  variant={a.source === "extension" ? "default" : "secondary"}
                                   className="rounded-full"
                                 >
                                   {a.source}
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {a.source === "demo"
-                                  ? "Inserido em modo demonstração"
-                                  : a.source === "extension"
-                                    ? "Capturado pela extensão"
-                                    : "Inserido manualmente"}
+                                {a.source === "extension"
+                                  ? "Capturado pela extensão"
+                                  : "Inserido manualmente"}
                               </TooltipContent>
                             </Tooltip>
                           </TableCell>

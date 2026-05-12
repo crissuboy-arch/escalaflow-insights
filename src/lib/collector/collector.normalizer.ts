@@ -1,4 +1,5 @@
 import type { CollectorAd } from "./collector.types";
+import { inferTagsFromText, scaleLevelFromScore, KEYWORD_CATEGORIES } from "../mining/keywords";
 
 type Obj = Record<string, unknown>;
 
@@ -59,13 +60,34 @@ function deepFind(obj: unknown, re: RegExp, depth = 0): string | undefined {
   return undefined;
 }
 
-function inferScore(copy: string, hasVideo: boolean, platforms?: string[]): number {
+const STRONG_CTAS = new Set([
+  "shop_now", "sign_up", "learn_more", "subscribe", "get_offer",
+  "buy_now", "comprar", "assinar", "saiba mais", "compre agora",
+]);
+
+function inferScore(args: {
+  copy: string;
+  headline: string;
+  hasVideo: boolean;
+  platforms?: string[];
+  cta?: string;
+  startDate?: string;
+  emotion?: string;
+}): number {
   let s = 50;
-  if (copy.length > 200) s += 10;
-  if (copy.length > 500) s += 10;
-  if (platforms && platforms.length >= 3) s += 10;
-  if (hasVideo) s += 10;
-  return Math.min(99, s);
+  if (args.copy.length > 200) s += 8;
+  if (args.copy.length > 500) s += 8;
+  if (args.platforms && args.platforms.length >= 3) s += 10;
+  if (args.hasVideo) s += 8;
+  if (args.cta && STRONG_CTAS.has(args.cta.toLowerCase())) s += 5;
+  if (args.startDate) {
+    const days = (Date.now() - new Date(args.startDate).getTime()) / 86_400_000;
+    if (days >= 7) s += 4;
+    if (days >= 21) s += 6;
+    if (days >= 60) s += 6;
+  }
+  if (args.emotion) s += 4;
+  return Math.min(99, Math.max(0, Math.round(s)));
 }
 
 export function normalize(
@@ -219,6 +241,21 @@ export function normalize(
           ? startEpoch
           : undefined;
 
+    const enrichText = `${headline}\n${copy}`;
+    const inferred = inferTagsFromText(enrichText);
+    const subniche = inferred.categories[0]
+      ? KEYWORD_CATEGORIES[inferred.categories[0]].label
+      : undefined;
+    const score = inferScore({
+      copy,
+      headline,
+      hasVideo: !!finalVideo,
+      platforms,
+      cta,
+      startDate,
+      emotion: inferred.emotion,
+    });
+
     out.push({
       advertiser,
       headline: headline.slice(0, 240),
@@ -232,19 +269,28 @@ export function normalize(
       platform,
       platforms,
       country,
-      niche: ctx.niche || "Geral",
-      score: inferScore(copy, !!finalVideo, platforms),
+      niche: ctx.niche || subniche || "Geral",
+      score,
       source: "collector",
       createdAt: new Date().toISOString(),
       startDate,
       mediaSource,
+      tags: inferred.tags,
+      subniche,
+      promise: inferred.promise,
+      mechanism: inferred.mechanism,
+      emotion: inferred.emotion,
+      scaleLevel: scaleLevelFromScore(score),
       raw: ad,
     });
   }
 
   const seen = new Set<string>();
   return out.filter((a) => {
-    const key = a.adLibraryId || a.adUrl || `${a.advertiser}|${a.headline}`;
+    const key =
+      a.adLibraryId ||
+      a.adUrl ||
+      `${a.advertiser}|${a.headline}|${a.imageUrl ?? a.videoUrl ?? ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

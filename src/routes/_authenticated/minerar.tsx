@@ -21,6 +21,7 @@ import { Badge as UIBadge } from "@/components/ui/badge";
 import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkCheck, Star } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { openExternal } from "@/lib/external";
+import { CATEGORY_LIST, type CategoryId } from "@/lib/mining/keywords";
 
 type CollectedAd = {
   id: string;
@@ -42,25 +43,7 @@ type CollectedAd = {
   media_source?: string;
 };
 
-type CollectorDebug = {
-  total: number;
-  firstItem: unknown | null;
-  fields: string[];
-  withImage: number;
-  withVideo: number;
-  withoutMedia: number;
-  mediaSources: Record<string, number>;
-};
-
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
-
-const QUICK_TAGS = [
-  "Infoproduto", "Produto físico", "Emagrecimento", "Beleza", "Marketing", "IA",
-  "Saúde", "Finanças", "Dropshipping", "SaaS", "Relacionamento", "Nutra",
-];
-const TAG_TO_NICHE: Record<string, string> = {
-  "Beleza": "Beleza", "Marketing": "Marketing", "Saúde": "Saúde", "Finanças": "Finanças",
-};
 
 function MinePage() {
   const { t } = useTranslation();
@@ -71,7 +54,7 @@ function MinePage() {
   const [country, setCountry] = useState("all");
   const [platform, setPlatform] = useState("all");
   const [quantity, setQuantity] = useState(20);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [aiOpen, setAiOpen] = useState(false);
@@ -80,7 +63,6 @@ function MinePage() {
   const [collecting, setCollecting] = useState(false);
   const [collectorProgress, setCollectorProgress] = useState(0);
   const [collectorFound, setCollectorFound] = useState<number | null>(null);
-  const [, setCollectorDebug] = useState<CollectorDebug | null>(null);
   const signals = getAITrends().signals;
 
   // Real ads from collected_ads (Supabase)
@@ -209,13 +191,11 @@ function MinePage() {
     toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
   };
 
-  const onTagClick = (tag: string) => {
-    const newActive = activeTag === tag ? null : tag;
-    setActiveTag(newActive);
-    const newKeyword = newActive ?? "";
-    const newNiche = newActive && TAG_TO_NICHE[newActive] ? TAG_TO_NICHE[newActive] : "all";
-    setKeyword(newKeyword);
-    setNiche(newNiche);
+  const onCategoryClick = (id: CategoryId) => {
+    setActiveCategory((cur) => (cur === id ? null : id));
+  };
+  const onKeywordChip = (kw: string) => {
+    setKeyword(kw);
   };
 
   const onAIMine = async () => {
@@ -251,24 +231,7 @@ function MinePage() {
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
       const adsArr = data.ads ?? [];
-      const sources: Record<string, number> = {};
-      let wImg = 0, wVid = 0, wNone = 0;
-      for (const a of adsArr) {
-        const ms = (a as unknown as { mediaSource?: string }).mediaSource ?? "none";
-        sources[ms] = (sources[ms] ?? 0) + 1;
-        if (a.videoUrl) wVid++;
-        else if (a.imageUrl) wImg++;
-        else wNone++;
-      }
-      setCollectorDebug({
-        total: adsArr.length,
-        firstItem: adsArr[0] ?? null,
-        fields: adsArr[0] ? Object.keys(adsArr[0] as unknown as Record<string, unknown>) : [],
-        withImage: wImg,
-        withVideo: wVid,
-        withoutMedia: wNone,
-        mediaSources: sources,
-      });
+      console.log("[minerar] collector adsArr:", adsArr);
       // Optimistically merge returned ads into local state so UI updates instantly
       const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
         id: a.adLibraryId || `${Date.now()}-${idx}`,
@@ -408,26 +371,45 @@ function MinePage() {
         </CardContent>
       </Card>
 
-      {/* Filtros rápidos */}
-      <div className="flex flex-wrap gap-2">
-        {QUICK_TAGS.map((tag) => {
-          const active = activeTag === tag;
-          return (
-            <motion.button
-              key={tag}
-              whileTap={{ scale: 0.94 }}
-              onClick={() => onTagClick(tag)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                active
-                  ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
-                  : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
-              }`}
-              style={active ? { background: "var(--gradient-primary)" } : undefined}
-            >
-              {tag}
-            </motion.button>
-          );
-        })}
+      {/* Categorias de inteligência */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {CATEGORY_LIST.map((c) => {
+            const active = activeCategory === c.id;
+            return (
+              <motion.button
+                key={c.id}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => onCategoryClick(c.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                  active
+                    ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
+                    : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
+                }`}
+                style={active ? { background: "var(--gradient-primary)" } : undefined}
+              >
+                <span className="mr-1">{c.emoji}</span>{c.label}
+              </motion.button>
+            );
+          })}
+        </div>
+        {activeCategory && (
+          <div className="flex flex-wrap gap-1.5 rounded-lg border border-border/60 bg-card/60 p-3">
+            {(CATEGORY_LIST.find((c) => c.id === activeCategory)?.keywords ?? []).map((kw) => (
+              <button
+                key={kw}
+                onClick={() => onKeywordChip(kw)}
+                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
+                  keyword === kw
+                    ? "border-primary/60 bg-primary/15 text-primary"
+                    : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
+                }`}
+              >
+                {kw}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filtros principais */}
