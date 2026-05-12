@@ -1,123 +1,220 @@
 ## Objetivo
 
-Hoje `/produtos/ebook` e `/produtos/playbook` são dois fluxos paralelos que partem do anúncio e geram artefatos isolados, sem nada que os una. Vamos introduzir uma entidade central **Projeto** que:
-
-- agrupa Briefing + Outline + Ebook + Playbook + Capa + Layout + Exportações
-- nasce ao selecionar um anúncio minerado (ou do zero / direto IA)
-- compartilha briefing entre Ebook e Playbook (Playbook = extensão interativa do Ebook, mesmo tema)
-- oferece modos: Ebook PDF, Ebook Premium, Ebook Amazon (KDP), Playbook Interativo, Combo
-
-Sem rebuild dos exporters/IA já estáveis — só uma camada nova "Projeto" por cima.
+Transformar o Ebook Engine num gerador completo de produtos digitais vendáveis. Tudo é construído por cima da entidade `Project` que já existe — sem refazer mineração, exporters base ou playbook engine.
 
 ---
 
-## 1. Modelo de dados
+## 1. Metadados do Produto
 
-Nova tabela `projects` (Lovable Cloud / Supabase, RLS por `user_id`):
+Adicionar bloco "Identidade do Produto" no workspace (`/projetos/:id`, aba Briefing). Persistir em `projects.meta.identity`:
 
-```text
-projects
-  id uuid pk
-  user_id uuid (RLS)
-  title text
-  niche text
-  source_ad_key text null          -- ad minerado de origem
-  briefing jsonb default '{}'      -- compartilhado ebook+playbook
-  outline jsonb default '[]'       -- capítulos/cenas base
-  mode text default 'combo'        -- pdf | premium | kdp | playbook | combo
-  ebook_id uuid null               -- fk lógica → ebooks.id
-  playbook_id uuid null            -- fk lógica → playbooks.id
-  cover_url text null
-  status text default 'draft'      -- draft | ready | published
-  step int default 0
-  meta jsonb default '{}'          -- style, palette, layout, language
-  created_at, updated_at
+```ts
+identity: {
+  author: string;
+  brand: string;        // marca/editora
+  instagram: string;
+  copyright: string;    // ex: "© 2026 Autor"
+  subtitle: string;
+  category: string;     // dropdown (presets de nicho)
+  language: "pt" | "en" | "es";
+  shortDescription: string;
+  logoUrl?: string;     // upload em bucket ebook-covers/logos/
+}
 ```
 
-Tabelas `ebooks` e `playbooks` permanecem; ganham coluna opcional `project_id uuid null` para apontar de volta. Sem migração destrutiva.
+Esses campos são injetados em:
+- capa (footer/header)
+- página de copyright do PDF/EPUB/DOCX
+- metadados EPUB (`dc:creator`, `dc:publisher`, `dc:language`, `dc:rights`)
+- header/footer do KDP
 
-RLS: select/insert/update/delete só onde `auth.uid() = user_id`.
+Sem migração nova: tudo cabe em `projects.meta` (jsonb).
 
-## 2. Camada de servidor (`src/lib/project.functions.ts` + `project.server.ts`)
+## 2. Controle de Tamanho
 
-Server functions novas (todas com `requireSupabaseAuth`):
-
-- `createProject({ source: 'ad'|'scratch'|'ai', ad?, category?, kickstart?, mode })` → cria row em `projects`, opcionalmente já roda `aiExtractBriefing` + `aiGenerateOutline` quando `source !== 'scratch'`. Retorna `{ id }`.
-- `loadProject({ id })`
-- `listProjects()` — para o hub
-- `updateProject({ id, patch })` — autosave debounced
-- `deleteProject({ id })`
-- `generateProjectEbook({ id, mode })` — usa briefing/outline já no projeto, cria/atualiza row em `ebooks`, salva `ebook_id` no projeto, gera capítulos (e imagens em modo premium) reaproveitando `aiGenerateChapter` / `aiGenerateChapterImage`.
-- `generateProjectPlaybook({ id })` — usa o mesmo briefing/outline, mapeia capítulos → cenas via `aiGenerateSceneOutline` + `aiGenerateSceneContent`, salva em `playbooks`, grava `playbook_id`.
-- `generateProjectCombo({ id })` — chama as duas em paralelo.
-
-Tudo reusa `ebook.server.ts` e `playbook.server.ts` existentes — nenhuma duplicação de prompts.
-
-## 3. Rotas
+Novo seletor "Tamanho do produto" no briefing:
 
 ```text
-src/routes/_authenticated/
-  projetos.tsx                    -> /projetos      (hub: lista + 3 cards de criação)
-  projetos.novo.tsx               -> /projetos/novo (escolha de origem)
-  projetos.$id.tsx                -> /projetos/:id  (workspace do projeto, tabs)
-  projetos.$id.ebook.tsx          -> tab ebook (embute UI atual)
-  projetos.$id.playbook.tsx       -> tab playbook (embute UI atual)
-  projetos.$id.exportar.tsx       -> tab export (PDF/DOCX/EPUB/Compartilhar)
-  p.$id.tsx                       -> /p/:id        (leitura pública mobile do playbook, igual ao atual)
+20 / 30 / 60 / 80 / 100 / 120 / 150 páginas
 ```
 
-`/produtos/ebook` e `/produtos/playbook` continuam funcionando (entrada legada) mas a sidebar passa a destacar **Projetos** como entrada principal.
+Salvo em `projects.meta.size.targetPages`. A camada de IA mapeia páginas → orçamento de geração:
 
-## 4. UX do workspace `/projetos/:id`
+```text
+páginas | capítulos | palavras/cap | extras
+20      | 5         | ~600         | —
+30      | 6         | ~750         | exemplos
+60      | 8         | ~1100        | exemplos + exercícios
+80      | 10        | ~1200        | + FAQ
+100     | 12        | ~1300        | + bônus
+120     | 14        | ~1400        | + storytelling
+150     | 16        | ~1500        | + bônus extras + estudos de caso
+```
 
-Header do projeto: título, badge de modo, botões `[ Gerar Ebook ] [ Gerar Playbook ] [ Gerar Combo ] [ Exportar ]` — todos habilitados depois que briefing+outline existem.
+`aiGenerateOutline` recebe `targetPages` e devolve outline com `chapterCount` calculado. `aiGenerateChapter` recebe `wordsTarget` e `extras: { examples, exercises, faq, bonus, storytelling }` para enriquecer cada capítulo.
 
-Tabs:
-1. **Briefing** — form do briefing compartilhado, paleta/estilo, capa.
-2. **Estrutura** — outline (capítulos = cenas).
-3. **Ebook** — preview/edição dos capítulos, modo (KDP/Premium), exports PDF/DOCX/EPUB.
-4. **Playbook** — preview interativo (cards/cenas/mobile), reorder, regen imagem por cena, link público compartilhável.
-5. **Exportar** — bundle final (.zip com PDF + EPUB + link playbook).
+## 3. Tipos de Produto (modos)
 
-Estado de busy por ação (não bloquear o resto). Autosave 1.5s já no padrão.
+Estender `projects.mode` para aceitar:
 
-## 5. Hub `/projetos` (substitui ponto de entrada)
+```text
+ebook | apostila | planner | planilha | playbook | kit
+```
 
-3 cards principais (mantém o que já fizemos no EbookHub, generalizado):
-- **Criar com Oferta Minerada** → seletor de ad → cria Projeto modo `combo` por padrão.
-- **Criar do Zero** → categorias (Amazon/KDP, Romance, Infantil, Low Ticket, Emagrecimento, Negócios, PLR, Apostila, Playbook puro, …) + seleção de modo.
-- **Criar com IA** → form curto (nicho, promessa, público, idioma, modo) → roda briefing+outline e abre workspace.
+Cada tipo tem seu pipeline:
 
-Abaixo: lista de projetos ("Continuar onde parou") com capa, modo e progresso.
+- **ebook**: já existe, só ganha metadados/tamanho.
+- **apostila**: como ebook, com tom didático (módulos, atividades, gabarito ao final). Reusa `ebook.server` com `style: "apostila"`.
+- **planner**: novo gerador `planner.server.ts` (ver §4).
+- **planilha**: novo gerador `spreadsheet.server.ts` (ver §5).
+- **playbook**: já existe.
+- **kit**: orquestrador que dispara ebook + playbook + planner + checklist + copy + mockup em paralelo (ver §6).
 
-## 6. Playbook como extensão do Ebook
+Hub `/projetos` ganha 6 cards de tipo (ou um seletor visual no fluxo "do zero"). O modo já aparece no header do projeto.
 
-Mesmo `briefing`/`outline` do projeto. Ao gerar Playbook a partir de um Ebook existente:
-- cada `chapter` vira uma `scene` (título + summary derivado dos bullets + texto curto IA).
-- imagens por cena via `aiGenerateSceneImage` em fundo.
-- tema visual derivado do `style/palette` do projeto (mapear: dourado→`dourado-editorial`, neon→`neon-roxo`, demais→`minimal-dark`).
-- página pública `/p/:projectId` mobile-first, cards swipe, compartilhável.
+## 4. Planner
 
-## 7. Fora de escopo
+Novo módulo `src/lib/planner.server.ts` + `planner/pdf.ts`. Templates:
 
-- Pagamento/marketplace de venda dos produtos.
-- Integração real DALL·E/Stability (segue só Gemini).
-- Editor WYSIWYG por capítulo (mantém markdown).
-- Novos exportadores além de PDF/DOCX/EPUB.
-- Migrar dados antigos de `ebooks`/`playbooks` órfãos para `projects` (ficam acessíveis pelas rotas legadas).
+```text
+hábitos | calendário | metas | financeiro | emagrecimento | estudos | rotina
+```
 
-## 8. Entregáveis
+Cada template define páginas modulares (capa → instruções → trackers → semanas → revisão). Geração:
 
-1. Migração: tabela `projects` + colunas `project_id` em `ebooks`/`playbooks` + RLS.
-2. `src/lib/project.functions.ts` + `project.server.ts` (orquestração reusa ebook/playbook server).
-3. Rotas `/projetos`, `/projetos/novo`, `/projetos/$id` (+ tabs).
-4. Componentes: `ProjectHub`, `ProjectHeader`, `ProjectTabs`, `EbookTab` (wrap do conteúdo atual), `PlaybookTab` (wrap), `ExportTab`.
-5. Item "Projetos" na sidebar como entrada principal; `/produtos/ebook` e `/produtos/playbook` ficam como atalhos legados.
+1. IA preenche títulos, frases motivacionais, exemplos de hábito por nicho.
+2. `planner/pdf.ts` (pdf-lib) monta páginas A4 com grids/tabelas pré-desenhados — não é texto corrido, é layout fixo com placeholders preenchidos.
 
-## 9. Validação
+Saída: PDF imprimível + DOCX simples.
 
-- Selecionar ad minerado → cria projeto em <2s, abre `/projetos/:id` com briefing pronto.
-- "Gerar Combo" produz Ebook completo + Playbook com cenas espelhando capítulos.
-- Reload da página retoma no mesmo step (autosave).
-- Link público do playbook abre no mobile sem auth.
-- Export final gera bundle zip baixável.
+## 5. Planilhas
+
+Novo módulo `src/lib/spreadsheet.server.ts`. Templates:
+
+```text
+financeiro | vendas | dieta | tráfego | leads | CRM
+```
+
+Geração via `xlsx` (já é leve, edge-compat): cria workbook com abas, fórmulas, dropdowns e formatação básica. IA preenche apenas cabeçalhos, descrições e linhas-exemplo do nicho. Saída: `.xlsx` + cópia `.csv` por aba.
+
+Adicionar `xlsx` como dependência.
+
+## 6. Kit Completo
+
+`generateProjectKit({ id })` no `project.functions.ts`. Em paralelo:
+
+```text
+ebook (mode=premium)
+playbook
+planner (template baseado no nicho)
+checklist (markdown 1 página, gera PDF)
+copy (3 textos: VSL curta, headline, bio Instagram)
+mockup (capa renderizada em 3 ângulos via composição CSS→PNG no client)
+```
+
+Resultado vai numa nova aba "Kit" do workspace, com download `.zip` único.
+
+## 7. Exportações
+
+Aba **Exportar** ganha botões:
+
+```text
+[ DOCX ] [ PDF ] [ PDF Amazon KDP ] [ EPUB ] [ HTML ] [ Link Playbook ] [ Baixar Kit (.zip) ]
+```
+
+- DOCX/PDF/EPUB: já existem em `src/lib/ebook/`.
+- **PDF Amazon KDP**: variante do PDF com trim 6×9", margens KDP, sem links externos, fontes embutidas. Novo arquivo `src/lib/ebook/pdf-kdp.ts` (deriva do `pdf.ts`).
+- **HTML**: novo `src/lib/ebook/html.ts` — single-file HTML standalone (CSS embutido, imagens base64). Bom para preview/landing.
+- **Link Playbook**: já existe (`/p/:projectId`).
+- **Kit .zip**: usa `jszip` (já necessário para o kit) reunindo todos os artefatos.
+
+Adicionar `jszip` como dependência.
+
+## 8. IA — qualidade do conteúdo
+
+Refinar prompts em `ebook.server.ts`:
+
+- novo system prompt com diretrizes de storytelling (gancho, conflito, virada, prova, CTA por capítulo)
+- exigir tom humano, frases curtas + parágrafos médios alternados
+- proibir bullets puros — exigir narrativa
+- pedir profundidade proporcional a `wordsTarget`
+- injetar `identity` (autor, marca) para voz consistente
+- pedir blocos opcionais por capítulo: `## Exemplo`, `## Exercício`, `## FAQ`, `## Bônus` — controlados pelo `extras`
+- nova função `aiGenerateBookExtras(briefing)` para gerar: introdução, conclusão, sobre o autor, página de bônus, índice — chamadas no momento da exportação
+
+## 9. Presets de Nicho
+
+Novo `src/lib/ebook/niches.ts`:
+
+```ts
+export const NICHES = [
+  { id: "low-ticket", label: "Low Ticket", style: "premium", palette: "preto", tone: "direto/persuasivo" },
+  { id: "manicure", label: "Manicure", style: "feminino", palette: "rosa", tone: "amigável" },
+  { id: "emagrecimento", ... },
+  { id: "romance", ... },
+  { id: "dark-romance", ... },
+  { id: "gangster", ... },
+  { id: "renda-extra", ... },
+  { id: "ia", ... },
+  { id: "figurinhas", ... },
+  { id: "tiktok", ... },
+  { id: "canva", ... },
+  { id: "planner-feminino", ... },
+  { id: "cristao", ... },
+  { id: "marketing", ... },
+  { id: "solda", ... },
+  { id: "receitas", ... },
+];
+```
+
+Cada preset injeta `style`, `palette`, `tone` e um seed de briefing (avatar, dores, desejos, mecanismo padrão). Aparece no hub "Criar do Zero" e no kickstart IA como dropdown principal.
+
+## 10. UI do Workspace
+
+Aba **Briefing** vira 4 seções colapsáveis:
+
+```text
+1. Conceito (título, nicho, promessa, avatar) — já existe
+2. Identidade (autor, marca, IG, copyright, logo, idioma)  — novo
+3. Formato (tipo de produto, tamanho, estilo, paleta)      — novo+existente
+4. IA (gerar/refinar briefing, gerar capa)                 — já existe
+```
+
+Header do projeto:
+
+```text
+[ Gerar Ebook ] [ Gerar Playbook ] [ Gerar Planner ] [ Gerar Planilha ] [ Gerar Kit Completo ] [ Exportar ]
+```
+
+Botões habilitam conforme `mode` ou ficam todos disponíveis em modo `kit`.
+
+## 11. Entregáveis
+
+1. Migração: nenhuma (tudo em `projects.meta`); só `xlsx` e `jszip` como deps.
+2. `src/lib/ebook/niches.ts` (presets)
+3. `src/lib/ebook/html.ts`, `src/lib/ebook/pdf-kdp.ts` (exporters)
+4. `src/lib/planner.server.ts` + `src/lib/planner/pdf.ts`
+5. `src/lib/spreadsheet.server.ts`
+6. `src/lib/kit.server.ts` (orquestrador) + zip util
+7. Update em `project.functions.ts`: `generateProjectPlanner`, `generateProjectSpreadsheet`, `generateProjectKit`, validators de `mode`
+8. Update em `ebook.server.ts`: prompts refinados, `targetPages`/`extras`, `aiGenerateBookExtras`
+9. UI: seções de identidade/formato no Briefing tab; novos botões no header; nova aba "Kit"; presets de nicho no hub
+
+## 12. Fora de Escopo
+
+- Marketplace/venda dos produtos
+- DALL·E/Stability reais (segue só Gemini para capa/cenas)
+- Editor WYSIWYG por capítulo
+- Mockups 3D reais (mockup é composição CSS→PNG)
+- Tradução automática multi-idioma de conteúdo já gerado
+
+## 13. Validação
+
+- Briefing salva metadados e logo aparece na capa do PDF
+- Selecionar "100 páginas" gera ~12 capítulos com FAQ + bônus
+- "Gerar Planner" produz PDF A4 imprimível com grids preenchidos
+- "Gerar Planilha" baixa `.xlsx` com fórmulas funcionando
+- "Gerar Kit Completo" entrega `.zip` com ebook + playbook + planner + checklist + copy + mockup
+- Preset "dark-romance" pré-preenche tom, paleta e estilo automaticamente
+- Export HTML abre standalone sem dependências externas
+- KDP PDF respeita 6×9" com margens corretas
