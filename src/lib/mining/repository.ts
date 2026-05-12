@@ -4,6 +4,7 @@
 // The rest of the app must depend ONLY on this module, never on the underlying store.
 
 import type { MinedAd, MiningIngestPayload } from "./types";
+import { inferTagsFromText } from "./keywords";
 
 const STORAGE_KEY = "escalaflow_mining_v1";
 const EVT = "escalaflow:mining:change";
@@ -49,7 +50,9 @@ function writeAll(rows: MinedAd[]) {
 function normalize(payload: MiningIngestPayload, source: MinedAd["source"]): MinedAd {
   const now = new Date().toISOString();
   const score = Math.max(0, Math.min(100, Math.round(payload.score ?? 0)));
-  const tags = Array.isArray(payload.tags) ? payload.tags : inferTags(payload);
+  const baseTags = Array.isArray(payload.tags) ? payload.tags : [];
+  const inferred = inferTagsFromText(`${payload.headline ?? ""}\n${payload.copy ?? ""}`);
+  const tags = Array.from(new Set([...baseTags, ...inferred.tags]));
   return {
     id: uid(),
     headline: payload.headline?.trim() || "(sem headline)",
@@ -79,16 +82,6 @@ function normalize(payload: MiningIngestPayload, source: MinedAd["source"]): Min
   };
 }
 
-function inferTags(p: MiningIngestPayload): string[] {
-  const tags: string[] = [];
-  const score = p.score ?? 0;
-  if (score >= 90) tags.push("🔥 Hot");
-  else if (score >= 75) tags.push("⭐ Promissor");
-  if (p.analysisType && p.analysisType !== "manual") tags.push("🧠 IA");
-  if (p.creativeType === "video") tags.push("🎬 Vídeo");
-  if ((p.platforms?.length ?? 0) >= 3) tags.push("🌐 Multi");
-  return tags;
-}
 
 export const miningRepo: MiningRepository = {
   async list() {
