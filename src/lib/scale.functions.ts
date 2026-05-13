@@ -78,13 +78,13 @@ export const analyzeAdsPerformance = createServerFn({ method: "POST" })
       await supabase.from("projects").update({ meta: nextMeta as never }).eq("id", data.projectId);
       await recordAi(supabase, userId, {
         projectId: data.projectId,
-        module: "scale",
+        module: "escala",
         prompt: { ...data, imageDataUrl: data.imageDataUrl ? "[image]" : undefined },
         response: analysis,
       });
     } else {
       await recordAi(supabase, userId, {
-        module: "scale",
+        module: "escala",
         prompt: { ...data, imageDataUrl: data.imageDataUrl ? "[image]" : undefined },
         response: analysis,
       });
