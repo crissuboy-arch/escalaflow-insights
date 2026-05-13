@@ -61,6 +61,8 @@ type Briefing = {
   desires: string[];
   uniqueMechanism: string;
 };
+type Extras = { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
+type Identity = { author?: string; brand?: string; bio?: string };
 type Outline = { title: string; bullets: string[] }[];
 type Chapter = { title: string; markdown: string; imageUrl?: string | null };
 type EbookMode = "kdp" | "premium" | "playbook";
