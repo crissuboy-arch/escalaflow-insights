@@ -864,6 +864,18 @@ function EbookPage() {
                 <Field label="Desejos (um por linha)" value={briefing.desires.join("\n")} onChange={(v) => setBriefing({ ...briefing, desires: v.split("\n").filter(Boolean) })} multiline />
               </div>
             )}
+            {briefing && (
+              <div className="mt-4 space-y-3 rounded-lg border border-border/60 p-4">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Identidade do autor</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Nome do autor" value={identity.author ?? ""} onChange={(v) => setIdentity({ ...identity, author: v })} />
+                  <Field label="Marca / Editora (opcional)" value={identity.brand ?? ""} onChange={(v) => setIdentity({ ...identity, brand: v })} />
+                  <div className="md:col-span-2">
+                    <Field label="Bio do autor" value={identity.bio ?? ""} onChange={(v) => setIdentity({ ...identity, bio: v })} multiline />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -922,6 +934,25 @@ function EbookPage() {
                   );
                 })}
               </div>
+            </div>
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Quantidade de páginas</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRODUCT_SIZES.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => onPagesChange(p)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      pages === p ? "border-primary bg-primary/10 text-primary" : "border-border/60 hover:border-primary/50"
+                    }`}
+                  >
+                    {p} pág
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Sugere {sizeSpec(pages).chapters} capítulos, ~{sizeSpec(pages).wordsPerChapter} palavras cada.
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Label>Capítulos</Label>
