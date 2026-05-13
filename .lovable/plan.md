@@ -1,61 +1,36 @@
-# Plano
 
-## 1. i18n — Estratégia e Exportação (PT/EN/ES/FR)
+## Diagnóstico
 
-**Arquivos:** `src/i18n/locales/{pt,en,es,fr}.json`, `src/routes/_authenticated/produtos.playbook.$id.tsx`, `src/components/LanguageSwitcher.tsx` (já tem 4 idiomas).
+Mapeei o app, sidebar, `PipelineHub`, `DualModeHub`, `projetos.$id.tsx` e as rotas de Playbook/Ebook. As rotas existem e estão registradas corretamente, mas há **fluxos mortos** (botões que abrem placeholders), **estados vazios sem ação real** e **guardas de auth inconsistentes**. O erro de runtime atual (`virtual:tanstack-start-client-entry`) é uma reotimização do Vite após mudanças no lockfile e some no próximo refresh — não é bug de código.
 
-Adicionar bloco `playbook` em cada locale com chaves:
-- `library`, `edit`, `export`, `copyContent`, `copySuccess`, `presentationSoon`
-- `pdf`, `docx`, `carousel`, `videoScript`
-- `strategy.button`, `strategy.title`, `strategy.intro`, `strategy.generate`, `strategy.regenerate`, `strategy.generated`, `strategy.copyBlock`, `strategy.copied`
-- Rótulos dos 19 blocos: `bigIdea`, `promise`, `mechanism`, `avatar`, `pains`, `desires`, `objections`, `triggers`, `headlines`, `vsl`, `page`, `funnel`, `offer`, `bonuses`, `stack`, `cta`, `scripts`, `angles`, `scalePlan`
-- Mensagens de erro/sucesso (`loadFailed`, `strategyGenerated`, `strategyFailed`)
+## Problemas que vou corrigir
 
-No `produtos.playbook.$id.tsx`: importar `useTranslation`, substituir todas strings PT-BR hardcoded (Biblioteca, Estratégia, Estratégia completa, Editar, Exportar, PDF, DOCX, Carrossel, Roteiro de vídeo, Copiar conteúdo, toasts, intro do Sheet, "Gerar estratégia com IA"). Atualizar `StrategyView` para usar `t()` nos rótulos dos blocos.
+1. **Tabs `Copy / Criativos / Página / Checkout / Escala` dentro de `/projetos/$id` mostram "Em construção Fase 2"** — clicar nesses cards no Hub leva o usuário a uma tela morta. Vou plugar os componentes que já existem (`StandaloneBriefingForm` + `CopyResult`, `CreativeWizard`, `SalesPageResult`) nesses tabs, lendo `briefing` do projeto e persistindo em `meta.copy / meta.creatives / meta.salesPage` via `updateProject`. `checkout` ganha um form simples (preço, âncora, bônus, order bump, garantia, link Kiwify/Hotmart/Stripe) salvando em `meta.checkout`. `escala` vira um checklist real lendo `ebook_id / playbook_id / meta.*` com botões que navegam para a etapa pendente.
 
-## 2. Upload de PDF → Ebook Premium com IA
+2. **Hubs `criativos / pagina-venda / checkout / escala` só listam projetos** — se o usuário não tem projeto, a tela termina em um aviso. Vou padronizar todos no `DualModeHub` (igual ao `copy`), reaproveitando os mesmos wizards standalone do item 1, com fallback "Criar projeto" no modo projeto. Nada de módulo novo — só reaproveitamento.
 
-**Fluxo simples (sem automação complexa):**
+3. **PipelineHub: estado vazio sem ação** — botão único "Ir para Projetos". Vou trocar por "Criar novo projeto" que abre `/projetos?new=1`, e ajustar `projetos.tsx` para abrir o diálogo de criação automaticamente quando esse search param estiver presente.
 
-```text
-EbookHub (3 cards) → adicionar 4º card "Importar PDF"
-  ↓
-Upload PDF (input file, max 10MB)
-  ↓
-parsePdfToText (server fn, usa pdf-parse ou pdfjs leve no worker)
-  ↓
-aiExtractBriefingFromText (server fn, Gemini)
-  ↓ briefing pré-preenchido
-Reusa pipeline existente: Outline → Capítulos → Capa → Export
-```
+4. **Guard de auth inconsistente** — `produtos.playbook.tsx`, `produtos.playbook.novo.tsx`, `produtos.playbook.$id.tsx` e `produtos.playbook.$id.editar.tsx` não têm `beforeLoad` (dependem só de `_authenticated`). Em refresh direto, os `useServerFn` disparam antes da hidratação e mostram loading infinito ou erro 401. Adiciono `beforeLoad` com `supabase.auth.getUser()` igual aos demais.
 
-**Arquivos novos:**
-- `src/lib/ebook/pdf-extract.ts` — server-only: extrai texto via `pdfjs-dist` (compatível com Worker; fallback para primeiras 50 páginas).
-- `src/lib/ebook.functions.ts` — adicionar `extractBriefingFromPdf({ base64, fileName })`:
-  - decode base64 → Uint8Array
-  - extrai texto (truncar ~30k chars)
-  - chama `aiExtractBriefingFromText` em `ebook.server.ts` (novo helper que reusa schema `BriefingSchema` mas com prompt orientado a "resumir este conteúdo e propor briefing de ebook premium")
-  - retorna `Briefing` + `suggestedTitle` + `suggestedChapterCount`
-- `src/components/ebook/PdfUploadCard.tsx` — card no Hub: drag&drop + `<input type="file" accept="application/pdf">`, lê como base64, mostra loader, dispara callback.
+5. **Loading infinito no PipelineHub** quando `listProjects` falha silenciosamente — o `.catch(() => setRows([]))` esconde o erro real. Vou logar e mostrar toast + estado de erro recuperável com botão "Tentar de novo".
 
-**Arquivos editados:**
-- `src/components/ebook/EbookHub.tsx` — grid passa para 4 cards (lg:grid-cols-2 ou xl:grid-cols-4); novo prop `onPdfImport(briefing, suggestion)`.
-- `src/routes/_authenticated/produtos.ebook.tsx` — handler `handlePdfImport`: seta `briefing`, `mode = "premium"`, `chapterCount` sugerido, pula direto para o passo "Outline" e dispara `generateOutline` automaticamente. Toda geração subsequente (capítulos, imagens, capa, export PDF/DOCX/EPUB) é a infra já existente — modo `premium` já está no schema.
-- `src/i18n/locales/*.json` — bloco `ebook.pdfImport`: `title`, `description`, `dropHere`, `selectFile`, `parsing`, `analyzing`, `success`, `errors.tooLarge`, `errors.notPdf`, `errors.parseFailed`.
+6. **`projetos.$id.tsx`: tab inicial não respeita `?tab=`** quando `defaultValue` é setado mas `value` não — uso controlado de `Tabs` para que navegação `Hub → Projeto?tab=copy` realmente abra a aba certa.
 
-**Limites/segurança:**
-- Tamanho máx. 10MB validado client + server (Zod).
-- Truncar texto a 30k chars antes do prompt.
-- Sem armazenamento do PDF (somente texto extraído usado in-memory para gerar briefing).
-- `pdfjs-dist` precisa ser instalado (`bun add pdfjs-dist`); usar build "legacy" sem worker (`pdfjs-dist/legacy/build/pdf.mjs`) para rodar no Worker SSR.
+7. **Salvar e continuar rascunho de projetos**: `updateProject` já faz deep-merge em `meta` (corrigido na fase anterior). Vou garantir que cada novo tab (copy/criativos/página/checkout) salve via `updateProject({ id, patch: { meta: { copy: ... } } })` ao concluir, e que ao reabrir o projeto o estado seja hidratado a partir de `meta.*` — fluxo "rascunho que continua".
 
-## 3. Validação
+## Validação final
 
-- `bun run build` limpo.
-- Trocar idioma no header → confirmar Estratégia/Exportar traduzidos nos 4 idiomas.
-- Subir PDF de teste → briefing populado → outline gerado → exportar ebook PDF/DOCX.
+- `bun run build` precisa passar (typecheck strict).
+- Caminhar manualmente cada item do checklist do usuário (Playbook, Ebook, Copy, Criativos, Página, Checkout, Escala, Projetos) abrindo do sidebar e a partir do hub do projeto.
+- Conferir que cada botão visível leva a um fluxo (gerar, abrir editor, exportar, ou criar projeto) — nenhum onClick vazio.
 
-## Fora de escopo
-- Persistir o PDF no Storage.
-- OCR de PDFs escaneados (somente texto extraível).
-- Tradução automática do conteúdo gerado (ebook segue idioma escolhido no formulário).
+## Fora de escopo (mantido para depois, conforme pedido)
+
+- Criar novos módulos / nova IA / novos formatos de criativos.
+- Refatorar visual; só ajustes mínimos onde estado vazio era confuso.
+- Deletar funcionalidades existentes.
+
+## Entregável final
+
+Resposta com **duas listas**: (a) o que foi corrigido, (b) o que ainda falta — sem narração extra.

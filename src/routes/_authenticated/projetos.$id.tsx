@@ -29,6 +29,13 @@ import {
   generateProjectEbook,
   generateProjectPlaybook,
 } from "@/lib/project.functions";
+import { CopyTab } from "@/components/pipeline/project/CopyTab";
+import { SalesPageTab } from "@/components/pipeline/project/SalesPageTab";
+import { CreativesTab } from "@/components/pipeline/project/CreativesTab";
+import { CheckoutTab, type CheckoutDraft } from "@/components/pipeline/project/CheckoutTab";
+import { EscalaTab } from "@/components/pipeline/project/EscalaTab";
+import type { SalesCopy } from "@/lib/copy.server";
+import type { SalesPage } from "@/lib/sales-page.server";
 
 export const Route = createFileRoute("/_authenticated/projetos/$id")({
   beforeLoad: async () => {
@@ -78,7 +85,27 @@ function ProjectWorkspace() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | "ebook" | "playbook" | "combo">(null);
-  const initialTab = (search.tab && ["briefing","estrutura","ebook","playbook","copy","criativos","pagina","checkout","escala","exportar"].includes(search.tab)) ? search.tab : "briefing";
+  const TABS = [
+    "briefing",
+    "estrutura",
+    "ebook",
+    "playbook",
+    "copy",
+    "criativos",
+    "pagina",
+    "checkout",
+    "escala",
+    "exportar",
+  ] as const;
+  const initialTab =
+    search.tab && (TABS as readonly string[]).includes(search.tab) ? search.tab : "briefing";
+  const [tab, setTab] = useState<string>(initialTab);
+  useEffect(() => {
+    if (search.tab && (TABS as readonly string[]).includes(search.tab)) {
+      setTab(search.tab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.tab]);
 
   async function refresh() {
     try {
@@ -207,7 +234,7 @@ function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs defaultValue={initialTab}>
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="briefing">Briefing</TabsTrigger>
           <TabsTrigger value="estrutura">Estrutura</TabsTrigger>
@@ -392,68 +419,63 @@ function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="copy">
-          <PlaceholderModule
-            icon={PenLine}
-            title="Copy de Vendas"
-            description="O gerador de copy completa (headline, big idea, mecanismo, oferta, stack, garantia, FAQ, CTA) chega na próxima fase. Os dados serão salvos em meta.copy deste projeto."
+          <CopyTab
+            projectId={id}
+            initial={(project.meta?.copy as SalesCopy | undefined) ?? null}
+            onSaved={(c) => setProject({ ...project, meta: { ...project.meta, copy: c } })}
           />
         </TabsContent>
         <TabsContent value="criativos">
-          <PlaceholderModule
-            icon={Megaphone}
-            title="Criativos & Anúncios"
-            description="18 formatos virais com prompt visual em 1:1, 4:5 e 9:16 chegam na Fase 2. Cada criativo gerado fica em meta.creatives[]."
+          <CreativesTab
+            projectId={id}
+            initial={
+              Array.isArray(project.meta?.creatives)
+                ? (project.meta!.creatives as never[])
+                : []
+            }
+            onSaved={(list) =>
+              setProject({ ...project, meta: { ...project.meta, creatives: list } })
+            }
           />
         </TabsContent>
         <TabsContent value="pagina">
-          <PlaceholderModule
-            icon={LayoutTemplate}
-            title="Página de Venda"
-            description="Estrutura em blocos (Hero, Dor, Promessa, Mecanismo, Benefícios, Prova, Oferta, Bônus, Garantia, FAQ, CTA) editáveis e exportáveis em HTML."
+          <SalesPageTab
+            projectId={id}
+            initial={(project.meta?.salesPage as { page: SalesPage; prompts: { lovable: string; googleAiStudio: string; v0: string; claude: string } } | undefined) ?? null}
+            onSaved={(d) =>
+              setProject({ ...project, meta: { ...project.meta, salesPage: d } })
+            }
           />
         </TabsContent>
         <TabsContent value="checkout">
-          <PlaceholderModule
-            icon={ShoppingCart}
-            title="Checkout & Oferta"
-            description="Configuração de preço, preço âncora, bônus, order bump, upsell, downsell, garantia e link Kiwify/Hotmart/Stripe."
+          <CheckoutTab
+            projectId={id}
+            initial={(project.meta?.checkout as Partial<CheckoutDraft> | undefined) ?? null}
+            onSaved={(d) =>
+              setProject({ ...project, meta: { ...project.meta, checkout: d } })
+            }
           />
         </TabsContent>
         <TabsContent value="escala">
-          <PlaceholderModule
-            icon={Rocket}
-            title="Escala do Produto"
-            description="Checklist final, ideias de anúncios e próximos passos de tráfego — disponível assim que cada etapa anterior estiver concluída."
+          <EscalaTab
+            hasEbook={!!project.ebook_id}
+            hasPlaybook={!!project.playbook_id}
+            hasCopy={!!project.meta?.copy}
+            hasSalesPage={!!project.meta?.salesPage}
+            hasCheckout={!!project.meta?.checkout}
+            hasCreatives={
+              Array.isArray(project.meta?.creatives) &&
+              (project.meta!.creatives as unknown[]).length > 0
+            }
+            creativesCount={
+              Array.isArray(project.meta?.creatives)
+                ? (project.meta!.creatives as unknown[]).length
+                : 0
+            }
+            onJump={(t) => setTab(t)}
           />
         </TabsContent>
       </Tabs>
     </div>
-  );
-}
-
-function PlaceholderModule({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: typeof BookOpen;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Card className="overflow-hidden border-border/60">
-      <CardContent className="space-y-4 p-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold">{title}</p>
-            <p className="text-xs text-muted-foreground">Em construção (Fase 2 da esteira)</p>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
   );
 }
