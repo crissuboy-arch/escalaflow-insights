@@ -1,62 +1,121 @@
-## Objetivo
+## Goal
 
-Padronizar todos os links externos do app (Facebook, ChatGPT, Gemini/AI Studio, perfis, biblioteca de anúncios, etc.) em um único helper robusto, com `target="_blank"`, `rel="noopener noreferrer"`, fallback `window.open` e proteção contra popup bloqueado. Garantir que nenhum clique falhe, em desktop, mobile e preview (iframe sandbox).
+Cobrir o fluxo **Oferta → Projeto** com testes Playwright headless reais e instrumentar logs estruturados no servidor para que qualquer perda de estado seja diagnosticável via `stack_modern--server-function-logs`.
 
-## Diagnóstico
+Sem alterar UI. Sem mexer em design tokens.
 
-Existem hoje DOIS helpers paralelos, o que causa comportamento inconsistente:
+---
 
-- `src/lib/external.ts` — robusto: tenta clique em `<a>` sintético → `window.open` → fallback de copiar para clipboard com toast. Exporta `openExternal`, `openInNewTab`, `openAdLink`, `openChatGPTWithPrompt`, `buildAdsLibraryUrl`.
-- `src/lib/external/openExternal.ts` — simples: só `window.open`, sem fallback de anchor click (falha em iframes sandbox de preview).
+## 1. Logs de debug (server functions)
 
-Componentes consumidores misturam os dois imports. Há também ocorrências diretas de `window.open` e `window.location.assign` para links externos.
+Criar `src/lib/debug/log.server.ts` com um helper único:
 
-## Plano
+```ts
+export function dlog(scope: "hydrate"|"persist"|"seed"|"read-fail", event: string, ctx: Record<string, unknown>)
+```
 
-### 1. Unificar em um único helper (`src/lib/external.ts`)
+Formato de saída:
+`[hydrate|persist|seed|read-fail] event projectId=... module=... keys=[...]`
 
-Manter o arquivo já robusto e adicionar funções específicas para os destinos pedidos:
+Pontos de instrumentação:
 
-- `openFacebook(url)` — abre Facebook/Meta com fallback.
-- `openChatGPT(prompt?)` — copia prompt (se houver) e abre `https://chatgpt.com/`.
-- `openGemini(prompt?)` — copia prompt e abre `https://gemini.google.com/app`.
-- `openAIStudio(prompt?)` — copia prompt e abre `https://aistudio.google.com/`.
+- `src/lib/project.functions.ts`
+  - `loadProject` → `dlog("hydrate", "project.load", { id, hasMeta, metaKeys })`
+  - `loadProject` no erro → `dlog("read-fail", "project.load", { id, error })`
+  - `updateProject` → `dlog("persist", "project.update", { id, patchKeys, mergedMetaKeys })`
+- `src/lib/project/seeding.server.ts`
+  - antes do update → `dlog("seed", "fanout.start", { module, projectId, seedKeys })`
+  - depois do update → `dlog("seed", "fanout.done", { module, projectId })`
+  - no catch → `dlog("read-fail", "seed.fanout", { module, projectId, error })`
+- `src/lib/copy.functions.ts`, `sales-page.functions.ts`, `checkout.functions.ts`, `ads-creative.functions.ts`, `scale.functions.ts`
+  - Em cada handler que escreve em `projects.meta.*`, logar `dlog("persist", "<module>.save", { projectId, metaKey })` antes do `updateProject`/insert.
 
-Todas reutilizam `openInNewTab`, que já implementa:
-1. `<a target="_blank" rel="noopener noreferrer">` sintético + `.click()` (funciona em iframes/preview).
-2. fallback `window.open(url, "_blank", "noopener,noreferrer")`.
-3. fallback final: copia URL para clipboard + toast com instrução.
+Os logs vão para o console do Worker e ficam acessíveis via `stack_modern--server-function-logs`.
 
-### 2. Remover o helper duplicado
+## 2. Suite Playwright
 
-- Deletar `src/lib/external/openExternal.ts`.
-- Atualizar qualquer import que aponte para `@/lib/external/openExternal` para usar `@/lib/external`.
+Adicionar dependências:
+- `@playwright/test` (devDep)
+- script `package.json` → `"e2e": "playwright test"`, `"e2e:install": "playwright install --with-deps chromium"`
 
-### 3. Substituir chamadas diretas
+Estrutura:
+```
+playwright.config.ts
+e2e/
+  fixtures/
+    auth.ts          // login programático + storageState reutilizável
+    test-user.ts     // lê E2E_USER_EMAIL / E2E_USER_PASSWORD do env
+  oferta-projeto.spec.ts
+  hidratacao.spec.ts
+  multi-projetos.spec.ts
+```
 
-- `window.open(...)` em código de UI → `openInNewTab(...)` ou helper específico.
-- `window.location.assign("https://...")` para links externos → `openInNewTab(...)`. Manter `window.location.assign("/rota-interna")` apenas para navegação interna.
-- Qualquer `<a href="https://...">` em componentes → adicionar `target="_blank" rel="noopener noreferrer"` (auditar e padronizar).
+`playwright.config.ts`:
+- `baseURL` = `process.env.E2E_BASE_URL` (preview URL do Lovable, default ao Preview URL atual)
+- `use.storageState` carregado por fixture
+- `projects: [{ name: "chromium", use: devices["Desktop Chrome"] }]`
+- timeout 60s, retries 1
 
-### 4. Página `/link-externo` (interstitial)
+`auth.ts`:
+- Faz `supabase.auth.signInWithPassword` via API REST do Supabase (anon key) para gerar sessão, grava `storageState.json` em `.auth/`. Evita digitar no formulário.
 
-Já usa `openInNewTab`. Garantir que todos os botões (anúncio, biblioteca, perfil) chamem o helper unificado e que o `<a class="btn">` em `public/go.html` tenha `rel="noopener noreferrer"` (já tem).
+### Specs
 
-### 5. Validação
+**`oferta-projeto.spec.ts`** — Fluxo principal
+1. Vai em `/ofertas-salvas`, clica "Usar como projeto" na primeira oferta.
+2. Espera redirect para `/projetos/:id?tab=briefing`.
+3. Valida que aba **Briefing** está ativa e os campos estão preenchidos (`title`, `niche`, `promise`).
+4. Para cada aba (`copy`, `criativos`, `pagina-venda`, `checkout`, `escala`): clica → preenche um campo único marcador (ex: `price = "R$ 199 E2E"`) → salva → verifica toast.
+5. Recarrega (`page.reload()`) e confirma que cada marcador continua presente.
 
-Após implementação:
-- `bun run build` para garantir sem regressão.
-- Browser tools: navegar até `/minerar`, `/ofertas-salvas`, `/central-mineracao`, `/analise-ia`, `/link-externo`. Clicar em "Abrir anúncio", "Abrir ChatGPT", "Abrir Gemini" e verificar que nova aba abre OU que o toast de fallback aparece.
-- Testar viewport mobile (375px) com `set_viewport_size`.
+**`hidratacao.spec.ts`** — Estabilidade de estado
+- Reload no meio de cada aba → marcador persiste.
+- `page.goBack()` após salvar → ao voltar, marcador persiste.
+- Troca rápida entre 5 abas em sequência → não perde nada (assert via `loadProject` indiretamente, lendo do DOM após reload).
 
-### Detalhes técnicos
+**`multi-projetos.spec.ts`** — Isolamento
+- Cria 2 projetos a partir de 2 ofertas distintas.
+- Salva valores diferentes em `meta.copy` em cada um.
+- Abre o outro e confirma que valores não vazaram.
 
-Arquivos a editar:
+### Cleanup
 
-- `src/lib/external.ts` — adicionar `openFacebook`, `openChatGPT` (renomear de `openChatGPTWithPrompt` mantendo alias retro-compatível), `openGemini`, `openAIStudio`.
-- `src/lib/external/openExternal.ts` — remover.
-- `src/routes/_authenticated/central-mineracao.tsx` — trocar `openChatGPTWithPrompt` por `openChatGPT`; conferir uso de `openExternal`.
-- Buscar e migrar qualquer outro consumidor de `@/lib/external/openExternal`.
-- Auditar `<a href="http">` em todos os componentes para garantir `target="_blank" rel="noopener noreferrer"`.
+`global.teardown.ts` deleta projetos criados pelo run via `deleteProject` (chamada HTTP autenticada com o storageState).
 
-Sem mudanças de design, layout ou lógica de negócio — apenas confiabilidade de navegação externa.
+## 3. Documentação
+
+`e2e/README.md` curto:
+- Variáveis: `E2E_BASE_URL`, `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`.
+- Comandos: `bun run e2e:install`, `bun run e2e`, `bun run e2e -- --ui`.
+- Como ler logs: `stack_modern--server-function-logs` filtrando por `[hydrate]`, `[persist]`, `[seed]`, `[read-fail]`.
+
+## 4. Não-objetivos
+
+- Sem mudanças em componentes ou estilos.
+- Sem nova migration.
+- Sem alterar fluxo de criação/edição existente.
+
+## Arquivos tocados
+
+Novos:
+- `src/lib/debug/log.server.ts`
+- `playwright.config.ts`
+- `e2e/fixtures/auth.ts`, `e2e/fixtures/test-user.ts`
+- `e2e/oferta-projeto.spec.ts`, `e2e/hidratacao.spec.ts`, `e2e/multi-projetos.spec.ts`
+- `e2e/global.teardown.ts`, `e2e/README.md`
+
+Editados (apenas adicionar chamadas `dlog(...)`):
+- `src/lib/project.functions.ts`
+- `src/lib/project/seeding.server.ts`
+- `src/lib/copy.functions.ts`
+- `src/lib/sales-page.functions.ts`
+- `src/lib/checkout.functions.ts`
+- `src/lib/ads-creative.functions.ts`
+- `src/lib/scale.functions.ts`
+- `package.json` (scripts + devDependency)
+
+## Aceitação
+
+- `bun run e2e` passa localmente contra o preview URL com credenciais de teste.
+- Cada cenário falho aponta o tab e o campo perdido.
+- Logs `[hydrate]`/`[persist]`/`[seed]`/`[read-fail]` aparecem no `server-function-logs` com `projectId` correlacionável.
