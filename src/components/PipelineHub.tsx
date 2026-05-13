@@ -2,10 +2,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowRight, FolderKanban, type LucideIcon } from "lucide-react";
+import { Loader2, ArrowRight, FolderKanban, RefreshCw, Plus, type LucideIcon } from "lucide-react";
 import { listProjects } from "@/lib/project.functions";
 
 type Row = {
@@ -42,16 +43,28 @@ export function PipelineHub({
   const list = useServerFn(listProjects);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () => {
+    setLoading(true);
+    setError(null);
     let alive = true;
     list()
       .then((r) => alive && setRows(r as Row[]))
-      .catch(() => alive && setRows([]))
+      .catch((e) => {
+        if (!alive) return;
+        const msg = e instanceof Error ? e.message : "Falha ao carregar projetos";
+        setError(msg);
+        toast.error(msg);
+      })
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
     };
+  };
+  useEffect(() => {
+    return load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list]);
 
   const open = (id: string) =>
@@ -97,16 +110,26 @@ export function PipelineHub({
         <div className="flex h-40 items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : error ? (
+        <Card>
+          <CardContent className="space-y-3 p-8 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button onClick={load} variant="outline" size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" /> Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
       ) : rows.length === 0 ? (
         <Card>
           <CardContent className="space-y-3 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Você ainda não tem projetos. Crie um em{" "}
-              <Link to="/projetos" className="text-primary underline">
-                Projetos
-              </Link>{" "}
-              para começar a esteira.
+              Você ainda não tem projetos. Crie um agora para começar este módulo.
             </p>
+            <Link to="/projetos" search={{ novo: 1, tab } as never}>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Criar projeto e abrir {tab}
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       ) : (
