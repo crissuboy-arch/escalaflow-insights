@@ -18,6 +18,7 @@ import {
   generateEbookChapter,
   generateEbookChapterImage,
   generateEbookCover,
+  generateEbookExtras,
   saveEbookDraft,
   listEbookDrafts,
   loadEbookDraft,
@@ -33,6 +34,7 @@ import {
   type EbookPalette,
   type EbookCategory,
 } from "@/lib/ebook/styles";
+import { PRODUCT_SIZES, sizeSpec, type ProductSize } from "@/lib/ebook/niches";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
 import { exportEbookDocx } from "@/lib/ebook/docx";
 import { exportEbookEpub } from "@/lib/ebook/epub";
