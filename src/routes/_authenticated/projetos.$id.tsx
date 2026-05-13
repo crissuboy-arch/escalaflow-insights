@@ -479,30 +479,3 @@ function ProjectWorkspace() {
     </div>
   );
 }
-
-function PlaceholderModule({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: typeof BookOpen;
-  title: string;
-  description: string;
-}) {
-  return (
-    <Card className="overflow-hidden border-border/60">
-      <CardContent className="space-y-4 p-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold">{title}</p>
-            <p className="text-xs text-muted-foreground">Em construção (Fase 2 da esteira)</p>
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  );
-}
