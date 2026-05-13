@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiGenerateCopy, SalesCopySchema, type CopyContext } from "./copy.server";
 import { StandaloneBriefingSchema } from "./standalone/briefing";
+import { seedFromModule } from "./project/seeding.server";
+import { recordAi } from "./ai/history.server";
 
 const InputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project"), projectId: z.string().uuid() }),
@@ -51,6 +53,19 @@ export const generateSalesCopy = createServerFn({ method: "POST" })
         .from("projects")
         .update({ meta: meta as never })
         .eq("id", projectRow.id);
+      await seedFromModule(supabase, userId, projectRow.id, "copy", { copy });
+      await recordAi(supabase, userId, {
+        projectId: projectRow.id,
+        module: "copy",
+        prompt: ctx,
+        response: copy,
+      });
+    } else {
+      await recordAi(supabase, userId, {
+        module: "copy",
+        prompt: ctx,
+        response: copy,
+      });
     }
 
     return { copy: SalesCopySchema.parse(copy) };
