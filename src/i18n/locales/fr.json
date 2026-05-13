@@ -113,5 +113,81 @@
     "loading": "Chargement...",
     "all": "Tous",
     "any": "Tous"
+  },
+  "playbook": {
+    "library": "Bibliothèque",
+    "edit": "Modifier",
+    "export": "Exporter",
+    "copyContent": "Copier le contenu",
+    "copySuccess": "Contenu copié",
+    "copyFailed": "Échec de la copie",
+    "copied": "Copié",
+    "copy": "Copier",
+    "presentationSoon": "Présentation (bientôt)",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "carousel": "Carrousel (PNG)",
+    "videoScript": "Script vidéo",
+    "regenerate": "Régénérer",
+    "loadFailed": "Échec du chargement",
+    "backToLibrary": "Retour à la bibliothèque",
+    "scene": "Scène",
+    "previous": "Précédent",
+    "next": "Suivant",
+    "noScenes": "Aucune scène. Modifiez ce playbook pour ajouter du contenu.",
+    "stageInfo": "À propos de cette étape",
+    "exercise": "Exercice",
+    "practicalAction": "Action pratique",
+    "strategy": {
+      "button": "Stratégie",
+      "title": "Stratégie complète",
+      "intro": "Générez la stratégie complète : Big Idea, Promesse, Mécanisme, Avatar, Douleurs, Désirs, Objections, Déclencheurs, Titres, VSL, Page, Tunnel, Offre, Bonus, Stack, CTA, Scripts, Angles et Plan d'Échelle.",
+      "generate": "Générer la stratégie avec l'IA",
+      "generated": "Stratégie générée",
+      "failed": "Échec de la génération",
+      "blocks": {
+        "bigIdea": "Big Idea",
+        "promise": "Promesse",
+        "uniqueMechanism": "Mécanisme Unique",
+        "avatar": "Avatar",
+        "pains": "Douleurs",
+        "desires": "Désirs",
+        "objections": "Objections",
+        "mentalTriggers": "Déclencheurs Mentaux",
+        "headlines": "Titres",
+        "vslStructure": "Structure VSL",
+        "pageStructure": "Structure de Page",
+        "funnel": "Tunnel",
+        "offer": "Offre",
+        "bonuses": "Bonus",
+        "stack": "Stack de Valeur",
+        "cta": "CTA",
+        "scripts": "Scripts",
+        "angles": "Angles Créatifs",
+        "scale": "Plan d'Échelle"
+      }
+    },
+    "toasts": {
+      "docxGenerating": "Génération DOCX…",
+      "docxDone": "DOCX téléchargé",
+      "scriptGenerating": "Génération du script…",
+      "scriptDone": "Script exporté",
+      "failed": "Échec"
+    }
+  },
+  "ebook": {
+    "pdfImport": {
+      "title": "Importer un PDF et générer un Ebook Premium",
+      "description": "Téléversez un PDF de référence et l'IA génère un ebook premium complet à partir du contenu.",
+      "dropHere": "Glissez le PDF ici ou cliquez pour sélectionner",
+      "selectFile": "Sélectionner un PDF",
+      "parsing": "Lecture du PDF…",
+      "analyzing": "Analyse par l'IA…",
+      "success": "Briefing prêt depuis le PDF",
+      "errorTooLarge": "PDF supérieur à 10 Mo",
+      "errorNotPdf": "Le fichier doit être un PDF",
+      "errorParse": "Impossible d'extraire le texte du PDF",
+      "errorEmpty": "PDF sans texte extractible (scanné ?)"
+    }
   }
 }

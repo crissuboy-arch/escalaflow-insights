@@ -113,5 +113,81 @@
     "loading": "Carregando...",
     "all": "Todos",
     "any": "Qualquer"
+  },
+  "playbook": {
+    "library": "Biblioteca",
+    "edit": "Editar",
+    "export": "Exportar",
+    "copyContent": "Copiar conteúdo",
+    "copySuccess": "Conteúdo copiado",
+    "copyFailed": "Falha ao copiar",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "presentationSoon": "Apresentação (em breve)",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "carousel": "Carrossel (PNG)",
+    "videoScript": "Roteiro de vídeo",
+    "regenerate": "Regenerar",
+    "loadFailed": "Falha ao carregar",
+    "backToLibrary": "Voltar à biblioteca",
+    "scene": "Cena",
+    "previous": "Anterior",
+    "next": "Próximo",
+    "noScenes": "Sem cenas. Edite este playbook para adicionar conteúdo.",
+    "stageInfo": "Sobre esta etapa",
+    "exercise": "Exercício",
+    "practicalAction": "Ação prática",
+    "strategy": {
+      "button": "Estratégia",
+      "title": "Estratégia completa",
+      "intro": "Gere a estratégia completa: Big Idea, Promessa, Mecanismo, Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL, Página, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos e Plano de Escala.",
+      "generate": "Gerar estratégia com IA",
+      "generated": "Estratégia gerada",
+      "failed": "Falha ao gerar estratégia",
+      "blocks": {
+        "bigIdea": "Big Idea",
+        "promise": "Promessa",
+        "uniqueMechanism": "Mecanismo Único",
+        "avatar": "Avatar",
+        "pains": "Dores",
+        "desires": "Desejos",
+        "objections": "Objeções",
+        "mentalTriggers": "Gatilhos Mentais",
+        "headlines": "Headlines",
+        "vslStructure": "Estrutura VSL",
+        "pageStructure": "Estrutura da Página",
+        "funnel": "Funil",
+        "offer": "Oferta",
+        "bonuses": "Bônus",
+        "stack": "Stack de Valor",
+        "cta": "CTA",
+        "scripts": "Scripts",
+        "angles": "Ângulos Criativos",
+        "scale": "Plano de Escala"
+      }
+    },
+    "toasts": {
+      "docxGenerating": "Gerando DOCX…",
+      "docxDone": "DOCX baixado",
+      "scriptGenerating": "Gerando roteiro…",
+      "scriptDone": "Roteiro exportado",
+      "failed": "Falhou"
+    }
+  },
+  "ebook": {
+    "pdfImport": {
+      "title": "Importar PDF e gerar Ebook Premium",
+      "description": "Envie um PDF de referência e a IA cria um ebook premium completo a partir do conteúdo.",
+      "dropHere": "Arraste o PDF aqui ou clique para selecionar",
+      "selectFile": "Selecionar PDF",
+      "parsing": "Lendo PDF…",
+      "analyzing": "Analisando com IA…",
+      "success": "Briefing pronto a partir do PDF",
+      "errorTooLarge": "PDF maior que 10 MB",
+      "errorNotPdf": "Arquivo precisa ser um PDF",
+      "errorParse": "Não foi possível extrair texto do PDF",
+      "errorEmpty": "PDF sem texto extraível (escaneado?)"
+    }
   }
 }

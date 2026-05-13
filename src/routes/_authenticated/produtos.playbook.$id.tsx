@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -67,6 +68,7 @@ type Playbook = {
 function PlaybookReaderPage() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const load = useServerFn(loadPlaybook);
   const scriptFn = useServerFn(generatePlaybookScript);
   const strategyFn = useServerFn(generatePlaybookStrategy);
@@ -81,12 +83,12 @@ function PlaybookReaderPage() {
         const row = (await load({ data: { id } })) as unknown as Playbook;
         setPb(row);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Falha ao carregar";
+        const msg = e instanceof Error ? e.message : t("playbook.loadFailed");
         setLoadError(msg);
         toast.error(msg);
       }
     })();
-  }, [id, load]);
+  }, [id, load, t]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -103,7 +105,7 @@ function PlaybookReaderPage() {
       <div className="playbook-surface -m-4 flex min-h-[calc(100vh-3rem)] flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="text-sm text-muted-foreground">{loadError}</p>
         <Button onClick={() => navigate({ to: "/produtos/playbook" })}>
-          <ChevronLeft className="mr-1 h-4 w-4" /> Voltar à biblioteca
+          <ChevronLeft className="mr-1 h-4 w-4" /> {t("playbook.backToLibrary")}
         </Button>
       </div>
     );
@@ -132,12 +134,12 @@ function PlaybookReaderPage() {
   };
   const exportDocx = async () => {
     try {
-      toast.loading("Gerando DOCX…", { id: "docx" });
+      toast.loading(t("playbook.toasts.docxGenerating"), { id: "docx" });
       const { exportPlaybookDocx } = await import("@/lib/playbook/docx");
       await exportPlaybookDocx(pb.title, scenes);
-      toast.success("DOCX baixado", { id: "docx" });
+      toast.success(t("playbook.toasts.docxDone"), { id: "docx" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falhou", { id: "docx" });
+      toast.error(e instanceof Error ? e.message : t("playbook.toasts.failed"), { id: "docx" });
     }
   };
   const copyAll = async () => {
@@ -157,9 +159,9 @@ function PlaybookReaderPage() {
       .join("\n\n");
     try {
       await navigator.clipboard.writeText(md);
-      toast.success("Conteúdo copiado");
+      toast.success(t("playbook.copySuccess"));
     } catch {
-      toast.error("Falha ao copiar");
+      toast.error(t("playbook.copyFailed"));
     }
   };
   const strategy = (pb.briefing as Record<string, unknown>)?.strategy as
@@ -173,16 +175,16 @@ function PlaybookReaderPage() {
         ...pb,
         briefing: { ...(pb.briefing as Record<string, unknown>), strategy: r.strategy },
       });
-      toast.success("Estratégia gerada");
+      toast.success(t("playbook.strategy.generated"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar estratégia");
+      toast.error(e instanceof Error ? e.message : t("playbook.strategy.failed"));
     } finally {
       setGeneratingStrategy(false);
     }
   };
   const exportScript = async () => {
     try {
-      toast.loading("Gerando roteiro…", { id: "script" });
+      toast.loading(t("playbook.toasts.scriptGenerating"), { id: "script" });
       const briefing = pb.briefing as never;
       const { markdown } = await scriptFn({
         data: {
@@ -197,9 +199,9 @@ function PlaybookReaderPage() {
       a.download = `${pb.title}-roteiro.md`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Roteiro exportado", { id: "script" });
+      toast.success(t("playbook.toasts.scriptDone"), { id: "script" });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falhou", { id: "script" });
+      toast.error(e instanceof Error ? e.message : t("playbook.toasts.failed"), { id: "script" });
     }
   };
 
@@ -208,7 +210,7 @@ function PlaybookReaderPage() {
       <header className="sticky top-0 z-20 border-b border-white/5 bg-background/40 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/produtos/playbook" })}>
-            <ChevronLeft className="mr-1 h-4 w-4" /> Biblioteca
+            <ChevronLeft className="mr-1 h-4 w-4" /> {t("playbook.library")}
           </Button>
           <div className="min-w-0 flex-1 text-center">
             <p className="playbook-title-display truncate text-sm font-bold md:text-base">{pb.title}</p>
@@ -218,22 +220,17 @@ function PlaybookReaderPage() {
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <Wand2 className="mr-1 h-3.5 w-3.5" /> Estratégia
+                  <Wand2 className="mr-1 h-3.5 w-3.5" /> {t("playbook.strategy.button")}
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
                 <SheetHeader>
-                  <SheetTitle>Estratégia completa</SheetTitle>
+                  <SheetTitle>{t("playbook.strategy.title")}</SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
                   {!strategy ? (
                     <div className="space-y-4 text-sm text-muted-foreground">
-                      <p>
-                        Gere a estratégia completa: Big Idea, Promessa, Mecanismo,
-                        Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL,
-                        Página, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos e
-                        Plano de Escala.
-                      </p>
+                      <p>{t("playbook.strategy.intro")}</p>
                       <Button
                         disabled={generatingStrategy}
                         onClick={onGenerateStrategy}
@@ -245,7 +242,7 @@ function PlaybookReaderPage() {
                         ) : (
                           <Wand2 className="mr-2 h-4 w-4" />
                         )}
-                        Gerar estratégia com IA
+                        {t("playbook.strategy.generate")}
                       </Button>
                     </div>
                   ) : (
@@ -260,22 +257,22 @@ function PlaybookReaderPage() {
             </Sheet>
             <Button asChild variant="outline" size="sm">
               <Link to="/produtos/playbook/$id/editar" params={{ id }}>
-                <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
+                <Pencil className="mr-1 h-3.5 w-3.5" /> {t("playbook.edit")}
               </Link>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" style={{ background: "var(--gradient-playbook)" }} className="text-white">
-                  <Download className="mr-1 h-3.5 w-3.5" /> Exportar
+                  <Download className="mr-1 h-3.5 w-3.5" /> {t("playbook.export")}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={exportPdf}><FileText className="mr-2 h-4 w-4" /> PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={exportDocx}><FileType2 className="mr-2 h-4 w-4" /> DOCX</DropdownMenuItem>
-                <DropdownMenuItem onClick={exportCarousel}><Images className="mr-2 h-4 w-4" /> Carrossel (PNG)</DropdownMenuItem>
-                <DropdownMenuItem onClick={exportScript}><Film className="mr-2 h-4 w-4" /> Roteiro de vídeo</DropdownMenuItem>
-                <DropdownMenuItem onClick={copyAll}><Copy className="mr-2 h-4 w-4" /> Copiar conteúdo</DropdownMenuItem>
-                <DropdownMenuItem disabled>Apresentação (em breve)</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportPdf}><FileText className="mr-2 h-4 w-4" /> {t("playbook.pdf")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportDocx}><FileType2 className="mr-2 h-4 w-4" /> {t("playbook.docx")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCarousel}><Images className="mr-2 h-4 w-4" /> {t("playbook.carousel")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={exportScript}><Film className="mr-2 h-4 w-4" /> {t("playbook.videoScript")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={copyAll}><Copy className="mr-2 h-4 w-4" /> {t("playbook.copyContent")}</DropdownMenuItem>
+                <DropdownMenuItem disabled>{t("playbook.presentationSoon")}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -284,7 +281,7 @@ function PlaybookReaderPage() {
 
       {scenes.length === 0 ? (
         <div className="mx-auto max-w-3xl p-10 text-center text-muted-foreground">
-          Sem cenas. Edite este playbook para adicionar conteúdo.
+          {t("playbook.noScenes")}
         </div>
       ) : (
         <main className="mx-auto max-w-4xl px-4 pb-32 pt-6 md:pt-10">
@@ -308,7 +305,7 @@ function PlaybookReaderPage() {
               </div>
               <header>
                 <p className="text-xs uppercase tracking-[0.3em] text-[var(--playbook-neon)]">
-                  Cena {idx + 1} · {pb.title}
+                  {t("playbook.scene")} {idx + 1} · {pb.title}
                 </p>
                 <h1 className="playbook-title-display mt-2 text-3xl font-bold md:text-5xl">{scene.title}</h1>
               </header>
@@ -330,13 +327,13 @@ function PlaybookReaderPage() {
               {(scene.exercise || scene.practical_action) && (
                 <section className="rounded-2xl border border-white/10 bg-card/30 p-5 backdrop-blur">
                   <p className="playbook-title-display mb-3 text-sm font-bold uppercase tracking-wider text-[var(--playbook-neon-2)]">
-                    Sobre esta etapa
+                    {t("playbook.stageInfo")}
                   </p>
                   {scene.exercise && (
-                    <p className="mb-2 text-sm"><strong>Exercício:</strong> {scene.exercise}</p>
+                    <p className="mb-2 text-sm"><strong>{t("playbook.exercise")}:</strong> {scene.exercise}</p>
                   )}
                   {scene.practical_action && (
-                    <p className="text-sm"><strong>Ação prática:</strong> {scene.practical_action}</p>
+                    <p className="text-sm"><strong>{t("playbook.practicalAction")}:</strong> {scene.practical_action}</p>
                   )}
                 </section>
               )}
@@ -349,7 +346,7 @@ function PlaybookReaderPage() {
         <footer className="fixed bottom-0 left-0 right-0 z-20 border-t border-white/10 bg-background/70 backdrop-blur">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
             <Button variant="outline" size="sm" disabled={idx === 0} onClick={() => setIdx((i) => i - 1)}>
-              <ArrowLeft className="mr-1 h-4 w-4" /> Anterior
+              <ArrowLeft className="mr-1 h-4 w-4" /> {t("playbook.previous")}
             </Button>
             <div className="flex items-center gap-1">
               {scenes.map((_, i) => (
@@ -363,7 +360,7 @@ function PlaybookReaderPage() {
               ))}
             </div>
             <p className="hidden text-xs text-muted-foreground md:block">
-              Cena {idx + 1}/{scenes.length}
+              {t("playbook.scene")} {idx + 1}/{scenes.length}
             </p>
             <Button
               size="sm"
@@ -372,7 +369,7 @@ function PlaybookReaderPage() {
               style={{ background: "var(--gradient-playbook)" }}
               className="text-white"
             >
-              Próximo <ArrowRight className="ml-1 h-4 w-4" />
+              {t("playbook.next")} <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </footer>
@@ -382,6 +379,7 @@ function PlaybookReaderPage() {
 }
 
 function CopyLine({ text }: { text: string }) {
+  const { t } = useTranslation();
   return (
     <Button
       type="button"
@@ -391,13 +389,13 @@ function CopyLine({ text }: { text: string }) {
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text);
-          toast.success("Copiado");
+          toast.success(t("playbook.copied"));
         } catch {
-          toast.error("Falha ao copiar");
+          toast.error(t("playbook.copyFailed"));
         }
       }}
     >
-      <Copy className="mr-1 h-3 w-3" /> Copiar
+      <Copy className="mr-1 h-3 w-3" /> {t("playbook.copy")}
     </Button>
   );
 }
@@ -425,6 +423,8 @@ function StrategyView({
   onRegenerate: () => void;
   busy: boolean;
 }) {
+  const { t } = useTranslation();
+  const tb = (k: string) => t(`playbook.strategy.blocks.${k}`);
   const str = (k: string) => (typeof strategy[k] === "string" ? (strategy[k] as string) : "");
   const arr = (k: string) =>
     Array.isArray(strategy[k]) ? (strategy[k] as unknown[]).map(String) : [];
@@ -440,28 +440,28 @@ function StrategyView({
       <div className="flex justify-end">
         <Button variant="outline" size="sm" disabled={busy} onClick={onRegenerate}>
           {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-          Regenerar
+          {t("playbook.regenerate")}
         </Button>
       </div>
-      {str("bigIdea") && <Block title="Big Idea" copyText={str("bigIdea")}>{str("bigIdea")}</Block>}
-      {str("promise") && <Block title="Promessa" copyText={str("promise")}>{str("promise")}</Block>}
-      {str("uniqueMechanism") && <Block title="Mecanismo Único" copyText={str("uniqueMechanism")}>{str("uniqueMechanism")}</Block>}
-      {str("avatar") && <Block title="Avatar" copyText={str("avatar")}>{str("avatar")}</Block>}
-      {arr("pains").length > 0 && <Block title="Dores" copyText={arr("pains").join("\n")}>{list(arr("pains"))}</Block>}
-      {arr("desires").length > 0 && <Block title="Desejos" copyText={arr("desires").join("\n")}>{list(arr("desires"))}</Block>}
-      {arr("objections").length > 0 && <Block title="Objeções" copyText={arr("objections").join("\n")}>{list(arr("objections"))}</Block>}
-      {arr("mentalTriggers").length > 0 && <Block title="Gatilhos Mentais" copyText={arr("mentalTriggers").join("\n")}>{list(arr("mentalTriggers"))}</Block>}
-      {arr("headlines").length > 0 && <Block title="Headlines" copyText={arr("headlines").join("\n")}>{list(arr("headlines"))}</Block>}
-      {str("vslStructure") && <Block title="Estrutura VSL" copyText={str("vslStructure")}><pre className="whitespace-pre-wrap text-xs">{str("vslStructure")}</pre></Block>}
-      {str("pageStructure") && <Block title="Estrutura da Página" copyText={str("pageStructure")}><pre className="whitespace-pre-wrap text-xs">{str("pageStructure")}</pre></Block>}
-      {str("funnel") && <Block title="Funil" copyText={str("funnel")}><pre className="whitespace-pre-wrap text-xs">{str("funnel")}</pre></Block>}
-      {str("offer") && <Block title="Oferta" copyText={str("offer")}>{str("offer")}</Block>}
-      {arr("bonuses").length > 0 && <Block title="Bônus" copyText={arr("bonuses").join("\n")}>{list(arr("bonuses"))}</Block>}
-      {str("stack") && <Block title="Stack de Valor" copyText={str("stack")}>{str("stack")}</Block>}
-      {str("cta") && <Block title="CTA" copyText={str("cta")}>{str("cta")}</Block>}
-      {arr("scripts").length > 0 && <Block title="Scripts" copyText={arr("scripts").join("\n\n---\n\n")}>{list(arr("scripts"))}</Block>}
-      {arr("angles").length > 0 && <Block title="Ângulos Criativos" copyText={arr("angles").join("\n")}>{list(arr("angles"))}</Block>}
-      {str("scale") && <Block title="Plano de Escala" copyText={str("scale")}><pre className="whitespace-pre-wrap text-xs">{str("scale")}</pre></Block>}
+      {str("bigIdea") && <Block title={tb("bigIdea")} copyText={str("bigIdea")}>{str("bigIdea")}</Block>}
+      {str("promise") && <Block title={tb("promise")} copyText={str("promise")}>{str("promise")}</Block>}
+      {str("uniqueMechanism") && <Block title={tb("uniqueMechanism")} copyText={str("uniqueMechanism")}>{str("uniqueMechanism")}</Block>}
+      {str("avatar") && <Block title={tb("avatar")} copyText={str("avatar")}>{str("avatar")}</Block>}
+      {arr("pains").length > 0 && <Block title={tb("pains")} copyText={arr("pains").join("\n")}>{list(arr("pains"))}</Block>}
+      {arr("desires").length > 0 && <Block title={tb("desires")} copyText={arr("desires").join("\n")}>{list(arr("desires"))}</Block>}
+      {arr("objections").length > 0 && <Block title={tb("objections")} copyText={arr("objections").join("\n")}>{list(arr("objections"))}</Block>}
+      {arr("mentalTriggers").length > 0 && <Block title={tb("mentalTriggers")} copyText={arr("mentalTriggers").join("\n")}>{list(arr("mentalTriggers"))}</Block>}
+      {arr("headlines").length > 0 && <Block title={tb("headlines")} copyText={arr("headlines").join("\n")}>{list(arr("headlines"))}</Block>}
+      {str("vslStructure") && <Block title={tb("vslStructure")} copyText={str("vslStructure")}><pre className="whitespace-pre-wrap text-xs">{str("vslStructure")}</pre></Block>}
+      {str("pageStructure") && <Block title={tb("pageStructure")} copyText={str("pageStructure")}><pre className="whitespace-pre-wrap text-xs">{str("pageStructure")}</pre></Block>}
+      {str("funnel") && <Block title={tb("funnel")} copyText={str("funnel")}><pre className="whitespace-pre-wrap text-xs">{str("funnel")}</pre></Block>}
+      {str("offer") && <Block title={tb("offer")} copyText={str("offer")}>{str("offer")}</Block>}
+      {arr("bonuses").length > 0 && <Block title={tb("bonuses")} copyText={arr("bonuses").join("\n")}>{list(arr("bonuses"))}</Block>}
+      {str("stack") && <Block title={tb("stack")} copyText={str("stack")}>{str("stack")}</Block>}
+      {str("cta") && <Block title={tb("cta")} copyText={str("cta")}>{str("cta")}</Block>}
+      {arr("scripts").length > 0 && <Block title={tb("scripts")} copyText={arr("scripts").join("\n\n---\n\n")}>{list(arr("scripts"))}</Block>}
+      {arr("angles").length > 0 && <Block title={tb("angles")} copyText={arr("angles").join("\n")}>{list(arr("angles"))}</Block>}
+      {str("scale") && <Block title={tb("scale")} copyText={str("scale")}><pre className="whitespace-pre-wrap text-xs">{str("scale")}</pre></Block>}
     </div>
   );
 }

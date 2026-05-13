@@ -663,6 +663,26 @@ function EbookPage() {
             onUseMined={onHubMined}
             onScratch={onHubScratch}
             onAiGenerate={onHubAi}
+            onPdfImport={(b, sc) => {
+              setEntryStarted(true);
+              setMode("premium");
+              setStyle("clean");
+              setBriefing(b);
+              setChapterCount(sc);
+              setStep(2);
+              (async () => {
+                setBusy("Gerando estrutura com IA…");
+                try {
+                  const o = await fnOutline({ data: { briefing: b, chapterCount: sc } });
+                  setOutline(o);
+                } catch (e) {
+                  toast.error(await errMsg(e, "Falha ao gerar estrutura"));
+                  setStep(1);
+                } finally {
+                  setBusy(null);
+                }
+              })();
+            }}
             busy={!!busy}
           />
           {drafts.length > 0 && (

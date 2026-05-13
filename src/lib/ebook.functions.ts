@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   aiExtractBriefing,
+  aiExtractBriefingFromText,
   aiGenerateChapter,
   aiGenerateChapterImage,
   aiGenerateCover,
@@ -33,6 +34,28 @@ export const extractEbookBriefing = createServerFn({ method: "POST" })
       return await aiExtractBriefing(data.ad);
     } catch (e) {
       throw new Error(e instanceof Error ? e.message : "Falha ao gerar briefing");
+    }
+  });
+
+export const extractEbookBriefingFromPdfText = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { text: string; fileName?: string; language?: string }) =>
+    z
+      .object({
+        text: z.string().min(20).max(60_000),
+        fileName: z.string().max(255).optional(),
+        language: z.string().max(40).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) => {
+    try {
+      return await aiExtractBriefingFromText(data.text, {
+        fileName: data.fileName,
+        language: data.language,
+      });
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar briefing do PDF");
     }
   });
 

@@ -113,5 +113,81 @@
     "loading": "Loading...",
     "all": "All",
     "any": "Any"
+  },
+  "playbook": {
+    "library": "Library",
+    "edit": "Edit",
+    "export": "Export",
+    "copyContent": "Copy content",
+    "copySuccess": "Content copied",
+    "copyFailed": "Failed to copy",
+    "copied": "Copied",
+    "copy": "Copy",
+    "presentationSoon": "Presentation (coming soon)",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "carousel": "Carousel (PNG)",
+    "videoScript": "Video script",
+    "regenerate": "Regenerate",
+    "loadFailed": "Failed to load",
+    "backToLibrary": "Back to library",
+    "scene": "Scene",
+    "previous": "Previous",
+    "next": "Next",
+    "noScenes": "No scenes. Edit this playbook to add content.",
+    "stageInfo": "About this stage",
+    "exercise": "Exercise",
+    "practicalAction": "Practical action",
+    "strategy": {
+      "button": "Strategy",
+      "title": "Full strategy",
+      "intro": "Generate the full strategy: Big Idea, Promise, Mechanism, Avatar, Pains, Desires, Objections, Triggers, Headlines, VSL, Page, Funnel, Offer, Bonuses, Stack, CTA, Scripts, Angles and Scale Plan.",
+      "generate": "Generate strategy with AI",
+      "generated": "Strategy generated",
+      "failed": "Failed to generate strategy",
+      "blocks": {
+        "bigIdea": "Big Idea",
+        "promise": "Promise",
+        "uniqueMechanism": "Unique Mechanism",
+        "avatar": "Avatar",
+        "pains": "Pains",
+        "desires": "Desires",
+        "objections": "Objections",
+        "mentalTriggers": "Mental Triggers",
+        "headlines": "Headlines",
+        "vslStructure": "VSL Structure",
+        "pageStructure": "Page Structure",
+        "funnel": "Funnel",
+        "offer": "Offer",
+        "bonuses": "Bonuses",
+        "stack": "Value Stack",
+        "cta": "CTA",
+        "scripts": "Scripts",
+        "angles": "Creative Angles",
+        "scale": "Scale Plan"
+      }
+    },
+    "toasts": {
+      "docxGenerating": "Generating DOCX…",
+      "docxDone": "DOCX downloaded",
+      "scriptGenerating": "Generating script…",
+      "scriptDone": "Script exported",
+      "failed": "Failed"
+    }
+  },
+  "ebook": {
+    "pdfImport": {
+      "title": "Import PDF and generate Premium Ebook",
+      "description": "Upload a reference PDF and AI will craft a full premium ebook from its content.",
+      "dropHere": "Drag your PDF here or click to select",
+      "selectFile": "Select PDF",
+      "parsing": "Reading PDF…",
+      "analyzing": "Analyzing with AI…",
+      "success": "Briefing ready from PDF",
+      "errorTooLarge": "PDF larger than 10 MB",
+      "errorNotPdf": "File must be a PDF",
+      "errorParse": "Could not extract text from PDF",
+      "errorEmpty": "PDF has no extractable text (scanned?)"
+    }
   }
 }
