@@ -1,125 +1,80 @@
-# Rebrand visual EscalaFlow — SaaS premium de IA
+## Ajustes de branding — Sidebar + Header + Microinterações
 
-Objetivo: tirar a aparência "gamer/crypto" (glow forte, partículas, gradientes saturados) e aproximar de Linear, Notion, Jasper, Framer, Perplexity. Manter conceito de crescimento, fluxo, escala, IA, performance.
-
-Escopo: branding + tokens visuais. **Sem mexer em funcionalidade, rotas, módulos, server functions ou banco.**
+Escopo: presença visual da marca. Sem mudar funcionalidade, rotas ou dados.
 
 ---
 
-## 1. Sistema de logo (5 versões)
+### 1. Sidebar — logo com mais presença
 
-Gerar via IA (premium, fundo transparente PNG) e salvar em `src/assets/brand/`:
+`src/components/AppSidebar.tsx` (header da sidebar):
 
-1. **`logo-horizontal.png`** — símbolo + wordmark "EscalaFlow" lado a lado. Para `AppHeader`, login, footer.
-2. **`logo-flat.png`** — wordmark sem efeitos, peso médio, espaçamento amplo. Para contextos densos.
-3. **`logo-mono.png`** — versão monocromática (branco para dark, preto para light). Para overlays, e-mails, exportações.
-4. **`logo-mark.png`** — apenas o símbolo (app icon, 1024×1024, cantos com respiro). Para PWA, OG image, avatar.
-5. **`favicon.png`** — símbolo simplificado 512×512 (legível em 16×16). Substitui `public/favicon.ico`.
+- Aumentar altura do logo em ~35%: `h-7` → `h-10` (horizontal) e `h-7 w-7` → `h-9 w-9` (mark colapsado).
+- Aumentar padding do `SidebarHeader`: de `px-2 py-2` para `px-3 py-4` para dar respiro premium.
+- Trocar o hack `dark:invert dark:brightness-200` (que distorce cores) por usar **`logo-mono.png` no dark** e `logo-horizontal.png` no light, via `useTheme()` do `ThemeProvider`. Isso melhora contraste sem inverter pixels.
+- Adicionar `transition-opacity duration-300` + `animate-fade-in` no logo para entrada suave.
+- Hover dos itens do menu: trocar o highlight atual por `hover:bg-sidebar-accent/60 transition-colors duration-200` e adicionar `data-[active=true]:bg-sidebar-accent` com borda esquerda sutil de 2px em `--primary` (estilo Linear/ClickUp).
 
-**Direção do símbolo**: forma geométrica única e estável — uma seta/curva ascendente integrada a uma "barra" sutil, sem partículas, sem rastro, sem glow. Linha limpa, traço médio, dois tons sólidos (azul elétrico + roxo) em transição suave (não arco-íris). Inspiração: marca Linear (geometria pura), Vercel (silhueta sólida), Perplexity (símbolo único reconhecível).
+### 2. Header — área de branding maior
 
-**Wordmark**: "EscalaFlow" em uma única cor sólida (não bicolor por letra). Tipografia premium geométrica (ver §3). Sem sublinhado "MINERE. CRIE. ESCALE." no logo principal — esse slogan vira tagline opcional fora da marca.
+`src/components/AppHeader.tsx`:
 
----
+- Aumentar altura: `h-14` → `h-16`.
+- Adicionar slot opcional à esquerda do `SidebarTrigger` com o `logo-mark` (`h-6 w-6`) visível **apenas quando a sidebar está colapsada** (via `useSidebar().state === "collapsed"`), garantindo branding contínuo.
+- Refinar borda: `border-border/60` → `border-border/40` + `backdrop-blur-md` para look Notion/Perplexity.
 
-## 2. Paleta — repintar tokens em `src/styles.css`
+### 3. Loading screen — animação leve premium
 
-Substituir a paleta atual (roxo saturado #7C3AED + cyan #06B6D4 com glow forte) por uma versão sóbria SaaS:
+`src/routes/_authenticated.tsx`:
 
-```
-Dark (principal):
-  --background: oklch(0.16 0.02 265)   /* near-black com leve azul */
-  --card:       oklch(0.20 0.02 265)
-  --foreground: oklch(0.96 0.005 250)
-  --primary:    oklch(0.62 0.20 265)   /* azul elétrico contido */
-  --accent:     oklch(0.58 0.22 295)   /* roxo premium */
-  --border:     oklch(1 0 0 / 6%)
-  --muted-foreground: oklch(0.65 0.01 260)
+- Aumentar logo do loading: `h-12` → `h-14`.
+- Substituir o shimmer atual por:
+  - logo com `animate-fade-in` (300ms) + `animate-pulse` muito sutil (opacidade 0.85 → 1.0, 2s).
+  - barra inferior fina (1px, w-32) com gradiente `from-transparent via-primary to-transparent` deslizando — animação `shimmer` já definida em `styles.css`.
+- Sem glow forte, sem partículas.
 
-Light:
-  --background: oklch(0.99 0.003 250)
-  --card:       oklch(1 0 0)
-  --primary:    oklch(0.55 0.22 265)
-  --accent:     oklch(0.52 0.22 295)
-  --border:     oklch(0.92 0.005 255)
-```
+### 4. Favicon separado do logo principal
 
-Reduzir intensidade de:
-- `--shadow-glow`, `--shadow-elegant` → blur menor, opacidade 0.10–0.15 (era 0.35–0.40).
-- `--gradient-primary` → gradiente sutil 165° entre primary e accent, **sem** o terceiro tom magenta.
-- `--gradient-glow` → opacidade 0.08.
+`src/assets/brand/`:
 
-Remover/atenuar utilities "gamer" em `@layer utilities`:
-- `.ai-glow` → manter mas com background-size estático e animação opcional via prop (default off).
-- `.ai-pulse` → reduzir blur de 14px → 6px, opacidade máx 0.25.
-- `.scan-line`, `.shimmer` → manter mas remover dos componentes globais (só usar em loading explícito).
+- Gerar **novo `favicon.png`** (512×512, transparent) — apenas o símbolo geométrico, mais condensado e legível em 16×16, **sem wordmark**, traço mais grosso que o `logo-mark`.
+- Atualizar `public/favicon.png` (cópia) e `__root.tsx` (`rel="icon"` aponta para o novo).
+- Manter `logo-mark.png` como app icon (1024) e OG image — não recriar.
 
-Tokens do Playbook (`--playbook-neon`, `--shadow-neon`, `--shadow-gold`) ficam isolados ao módulo Playbook (telas internas que pedem visual diferenciado). **Não tocar.**
+### 5. Microinterações globais (sutis)
 
----
+`src/styles.css` (já tem `fade-in`, `shimmer`):
 
-## 3. Tipografia premium
+- Garantir keyframe `shimmer` existe (adicionar se faltar): `0% { transform: translateX(-100%) } 100% { transform: translateX(100%) }`.
+- Adicionar utility `.menu-item-hover` com `transition: background-color 180ms ease, color 180ms ease` para reuso.
 
-Adicionar via Google Fonts em `index.html`:
-- **Display/headings**: `Geist` ou `Inter Display` (peso 500–600, tracking -0.02em).
-- **Body**: `Inter` (400/500).
-- **Mono** (badges, códigos): `Geist Mono` ou `JetBrains Mono`.
+Aplicar `animate-fade-in` (300ms) no `<main>` do `_authenticated.tsx` para fade premium ao trocar de rota.
 
-Atualizar `src/styles.css` com `--font-display`, `--font-body`, `--font-mono` e aplicar em `body` + `h1–h6`. Remover qualquer uso de `Space Grotesk`/`Sora` fora do Playbook.
+### 6. Correção runtime de RLS (paralelo, fora de branding)
+
+Console mostra `permission denied for function has_role`. Criar migração para `GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role) TO authenticated, anon;` — desbloqueia policies que usam essa função. Sem isso, várias queries quebram silenciosamente.
 
 ---
 
-## 4. Aplicação no app (sem mudar layout)
+### Arquivos editados
 
-- **`src/components/AppHeader.tsx`**: trocar texto "EscalaFlow" por `<img src={logoHorizontal} alt="EscalaFlow" className="h-7" />`. Importar de `@/assets/brand/logo-horizontal.png`.
-- **`src/components/AppSidebar.tsx`**: usar `logo-mark.png` colapsado, `logo-horizontal.png` expandido.
-- **`src/routes/_authenticated.tsx`** (loading screen): trocar `<Loader2>` genérico por `logo-mark` + spinner discreto (border 2px primary, sem glow forte).
-- **`src/routes/login.tsx`**: header com `logo-horizontal`.
-- **`src/routes/__root.tsx`** + **`index.html`**: `<title>EscalaFlow — IA para criar, escalar e monetizar</title>`, meta description, og:image (`logo-mark` 1024 com fundo dark), favicon.
-- **`public/favicon.ico`**: substituir por novo favicon (PNG renomeado ou via export). Limpar `public/placeholder.svg`, `public/og-image.png` se existirem com asset default.
-- Botões `variant="default"`: revisar para usar `bg-primary` puro (sem `ai-glow`/`ai-pulse` no estado padrão).
-- Cards do `PipelineHub`, `DualModeHub`, `ModePicker`: remover classes `ai-pulse`/`shadow-glow` do estado idle; manter apenas hover sutil.
+- `src/components/AppSidebar.tsx` (logo maior, theme-aware, hover)
+- `src/components/AppHeader.tsx` (h-16, mark quando colapsado)
+- `src/routes/_authenticated.tsx` (loading refinado, fade no main)
+- `src/routes/__root.tsx` (favicon novo)
+- `src/styles.css` (utility hover, garantir keyframes)
+- `public/favicon.png` (substituído)
+- nova migração SQL (grant has_role)
 
----
+### Arquivos novos
 
-## 5. QA visual
+- `src/assets/brand/favicon.png` (regerado, símbolo condensado)
 
-Após implementar:
-- Rodar `bun run build` para validar bundle.
-- Capturar screenshots: `/dashboard`, `/projetos`, `/criativos`, `/login` em dark + light.
-- Comparar lado a lado com Linear/Jasper/Framer (referência mental) — checar contraste, peso de glow, harmonia de cor.
-- Verificar favicon na aba do navegador.
+### Referências visuais
 
----
+Linear (sidebar com logo grande + borda ativa esquerda), Notion (header alto, hover suave bg), Perplexity (loading com shimmer fino), ClickUp (branding contínuo header+sidebar).
 
-## Arquivos novos
+### Não fazer
 
-- `src/assets/brand/logo-horizontal.png`
-- `src/assets/brand/logo-flat.png`
-- `src/assets/brand/logo-mono.png`
-- `src/assets/brand/logo-mark.png`
-- `src/assets/brand/favicon.png`
-
-## Arquivos editados
-
-- `src/styles.css` (paleta, sombras, gradientes, fontes)
-- `index.html` (fontes, favicon, meta, title)
-- `src/routes/__root.tsx` (head, og)
-- `src/routes/_authenticated.tsx` (loading)
-- `src/routes/login.tsx`
-- `src/components/AppHeader.tsx`
-- `src/components/AppSidebar.tsx`
-- `public/favicon.ico` (substituído)
-
-## Ordem de execução
-
-1. Gerar 5 logos (premium, transparent).
-2. Atualizar `styles.css` (paleta + sombras + fontes).
-3. Atualizar `index.html` + `__root.tsx` (fontes, meta, favicon).
-4. Trocar logo em Header/Sidebar/Login/Loading.
-5. Sweep de utilities `ai-pulse`/`shadow-glow` em estados idle de cards/botões globais.
-6. Build + QA visual + screenshots.
-
-## Pergunta antes de começar
-
-Confirma que posso **gerar os 5 logos via IA** com a direção descrita (símbolo geométrico azul→roxo, wordmark "EscalaFlow" em Geist/Inter, sem partículas)? Ou prefere enviar uma versão final do logo já desenhada por você, e eu só faço a paleta + tipografia + integração?
+- Sem glow forte, sem partículas, sem efeitos espaciais.
+- Sem gerar novos logos horizontais — os atuais funcionam bem após o resize.
+- Sem mexer em módulos da esteira, server functions ou banco (exceto o grant de RLS).
