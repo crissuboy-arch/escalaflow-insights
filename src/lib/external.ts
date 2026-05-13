@@ -121,3 +121,44 @@ export async function openChatGPTWithPrompt(prompt: string): Promise<void> {
     });
   }
 }
+
+/** Open Facebook / Meta URLs (ad library, profiles, etc.) in a new tab. */
+export function openFacebook(url: string): boolean {
+  return openInNewTab(url);
+}
+
+async function openAIToolWithPrompt(
+  url: string,
+  toolName: string,
+  prompt?: string,
+): Promise<void> {
+  if (prompt) {
+    const copied = await copyToClipboard(prompt);
+    if (copied) toast.success("Prompt copiado");
+  }
+  const opened = openInNewTab(url);
+  if (!opened && prompt) {
+    toast(`Permita popups para abrir o ${toolName}`, {
+      action: {
+        label: "Copiar prompt",
+        onClick: () => {
+          void copyToClipboard(prompt).then((ok) => {
+            if (ok) toast.success("Prompt copiado");
+          });
+        },
+      },
+    });
+  }
+}
+
+export function openChatGPT(prompt?: string): Promise<void> {
+  return openAIToolWithPrompt("https://chatgpt.com/", "ChatGPT", prompt);
+}
+
+export function openGemini(prompt?: string): Promise<void> {
+  return openAIToolWithPrompt("https://gemini.google.com/app", "Gemini", prompt);
+}
+
+export function openAIStudio(prompt?: string): Promise<void> {
+  return openAIToolWithPrompt("https://aistudio.google.com/", "Google AI Studio", prompt);
+}
