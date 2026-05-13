@@ -8,7 +8,13 @@ import type { SalesPage } from "@/lib/sales-page.server";
 import type { StandaloneBriefing } from "@/lib/standalone/briefing";
 import { SaveToProjectButton } from "./SaveToProjectButton";
 
-type Prompts = { lovable: string; googleAiStudio: string; v0: string; claude: string };
+type Prompts = {
+  lovable: string;
+  googleAiStudio: string;
+  html: string;
+  v0: string;
+  claude: string;
+};
 
 export function StandaloneSalesPage() {
   const generate = useServerFn(generateSalesPage);
