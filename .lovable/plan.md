@@ -1,113 +1,112 @@
-## Escopo
+# Plano: fluxo, estado e navegação entre módulos
 
-Finalizar 3 módulos comerciais + gating admin + esconder badge Lovable. Branding (favicon/logo/header) já está EscalaFlow — apenas conferir rodapé.
-
----
-
-## 1. Página de Venda (`/pagina-venda` + tab no projeto)
-
-**Standalone — adicionar seletor de modo no topo:**
-- "Selecionar projeto existente" (Select com lista de `projects` do usuário) → roda `generateSalesPage({ kind: "project", projectId })`
-- "Criar produto avulso" → mantém `StandaloneBriefingForm` atual
-- Mesma tela de resultado para ambos
-
-**Em `sales-page.server.ts → buildExternalPrompts`:**
-- Renomear/expor 3 prompts solicitados: `googleAiStudio`, `lovable`, `html` (HTML puro autocontido com Tailwind CDN)
-- Manter `v0` e `claude` como extras
-
-**`SalesPageResult.tsx`:**
-- Trocar a aba/cards de prompts para mostrar os 3 oficiais (Google AI Studio · Lovable · HTML) com botão "Copiar"
-- Adicionar botão **Exportar DOCX** (novo `src/lib/sales-page/docx.ts` usando lib `docx` já presente, mesmo padrão de `playbook/docx.ts`) com todas as dobras (Hero, Lead, Dor, Mecanismo, Benefícios, Objeções, Depoimentos, Oferta, Bônus, Garantia, FAQ, CTA, Estrutura visual)
+Foco: fazer o que já existe **funcionar de verdade** nos dois modos (Novo / Projeto Existente). Sem novas telas, sem mudar design.
 
 ---
 
-## 2. Checkout & Oferta (`/checkout` + tab no projeto)
+## 1. Modo "Selecionar Projeto Existente" funcionando em todos os módulos
 
-Hoje é só formulário manual. Adicionar geração IA real.
+Hoje `DualModeHub` (modo `project`) renderiza `PipelineHub` que lista projetos e abre `/projetos/$id?tab=...`. Falhas:
 
-**Novo `src/lib/checkout.server.ts` + `checkout.functions.ts`:**
-- `generateCheckoutOffer({ kind: "project"|"standalone", ... })` → IA Lovable Gateway (`google/gemini-3-flash-preview`)
-- Schema retornado: `{ oferta, stack: string[], bonus: [{nome, valorPercebido, descricao}], garantia, orderBump, upsell, downsell, anchoring: {de, por, justificativa}, urgencia, cta, kiwify, hotmart, stripe }` onde os 3 últimos são blocos de descrição/bullets prontos para colar nos campos de cada plataforma.
-- Salva em `meta.checkout` (modo project) e em `ai_history`.
+- Em **Ebook** e **Playbook** o hub dual nem é usado — as rotas `/produtos.ebook` e `/produtos.playbook` só listam itens, sem opção "abrir num projeto existente".
+- Em **Copy / Criativos / Página / Checkout / Escala**, o clique no card do projeto navega, mas:
+  - `projetos.$id.tsx` recebe `?tab=` mas só hidrata `briefing/outline/meta`; não dispara fetch incremental do histórico IA nem dos assets vinculados (ebook/playbook).
+  - Tabs `CopyTab`, `CreativesTab`, `SalesPageTab`, `CheckoutTab`, `EscalaTab` dependem de `project.meta[chave]` mas, quando o usuário entra direto via `?tab=criativos`, o `useState` inicial fica nulo e o componente trata como "ainda não gerado" mesmo havendo dado em `meta`.
 
-**UI `StandaloneCheckout.tsx` e `CheckoutTab.tsx`:**
-- Botão "Gerar oferta com IA" no topo (em standalone usa `StandaloneBriefingForm`; em project usa dados do projeto)
-- Exibe resultado em cards: Oferta · Stack de valor · Bônus · Garantia · Order bump · Upsell · Downsell · Ancoragem · Urgência · CTA
-- Sub-abas Kiwify · Hotmart · Stripe com texto pronto + botão Copiar
-- Mantém formulário manual (campos preço/link) abaixo, prefilled com a oferta gerada
+Ações:
+
+1. `DualModeHub` (modo project): ao clicar num card, além de navegar, pré-fetch `loadProject` via `react-query` cache (ou simples `router.preloadRoute`) para abrir já hidratado.
+2. `projetos.$id.tsx`:
+   - No `refresh()`, sempre passar `meta.copy / meta.salesPage / meta.creatives / meta.checkout / meta.scale` como `initial` para cada `*Tab`.
+   - Garantir que mudar `?tab=` por URL aciona render da aba correta (já há `useEffect`; validar com a lista TABS atual).
+3. Criar `EbookHubDual` e `PlaybookHubDual` reutilizando `DualModeHub`:
+   - Modo "novo" = comportamento atual (`/produtos/ebook` listagem + criar).
+   - Modo "projeto" = lista projetos e ao clicar abre `/projetos/$id?tab=ebook` (ou `playbook`). Já existem essas tabs no workspace.
+4. Renomear/expor entradas no `AppSidebar` para "Criar Ebook" e "Criar Playbook" abrirem o hub dual.
+
+## 2. Botões mortos / módulos que não abrem
+
+Auditoria + correções pontuais:
+
+- **Playbook / Ebook**: links no dashboard apontam para `/produtos/ebook` e `/produtos/playbook`; verificar `to=` com strings exatas declaradas no `routeTree.gen.ts`.
+- **Criativos / Escala**: rotas existem (`/criativos`, `/escala`) — confirmar links do sidebar e dashboard.
+- **Oferta Minerada**: cards em `/ofertas-salvas` hoje vão para `/analise-ia?ad=...`. Trocar para fluxo do item 3.
+
+Para cada botão suspeito: garantir `Link to="..."` válido (sem template strings em `to`), e nada de `<a href>` para rota interna.
+
+## 3. Fluxo Oferta Minerada → Projeto
+
+Hoje termina em `/analise-ia`. Novo fluxo:
+
+```text
+ofertas-salvas → "Usar esta oferta"
+  → modal de confirmação (nicho / promessa pré-preenchidos do análise IA)
+  → server fn createProjectFromOffer({ offerId })
+       cria projects row com briefing seedado
+       (title, niche, promise, avatar, pains, desires, mechanism)
+  → navigate /projetos/$id?tab=briefing
+```
+
+Implementação:
+
+- Nova server fn `createProjectFromOffer` em `src/lib/project.functions.ts` usando `getAnalysisForOffer` + `getOfferById` (já existem).
+- Botão "Usar como projeto" no card de `/ofertas-salvas` e em `/oferta/$id`.
+- O briefing já alimenta automaticamente os outros módulos via `meta.copy` etc. (ações geradas sob demanda nas tabs).
+
+## 4. Escala IA real (substituir checklist superficial)
+
+Tab `EscalaTab` no workspace passa a ter:
+
+- Upload de screenshot do Facebook Ads (storage bucket `ads-metrics`, criar via migration).
+- Campos manuais: CTR, CPC, CPM, ROAS, frequência, gasto, dias rodando.
+- Textarea "colar resultados".
+- Botão "Analisar com IA" → server fn `analyzeAdsPerformance` (Gemini 2.5 Pro com vision para o screenshot).
+- Output estruturado (Zod): diagnóstico, criativo vencedor, ângulo vencedor, fadiga, recomendação de escala (2x/manter/cortar), próximos testes.
+- Persistir em `projects.meta.scale.analyses[]` + `ai_history`.
+
+`StandaloneEscala` (modo standalone) ganha o mesmo formulário, sem persistência por projeto (só `ai_history`).
+
+## 5. Links externos (Facebook / ChatGPT / Gemini)
+
+Já existe `openExternal` em `src/lib/external/openExternal.ts` (usa `window.open` + fallback toast). Migrar TODOS os pontos que ainda usam `<a target="_blank">` ou `window.location` direto para `openExternal()`:
+
+- `/link-externo`
+- Cards de oferta (links Meta Ads Library)
+- Botões "Abrir no ChatGPT" / "Abrir no Gemini" nos resultados de Copy, Página e Criativos (passam o prompt via clipboard antes de abrir).
+
+## 6. Modo duplo confirmado em todos os módulos
+
+Tabela final (verificar pós-fix):
+
+| Módulo | Standalone | Projeto |
+|---|---|---|
+| Ebook | listagem `/produtos/ebook` | tab `ebook` |
+| Playbook | listagem `/produtos/playbook` | tab `playbook` |
+| Copy | `StandaloneBriefingForm` | `CopyTab` |
+| Criativos | `CreativeWizard` | `CreativesTab` |
+| Página | `StandaloneSalesPage` | `SalesPageTab` |
+| Checkout | `StandaloneCheckout` | `CheckoutTab` |
+| Escala | `StandaloneEscala` (com IA nova) | `EscalaTab` (com IA nova) |
+
+## 7. Detalhes técnicos
+
+- Nova server fn `createProjectFromOffer` (em `src/lib/project.functions.ts`).
+- Nova server fn `analyzeAdsPerformance` (em novo arquivo `src/lib/scale.functions.ts` + `scale.server.ts`, Gemini 2.5 Pro multimodal).
+- Migration: bucket `ads-metrics` (privado, RLS por user_id no path).
+- Sem mudanças de schema em `projects` — usar `meta.scale.analyses` (array de objetos).
+- Sem mudanças de design — só substituir conteúdo dos componentes existentes.
+
+## 8. Verificação final
+
+Após implementar, rodar manualmente (browser tools):
+
+1. Sidebar: cada item abre rota correta.
+2. Cada módulo: alternar Modo Novo ↔ Projeto.
+3. Ofertas Salvas → Usar oferta → projeto criado → tabs hidratadas.
+4. Escala: upload screenshot → análise IA retorna JSON.
+5. Links externos: Meta Ads Library, ChatGPT, Gemini abrem (com fallback toast).
+6. Build limpo.
 
 ---
 
-## 3. Escala do Produto (`/escala` + tab no projeto)
-
-Hoje é checklist estático. Adicionar plano gerado por IA.
-
-**Novo `src/lib/escala.server.ts` + `escala.functions.ts`:**
-- `generateScalePlan({ kind, ... })` → schema:
-  ```
-  {
-    planoConteudo: { semana1, semana2, semana3, semana4 } com 5 posts/dia tipados,
-    anuncios: [{ angulo, headline, copy, formato, cta }] (5–8),
-    canais: { organico, pago, tiktok, instagram, shorts, whatsapp, email },
-    recorrencia: { ideias: string[], oferta: string },
-    assinatura: { tiers: [{nome, preco, beneficios[]}], retencao: string }
-  }
-  ```
-- Salva em `meta.scale`.
-
-**UI:**
-- `StandaloneEscala.tsx` ganha botão "Gerar plano de escala com IA" + briefing curto
-- `EscalaTab.tsx` mantém checklist atual mas adiciona seção "Plano de Escala IA" com tabs (Conteúdo · Anúncios · Canais · Recorrência · Assinatura), cada uma com cards copiáveis
-- Botão Exportar DOCX do plano
-
----
-
-## 4. Supabase / Roles
-
-Já existe: `user_roles` table, função `has_role`, trigger `handle_new_user` insere role `user`, RLS por user_id, login/cadastro funcionando, projetos salvos com RLS.
-
-**Falta:** gating de UI para admin.
-- Criar hook `useIsAdmin()` em `src/hooks/useIsAdmin.ts` que consulta `user_roles` via supabase client
-- Em `src/routes/_authenticated/configuracoes.tsx`: `beforeLoad` checa role admin via server function `getMyRole` (nova, em `src/lib/roles.functions.ts` com `requireSupabaseAuth`); se não admin → `redirect({ to: "/dashboard" })` + toast
-- Esconder item "Configurações" no `AppSidebar.tsx` e no menu do `AppHeader.tsx` quando não admin
-
-Nenhuma migration nova necessária.
-
----
-
-## 5. Marca própria
-
-Já feito: favicon (`@/assets/brand/favicon.png`), logo (`logo-mark.png`), título EscalaFlow, OG tags.
-
-**Falta:**
-- Esconder badge "Edit with Lovable" via `publish_settings--set_badge_visibility({ hide_badge: true })` (Pro)
-- Conferir rodapé: se houver menção a Lovable em algum footer, trocar por "© EscalaFlow" (busca rápida em src/components/AppSidebar.tsx + páginas públicas)
-
----
-
-## 6. Verificação final
-
-- Build automático do harness valida typecheck
-- Testar manualmente: login, criar projeto, abrir cada tab (ebook/playbook/copy/criativos/pagina/checkout/escala), gerar IA em cada um, exportar DOCX/PDF, salvar, recarregar página e ver dados persistidos
-- Confirmar que usuário comum não vê `/configuracoes` e é redirecionado se acessar pela URL
-
----
-
-## Arquivos novos
-
-- `src/lib/sales-page/docx.ts`
-- `src/lib/checkout.server.ts`, `src/lib/checkout.functions.ts`
-- `src/lib/escala.server.ts`, `src/lib/escala.functions.ts`, `src/lib/escala/docx.ts`
-- `src/lib/roles.functions.ts`
-- `src/hooks/useIsAdmin.ts`
-
-## Arquivos editados
-
-- `src/lib/sales-page.server.ts` (prompt HTML), `SalesPageResult.tsx`, `StandaloneSalesPage.tsx` (seletor projeto/avulso)
-- `src/components/pipeline/StandaloneCheckout.tsx`, `project/CheckoutTab.tsx`
-- `src/components/pipeline/StandaloneEscala.tsx`, `project/EscalaTab.tsx`
-- `src/routes/_authenticated/configuracoes.tsx` (admin gate)
-- `src/components/AppSidebar.tsx`, `AppHeader.tsx` (esconder item Configurações)
-- Toolcall: hide badge
-
-Sem novas dependências, sem migrations.
+**Não inclui**: novas telas, mudanças de design, novos módulos. Apenas conserto de fluxo, hidratação e integração.

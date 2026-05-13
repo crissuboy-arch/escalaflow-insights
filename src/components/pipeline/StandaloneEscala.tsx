@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Rocket, Plus, Check } from "lucide-react";
+import { ScaleAnalyzer } from "@/components/pipeline/ScaleAnalyzer";
 
 const STEPS = [
   "Definir oferta principal e preço",
@@ -18,6 +19,8 @@ const STEPS = [
 export function StandaloneEscala() {
   return (
     <div className="space-y-4">
+      <ScaleAnalyzer />
+
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
         <CardContent className="space-y-3 p-5">
           <div className="flex items-center gap-3">
