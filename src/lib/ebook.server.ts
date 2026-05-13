@@ -161,6 +161,74 @@ export async function aiExtractBriefing(ad: AdInput): Promise<Briefing> {
   return BriefingSchema.parse(safeParseToolArgs(args));
 }
 
+export async function aiExtractBriefingFromText(
+  text: string,
+  opts?: { fileName?: string; language?: string },
+): Promise<Briefing & { suggestedChapterCount: number }> {
+  const lang = opts?.language || "Português";
+  const data = (await aiChat({
+    model: "google/gemini-3-flash-preview",
+    messages: [
+      {
+        role: "system",
+        content:
+          "Você é um editor sênior que transforma documentos de referência em briefings de ebook PREMIUM. Identifique tema, promessa, avatar, dores, desejos e mecanismo único. Sempre responda chamando a ferramenta `briefing`. Use o idioma do conteúdo enviado (fallback: " +
+          lang +
+          ").",
+      },
+      {
+        role: "user",
+        content: `Arquivo: ${opts?.fileName ?? "documento.pdf"}\n\nConteúdo extraído (pode estar truncado):\n"""\n${text}\n"""\n\nGere um briefing premium e sugira número ideal de capítulos (3 a 12).`,
+      },
+    ],
+    tools: [
+      {
+        type: "function",
+        function: {
+          name: "briefing",
+          description: "Briefing premium para ebook a partir de PDF",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              subtitle: { type: "string" },
+              niche: { type: "string" },
+              promise: { type: "string" },
+              avatar: { type: "string" },
+              pains: { type: "array", items: { type: "string" } },
+              desires: { type: "array", items: { type: "string" } },
+              uniqueMechanism: { type: "string" },
+              suggestedChapterCount: { type: "number" },
+            },
+            required: [
+              "title",
+              "subtitle",
+              "niche",
+              "promise",
+              "avatar",
+              "pains",
+              "desires",
+              "uniqueMechanism",
+              "suggestedChapterCount",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+    ],
+    tool_choice: { type: "function", function: { name: "briefing" } },
+  })) as any;
+  const args =
+    data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ??
+    data?.choices?.[0]?.message?.content ??
+    "{}";
+  const parsed = safeParseToolArgs(args) as Record<string, unknown>;
+  const briefing = BriefingSchema.parse(parsed);
+  const sc = Number(parsed.suggestedChapterCount);
+  const suggestedChapterCount = Number.isFinite(sc) ? Math.max(3, Math.min(12, Math.round(sc))) : 6;
+  return { ...briefing, suggestedChapterCount };
+}
+
 export async function aiGenerateOutline(
   briefing: Briefing,
   chapterCount: number,
