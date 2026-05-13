@@ -34,6 +34,7 @@ import { SalesPageTab } from "@/components/pipeline/project/SalesPageTab";
 import { CreativesTab } from "@/components/pipeline/project/CreativesTab";
 import { CheckoutTab, type CheckoutDraft } from "@/components/pipeline/project/CheckoutTab";
 import { EscalaTab } from "@/components/pipeline/project/EscalaTab";
+import { AiHistoryTab } from "@/components/project/AiHistoryTab";
 import type { SalesCopy } from "@/lib/copy.server";
 import type { SalesPage } from "@/lib/sales-page.server";
 
@@ -96,6 +97,7 @@ function ProjectWorkspace() {
     "checkout",
     "escala",
     "exportar",
+    "historico",
   ] as const;
   const initialTab =
     search.tab && (TABS as readonly string[]).includes(search.tab) ? search.tab : "briefing";
@@ -246,6 +248,7 @@ function ProjectWorkspace() {
           <TabsTrigger value="checkout"><ShoppingCart className="mr-1 h-3.5 w-3.5" />Checkout</TabsTrigger>
           <TabsTrigger value="escala"><Rocket className="mr-1 h-3.5 w-3.5" />Escala</TabsTrigger>
           <TabsTrigger value="exportar">Exportar</TabsTrigger>
+          <TabsTrigger value="historico">Histórico IA</TabsTrigger>
         </TabsList>
 
         <TabsContent value="briefing" className="space-y-3">
@@ -474,6 +477,9 @@ function ProjectWorkspace() {
             }
             onJump={(t) => setTab(t)}
           />
+        </TabsContent>
+        <TabsContent value="historico">
+          <AiHistoryTab projectId={id} />
         </TabsContent>
       </Tabs>
     </div>
