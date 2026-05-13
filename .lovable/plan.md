@@ -1,237 +1,125 @@
-# Fase 3 — Inteligência Contínua e Persistência Global
+# Rebrand visual EscalaFlow — SaaS premium de IA
 
-Objetivo: transformar a esteira em um sistema único onde cada módulo alimenta os outros, tudo salva sozinho, nada se perde, e o produto deixa de parecer "Lovable" para virar EscalaFlow.
+Objetivo: tirar a aparência "gamer/crypto" (glow forte, partículas, gradientes saturados) e aproximar de Linear, Notion, Jasper, Framer, Perplexity. Manter conceito de crescimento, fluxo, escala, IA, performance.
 
-Escopo restrito: integração, persistência, automação. **Sem novos módulos, sem novo visual.**
-
----
-
-## 1. Semeadura cross-módulo (server-side)
-
-Centralizar em `src/lib/project/seeding.server.ts` uma função `seedFromModule(projectId, module, payload)` que monta o patch correto em `meta.*_seed` e chama `updateProject` com merge profundo.
-
-Gatilhos (todos em `*.functions.ts` server-side, dentro do `.handler`):
-
-- `generateProjectEbook` → semeia `copy_seed`, `salesPage_seed`, `creative_seed`, `checkout_seed`, `scale_seed` (título, promessa, avatar, dores, mecanismo, capítulos-chave).
-- `generateSalesCopy` (kind=project) → semeia `creative_seed.headlines/hooks` + `salesPage_seed.copyBlocks`.
-- `generateCreative` → push em `meta.creatives_history[]` + atualiza `creative_seed.bestHeadlines`.
-- `generateSalesPage` → semeia `checkout_seed` (preço, bônus, garantia, CTA).
-- `generatePlaybookStrategy` → semeia `copy_seed.strategy` e `creative_seed.angles`.
-
-Regra: semear **apenas inputs default**, nunca disparar geração em cascata (custo).
+Escopo: branding + tokens visuais. **Sem mexer em funcionalidade, rotas, módulos, server functions ou banco.**
 
 ---
 
-## 2. Botão universal "Salvar em Projeto"
+## 1. Sistema de logo (5 versões)
 
-Componente reutilizável `src/components/pipeline/SaveToProjectButton.tsx`:
+Gerar via IA (premium, fundo transparente PNG) e salvar em `src/assets/brand/`:
 
-- Props: `kind` (`copy|salesPage|creative|checkout|escala|ebook|playbook`), `payload`, `prompts?`.
-- Abre `Dialog` com:
-  - Select de projetos existentes (`listProjects`).
-  - Opção "Criar novo projeto" (chama `createProject({ source:"scratch", title })`).
-- Ao confirmar: `updateProject({ id, patch:{ meta:{ [kind]: payload, [`${kind}_history`]: [...prev, entry] } } })` + toast + Link "Abrir projeto".
+1. **`logo-horizontal.png`** — símbolo + wordmark "EscalaFlow" lado a lado. Para `AppHeader`, login, footer.
+2. **`logo-flat.png`** — wordmark sem efeitos, peso médio, espaçamento amplo. Para contextos densos.
+3. **`logo-mono.png`** — versão monocromática (branco para dark, preto para light). Para overlays, e-mails, exportações.
+4. **`logo-mark.png`** — apenas o símbolo (app icon, 1024×1024, cantos com respiro). Para PWA, OG image, avatar.
+5. **`favicon.png`** — símbolo simplificado 512×512 (legível em 16×16). Substitui `public/favicon.ico`.
 
-Inserir o botão em **todas as telas standalone**: `StandaloneSalesPage`, `StandaloneCheckout`, `StandaloneEscala`, `CreativeWizard` (modo standalone), `CopyResult`, `EbookHub` (modo avulso).
+**Direção do símbolo**: forma geométrica única e estável — uma seta/curva ascendente integrada a uma "barra" sutil, sem partículas, sem rastro, sem glow. Linha limpa, traço médio, dois tons sólidos (azul elétrico + roxo) em transição suave (não arco-íris). Inspiração: marca Linear (geometria pura), Vercel (silhueta sólida), Perplexity (símbolo único reconhecível).
+
+**Wordmark**: "EscalaFlow" em uma única cor sólida (não bicolor por letra). Tipografia premium geométrica (ver §3). Sem sublinhado "MINERE. CRIE. ESCALE." no logo principal — esse slogan vira tagline opcional fora da marca.
 
 ---
 
-## 3. Autosave global
+## 2. Paleta — repintar tokens em `src/styles.css`
 
-Hook `src/hooks/useAutosave.ts`:
+Substituir a paleta atual (roxo saturado #7C3AED + cyan #06B6D4 com glow forte) por uma versão sóbria SaaS:
 
-```ts
-useAutosave({ key, data, save, debounceMs: 1500, enabled })
+```
+Dark (principal):
+  --background: oklch(0.16 0.02 265)   /* near-black com leve azul */
+  --card:       oklch(0.20 0.02 265)
+  --foreground: oklch(0.96 0.005 250)
+  --primary:    oklch(0.62 0.20 265)   /* azul elétrico contido */
+  --accent:     oklch(0.58 0.22 295)   /* roxo premium */
+  --border:     oklch(1 0 0 / 6%)
+  --muted-foreground: oklch(0.65 0.01 260)
+
+Light:
+  --background: oklch(0.99 0.003 250)
+  --card:       oklch(1 0 0)
+  --primary:    oklch(0.55 0.22 265)
+  --accent:     oklch(0.52 0.22 295)
+  --border:     oklch(0.92 0.005 255)
 ```
 
-- Debounce + dirty check (compara hash JSON).
-- Persistência dupla: `localStorage` (key `autosave:<key>`) + chamada server (`save`).
-- Indicador visual via callback `onStatus("saving"|"saved"|"error")`.
+Reduzir intensidade de:
+- `--shadow-glow`, `--shadow-elegant` → blur menor, opacidade 0.10–0.15 (era 0.35–0.40).
+- `--gradient-primary` → gradiente sutil 165° entre primary e accent, **sem** o terceiro tom magenta.
+- `--gradient-glow` → opacidade 0.08.
 
-Hook complementar `useDraftRecovery({ key, onRecover })`:
-- Na montagem, se `localStorage` tem rascunho mais novo que server, mostra toast "Restaurar rascunho não salvo?" com ação.
+Remover/atenuar utilities "gamer" em `@layer utilities`:
+- `.ai-glow` → manter mas com background-size estático e animação opcional via prop (default off).
+- `.ai-pulse` → reduzir blur de 14px → 6px, opacidade máx 0.25.
+- `.scan-line`, `.shimmer` → manter mas remover dos componentes globais (só usar em loading explícito).
 
-Aplicar em:
-- `CopyTab`, `SalesPageTab`, `CheckoutTab`, `CreativesTab`, `EscalaTab` (project mode).
-- `StandaloneCheckout`, `StandaloneSalesPage`, `StandaloneBriefingForm`.
-- Editor de Playbook (`produtos.playbook.$id.editar.tsx`).
-- Editor de Ebook (`EbookHub`).
-
-Indicador único no `AppHeader`: ponto verde "Salvo" / amarelo "Salvando…" / vermelho "Falha — repetir" via context global `AutosaveProvider`.
+Tokens do Playbook (`--playbook-neon`, `--shadow-neon`, `--shadow-gold`) ficam isolados ao módulo Playbook (telas internas que pedem visual diferenciado). **Não tocar.**
 
 ---
 
-## 4. Histórico IA por projeto
+## 3. Tipografia premium
 
-Migração Supabase — nova tabela:
+Adicionar via Google Fonts em `index.html`:
+- **Display/headings**: `Geist` ou `Inter Display` (peso 500–600, tracking -0.02em).
+- **Body**: `Inter` (400/500).
+- **Mono** (badges, códigos): `Geist Mono` ou `JetBrains Mono`.
 
-```sql
-create table public.ai_history (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  project_id uuid references public.projects(id) on delete cascade,
-  module text not null,        -- copy|salesPage|creative|checkout|escala|ebook|playbook
-  prompt jsonb not null,
-  response jsonb not null,
-  model text,
-  version int not null default 1,
-  created_at timestamptz not null default now()
-);
-alter table public.ai_history enable row level security;
--- policies: select/insert/delete own
-create index ai_history_project_idx on public.ai_history(project_id, module, created_at desc);
-```
-
-Helper server `src/lib/ai/history.server.ts`:
-- `recordAi({ projectId, module, prompt, response, model })`.
-- `listAiHistory({ projectId, module? })`.
-
-Chamar `recordAi` ao final de cada server fn de geração (copy, criativos, página, ebook, playbook strategy/scene).
-
-UI: aba "Histórico IA" no workspace do projeto (`projetos.$id.tsx`):
-- Lista cronológica com filtro por módulo.
-- Ações: **Reutilizar** (preenche o input do módulo), **Duplicar** (clona como nova versão), **Continuar geração** (envia ao server fn correspondente), **Exportar JSON**.
+Atualizar `src/styles.css` com `--font-display`, `--font-body`, `--font-mono` e aplicar em `body` + `h1–h6`. Remover qualquer uso de `Space Grotesk`/`Sora` fora do Playbook.
 
 ---
 
-## 5. Auditoria final do Playbook
+## 4. Aplicação no app (sem mudar layout)
 
-Checklist de execução em `produtos.playbook.$id.tsx`, `.editar.tsx`, `.novo.tsx`:
-- Remover qualquer branch que renderize dados sintéticos sem `loadPlaybook`.
-- Garantir `<Loader2>` real enquanto carrega; erro com retry.
-- Salvar via `savePlaybook` (autosave + manual).
-- "Continuar geração" reusa `generatePlaybookSceneContent` por cena faltante.
-- Exportar PDF/DOCX (já existem) testar com playbook real.
-- Recarregar (F5) restaura estado idêntico.
-
----
-
-## 6. Links externos seguros
-
-Criar `src/lib/external/openExternal.ts`:
-
-```ts
-export function openExternal(url: string, fallbackLabel?: string) {
-  const w = window.open(url, "_blank", "noopener,noreferrer");
-  if (!w || w.closed) {
-    // popup bloqueado → toast com link clicável
-    toast("Popup bloqueado", { action: { label: fallbackLabel ?? "Abrir", onClick: () => location.assign(url) } });
-  }
-}
-```
-
-Aplicar em todos os botões que apontam para Facebook Ad Library, ChatGPT, Google AI Studio, v0, Claude (procurar `target="_blank"` em `CopyResult`, `SalesPageResult`, `CreativeCard`, `OfferCard`, `oferta.$id.tsx`, `link-externo.tsx`).
-
-Garantir `rel="noopener noreferrer"` em todos os `<a target="_blank">`.
+- **`src/components/AppHeader.tsx`**: trocar texto "EscalaFlow" por `<img src={logoHorizontal} alt="EscalaFlow" className="h-7" />`. Importar de `@/assets/brand/logo-horizontal.png`.
+- **`src/components/AppSidebar.tsx`**: usar `logo-mark.png` colapsado, `logo-horizontal.png` expandido.
+- **`src/routes/_authenticated.tsx`** (loading screen): trocar `<Loader2>` genérico por `logo-mark` + spinner discreto (border 2px primary, sem glow forte).
+- **`src/routes/login.tsx`**: header com `logo-horizontal`.
+- **`src/routes/__root.tsx`** + **`index.html`**: `<title>EscalaFlow — IA para criar, escalar e monetizar</title>`, meta description, og:image (`logo-mark` 1024 com fundo dark), favicon.
+- **`public/favicon.ico`**: substituir por novo favicon (PNG renomeado ou via export). Limpar `public/placeholder.svg`, `public/og-image.png` se existirem com asset default.
+- Botões `variant="default"`: revisar para usar `bg-primary` puro (sem `ai-glow`/`ai-pulse` no estado padrão).
+- Cards do `PipelineHub`, `DualModeHub`, `ModePicker`: remover classes `ai-pulse`/`shadow-glow` do estado idle; manter apenas hover sutil.
 
 ---
 
-## 7. Hardening Supabase (auth, roles, isolation)
+## 5. QA visual
 
-Migração:
-
-```sql
--- enum já existe? garantir admin/user
-do $$ begin
-  if not exists (select 1 from pg_type where typname='app_role') then
-    create type public.app_role as enum ('admin','user');
-  end if;
-end $$;
-
--- has_role já existe (ver schema)
--- adicionar policy admin-bypass em projects/ebooks/playbooks
-create policy "admins read all projects" on public.projects
-  for select to authenticated using (public.has_role(auth.uid(),'admin'));
--- idem update/delete admin para projects, ebooks, playbooks, ai_history
-```
-
-Auditoria de RLS (já OK em `projects`, `ebooks`, `playbooks`, `profiles`, `user_roles`, `saved_offers`, `ai_analyses`, `user_ad_actions`). Confirmar:
-- Nenhuma server fn usa `supabaseAdmin` para CRUD de usuário comum (usar `requireSupabaseAuth`).
-- Prompts globais (catálogos em `src/lib/ads/catalog.ts`, `storybook/catalog.ts`) ficam em código — não editáveis pelo usuário.
-
-UI:
-- Esconder rotas admin (se houver) atrás de `has_role('admin')` checado via server fn `getMyRole`.
-- Bloquear edição de `project.user_id` no client (já garantido por RLS).
-
----
-
-## 8. Remover identidade Lovable / branding EscalaFlow
-
-- `index.html`: trocar `<title>`, meta description, og:image, favicon (`/favicon.ico` próprio).
-- `src/routes/__root.tsx`: head() com title/description EscalaFlow; remover qualquer `gpteng.co` / referências Lovable visíveis ao usuário (script `cdn.gpteng.co` é injetado pelo runtime — não tocar no script tag, mas remover badges/footers visuais).
-- Loading screen em `_authenticated.tsx`: trocar spinner genérico por logo EscalaFlow + cor da marca.
-- Conferir `public/` por assets default (placeholder.svg, robots.txt, og-image).
-- Manifest PWA (se existir) atualizado.
-
-Pedir ao usuário: cor primária + logo (PNG/SVG). Default temporário: paleta atual + texto "EscalaFlow".
-
----
-
-## 9. Performance
-
-- Lazy load de rotas pesadas via `createFileRoute` + dynamic import nos componentes de export (PDF/DOCX — `pdf-lib`, `docx`, `epub`): já estão em `*.server.ts`, validar que não vazam pro client (regras `tanstack-supabase-import-graph`).
-- Imagens com `loading="lazy"` em `OfferCard`, `CreativeCard`, capas de ebook/playbook.
-- Code-split do `CreativeWizard`, `EbookHub`, `EscalaTab`.
-- Rodar `bun run build` e checar bundle (alerta se >500KB por chunk).
-- Validar hydration sem warning.
-
----
-
-## 10. Pré-deploy
-
-- `tsc --noEmit` + build verde.
-- Smoke manual: criar projeto → ebook → copy → criativos → página → checkout → escala → exportar tudo → fechar aba → reabrir → estado intacto.
-- Verificar `cloud_status` ACTIVE_HEALTHY.
-
----
-
-## Ordem de execução
-
-1. Migração `ai_history` + admin policies (aprovação do usuário).
-2. `seeding.server.ts` + gatilhos cross-módulo.
-3. `useAutosave` + `AutosaveProvider` + aplicar nos tabs.
-4. `SaveToProjectButton` + integrar nos standalones.
-5. `recordAi` em todas server fns + aba Histórico IA no workspace.
-6. Auditoria Playbook.
-7. `openExternal` + sweep de links.
-8. Branding EscalaFlow (após user enviar logo/cor).
-9. Performance pass + build final.
+Após implementar:
+- Rodar `bun run build` para validar bundle.
+- Capturar screenshots: `/dashboard`, `/projetos`, `/criativos`, `/login` em dark + light.
+- Comparar lado a lado com Linear/Jasper/Framer (referência mental) — checar contraste, peso de glow, harmonia de cor.
+- Verificar favicon na aba do navegador.
 
 ---
 
 ## Arquivos novos
 
-- `src/lib/project/seeding.server.ts`
-- `src/lib/ai/history.server.ts`, `src/lib/ai/history.functions.ts`
-- `src/hooks/useAutosave.ts`, `src/hooks/useDraftRecovery.ts`
-- `src/providers/AutosaveProvider.tsx`
-- `src/components/pipeline/SaveToProjectButton.tsx`
-- `src/components/project/AiHistoryTab.tsx`
-- `src/lib/external/openExternal.ts`
-- Migração SQL: `ai_history` + admin policies.
+- `src/assets/brand/logo-horizontal.png`
+- `src/assets/brand/logo-flat.png`
+- `src/assets/brand/logo-mono.png`
+- `src/assets/brand/logo-mark.png`
+- `src/assets/brand/favicon.png`
 
 ## Arquivos editados
 
-- Todos os `*Tab.tsx` (project), `Standalone*.tsx`, `EbookHub.tsx`, `produtos.playbook.*.tsx`.
-- Server fns de geração (copy, sales-page, ads-creative, ebook, playbook) → adicionar `recordAi` + `seedFromModule`.
-- `__root.tsx`, `index.html`, `_authenticated.tsx` para branding.
-- `AppHeader.tsx` para indicador autosave global.
+- `src/styles.css` (paleta, sombras, gradientes, fontes)
+- `index.html` (fontes, favicon, meta, title)
+- `src/routes/__root.tsx` (head, og)
+- `src/routes/_authenticated.tsx` (loading)
+- `src/routes/login.tsx`
+- `src/components/AppHeader.tsx`
+- `src/components/AppSidebar.tsx`
+- `public/favicon.ico` (substituído)
 
-## Entregável final
+## Ordem de execução
 
-Ao concluir, lista:
-- **100% operacionais**: módulos validados ponta-a-ponta com semeadura, autosave, histórico, save-to-project.
-- **Parciais**: o que ficou para próxima rodada.
-- **Dependências Supabase pendentes**: migrations a aprovar, secrets a configurar.
-- **Pronto para deploy**: checklist verde (build, smoke, RLS, branding).
-
----
+1. Gerar 5 logos (premium, transparent).
+2. Atualizar `styles.css` (paleta + sombras + fontes).
+3. Atualizar `index.html` + `__root.tsx` (fontes, meta, favicon).
+4. Trocar logo em Header/Sidebar/Login/Loading.
+5. Sweep de utilities `ai-pulse`/`shadow-glow` em estados idle de cards/botões globais.
+6. Build + QA visual + screenshots.
 
 ## Pergunta antes de começar
 
-Para o item 8 (branding) preciso de:
-- **Cor primária** (hex ou oklch).
-- **Logo** (PNG/SVG transparente) — ou autorizo gerar uma temporária com IA?
-- **Nome final** confirmado: "EscalaFlow"?
-
-Se preferir, executo 1–7 e 9 primeiro e deixo branding (8) por último quando você enviar os assets.
+Confirma que posso **gerar os 5 logos via IA** com a direção descrita (símbolo geométrico azul→roxo, wordmark "EscalaFlow" em Geist/Inter, sem partículas)? Ou prefere enviar uma versão final do logo já desenhada por você, e eu só faço a paleta + tipografia + integração?
