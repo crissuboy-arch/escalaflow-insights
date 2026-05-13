@@ -1,13 +1,19 @@
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, Copy, Check } from "lucide-react";
+import { ShoppingCart, Copy, Check, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { SaveToProjectButton } from "./SaveToProjectButton";
+import { StandaloneBriefingForm } from "./StandaloneBriefingForm";
+import { CheckoutOfferResult } from "./CheckoutOfferResult";
+import { generateCheckoutOffer } from "@/lib/checkout.functions";
+import type { CheckoutOffer } from "@/lib/checkout.server";
+import type { StandaloneBriefing } from "@/lib/standalone/briefing";
 
 type Draft = {
   price: string;
@@ -36,6 +42,25 @@ const empty: Draft = {
 const KEY = "escalaflow:standalone:checkout";
 
 export function StandaloneCheckout() {
+  const generate = useServerFn(generateCheckoutOffer);
+  const [offer, setOffer] = useState<CheckoutOffer | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [showBriefing, setShowBriefing] = useState(false);
+
+  async function onGenerate(b: StandaloneBriefing) {
+    setAiBusy(true);
+    try {
+      const r = await generate({ data: { kind: "standalone", briefing: b } });
+      setOffer(r.offer);
+      setShowBriefing(false);
+      toast.success("Oferta gerada com IA.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar oferta");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   const [data, setData] = useState<Draft>(() => {
     if (typeof window === "undefined") return empty;
     try {

@@ -444,7 +444,7 @@ function ProjectWorkspace() {
         <TabsContent value="pagina">
           <SalesPageTab
             projectId={id}
-            initial={(project.meta?.salesPage as { page: SalesPage; prompts: { lovable: string; googleAiStudio: string; v0: string; claude: string } } | undefined) ?? null}
+            initial={(project.meta?.salesPage as { page: SalesPage; prompts: { lovable: string; googleAiStudio: string; html: string; v0: string; claude: string } } | undefined) ?? null}
             onSaved={(d) =>
               setProject({ ...project, meta: { ...project.meta, salesPage: d } })
             }

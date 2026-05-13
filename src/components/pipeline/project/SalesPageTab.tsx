@@ -8,7 +8,13 @@ import { generateSalesPage } from "@/lib/sales-page.functions";
 import type { SalesPage } from "@/lib/sales-page.server";
 import { SalesPageResult } from "@/components/pipeline/SalesPageResult";
 
-type Prompts = { lovable: string; googleAiStudio: string; v0: string; claude: string };
+type Prompts = {
+  lovable: string;
+  googleAiStudio: string;
+  html: string;
+  v0: string;
+  claude: string;
+};
 
 export function SalesPageTab({
   projectId,
