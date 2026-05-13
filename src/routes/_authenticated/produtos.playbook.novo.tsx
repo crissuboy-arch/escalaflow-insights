@@ -25,6 +25,7 @@ import {
   savePlaybook,
   uploadPlaybookImage,
 } from "@/lib/playbook.functions";
+import { loadEbookDraft } from "@/lib/ebook.functions";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/produtos/playbook/novo")({
@@ -62,6 +63,7 @@ function NewPlaybookPage() {
   const imageFn = useServerFn(generatePlaybookSceneImage);
   const saveFn = useServerFn(savePlaybook);
   const uploadFn = useServerFn(uploadPlaybookImage);
+  const loadEbook = useServerFn(loadEbookDraft);
 
   const [step, setStep] = useState(0);
   const [ads, setAds] = useState<PlaybookAd[]>([]);
@@ -83,6 +85,61 @@ function NewPlaybookPage() {
       }
     })();
   }, []);
+
+  // Prefill from ebook (?fromEbook=<id>) — skip ad step.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const fromEbook = params.get("fromEbook");
+    if (!fromEbook) return;
+    (async () => {
+      try {
+        const row = (await loadEbook({ data: { id: fromEbook } })) as Record<string, unknown>;
+        const eb = (row.briefing ?? {}) as Record<string, unknown>;
+        const outlineEb = Array.isArray(row.outline) ? (row.outline as Array<{ title?: string; bullets?: string[] }>) : [];
+        setBriefing({
+          title: String(eb.title ?? row.title ?? "Playbook"),
+          niche: String(eb.niche ?? row.niche ?? ""),
+          promise: String(eb.promise ?? ""),
+          avatar: String(eb.avatar ?? ""),
+          uniqueMechanism: String(eb.uniqueMechanism ?? ""),
+          pains: Array.isArray(eb.pains) ? (eb.pains as string[]) : [],
+          desires: Array.isArray(eb.desires) ? (eb.desires as string[]) : [],
+        });
+        if (outlineEb.length > 0) {
+          setOutline(
+            outlineEb.map((c) => ({
+              title: c.title ?? "",
+              summary: (c.bullets ?? []).slice(0, 3).join(" • "),
+              exercise: "",
+              practicalAction: "",
+            })),
+          );
+          setSceneCount(Math.min(12, Math.max(3, outlineEb.length)));
+          setStep(2);
+        } else {
+          setStep(1);
+        }
+        toast.success("Importado do ebook");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Falha ao importar ebook");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onStartScratch = () => {
+    setSelectedAd(null);
+    setBriefing({
+      title: "",
+      niche: "",
+      promise: "",
+      avatar: "",
+      uniqueMechanism: "",
+      pains: [],
+      desires: [],
+    });
+    setStep(1);
+  };
 
   const adInput = useMemo(
     () =>

@@ -16,6 +16,9 @@ export interface EbookDocxInput {
   subtitle?: string | null;
   coverUrl?: string | null;
   chapters: { title: string; markdown: string; imageUrl?: string | null }[];
+  identity?: { author?: string; brand?: string; bio?: string };
+  extras?: { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
+  finalCta?: string;
 }
 
 async function fetchImageBytes(url: string): Promise<Uint8Array | null> {
@@ -127,6 +130,15 @@ export async function exportEbookDocx(input: EbookDocxInput): Promise<Blob> {
       }),
     );
   }
+  if (input.identity?.author) {
+    sections.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 400 },
+        children: [new TextRun({ text: `por ${input.identity.author}`, bold: true, size: 24 })],
+      }),
+    );
+  }
   sections.push(new Paragraph({ children: [new PageBreak()] }));
 
   // TOC
@@ -146,6 +158,15 @@ export async function exportEbookDocx(input: EbookDocxInput): Promise<Blob> {
     );
   });
   sections.push(new Paragraph({ children: [new PageBreak()] }));
+
+  // Introduction
+  if (input.extras?.introduction?.trim()) {
+    sections.push(
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Introdução")] }),
+    );
+    sections.push(...mdToParagraphs(input.extras.introduction));
+    sections.push(new Paragraph({ children: [new PageBreak()] }));
+  }
 
   // Chapters
   for (let i = 0; i < input.chapters.length; i++) {
@@ -185,6 +206,50 @@ export async function exportEbookDocx(input: EbookDocxInput): Promise<Blob> {
     if (i < input.chapters.length - 1) {
       sections.push(new Paragraph({ children: [new PageBreak()] }));
     }
+  }
+
+  // Conclusion + CTA
+  if (input.extras?.conclusion?.trim() || input.finalCta?.trim()) {
+    sections.push(new Paragraph({ children: [new PageBreak()] }));
+    sections.push(
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Conclusão")] }),
+    );
+    if (input.extras?.conclusion?.trim()) {
+      sections.push(...mdToParagraphs(input.extras.conclusion));
+    }
+    if (input.finalCta?.trim()) {
+      sections.push(
+        new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Próximo passo")] }),
+      );
+      sections.push(...mdToParagraphs(input.finalCta));
+    }
+  }
+
+  // About the author
+  const aboutMd = [
+    input.extras?.aboutAuthor?.trim() ?? "",
+    input.identity?.bio?.trim() ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  if (aboutMd) {
+    sections.push(new Paragraph({ children: [new PageBreak()] }));
+    sections.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun(`Sobre ${input.identity?.author ?? "o autor"}`)],
+      }),
+    );
+    sections.push(...mdToParagraphs(aboutMd));
+  }
+
+  // Bonus
+  if (input.extras?.bonus?.trim()) {
+    sections.push(new Paragraph({ children: [new PageBreak()] }));
+    sections.push(
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Bônus")] }),
+    );
+    sections.push(...mdToParagraphs(input.extras.bonus));
   }
 
   // Reference TableOfContents to avoid unused import warning

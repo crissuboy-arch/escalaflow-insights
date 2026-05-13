@@ -18,6 +18,7 @@ import {
   generateEbookChapter,
   generateEbookChapterImage,
   generateEbookCover,
+  generateEbookExtras,
   saveEbookDraft,
   listEbookDrafts,
   loadEbookDraft,
@@ -33,6 +34,7 @@ import {
   type EbookPalette,
   type EbookCategory,
 } from "@/lib/ebook/styles";
+import { PRODUCT_SIZES, sizeSpec, type ProductSize } from "@/lib/ebook/niches";
 import { exportEbookPdf } from "@/lib/ebook/pdf";
 import { exportEbookDocx } from "@/lib/ebook/docx";
 import { exportEbookEpub } from "@/lib/ebook/epub";
@@ -59,6 +61,8 @@ type Briefing = {
   desires: string[];
   uniqueMechanism: string;
 };
+type Extras = { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
+type Identity = { author?: string; brand?: string; bio?: string };
 type Outline = { title: string; bullets: string[] }[];
 type Chapter = { title: string; markdown: string; imageUrl?: string | null };
 type EbookMode = "kdp" | "premium" | "playbook";
@@ -106,6 +110,10 @@ function EbookPage() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [outline, setOutline] = useState<Outline>([]);
   const [chapterCount, setChapterCount] = useState(6);
+  const [pages, setPages] = useState<ProductSize>(60);
+  const [identity, setIdentity] = useState<Identity>({ author: "", brand: "", bio: "" });
+  const [extras, setExtras] = useState<Extras | null>(null);
+  const [finalCta, setFinalCta] = useState<string>("Acesse o link abaixo e dê o próximo passo agora.");
   const [mode, setMode] = useState<EbookMode>("kdp");
   const [layout, setLayout] = useState<EbookLayout>("classico");
   const [style, setStyle] = useState<EbookStyle>("clean");
@@ -127,6 +135,7 @@ function EbookPage() {
   const fnChapter = useServerFn(generateEbookChapter);
   const fnChapterImg = useServerFn(generateEbookChapterImage);
   const fnCover = useServerFn(generateEbookCover);
+  const fnExtras = useServerFn(generateEbookExtras);
   const fnSave = useServerFn(saveEbookDraft);
   const fnList = useServerFn(listEbookDrafts);
   const fnLoad = useServerFn(loadEbookDraft);
@@ -157,12 +166,19 @@ function EbookPage() {
   const saveDraft = async (overrides?: { step?: number; status?: "draft" | "ready" }) => {
     if (!briefing && !selectedAd) return;
     try {
+      const briefingPayload = {
+        ...(briefing ?? {}),
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
+        pages,
+      } as Record<string, unknown>;
       const payload = {
         source_ad_key: selectedAd?.key ?? null,
         title: briefing?.title || selectedAd?.headline?.slice(0, 80) || "Novo Ebook",
         subtitle: briefing?.subtitle ?? null,
         niche: briefing?.niche ?? selectedAd?.niche ?? null,
-        briefing: (briefing ?? {}) as Record<string, unknown>,
+        briefing: briefingPayload,
         outline,
         chapters,
         layout,
@@ -203,7 +219,7 @@ function EbookPage() {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefing, outline, chapters, layout, coverUrl, chapterCount, mode]);
+  }, [briefing, outline, chapters, layout, coverUrl, chapterCount, mode, identity, extras, finalCta, pages]);
 
   // Local backup so a refresh before the first remote save doesn't lose work
   useEffect(() => {
@@ -253,7 +269,12 @@ function EbookPage() {
     try {
       const row = (await fnLoad({ data: { id } })) as Record<string, unknown>;
       setEbookId(id);
-      setBriefing((row.briefing as Briefing) ?? null);
+      const b = (row.briefing as (Briefing & { identity?: Identity; extras?: Extras; finalCta?: string; pages?: ProductSize }) | null) ?? null;
+      setBriefing(b);
+      if (b?.identity) setIdentity({ author: b.identity.author ?? "", brand: b.identity.brand ?? "", bio: b.identity.bio ?? "" });
+      if (b?.extras) setExtras(b.extras);
+      if (typeof b?.finalCta === "string") setFinalCta(b.finalCta);
+      if (b?.pages && (PRODUCT_SIZES as readonly number[]).includes(b.pages)) setPages(b.pages as ProductSize);
       setOutline((row.outline as Outline) ?? []);
       setChapters((row.chapters as Chapter[]) ?? []);
       setLayout((row.layout as EbookLayout) ?? "classico");
@@ -338,6 +359,38 @@ function EbookPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const onPagesChange = (p: ProductSize) => {
+    setPages(p);
+    const spec = sizeSpec(p);
+    setChapterCount(spec.chapters);
+  };
+
+  const onGenerateExtras = async () => {
+    if (!briefing) return;
+    setBusy("Gerando introdução, conclusão, sobre o autor e bônus…");
+    try {
+      const r = await fnExtras({
+        data: { briefing, identity },
+      });
+      setExtras(r);
+      toast.success("Conteúdos extras gerados");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao gerar extras"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onCreatePlaybookFromEbook = async () => {
+    if (!briefing) return;
+    await saveDraft();
+    if (!ebookId) {
+      toast.error("Salve o rascunho primeiro");
+      return;
+    }
+    navigate({ to: "/produtos/playbook/novo", search: { fromEbook: ebookId } as never });
   };
 
   const onCover = async () => {
@@ -440,6 +493,9 @@ function EbookPage() {
         layout,
         coverUrl,
         chapters,
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
       });
       downloadBlob(blob, `${slug(briefing.title)}.pdf`);
 
@@ -461,6 +517,9 @@ function EbookPage() {
         subtitle: briefing.subtitle,
         coverUrl,
         chapters,
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
       });
       downloadBlob(blob, `${slug(briefing.title)}.docx`);
       await saveDraft({ status: "ready" });
@@ -805,6 +864,18 @@ function EbookPage() {
                 <Field label="Desejos (um por linha)" value={briefing.desires.join("\n")} onChange={(v) => setBriefing({ ...briefing, desires: v.split("\n").filter(Boolean) })} multiline />
               </div>
             )}
+            {briefing && (
+              <div className="mt-4 space-y-3 rounded-lg border border-border/60 p-4">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Identidade do autor</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Nome do autor" value={identity.author ?? ""} onChange={(v) => setIdentity({ ...identity, author: v })} />
+                  <Field label="Marca / Editora (opcional)" value={identity.brand ?? ""} onChange={(v) => setIdentity({ ...identity, brand: v })} />
+                  <div className="md:col-span-2">
+                    <Field label="Bio do autor" value={identity.bio ?? ""} onChange={(v) => setIdentity({ ...identity, bio: v })} multiline />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -863,6 +934,25 @@ function EbookPage() {
                   );
                 })}
               </div>
+            </div>
+            <div>
+              <Label className="mb-2 block text-xs uppercase tracking-wide text-muted-foreground">Quantidade de páginas</Label>
+              <div className="flex flex-wrap gap-2">
+                {PRODUCT_SIZES.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => onPagesChange(p)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      pages === p ? "border-primary bg-primary/10 text-primary" : "border-border/60 hover:border-primary/50"
+                    }`}
+                  >
+                    {p} pág
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Sugere {sizeSpec(pages).chapters} capítulos, ~{sizeSpec(pages).wordsPerChapter} palavras cada.
+              </p>
             </div>
             <div className="flex items-center gap-3">
               <Label>Capítulos</Label>
@@ -992,6 +1082,35 @@ function EbookPage() {
                   </Button>
                 </>
               )}
+              <Button onClick={onExportDocx} disabled={!!busy || chapters.length === 0} variant="outline">
+                <FileDown className="mr-2 h-4 w-4" /> DOCX
+              </Button>
+              <Button
+                onClick={onCreatePlaybookFromEbook}
+                disabled={!!busy || !briefing}
+                variant="outline"
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> Criar Playbook a partir deste Ebook
+              </Button>
+            </div>
+            <div className="space-y-3 rounded-lg border border-border/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Introdução, Conclusão, Sobre o autor e Bônus
+                </Label>
+                <Button size="sm" variant="outline" onClick={onGenerateExtras} disabled={!!busy || !briefing}>
+                  <Wand2 className="mr-2 h-3 w-3" /> {extras ? "Regerar" : "Gerar"} extras
+                </Button>
+              </div>
+              {extras && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Introdução" value={extras.introduction ?? ""} onChange={(v) => setExtras({ ...extras, introduction: v })} multiline />
+                  <Field label="Conclusão" value={extras.conclusion ?? ""} onChange={(v) => setExtras({ ...extras, conclusion: v })} multiline />
+                  <Field label="Sobre o autor" value={extras.aboutAuthor ?? ""} onChange={(v) => setExtras({ ...extras, aboutAuthor: v })} multiline />
+                  <Field label="Bônus" value={extras.bonus ?? ""} onChange={(v) => setExtras({ ...extras, bonus: v })} multiline />
+                </div>
+              )}
+              <Field label="CTA final" value={finalCta} onChange={setFinalCta} multiline />
             </div>
             {mode === "premium" && chapters.length > 0 && (
               <div className="grid gap-2 md:grid-cols-2">

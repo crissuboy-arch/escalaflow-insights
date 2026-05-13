@@ -1,80 +1,103 @@
-## Ajustes de branding — Sidebar + Header + Microinterações
+## Finalizar módulos Criar Ebook e Criar Playbook
 
-Escopo: presença visual da marca. Sem mudar funcionalidade, rotas ou dados.
+Escopo: completar campos faltantes, integrar entradas/saídas reais e fechar o que já existe. **Sem nova rota, sem novo módulo, sem mexer em visual.**
 
 ---
 
-### 1. Sidebar — logo com mais presença
+### 1. Ebook — campos do autor
 
-`src/components/AppSidebar.tsx` (header da sidebar):
+`src/routes/_authenticated/produtos.ebook.tsx` + tipo `Briefing` local:
 
-- Aumentar altura do logo em ~35%: `h-7` → `h-10` (horizontal) e `h-7 w-7` → `h-9 w-9` (mark colapsado).
-- Aumentar padding do `SidebarHeader`: de `px-2 py-2` para `px-3 py-4` para dar respiro premium.
-- Trocar o hack `dark:invert dark:brightness-200` (que distorce cores) por usar **`logo-mono.png` no dark** e `logo-horizontal.png` no light, via `useTheme()` do `ThemeProvider`. Isso melhora contraste sem inverter pixels.
-- Adicionar `transition-opacity duration-300` + `animate-fade-in` no logo para entrada suave.
-- Hover dos itens do menu: trocar o highlight atual por `hover:bg-sidebar-accent/60 transition-colors duration-200` e adicionar `data-[active=true]:bg-sidebar-accent` com borda esquerda sutil de 2px em `--primary` (estilo Linear/ClickUp).
+- Adicionar painel **"Identidade do autor"** no Step 1 (Briefing): `authorName`, `authorBio`, `brand` (opcional). Persistido em `briefing.identity` (já é jsonb, não precisa migração).
+- Passar `identity` via `opts.identity` para `aiGenerateOutline` e `aiGenerateChapter` (server.ts já aceita).
+- Renderizado nos exports (ver §5).
 
-### 2. Header — área de branding maior
+### 2. Ebook — seletor de páginas (20/30/60/80/100/120/150)
 
-`src/components/AppHeader.tsx`:
+`PRODUCT_SIZES` e `sizeSpec()` já existem em `src/lib/ebook/niches.ts` mas a UI só expõe `chapterCount`.
 
-- Aumentar altura: `h-14` → `h-16`.
-- Adicionar slot opcional à esquerda do `SidebarTrigger` com o `logo-mark` (`h-6 w-6`) visível **apenas quando a sidebar está colapsada** (via `useSidebar().state === "collapsed"`), garantindo branding contínuo.
-- Refinar borda: `border-border/60` → `border-border/40` + `backdrop-blur-md` para look Notion/Perplexity.
+- Substituir o `Input number` de capítulos no Step 2 por um grupo de chips com os 7 tamanhos.
+- Ao escolher tamanho: derivar `chapterCount = sizeSpec(pages).chapters`, salvar `pages` em `briefing.size = sizeSpec(pages)`.
+- Passar `size` para `aiGenerateChapter` (já aceita `opts.size`) — controla `wordsPerChapter` e blocos extras (storytelling/exemplo/exercício/FAQ/bônus).
+- Manter o input numérico de capítulos como ajuste fino, default vindo do tamanho.
 
-### 3. Loading screen — animação leve premium
+### 3. Ebook — catálogo de estilos cobrindo as 12 categorias pedidas
 
-`src/routes/_authenticated.tsx`:
+`src/lib/ebook/styles.ts`:
 
-- Aumentar logo do loading: `h-12` → `h-14`.
-- Substituir o shimmer atual por:
-  - logo com `animate-fade-in` (300ms) + `animate-pulse` muito sutil (opacidade 0.85 → 1.0, 2s).
-  - barra inferior fina (1px, w-32) com gradiente `from-transparent via-primary to-transparent` deslizando — animação `shimmer` já definida em `styles.css`.
-- Sem glow forte, sem partículas.
+- Estender `STYLES[]` com: `low-ticket`, `apostila`, `planner`, `receita`, `emagrecimento`, `beleza`, `romance`, `negocio`, `plr` (KDP, premium, infantil já existem).
+- Cada um com `mode`/`layout`/`promptHint` adequados (KDP para apostila/planner/PLR; premium para receita/beleza/romance; etc.).
+- `EBOOK_CATEGORIES` ajustado para casar 1‑para‑1 com os IDs novos.
 
-### 4. Favicon separado do logo principal
+### 4. Ebook — Sumário, Conclusão, Sobre o Autor, CTA final
 
-`src/assets/brand/`:
+A função `aiGenerateBookExtras` em `ebook.server.ts` já existe e devolve `{ introduction, conclusion, aboutAuthor, bonus }` mas **nunca é chamada**.
 
-- Gerar **novo `favicon.png`** (512×512, transparent) — apenas o símbolo geométrico, mais condensado e legível em 16×16, **sem wordmark**, traço mais grosso que o `logo-mark`.
-- Atualizar `public/favicon.png` (cópia) e `__root.tsx` (`rel="icon"` aponta para o novo).
-- Manter `logo-mark.png` como app icon (1024) e OG image — não recriar.
+- Novo server fn `generateEbookExtras` em `src/lib/ebook.functions.ts` (wrapper).
+- No Step 4 (Capítulos & exportar): botão **"Gerar introdução, conclusão, sobre o autor e bônus"** + edição inline.
+- Estado novo `extras: BookExtras | null` salvo em `briefing.extras`.
+- Estender `DraftPayloadSchema` (briefing já é record genérico — só garantir que `extras` é serializado no autosave).
+- Adicionar campo separado **"CTA final"** (string editável, default `"Acesse [link] e dê o próximo passo."`) salvo em `briefing.finalCta`.
 
-### 5. Microinterações globais (sutis)
+### 5. Ebook — PDF/DOCX premium (sumário + extras + autor)
 
-`src/styles.css` (já tem `fade-in`, `shimmer`):
+`src/lib/ebook/pdf.ts` e `src/lib/ebook/docx.ts`:
 
-- Garantir keyframe `shimmer` existe (adicionar se faltar): `0% { transform: translateX(-100%) } 100% { transform: translateX(100%) }`.
-- Adicionar utility `.menu-item-hover` com `transition: background-color 180ms ease, color 180ms ease` para reuso.
+- **PDF**: capa com `identity.author`; nova página de **Sumário** numerada (parsea `chapters[].title`); página de **Introdução** antes do cap. 1; página de **Conclusão + CTA final** após o último capítulo; página de **Sobre o autor** com `authorName + authorBio`; página de **Bônus** se houver.
+- **DOCX**: usa `TableOfContents` (já importado mas não usado); paragráfos para intro/conclusão/CTA/autor/bônus; mantém imagens de capítulo se existentes.
+- Atualizar tipos `EbookPdfInput`/`EbookDocxInput` com `identity`, `extras`, `finalCta`.
 
-Aplicar `animate-fade-in` (300ms) no `<main>` do `_authenticated.tsx` para fade premium ao trocar de rota.
+### 6. Playbook — criar a partir do Ebook
 
-### 6. Correção runtime de RLS (paralelo, fora de branding)
+`src/routes/_authenticated/produtos.ebook.tsx`:
 
-Console mostra `permission denied for function has_role`. Criar migração para `GRANT EXECUTE ON FUNCTION public.has_role(uuid, app_role) TO authenticated, anon;` — desbloqueia policies que usam essa função. Sem isso, várias queries quebram silenciosamente.
+- Botão **"Criar Playbook a partir deste Ebook"** no Step 4, chama `navigate({ to: "/produtos/playbook/novo", search: { fromEbook: ebookId } })`.
+
+`src/routes/_authenticated/produtos.playbook.novo.tsx`:
+
+- Ao montar, ler `?fromEbook=<id>`. Se presente: chamar `loadEbookDraft({id})` (já existe), montar `briefing` Playbook com base no briefing do ebook (mapear `title/niche/promise/avatar/uniqueMechanism/pains/desires`) e pular Step 0 (anúncio). Skip do `selectedAd` (já trata `selectedAd` opcional na chamada `saveFn`).
+- Pré-popular `outline` com os títulos de `ebook.outline` se quiser ("usar capítulos como cenas").
+
+### 7. Playbook — criar do zero (sem anúncio)
+
+`src/routes/_authenticated/produtos.playbook.novo.tsx`:
+
+- No Step 0, adicionar botão **"Começar do zero"** ao lado do "Gerar briefing". Ao clicar: setar `briefing` vazio (`{ title:"", niche:"", promise:"", avatar:"", uniqueMechanism:"", pains:[], desires:[] }`) e ir direto para Step 1 (briefing manual).
+- `onOutline` já tem fallback local — funciona mesmo sem IA.
+- `selectedAd` continua opcional ao salvar (`source_ad_key` aceita `null`).
+
+### 8. Playbook — Estratégia já gera tudo pedido
+
+A função `aiGeneratePlaybookStrategy` já cobre: bigIdea, promise, uniqueMechanism, avatar, pains, desires, objections, mentalTriggers, headlines, vslStructure, pageStructure, funnel, offer, bonuses, stack, cta, scripts, angles, scale. Já existe botão **"Estratégia"** no leitor (`/produtos/playbook/$id`). **Sem mudança aqui** — apenas garantir que o sheet aparece e a chamada funciona (já testado com migração `has_role` corrigida).
+
+### 9. Correções diversas
+
+- Garantir que `i18n/locales/pt.json` tem chaves usadas em `PdfUploadCard` e no leitor de Playbook (assumir já existentes; se faltarem, adicionar).
+- Autosave do ebook: incluir `extras`, `identity`, `finalCta`, `pages` em `briefing` para não perder estado.
+- Tipo `Briefing` do route file: estender com `identity`, `extras`, `finalCta`, `size`.
 
 ---
 
 ### Arquivos editados
 
-- `src/components/AppSidebar.tsx` (logo maior, theme-aware, hover)
-- `src/components/AppHeader.tsx` (h-16, mark quando colapsado)
-- `src/routes/_authenticated.tsx` (loading refinado, fade no main)
-- `src/routes/__root.tsx` (favicon novo)
-- `src/styles.css` (utility hover, garantir keyframes)
-- `public/favicon.png` (substituído)
-- nova migração SQL (grant has_role)
+- `src/routes/_authenticated/produtos.ebook.tsx` — identidade, seletor de páginas, extras, CTA final, botão "Criar Playbook a partir deste Ebook"
+- `src/routes/_authenticated/produtos.playbook.novo.tsx` — botão "Começar do zero", import por `?fromEbook=`
+- `src/lib/ebook.functions.ts` — novo `generateEbookExtras`
+- `src/lib/ebook/styles.ts` — 9 estilos novos + categorias
+- `src/lib/ebook/pdf.ts` — sumário, intro, conclusão+CTA, sobre o autor, bônus
+- `src/lib/ebook/docx.ts` — TableOfContents real, intro, conclusão+CTA, autor, bônus
 
 ### Arquivos novos
 
-- `src/assets/brand/favicon.png` (regerado, símbolo condensado)
+Nenhum (tudo cabe nos arquivos existentes).
 
-### Referências visuais
+### Banco de dados
 
-Linear (sidebar com logo grande + borda ativa esquerda), Notion (header alto, hover suave bg), Perplexity (loading com shimmer fino), ClickUp (branding contínuo header+sidebar).
+Sem migração. `briefing` já é `jsonb`; `identity`, `extras`, `finalCta`, `size` ficam dentro dele.
 
-### Não fazer
+### O que não fazer
 
-- Sem glow forte, sem partículas, sem efeitos espaciais.
-- Sem gerar novos logos horizontais — os atuais funcionam bem após o resize.
-- Sem mexer em módulos da esteira, server functions ou banco (exceto o grant de RLS).
+- Não criar nova rota.
+- Não alterar visual/branding.
+- Não mexer em outros módulos da esteira (copy, criativos, página, checkout, escala).
+- Não tocar em `client.ts`/`types.ts` Supabase.

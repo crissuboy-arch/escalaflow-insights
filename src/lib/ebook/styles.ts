@@ -10,7 +10,16 @@ export type EbookStyle =
   | "luxo"
   | "feminino"
   | "infantil"
-  | "playbook";
+  | "playbook"
+  | "low-ticket"
+  | "apostila"
+  | "planner"
+  | "receita"
+  | "emagrecimento"
+  | "beleza"
+  | "romance"
+  | "negocio"
+  | "plr";
 
 export type EbookPalette =
   | "rosa"
@@ -43,6 +52,15 @@ export const STYLES: StyleSpec[] = [
   { id: "feminino", label: "Feminino", description: "Tons suaves, elegante.", mode: "premium", layout: "moderno", promptHint: "estilo feminino delicado, tons suaves, elegante" },
   { id: "infantil", label: "Infantil", description: "Cores alegres, ilustrado.", mode: "premium", layout: "moderno", promptHint: "estilo infantil, ilustrações alegres, cores primárias" },
   { id: "playbook", label: "Playbook", description: "Cenas e narrativa visual.", mode: "playbook", layout: "moderno", promptHint: "narrativa visual, cenas sequenciais" },
+  { id: "low-ticket", label: "Low Ticket", description: "Direto ao ponto, foco em conversão.", mode: "kdp", layout: "moderno", promptHint: "design direto e persuasivo, foco em valor percebido alto a baixo custo" },
+  { id: "apostila", label: "Apostila", description: "Material didático estruturado.", mode: "kdp", layout: "classico", promptHint: "estilo apostila escolar profissional, didático, capa institucional" },
+  { id: "planner", label: "Planner", description: "Organização e produtividade.", mode: "premium", layout: "moderno", promptHint: "estilo planner premium, layout funcional com elementos de organização" },
+  { id: "receita", label: "Receita", description: "Culinária e gastronomia.", mode: "premium", layout: "moderno", promptHint: "estilo livro de receitas premium, fotografia de comida implícita, paleta apetitosa" },
+  { id: "emagrecimento", label: "Emagrecimento", description: "Saúde, fitness, transformação.", mode: "premium", layout: "moderno", promptHint: "estilo saúde e bem-estar, leve, fresco, motivacional" },
+  { id: "beleza", label: "Beleza", description: "Estética, skincare, autocuidado.", mode: "premium", layout: "moderno", promptHint: "estilo beleza premium, cores suaves, sofisticado, feminino" },
+  { id: "romance", label: "Romance", description: "Ficção romântica envolvente.", mode: "premium", layout: "classico", promptHint: "capa romance editorial, atmosfera emocional, tipografia serif" },
+  { id: "negocio", label: "Negócios", description: "Empreendedorismo e estratégia.", mode: "kdp", layout: "moderno", promptHint: "estilo executivo, autoridade, paleta sóbria com acento" },
+  { id: "plr", label: "PLR", description: "Pronto para revenda/marca branca.", mode: "kdp", layout: "classico", promptHint: "capa neutra e versátil, fácil customização, layout limpo" },
 ];
 
 export interface PaletteSpec {
@@ -73,14 +91,15 @@ export function styleToLayout(style: EbookStyle): EbookLayout {
 export const EBOOK_CATEGORIES = [
   "Amazon/KDP",
   "Low Ticket",
-  "Emagrecimento",
+  "Apostila",
+  "Planner",
   "Receita",
+  "Emagrecimento",
+  "Beleza",
   "Romance",
   "Infantil",
   "Negócios",
-  "Desenvolvimento Pessoal",
   "PLR",
-  "Apostila",
   "Playbook",
 ] as const;
 export type EbookCategory = (typeof EBOOK_CATEGORIES)[number];
