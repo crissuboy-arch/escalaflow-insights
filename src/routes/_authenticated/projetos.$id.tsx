@@ -234,8 +234,7 @@ function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs defaultValue={initialTab}>
-      </Tabs>
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="briefing">Briefing</TabsTrigger>
           <TabsTrigger value="estrutura">Estrutura</TabsTrigger>
@@ -420,38 +419,60 @@ function ProjectWorkspace() {
         </TabsContent>
 
         <TabsContent value="copy">
-          <PlaceholderModule
-            icon={PenLine}
-            title="Copy de Vendas"
-            description="O gerador de copy completa (headline, big idea, mecanismo, oferta, stack, garantia, FAQ, CTA) chega na próxima fase. Os dados serão salvos em meta.copy deste projeto."
+          <CopyTab
+            projectId={id}
+            initial={(project.meta?.copy as SalesCopy | undefined) ?? null}
+            onSaved={(c) => setProject({ ...project, meta: { ...project.meta, copy: c } })}
           />
         </TabsContent>
         <TabsContent value="criativos">
-          <PlaceholderModule
-            icon={Megaphone}
-            title="Criativos & Anúncios"
-            description="18 formatos virais com prompt visual em 1:1, 4:5 e 9:16 chegam na Fase 2. Cada criativo gerado fica em meta.creatives[]."
+          <CreativesTab
+            projectId={id}
+            initial={
+              Array.isArray(project.meta?.creatives)
+                ? (project.meta!.creatives as never[])
+                : []
+            }
+            onSaved={(list) =>
+              setProject({ ...project, meta: { ...project.meta, creatives: list } })
+            }
           />
         </TabsContent>
         <TabsContent value="pagina">
-          <PlaceholderModule
-            icon={LayoutTemplate}
-            title="Página de Venda"
-            description="Estrutura em blocos (Hero, Dor, Promessa, Mecanismo, Benefícios, Prova, Oferta, Bônus, Garantia, FAQ, CTA) editáveis e exportáveis em HTML."
+          <SalesPageTab
+            projectId={id}
+            initial={(project.meta?.salesPage as { page: SalesPage; prompts: { lovable: string; googleAiStudio: string; v0: string; claude: string } } | undefined) ?? null}
+            onSaved={(d) =>
+              setProject({ ...project, meta: { ...project.meta, salesPage: d } })
+            }
           />
         </TabsContent>
         <TabsContent value="checkout">
-          <PlaceholderModule
-            icon={ShoppingCart}
-            title="Checkout & Oferta"
-            description="Configuração de preço, preço âncora, bônus, order bump, upsell, downsell, garantia e link Kiwify/Hotmart/Stripe."
+          <CheckoutTab
+            projectId={id}
+            initial={(project.meta?.checkout as Partial<CheckoutDraft> | undefined) ?? null}
+            onSaved={(d) =>
+              setProject({ ...project, meta: { ...project.meta, checkout: d } })
+            }
           />
         </TabsContent>
         <TabsContent value="escala">
-          <PlaceholderModule
-            icon={Rocket}
-            title="Escala do Produto"
-            description="Checklist final, ideias de anúncios e próximos passos de tráfego — disponível assim que cada etapa anterior estiver concluída."
+          <EscalaTab
+            hasEbook={!!project.ebook_id}
+            hasPlaybook={!!project.playbook_id}
+            hasCopy={!!project.meta?.copy}
+            hasSalesPage={!!project.meta?.salesPage}
+            hasCheckout={!!project.meta?.checkout}
+            hasCreatives={
+              Array.isArray(project.meta?.creatives) &&
+              (project.meta!.creatives as unknown[]).length > 0
+            }
+            creativesCount={
+              Array.isArray(project.meta?.creatives)
+                ? (project.meta!.creatives as unknown[]).length
+                : 0
+            }
+            onJump={(t) => setTab(t)}
           />
         </TabsContent>
       </Tabs>
