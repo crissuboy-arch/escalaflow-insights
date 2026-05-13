@@ -11,6 +11,7 @@ import { StandaloneBriefingSchema } from "./standalone/briefing";
 import { ADS_FORMATS, DIMENSIONS, OBJECTIVES, PLATFORMS } from "./ads/catalog";
 import { seedFromModule } from "./project/seeding.server";
 import { recordAi } from "./ai/history.server";
+import { dlog } from "./debug/log.server";
 
 const PlatformEnum = z.enum(PLATFORMS.map((p) => p.id) as [string, ...string[]]);
 const ObjectiveEnum = z.enum(OBJECTIVES.map((o) => o.id) as [string, ...string[]]);
@@ -84,6 +85,7 @@ async function appendCreatives(
   const prev = Array.isArray(meta?.creatives) ? (meta!.creatives as unknown[]) : [];
   const next = [...prev, ...added];
   const m = { ...(meta ?? {}), creatives: next };
+  dlog("persist", "creatives.save", { projectId, metaKey: "creatives", count: next.length });
   await supabase.from("projects").update({ meta: m as never }).eq("id", projectId);
 }
 

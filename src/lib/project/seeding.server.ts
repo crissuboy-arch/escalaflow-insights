@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { dlog } from "../debug/log.server";
 
 /**
  * Cross-module seeding: when one module generates content, populate
@@ -110,6 +111,7 @@ export async function seedFromModule(
   try {
     const seeds = buildSeeds(module, payload);
     if (Object.keys(seeds).length === 0) return;
+    dlog("seed", "fanout.start", { module, projectId, seedKeys: Object.keys(seeds) });
     const { data: row } = await supabase
       .from("projects")
       .select("meta")
@@ -123,8 +125,10 @@ export async function seedFromModule(
       .update({ meta: nextMeta as never, updated_at: new Date().toISOString() } as never)
       .eq("id", projectId)
       .eq("user_id", userId);
+    dlog("seed", "fanout.done", { module, projectId });
   } catch (e) {
     // seeding is best-effort; never break the main flow
+    dlog("read-fail", "seed.fanout", { module, projectId, error: e instanceof Error ? e.message : String(e) });
     console.error("[seedFromModule] failed", { module, projectId, error: e });
   }
 }

@@ -5,6 +5,7 @@ import { aiGenerateCopy, SalesCopySchema, type CopyContext } from "./copy.server
 import { StandaloneBriefingSchema } from "./standalone/briefing";
 import { seedFromModule } from "./project/seeding.server";
 import { recordAi } from "./ai/history.server";
+import { dlog } from "./debug/log.server";
 
 const InputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project"), projectId: z.string().uuid() }),
@@ -49,6 +50,7 @@ export const generateSalesCopy = createServerFn({ method: "POST" })
 
     if (projectRow) {
       const meta = { ...(projectRow.meta ?? {}), copy };
+      dlog("persist", "copy.save", { projectId: projectRow.id, metaKey: "copy" });
       await supabase
         .from("projects")
         .update({ meta: meta as never })
