@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Flame, BookOpen, Sparkles } from "lucide-react";
 import { EBOOK_CATEGORIES, type EbookCategory } from "@/lib/ebook/styles";
+import { PdfUploadCard } from "./PdfUploadCard";
+import type { Briefing } from "@/lib/ebook.server";
 
 export interface AiKickstart {
   niche: string;
@@ -22,10 +24,11 @@ interface Props {
   onUseMined: () => void;
   onScratch: (category: EbookCategory) => void;
   onAiGenerate: (input: AiKickstart) => void;
+  onPdfImport: (briefing: Briefing, suggestedChapterCount: number) => void;
   busy?: boolean;
 }
 
-export function EbookHub({ onUseMined, onScratch, onAiGenerate, busy }: Props) {
+export function EbookHub({ onUseMined, onScratch, onAiGenerate, onPdfImport, busy }: Props) {
   const [category, setCategory] = useState<EbookCategory>("Amazon/KDP");
   const [ai, setAi] = useState<AiKickstart>({
     niche: "",
@@ -40,7 +43,7 @@ export function EbookHub({ onUseMined, onScratch, onAiGenerate, busy }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="grid gap-4 lg:grid-cols-3"
+      className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
     >
       {/* Card 1 */}
       <Card className="flex flex-col border-primary/30">
