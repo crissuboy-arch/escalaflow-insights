@@ -14,6 +14,9 @@ export interface EbookPdfInput {
   layout: EbookLayout;
   coverUrl?: string | null;
   chapters: { title: string; markdown: string; imageUrl?: string | null }[];
+  identity?: { author?: string; brand?: string; bio?: string };
+  extras?: { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
+  finalCta?: string;
 }
 
 const PAGE = { w: 595.28, h: 841.89 }; // A4 portrait
@@ -153,6 +156,18 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
       yT -= 22;
     }
   }
+  const authorName = input.identity?.author || input.author;
+  if (authorName) {
+    yT -= 24;
+    cover.drawText(`por ${authorName}`, {
+      x: margin,
+      y: Math.max(yT, margin + 40),
+      size: 13,
+      font: fontBold,
+      color: rgb(...spec.coverText),
+      opacity: 0.9,
+    });
+  }
 
   // ---- TOC ----
   let page = pdf.addPage([PAGE.w, PAGE.h]);
@@ -180,7 +195,7 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
     y -= spec.bodySize + 10;
   });
 
-  // ---- CHAPTERS ----
+  // ---- INTRODUCTION ----
   const drawBlock = (p: PDFPage, block: MdBlock, yPos: number): { page: PDFPage; y: number } => {
     let cy = yPos;
     let cp = p;
@@ -251,6 +266,33 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
     return { page: cp, y: cy };
   };
 
+  const drawSection = (heading: string, markdown: string) => {
+    page = pdf.addPage([PAGE.w, PAGE.h]);
+    y = PAGE.h - margin;
+    const titleLs = wrap(heading, fontBold, spec.headingSize + 6, contentW);
+    for (const ln of titleLs) {
+      page.drawText(ln, {
+        x: margin,
+        y,
+        size: spec.headingSize + 6,
+        font: fontBold,
+        color: rgb(...spec.accent),
+      });
+      y -= spec.headingSize + 10;
+    }
+    y -= 12;
+    const blocks = parseMd(markdown);
+    for (const b of blocks) {
+      const r = drawBlock(page, b, y);
+      page = r.page;
+      y = r.y;
+    }
+  };
+
+  if (input.extras?.introduction?.trim()) {
+    drawSection("Introdução", input.extras.introduction);
+  }
+
   for (let i = 0; i < input.chapters.length; i++) {
     const ch = input.chapters[i];
     page = pdf.addPage([PAGE.w, PAGE.h]);
@@ -304,6 +346,33 @@ export async function exportEbookPdf(input: EbookPdfInput): Promise<Blob> {
       page = r.page;
       y = r.y;
     }
+  }
+
+  // ---- CONCLUSION + CTA ----
+  if (input.extras?.conclusion?.trim() || input.finalCta?.trim()) {
+    const md = [
+      input.extras?.conclusion?.trim() ?? "",
+      input.finalCta?.trim() ? `\n\n## Próximo passo\n\n${input.finalCta.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    drawSection("Conclusão", md);
+  }
+
+  // ---- ABOUT THE AUTHOR ----
+  const aboutMd = [
+    input.extras?.aboutAuthor?.trim() ?? "",
+    input.identity?.bio?.trim() ?? "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  if (aboutMd) {
+    drawSection(`Sobre ${input.identity?.author ?? "o autor"}`, aboutMd);
+  }
+
+  // ---- BONUS ----
+  if (input.extras?.bonus?.trim()) {
+    drawSection("Bônus", input.extras.bonus);
   }
 
   // Page numbers
