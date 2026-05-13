@@ -1082,6 +1082,35 @@ function EbookPage() {
                   </Button>
                 </>
               )}
+              <Button onClick={onExportDocx} disabled={!!busy || chapters.length === 0} variant="outline">
+                <FileDown className="mr-2 h-4 w-4" /> DOCX
+              </Button>
+              <Button
+                onClick={onCreatePlaybookFromEbook}
+                disabled={!!busy || !briefing}
+                variant="outline"
+              >
+                <Sparkles className="mr-2 h-4 w-4" /> Criar Playbook a partir deste Ebook
+              </Button>
+            </div>
+            <div className="space-y-3 rounded-lg border border-border/60 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Introdução, Conclusão, Sobre o autor e Bônus
+                </Label>
+                <Button size="sm" variant="outline" onClick={onGenerateExtras} disabled={!!busy || !briefing}>
+                  <Wand2 className="mr-2 h-3 w-3" /> {extras ? "Regerar" : "Gerar"} extras
+                </Button>
+              </div>
+              {extras && (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Introdução" value={extras.introduction ?? ""} onChange={(v) => setExtras({ ...extras, introduction: v })} multiline />
+                  <Field label="Conclusão" value={extras.conclusion ?? ""} onChange={(v) => setExtras({ ...extras, conclusion: v })} multiline />
+                  <Field label="Sobre o autor" value={extras.aboutAuthor ?? ""} onChange={(v) => setExtras({ ...extras, aboutAuthor: v })} multiline />
+                  <Field label="Bônus" value={extras.bonus ?? ""} onChange={(v) => setExtras({ ...extras, bonus: v })} multiline />
+                </div>
+              )}
+              <Field label="CTA final" value={finalCta} onChange={setFinalCta} multiline />
             </div>
             {mode === "premium" && chapters.length > 0 && (
               <div className="grid gap-2 md:grid-cols-2">
