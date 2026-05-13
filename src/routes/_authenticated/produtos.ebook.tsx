@@ -493,6 +493,9 @@ function EbookPage() {
         layout,
         coverUrl,
         chapters,
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
       });
       downloadBlob(blob, `${slug(briefing.title)}.pdf`);
 
@@ -514,6 +517,9 @@ function EbookPage() {
         subtitle: briefing.subtitle,
         coverUrl,
         chapters,
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
       });
       downloadBlob(blob, `${slug(briefing.title)}.docx`);
       await saveDraft({ status: "ready" });
