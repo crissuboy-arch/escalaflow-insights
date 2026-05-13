@@ -1,63 +1,61 @@
-# Fase 1 — Correções Críticas EscalaFlow
+# Plano
 
-Foco: deixar a esteira atual estável **sem adicionar módulos novos**. Nada de tocar em ebook avançado, criativos 40 formatos, upload de PDF, escala ou auth-roles agora — esses entram nas próximas fases.
+## 1. i18n — Estratégia e Exportação (PT/EN/ES/FR)
 
-## 1. Playbook (prioridade #1)
+**Arquivos:** `src/i18n/locales/{pt,en,es,fr}.json`, `src/routes/_authenticated/produtos.playbook.$id.tsx`, `src/components/LanguageSwitcher.tsx` (já tem 4 idiomas).
 
-Sintomas reportados: botão gerar não responde, abrir em nova aba quebra, exportar não funciona, geração trava.
+Adicionar bloco `playbook` em cada locale com chaves:
+- `library`, `edit`, `export`, `copyContent`, `copySuccess`, `presentationSoon`
+- `pdf`, `docx`, `carousel`, `videoScript`
+- `strategy.button`, `strategy.title`, `strategy.intro`, `strategy.generate`, `strategy.regenerate`, `strategy.generated`, `strategy.copyBlock`, `strategy.copied`
+- Rótulos dos 19 blocos: `bigIdea`, `promise`, `mechanism`, `avatar`, `pains`, `desires`, `objections`, `triggers`, `headlines`, `vsl`, `page`, `funnel`, `offer`, `bonuses`, `stack`, `cta`, `scripts`, `angles`, `scalePlan`
+- Mensagens de erro/sucesso (`loadFailed`, `strategyGenerated`, `strategyFailed`)
 
-Vou auditar e corrigir nesta ordem:
+No `produtos.playbook.$id.tsx`: importar `useTranslation`, substituir todas strings PT-BR hardcoded (Biblioteca, Estratégia, Estratégia completa, Editar, Exportar, PDF, DOCX, Carrossel, Roteiro de vídeo, Copiar conteúdo, toasts, intro do Sheet, "Gerar estratégia com IA"). Atualizar `StrategyView` para usar `t()` nos rótulos dos blocos.
 
-1. **`/produtos/playbook/novo`** — verificar o submit do wizard: garantir que `aiExtractPlaybookBriefing` e `aiGenerateSceneOutline` (server fns) sejam invocados via `useServerFn` (não chamada direta) e que erros de IA virem toast em vez de loader infinito.
-2. **`/produtos/playbook/$id`** — garantir loader gateado por `_authenticated` (já está), tratar `notFoundComponent` e `errorComponent`, e trocar qualquer `window.open` quebrado por `<Link to="..." target="_blank">` tipado.
-3. **Geração de cenas** — `aiGenerateSceneContent` e `aiGenerateSceneImage`: capturar `429`/`402` do gateway e mostrar mensagem clara; persistir resultado parcial após cada cena (UPDATE em `playbooks.scenes`) para não perder progresso.
-4. **Exportações** — corrigir export PDF (`src/lib/playbook/pdf.ts`) e adicionar export DOCX usando `docx` (já em uso no ebook). Botão "Copiar conteúdo" copiando markdown completo do playbook.
-5. **Conteúdos faltando do escopo** (Big Idea, Promessa, Mecanismo Único, Avatar, Dores, Desejos, Objeções, Gatilhos, Headlines, VSL, Funil, Oferta, Bônus, Stack, CTA, Scripts, Ângulos, Escala) — estender `PlaybookBriefingSchema` no server e o prompt do `aiExtractPlaybookBriefing` para retornar TODOS esses campos em um JSON estruturado, salvos em `playbooks.briefing`. UI nova: aba "Estratégia" no `/produtos/playbook/$id` renderizando cada bloco em `Card` com botão "Copiar".
+## 2. Upload de PDF → Ebook Premium com IA
 
-## 2. Rotas, Loaders e Botões Mortos
+**Fluxo simples (sem automação complexa):**
 
-Varredura sistemática de `src/routes/_authenticated/*` procurando:
+```text
+EbookHub (3 cards) → adicionar 4º card "Importar PDF"
+  ↓
+Upload PDF (input file, max 10MB)
+  ↓
+parsePdfToText (server fn, usa pdf-parse ou pdfjs leve no worker)
+  ↓
+aiExtractBriefingFromText (server fn, Gemini)
+  ↓ briefing pré-preenchido
+Reusa pipeline existente: Outline → Capítulos → Capa → Export
+```
 
-- Rotas que usam `useState(true)` para loading sem `finally` → adicionar try/catch/finally.
-- `useQuery` sem `errorComponent`/`notFoundComponent` na rota → adicionar os dois em todas as rotas com loader.
-- Botões `<Button>` sem `onClick` ou com handler vazio → conectar à server fn correta ou remover.
-- `<Link to="...">` apontando para rotas inexistentes → tipar com `routeTree` (já é gerado, vai falhar em build se quebrado) e corrigir destinos.
+**Arquivos novos:**
+- `src/lib/ebook/pdf-extract.ts` — server-only: extrai texto via `pdfjs-dist` (compatível com Worker; fallback para primeiras 50 páginas).
+- `src/lib/ebook.functions.ts` — adicionar `extractBriefingFromPdf({ base64, fileName })`:
+  - decode base64 → Uint8Array
+  - extrai texto (truncar ~30k chars)
+  - chama `aiExtractBriefingFromText` em `ebook.server.ts` (novo helper que reusa schema `BriefingSchema` mas com prompt orientado a "resumir este conteúdo e propor briefing de ebook premium")
+  - retorna `Briefing` + `suggestedTitle` + `suggestedChapterCount`
+- `src/components/ebook/PdfUploadCard.tsx` — card no Hub: drag&drop + `<input type="file" accept="application/pdf">`, lê como base64, mostra loader, dispara callback.
 
-Rotas suspeitas a auditar: `radar`, `central-mineracao`, `analise-ia`, `favoritos`, `ofertas-escaladas`, `escala`, `checkout`, `pagina-venda`, `criativos`, `copy`. As 4 últimas hoje renderizam `StandaloneSoon` em modo avulso — vou manter o placeholder mas garantir que **modo projeto** funciona e o picker de modo não fica preso.
+**Arquivos editados:**
+- `src/components/ebook/EbookHub.tsx` — grid passa para 4 cards (lg:grid-cols-2 ou xl:grid-cols-4); novo prop `onPdfImport(briefing, suggestion)`.
+- `src/routes/_authenticated/produtos.ebook.tsx` — handler `handlePdfImport`: seta `briefing`, `mode = "premium"`, `chapterCount` sugerido, pula direto para o passo "Outline" e dispara `generateOutline` automaticamente. Toda geração subsequente (capítulos, imagens, capa, export PDF/DOCX/EPUB) é a infra já existente — modo `premium` já está no schema.
+- `src/i18n/locales/*.json` — bloco `ebook.pdfImport`: `title`, `description`, `dropHere`, `selectFile`, `parsing`, `analyzing`, `success`, `errors.tooLarge`, `errors.notPdf`, `errors.parseFailed`.
 
-## 3. Salvar / Recuperar Projeto
+**Limites/segurança:**
+- Tamanho máx. 10MB validado client + server (Zod).
+- Truncar texto a 30k chars antes do prompt.
+- Sem armazenamento do PDF (somente texto extraído usado in-memory para gerar briefing).
+- `pdfjs-dist` precisa ser instalado (`bun add pdfjs-dist`); usar build "legacy" sem worker (`pdfjs-dist/legacy/build/pdf.mjs`) para rodar no Worker SSR.
 
-- `src/lib/project.functions.ts`: revisar `saveProject`/`getProject`/`listProjects`. Garantir `updated_at = now()` em todo update e que `meta` (jsonb) faz merge em vez de overwrite (problema comum que apaga `meta.copy` ao salvar `meta.salesPage`).
-- Adicionar autosave no `/projetos/$id` (debounce 1.5s) usando `useMutation` + toast silencioso.
-- Botões: **Duplicar**, **Excluir** (com `AlertDialog` de confirmação), **Exportar** (JSON do projeto) — os dois primeiros já podem existir parcialmente; vou completar.
+## 3. Validação
 
-## 4. Remover Branding Lovable da UI
+- `bun run build` limpo.
+- Trocar idioma no header → confirmar Estratégia/Exportar traduzidos nos 4 idiomas.
+- Subir PDF de teste → briefing populado → outline gerado → exportar ebook PDF/DOCX.
 
-- `src/routes/__root.tsx` linha 43: trocar `twitter:site` de `@Lovable` para `@EscalaFlow`.
-- Remover qualquer footer/watermark Lovable se presente em layouts (varredura `rg "lovable" src/components/`).
-- **Não tocar** em `src/integrations/lovable/index.ts` (auto-gerado, é o auth provider — funcional, não é branding visível).
-- Garantir favicon e título do `<head>` 100% EscalaFlow (já estão).
-
-Observação: a marca "lovable.app" no domínio e o badge de publicação são controlados pela plataforma, não por código — a remoção do badge requer plano Pro via `publish_settings` (informo o usuário se relevante, não bloqueio a fase).
-
-## 5. Validação Final da Fase
-
-- `bun run build` limpo (sem warnings de rota inexistente).
-- Smoke test manual via `browser--navigate_to_sandbox` em: `/dashboard`, `/projetos`, `/projetos/<id>`, `/produtos/playbook`, `/produtos/playbook/novo`, `/produtos/playbook/<id>`, `/copy`, `/pagina-venda`, `/criativos`, `/checkout`, `/escala`.
-- Verificar console limpo (sem erros vermelhos) e nenhum loader infinito após 10s.
-
-## Detalhes técnicos
-
-- **Não** mexer em: schema do banco (sem migrations nesta fase), `src/integrations/supabase/*`, `src/integrations/lovable/index.ts`, ebook avançado, criativos 40 formatos.
-- **Padrão de erro IA**: todo `handler` que chama `aiChat` envolto em try/catch retornando `{ ok: false, error: string }` discriminado, e a UI mostra `toast.error(error)` em vez de quebrar.
-- **Padrão de server fn**: manter `discriminatedUnion("kind")` projeto/avulso já adotado; nada novo aqui.
-
-## Fora desta fase (próximas)
-
-- Fase 2: Playbook completo "versão longa" e prompt-set externo.
-- Fase 3: Ebook IA premium + upload PDF + análise IA do PDF.
-- Fase 4: Criativos 40 formatos com tooltip e exports externos.
-- Fase 5: Página de Venda 10 dobras + Checkout completo + Escala do Produto.
-- Fase 6: Auth roles admin/user e hardening RLS.
-
-Confirma para eu executar a Fase 1?
+## Fora de escopo
+- Persistir o PDF no Storage.
+- OCR de PDFs escaneados (somente texto extraível).
+- Tradução automática do conteúdo gerado (ebook segue idioma escolhido no formulário).
