@@ -8,6 +8,8 @@ import {
   type PageContext,
 } from "./sales-page.server";
 import { StandaloneBriefingSchema } from "./standalone/briefing";
+import { seedFromModule } from "./project/seeding.server";
+import { recordAi } from "./ai/history.server";
 
 const InputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project"), projectId: z.string().uuid() }),
@@ -58,6 +60,19 @@ export const generateSalesPage = createServerFn({ method: "POST" })
         .from("projects")
         .update({ meta: meta as never })
         .eq("id", projectRow.id);
+      await seedFromModule(supabase, userId, projectRow.id, "salesPage", { page });
+      await recordAi(supabase, userId, {
+        projectId: projectRow.id,
+        module: "salesPage",
+        prompt: ctx,
+        response: page,
+      });
+    } else {
+      await recordAi(supabase, userId, {
+        module: "salesPage",
+        prompt: ctx,
+        response: page,
+      });
     }
 
     return { page: SalesPageSchema.parse(page), prompts };

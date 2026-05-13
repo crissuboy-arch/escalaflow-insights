@@ -9,6 +9,8 @@ import {
 } from "./ads.server";
 import { StandaloneBriefingSchema } from "./standalone/briefing";
 import { ADS_FORMATS, DIMENSIONS, OBJECTIVES, PLATFORMS } from "./ads/catalog";
+import { seedFromModule } from "./project/seeding.server";
+import { recordAi } from "./ai/history.server";
 
 const PlatformEnum = z.enum(PLATFORMS.map((p) => p.id) as [string, ...string[]]);
 const ObjectiveEnum = z.enum(OBJECTIVES.map((o) => o.id) as [string, ...string[]]);
@@ -101,6 +103,19 @@ export const generateCreative = createServerFn({ method: "POST" })
           createdAt: new Date().toISOString(),
         },
       ]);
+      await seedFromModule(supabase, userId, projectId, "creative", { creative });
+      await recordAi(supabase, userId, {
+        projectId,
+        module: "creative",
+        prompt: { platform: data.platform, objective: data.objective, formatId: data.formatId },
+        response: creative,
+      });
+    } else {
+      await recordAi(supabase, userId, {
+        module: "creative",
+        prompt: { platform: data.platform, objective: data.objective, formatId: data.formatId },
+        response: creative,
+      });
     }
     return { creative };
   });
@@ -135,6 +150,12 @@ export const generateCreativeVariations = createServerFn({ method: "POST" })
           createdAt: new Date().toISOString(),
         })),
       );
+      await recordAi(supabase, userId, {
+        projectId,
+        module: "creative",
+        prompt: { platform: data.platform, count: data.count },
+        response: { creatives },
+      });
     }
     return { creatives };
   });

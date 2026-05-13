@@ -6,6 +6,7 @@ import { SalesPageResult } from "./SalesPageResult";
 import { generateSalesPage } from "@/lib/sales-page.functions";
 import type { SalesPage } from "@/lib/sales-page.server";
 import type { StandaloneBriefing } from "@/lib/standalone/briefing";
+import { SaveToProjectButton } from "./SaveToProjectButton";
 
 type Prompts = { lovable: string; googleAiStudio: string; v0: string; claude: string };
 
@@ -35,7 +36,18 @@ export function StandaloneSalesPage() {
         busy={busy}
         submitLabel="Gerar Página com IA"
       />
-      {data && <SalesPageResult page={data.page} prompts={data.prompts} />}
+      {data && (
+        <>
+          <div className="flex justify-end">
+            <SaveToProjectButton
+              kind="salesPage"
+              payload={data}
+              defaultTitle={data.page.headline?.slice(0, 60) || "Página"}
+            />
+          </div>
+          <SalesPageResult page={data.page} prompts={data.prompts} />
+        </>
+      )}
     </div>
   );
 }

@@ -70,6 +70,50 @@ export type Database = {
           },
         ]
       }
+      ai_history: {
+        Row: {
+          created_at: string
+          id: string
+          model: string | null
+          module: string
+          project_id: string | null
+          prompt: Json
+          response: Json
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          module: string
+          project_id?: string | null
+          prompt?: Json
+          response?: Json
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model?: string | null
+          module?: string
+          project_id?: string | null
+          prompt?: Json
+          response?: Json
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collected_ads: {
         Row: {
           ad_library_id: string | null

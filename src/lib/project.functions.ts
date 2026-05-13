@@ -15,6 +15,8 @@ import {
   aiGenerateSceneOutline,
   aiGenerateSceneContent,
 } from "./playbook.server";
+import { seedFromModule } from "./project/seeding.server";
+import { recordAi } from "./ai/history.server";
 
 const AdInputSchema = z.object({
   headline: z.string().optional(),
@@ -283,6 +285,13 @@ export const generateProjectEbook = createServerFn({ method: "POST" })
       ebookId = ins.id as string;
       await supabase.from("projects").update({ ebook_id: ebookId } as never).eq("id", data.id);
     }
+    await seedFromModule(supabase, userId, data.id, "ebook", { briefing, outline });
+    await recordAi(supabase, userId, {
+      projectId: data.id,
+      module: "ebook",
+      prompt: { mode: data.mode, briefing },
+      response: { ebookId, chapterCount: chapters.length },
+    });
     return { ebookId };
   });
 
@@ -361,5 +370,12 @@ export const generateProjectPlaybook = createServerFn({ method: "POST" })
         .update({ playbook_id: playbookId } as never)
         .eq("id", data.id);
     }
+    await seedFromModule(supabase, userId, data.id, "playbook", { briefing: pbBriefing });
+    await recordAi(supabase, userId, {
+      projectId: data.id,
+      module: "playbook",
+      prompt: { briefing: pbBriefing, sceneCount },
+      response: { playbookId, scenes: scenes.length },
+    });
     return { playbookId };
   });

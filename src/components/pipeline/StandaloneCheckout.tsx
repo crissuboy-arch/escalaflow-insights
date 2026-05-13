@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import { SaveToProjectButton } from "./SaveToProjectButton";
 
 type Draft = {
   price: string;
@@ -121,10 +122,13 @@ export function StandaloneCheckout() {
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3">
           <Badge variant="outline">Autosave local</Badge>
-          <Button onClick={copyAll} variant="outline" size="sm">
-            {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-            Copiar resumo
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <SaveToProjectButton kind="checkout" payload={data} defaultTitle="Checkout" />
+            <Button onClick={copyAll} variant="outline" size="sm">
+              {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              Copiar resumo
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

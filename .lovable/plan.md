@@ -1,96 +1,237 @@
-## Fase 2 — Hubs funcionais (integração real)
+# Fase 3 — Inteligência Contínua e Persistência Global
 
-Não criar telas novas, não mudar visual, não inventar módulos. Foco em ligar tudo que já existe ao fluxo do projeto, com persistência e fallback de uso avulso.
+Objetivo: transformar a esteira em um sistema único onde cada módulo alimenta os outros, tudo salva sozinho, nada se perde, e o produto deixa de parecer "Lovable" para virar EscalaFlow.
 
-### 1. Padronizar todos os hubs como `DualModeHub`
-
-Hoje só `/copy` usa `DualModeHub`. `/criativos`, `/pagina-venda`, `/checkout` e `/escala` ainda usam `PipelineHub` puro (só lista projetos, sem modo avulso) — por isso parecem "mockados" e morrem no estado vazio.
-
-Trocar cada hub para `DualModeHub` reaproveitando os componentes que já existem:
-
-- `/criativos` → standalone = `<CreativeWizard />` (já implementado, modo `standalone` no briefing).
-- `/pagina-venda` → standalone = novo wrapper fino que reusa `StandaloneBriefingForm` + `generateSalesPage({ kind:"standalone", briefing })` + `<SalesPageResult />`.
-- `/checkout` → standalone = formulário avulso reusando `CheckoutTab` (sem `projectId`) que apenas exibe os campos e oferece "Salvar em projeto" (cria projeto novo on-demand).
-- `/escala` → standalone = checklist genérico apontando o usuário para criar projeto (não há "escala avulsa" real).
-
-### 2. Estado vazio cria projeto automaticamente
-
-`PipelineHub` hoje aponta para `/projetos` quando não há projeto. Mudar para:
-
-- Botão "Criar projeto e abrir [aba]" → navega `to: "/projetos", search: { novo: 1, tab }`.
-- `projetos.tsx`: ler `?novo=1` no `validateSearch`, abrir o card "Criar do Zero" expandido (ou disparar `startScratch` direto se houver `tab`), e após `createProject` redirecionar para `/projetos/$id?tab=<tab>`.
-- Adicionar `Link` to `/projetos?novo=1&tab=<tab>` no empty state do `PipelineHub` em vez do link genérico.
-
-### 3. Modo duplo real em cada módulo
-
-- `CopyTab`, `SalesPageTab`, `CreativesTab`, `CheckoutTab` já aceitam `projectId` + `initial` — usar como modo "ligado".
-- Modo "avulso" usa as MESMAS server fns com `kind: "standalone"` + briefing inline; resultado fica em estado local com botão **"Salvar em projeto"** que chama `createProject({ source:"scratch" })` e em seguida `updateProject({ patch:{ meta:{ <key>: data } } })`.
-
-### 4. Playbook real (sem mock)
-
-- Verificar e garantir que `/produtos/playbook/$id` não tenha branches mockados; toda renderização vem de `loadPlaybook`.
-- Garantir loading real (`<Loader2 />`), salvar via `savePlaybook`, "Continuar geração" reusa `generatePlaybookSceneContent` por cena faltante, exportar via `playbook/pdf.ts` e `playbook/docx.ts` já existentes.
-- Strategy: já usa `generatePlaybookStrategy` server-side — confirmar que botão "Regenerar estratégia" persiste o resultado.
-
-### 5. Integração entre módulos
-
-- Em `generateProjectEbook` (já existe): após gerar, gravar `meta.copy_seed`, `meta.creatives_seed`, `meta.salesPage_seed` com briefing/outline para que `CopyTab`/`SalesPageTab`/`CreativesTab` usem como input default na primeira geração.
-- Em `createProject` com `source:"ad"`: já popula briefing — adicionar também `meta.fromAd = { headline, copy, cta, advertiser }` para alimentar criativos/copy/página.
-- Não disparar gerações automáticas em cascata (custo) — apenas pré-popular inputs.
-
-### 6. Criativos via Mago Criativo
-
-`CreativeWizard` já é o engine. Garantir que `CreativesTab` (modo projeto) também usa o mesmo wizard (selecionar plataforma → objetivo → formato → gerar com briefing do projeto) e salva cada criativo em `meta.creatives[]` via `updateProject`. Botões: gerar, gerar variações, copiar headline/CTA/prompt visual, remover.
-
-### 7. Erro `virtual:tanstack-start-client-entry`
-
-Investigar o log do dev-server (`sqlite3 /tmp/sandbox-state.db ...`) para identificar o módulo culpado. Causas comuns nesta base:
-- import de `*.server.ts` chegando ao client via cadeia transitiva.
-- `useServerFn` dentro de hub novo importando módulo errado.
-
-Ação: rodar `bun run build` (via harness automático) e corrigir o leaf reportado. Não tocar lockfile/cache manualmente.
-
-### 8. Persistência e retomada
-
-- `updateProject` já faz merge profundo de `meta` — usar consistentemente em todos os tabs (já feito em CopyTab/SalesPageTab/CheckoutTab/CreativesTab).
-- `loadProject` hidrata `meta` → cada tab recebe `initial` → usuário continua de onde parou.
-- Adicionar autosave debounced no `CheckoutTab` (já tem botão Salvar — manter, opcional).
-
-### 9. Garantias finais
-
-- Nenhum botão sem `onClick`/`Link`.
-- Nenhum tab com "Em construção".
-- `PipelineHub`: adicionar tratamento de erro real (toast + retry) em vez de `.catch(() => setRows([]))` silencioso.
-
-### 10. Fora de escopo
-
-Sem novos módulos, sem novo visual, sem novos formatos. Apenas integração + persistência + correções.
+Escopo restrito: integração, persistência, automação. **Sem novos módulos, sem novo visual.**
 
 ---
 
-### Detalhes técnicos
+## 1. Semeadura cross-módulo (server-side)
 
-**Arquivos a editar:**
-- `src/components/PipelineHub.tsx` — tratar erro com toast + botão retry; trocar empty state para link `?novo=1&tab=...`.
-- `src/components/pipeline/DualModeHub.tsx` — sem alterações estruturais.
-- `src/routes/_authenticated/criativos.tsx`, `pagina-venda.tsx`, `checkout.tsx`, `escala.tsx` — converter para `DualModeHub` com componente standalone.
-- `src/routes/_authenticated/projetos.tsx` — `validateSearch({ novo, tab })`, auto-abrir criação ao carregar com `?novo=1`, redirecionar com `?tab=` após criar.
-- `src/lib/project.functions.ts` — em `createProject`, popular `meta.fromAd` quando aplicável; em `generateProjectEbook`, semear `meta.*_seed`.
-- `src/components/pipeline/project/CreativesTab.tsx` — confirmar uso do `CreativeWizard` interno; se hoje for form simplificado, embutir wizard.
-- `src/routes/_authenticated/produtos.playbook.$id.tsx` — auditar para remover qualquer branch mock/placeholder (ler arquivo completo na execução).
+Centralizar em `src/lib/project/seeding.server.ts` uma função `seedFromModule(projectId, module, payload)` que monta o patch correto em `meta.*_seed` e chama `updateProject` com merge profundo.
 
-**Componentes standalone novos (finos, sem nova UI):**
-- `src/components/pipeline/StandaloneSalesPage.tsx`
-- `src/components/pipeline/StandaloneCheckout.tsx`
-- `src/components/pipeline/StandaloneEscala.tsx` (texto + CTA criar projeto)
+Gatilhos (todos em `*.functions.ts` server-side, dentro do `.handler`):
 
-**Validação:**
-- Build do harness deve passar (`tsc --noEmit` + vite build).
-- Smoke manual via `browser--navigate_to_sandbox` em `/criativos`, `/pagina-venda`, `/checkout`, `/escala` (modo projeto vazio + modo avulso).
+- `generateProjectEbook` → semeia `copy_seed`, `salesPage_seed`, `creative_seed`, `checkout_seed`, `scale_seed` (título, promessa, avatar, dores, mecanismo, capítulos-chave).
+- `generateSalesCopy` (kind=project) → semeia `creative_seed.headlines/hooks` + `salesPage_seed.copyBlocks`.
+- `generateCreative` → push em `meta.creatives_history[]` + atualiza `creative_seed.bestHeadlines`.
+- `generateSalesPage` → semeia `checkout_seed` (preço, bônus, garantia, CTA).
+- `generatePlaybookStrategy` → semeia `copy_seed.strategy` e `creative_seed.angles`.
 
-### Entregável final
+Regra: semear **apenas inputs default**, nunca disparar geração em cascata (custo).
 
-Lista no fim da execução:
-- Integrado: hubs migrados, fluxo `?novo=1`, modo duplo, semeação cross-módulo, persistência.
-- Falta: itens não cobertos (ex: autosave global, regeneração inteligente).
-- 100% operacionais: módulos confirmados ponta-a-ponta.
+---
+
+## 2. Botão universal "Salvar em Projeto"
+
+Componente reutilizável `src/components/pipeline/SaveToProjectButton.tsx`:
+
+- Props: `kind` (`copy|salesPage|creative|checkout|escala|ebook|playbook`), `payload`, `prompts?`.
+- Abre `Dialog` com:
+  - Select de projetos existentes (`listProjects`).
+  - Opção "Criar novo projeto" (chama `createProject({ source:"scratch", title })`).
+- Ao confirmar: `updateProject({ id, patch:{ meta:{ [kind]: payload, [`${kind}_history`]: [...prev, entry] } } })` + toast + Link "Abrir projeto".
+
+Inserir o botão em **todas as telas standalone**: `StandaloneSalesPage`, `StandaloneCheckout`, `StandaloneEscala`, `CreativeWizard` (modo standalone), `CopyResult`, `EbookHub` (modo avulso).
+
+---
+
+## 3. Autosave global
+
+Hook `src/hooks/useAutosave.ts`:
+
+```ts
+useAutosave({ key, data, save, debounceMs: 1500, enabled })
+```
+
+- Debounce + dirty check (compara hash JSON).
+- Persistência dupla: `localStorage` (key `autosave:<key>`) + chamada server (`save`).
+- Indicador visual via callback `onStatus("saving"|"saved"|"error")`.
+
+Hook complementar `useDraftRecovery({ key, onRecover })`:
+- Na montagem, se `localStorage` tem rascunho mais novo que server, mostra toast "Restaurar rascunho não salvo?" com ação.
+
+Aplicar em:
+- `CopyTab`, `SalesPageTab`, `CheckoutTab`, `CreativesTab`, `EscalaTab` (project mode).
+- `StandaloneCheckout`, `StandaloneSalesPage`, `StandaloneBriefingForm`.
+- Editor de Playbook (`produtos.playbook.$id.editar.tsx`).
+- Editor de Ebook (`EbookHub`).
+
+Indicador único no `AppHeader`: ponto verde "Salvo" / amarelo "Salvando…" / vermelho "Falha — repetir" via context global `AutosaveProvider`.
+
+---
+
+## 4. Histórico IA por projeto
+
+Migração Supabase — nova tabela:
+
+```sql
+create table public.ai_history (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  project_id uuid references public.projects(id) on delete cascade,
+  module text not null,        -- copy|salesPage|creative|checkout|escala|ebook|playbook
+  prompt jsonb not null,
+  response jsonb not null,
+  model text,
+  version int not null default 1,
+  created_at timestamptz not null default now()
+);
+alter table public.ai_history enable row level security;
+-- policies: select/insert/delete own
+create index ai_history_project_idx on public.ai_history(project_id, module, created_at desc);
+```
+
+Helper server `src/lib/ai/history.server.ts`:
+- `recordAi({ projectId, module, prompt, response, model })`.
+- `listAiHistory({ projectId, module? })`.
+
+Chamar `recordAi` ao final de cada server fn de geração (copy, criativos, página, ebook, playbook strategy/scene).
+
+UI: aba "Histórico IA" no workspace do projeto (`projetos.$id.tsx`):
+- Lista cronológica com filtro por módulo.
+- Ações: **Reutilizar** (preenche o input do módulo), **Duplicar** (clona como nova versão), **Continuar geração** (envia ao server fn correspondente), **Exportar JSON**.
+
+---
+
+## 5. Auditoria final do Playbook
+
+Checklist de execução em `produtos.playbook.$id.tsx`, `.editar.tsx`, `.novo.tsx`:
+- Remover qualquer branch que renderize dados sintéticos sem `loadPlaybook`.
+- Garantir `<Loader2>` real enquanto carrega; erro com retry.
+- Salvar via `savePlaybook` (autosave + manual).
+- "Continuar geração" reusa `generatePlaybookSceneContent` por cena faltante.
+- Exportar PDF/DOCX (já existem) testar com playbook real.
+- Recarregar (F5) restaura estado idêntico.
+
+---
+
+## 6. Links externos seguros
+
+Criar `src/lib/external/openExternal.ts`:
+
+```ts
+export function openExternal(url: string, fallbackLabel?: string) {
+  const w = window.open(url, "_blank", "noopener,noreferrer");
+  if (!w || w.closed) {
+    // popup bloqueado → toast com link clicável
+    toast("Popup bloqueado", { action: { label: fallbackLabel ?? "Abrir", onClick: () => location.assign(url) } });
+  }
+}
+```
+
+Aplicar em todos os botões que apontam para Facebook Ad Library, ChatGPT, Google AI Studio, v0, Claude (procurar `target="_blank"` em `CopyResult`, `SalesPageResult`, `CreativeCard`, `OfferCard`, `oferta.$id.tsx`, `link-externo.tsx`).
+
+Garantir `rel="noopener noreferrer"` em todos os `<a target="_blank">`.
+
+---
+
+## 7. Hardening Supabase (auth, roles, isolation)
+
+Migração:
+
+```sql
+-- enum já existe? garantir admin/user
+do $$ begin
+  if not exists (select 1 from pg_type where typname='app_role') then
+    create type public.app_role as enum ('admin','user');
+  end if;
+end $$;
+
+-- has_role já existe (ver schema)
+-- adicionar policy admin-bypass em projects/ebooks/playbooks
+create policy "admins read all projects" on public.projects
+  for select to authenticated using (public.has_role(auth.uid(),'admin'));
+-- idem update/delete admin para projects, ebooks, playbooks, ai_history
+```
+
+Auditoria de RLS (já OK em `projects`, `ebooks`, `playbooks`, `profiles`, `user_roles`, `saved_offers`, `ai_analyses`, `user_ad_actions`). Confirmar:
+- Nenhuma server fn usa `supabaseAdmin` para CRUD de usuário comum (usar `requireSupabaseAuth`).
+- Prompts globais (catálogos em `src/lib/ads/catalog.ts`, `storybook/catalog.ts`) ficam em código — não editáveis pelo usuário.
+
+UI:
+- Esconder rotas admin (se houver) atrás de `has_role('admin')` checado via server fn `getMyRole`.
+- Bloquear edição de `project.user_id` no client (já garantido por RLS).
+
+---
+
+## 8. Remover identidade Lovable / branding EscalaFlow
+
+- `index.html`: trocar `<title>`, meta description, og:image, favicon (`/favicon.ico` próprio).
+- `src/routes/__root.tsx`: head() com title/description EscalaFlow; remover qualquer `gpteng.co` / referências Lovable visíveis ao usuário (script `cdn.gpteng.co` é injetado pelo runtime — não tocar no script tag, mas remover badges/footers visuais).
+- Loading screen em `_authenticated.tsx`: trocar spinner genérico por logo EscalaFlow + cor da marca.
+- Conferir `public/` por assets default (placeholder.svg, robots.txt, og-image).
+- Manifest PWA (se existir) atualizado.
+
+Pedir ao usuário: cor primária + logo (PNG/SVG). Default temporário: paleta atual + texto "EscalaFlow".
+
+---
+
+## 9. Performance
+
+- Lazy load de rotas pesadas via `createFileRoute` + dynamic import nos componentes de export (PDF/DOCX — `pdf-lib`, `docx`, `epub`): já estão em `*.server.ts`, validar que não vazam pro client (regras `tanstack-supabase-import-graph`).
+- Imagens com `loading="lazy"` em `OfferCard`, `CreativeCard`, capas de ebook/playbook.
+- Code-split do `CreativeWizard`, `EbookHub`, `EscalaTab`.
+- Rodar `bun run build` e checar bundle (alerta se >500KB por chunk).
+- Validar hydration sem warning.
+
+---
+
+## 10. Pré-deploy
+
+- `tsc --noEmit` + build verde.
+- Smoke manual: criar projeto → ebook → copy → criativos → página → checkout → escala → exportar tudo → fechar aba → reabrir → estado intacto.
+- Verificar `cloud_status` ACTIVE_HEALTHY.
+
+---
+
+## Ordem de execução
+
+1. Migração `ai_history` + admin policies (aprovação do usuário).
+2. `seeding.server.ts` + gatilhos cross-módulo.
+3. `useAutosave` + `AutosaveProvider` + aplicar nos tabs.
+4. `SaveToProjectButton` + integrar nos standalones.
+5. `recordAi` em todas server fns + aba Histórico IA no workspace.
+6. Auditoria Playbook.
+7. `openExternal` + sweep de links.
+8. Branding EscalaFlow (após user enviar logo/cor).
+9. Performance pass + build final.
+
+---
+
+## Arquivos novos
+
+- `src/lib/project/seeding.server.ts`
+- `src/lib/ai/history.server.ts`, `src/lib/ai/history.functions.ts`
+- `src/hooks/useAutosave.ts`, `src/hooks/useDraftRecovery.ts`
+- `src/providers/AutosaveProvider.tsx`
+- `src/components/pipeline/SaveToProjectButton.tsx`
+- `src/components/project/AiHistoryTab.tsx`
+- `src/lib/external/openExternal.ts`
+- Migração SQL: `ai_history` + admin policies.
+
+## Arquivos editados
+
+- Todos os `*Tab.tsx` (project), `Standalone*.tsx`, `EbookHub.tsx`, `produtos.playbook.*.tsx`.
+- Server fns de geração (copy, sales-page, ads-creative, ebook, playbook) → adicionar `recordAi` + `seedFromModule`.
+- `__root.tsx`, `index.html`, `_authenticated.tsx` para branding.
+- `AppHeader.tsx` para indicador autosave global.
+
+## Entregável final
+
+Ao concluir, lista:
+- **100% operacionais**: módulos validados ponta-a-ponta com semeadura, autosave, histórico, save-to-project.
+- **Parciais**: o que ficou para próxima rodada.
+- **Dependências Supabase pendentes**: migrations a aprovar, secrets a configurar.
+- **Pronto para deploy**: checklist verde (build, smoke, RLS, branding).
+
+---
+
+## Pergunta antes de começar
+
+Para o item 8 (branding) preciso de:
+- **Cor primária** (hex ou oklch).
+- **Logo** (PNG/SVG transparente) — ou autorizo gerar uma temporária com IA?
+- **Nome final** confirmado: "EscalaFlow"?
+
+Se preferir, executo 1–7 e 9 primeiro e deixo branding (8) por último quando você enviar os assets.
