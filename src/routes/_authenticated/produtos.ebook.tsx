@@ -269,7 +269,12 @@ function EbookPage() {
     try {
       const row = (await fnLoad({ data: { id } })) as Record<string, unknown>;
       setEbookId(id);
-      setBriefing((row.briefing as Briefing) ?? null);
+      const b = (row.briefing as (Briefing & { identity?: Identity; extras?: Extras; finalCta?: string; pages?: ProductSize }) | null) ?? null;
+      setBriefing(b);
+      if (b?.identity) setIdentity({ author: b.identity.author ?? "", brand: b.identity.brand ?? "", bio: b.identity.bio ?? "" });
+      if (b?.extras) setExtras(b.extras);
+      if (typeof b?.finalCta === "string") setFinalCta(b.finalCta);
+      if (b?.pages && (PRODUCT_SIZES as readonly number[]).includes(b.pages)) setPages(b.pages as ProductSize);
       setOutline((row.outline as Outline) ?? []);
       setChapters((row.chapters as Chapter[]) ?? []);
       setLayout((row.layout as EbookLayout) ?? "classico");
