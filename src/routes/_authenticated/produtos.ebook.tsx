@@ -110,6 +110,10 @@ function EbookPage() {
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [outline, setOutline] = useState<Outline>([]);
   const [chapterCount, setChapterCount] = useState(6);
+  const [pages, setPages] = useState<ProductSize>(60);
+  const [identity, setIdentity] = useState<Identity>({ author: "", brand: "", bio: "" });
+  const [extras, setExtras] = useState<Extras | null>(null);
+  const [finalCta, setFinalCta] = useState<string>("Acesse o link abaixo e dê o próximo passo agora.");
   const [mode, setMode] = useState<EbookMode>("kdp");
   const [layout, setLayout] = useState<EbookLayout>("classico");
   const [style, setStyle] = useState<EbookStyle>("clean");
@@ -131,6 +135,7 @@ function EbookPage() {
   const fnChapter = useServerFn(generateEbookChapter);
   const fnChapterImg = useServerFn(generateEbookChapterImage);
   const fnCover = useServerFn(generateEbookCover);
+  const fnExtras = useServerFn(generateEbookExtras);
   const fnSave = useServerFn(saveEbookDraft);
   const fnList = useServerFn(listEbookDrafts);
   const fnLoad = useServerFn(loadEbookDraft);
