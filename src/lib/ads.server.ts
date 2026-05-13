@@ -78,6 +78,11 @@ export const CreativeSchema = z.object({
   estrutura: z.string(),
   emocao: z.string(),
   angulo: z.string(),
+  body: z.string().default(""),
+  caption: z.string().default(""),
+  shortScript: z.string().default(""),
+  imagePrompt: z.string().default(""),
+  videoPrompt: z.string().default(""),
 });
 export type Creative = z.infer<typeof CreativeSchema>;
 
