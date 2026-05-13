@@ -40,10 +40,14 @@ import {
 } from "@/lib/queries";
 import logoHorizontal from "@/assets/brand/logo-horizontal.png";
 import logoMark from "@/assets/brand/logo-mark.png";
+import logoMono from "@/assets/brand/logo-mono.png";
+import { useTheme } from "@/providers/ThemeProvider";
 
 export function AppSidebar() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const { theme } = useTheme();
+  const horizontalSrc = theme === "dark" ? logoMono : logoHorizontal;
   const [favCount, setFavCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [scaledCount, setScaledCount] = useState(0);
@@ -87,19 +91,23 @@ export function AppSidebar() {
   ];
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2" aria-label="EscalaFlow">
+      <SidebarHeader className="border-b border-sidebar-border/60">
+        <Link
+          to="/dashboard"
+          className="flex items-center gap-2 px-3 py-4 transition-opacity duration-300 animate-fade-in group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:py-3 group-data-[collapsible=icon]:justify-center"
+          aria-label="EscalaFlow"
+        >
           <img
             src={logoMark}
             alt=""
-            width={28}
-            height={28}
-            className="h-7 w-7 shrink-0 group-data-[collapsible=icon]:block hidden"
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:block hidden"
           />
           <img
-            src={logoHorizontal}
+            src={horizontalSrc}
             alt="EscalaFlow"
-            className="h-7 w-auto group-data-[collapsible=icon]:hidden dark:invert dark:brightness-200"
+            className="h-10 w-auto group-data-[collapsible=icon]:hidden"
           />
         </Link>
       </SidebarHeader>
@@ -111,7 +119,11 @@ export function AppSidebar() {
               <SidebarMenu>
                 {g.items.map((it) => (
                   <SidebarMenuItem key={it.to}>
-                    <SidebarMenuButton asChild isActive={path === it.to}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={path === it.to}
+                      className="relative transition-colors duration-200 hover:bg-sidebar-accent/60 data-[active=true]:bg-sidebar-accent data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-0.5 data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary"
+                    >
                       <Link to={it.to} className="flex items-center gap-3">
                         <it.icon className="h-4 w-4" />
                         <span className="flex-1">{it.label}</span>
