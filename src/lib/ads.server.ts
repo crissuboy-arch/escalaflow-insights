@@ -78,6 +78,11 @@ export const CreativeSchema = z.object({
   estrutura: z.string(),
   emocao: z.string(),
   angulo: z.string(),
+  body: z.string().default(""),
+  caption: z.string().default(""),
+  shortScript: z.string().default(""),
+  imagePrompt: z.string().default(""),
+  videoPrompt: z.string().default(""),
 });
 export type Creative = z.infer<typeof CreativeSchema>;
 
@@ -129,6 +134,8 @@ function userPrompt(opts: {
 PLATAFORMA: ${plat?.name} (${plat?.desc})
 OBJETIVO: ${obj?.name} — ${obj?.desc}
 FORMATO: ${fmt?.name} — ${fmt?.description}
+GATILHO MENTAL DO FORMATO: ${(fmt as { gatilho?: string } | undefined)?.gatilho ?? "—"}
+USO ESTRATÉGICO DO FORMATO: ${(fmt as { uso?: string } | undefined)?.uso ?? "—"}
 DIMENSÃO: ${opts.dimension}
 TIPO PRINCIPAL: ${isVideo ? "vídeo vertical (roteiro com cortes/falas)" : "estática (composição visual)"}
 
@@ -152,7 +159,12 @@ Devolva EXATAMENTE este JSON:
       "headline": "headline curta (até 80 chars)",
       "cta": "CTA específico (até 50 chars)",
       "copy": "${isVideo ? "roteiro completo com cortes [CORTE 1] [CORTE 2]…" : "copy completa do criativo"}",
-      "visualPrompt": "prompt visual em INGLÊS pronto para Midjourney/DALL·E/Leonardo descrevendo composição, cores, mood, tipografia e detalhes do formato ${fmt?.name}. Inclua aspecto ${opts.dimension}.",
+      "body": "corpo de texto principal do criativo em PT-BR — pronto para ser sobreposto na peça (sem markdown, frases diretas, quebras de linha curtas)",
+      "caption": "legenda pronta para Instagram/TikTok/Facebook em PT-BR com gancho na 1ª linha, micro-storytelling, CTA e 5 hashtags relevantes ao final",
+      "shortScript": "roteiro curto de 15–30s para vídeo vertical com [CENA 1], [CENA 2], [CENA 3] e fala/legenda em cada cena — mesmo se o formato for estático, descreva como adaptar para vídeo",
+      "imagePrompt": "prompt em INGLÊS pronto para Midjourney/DALL·E/Nano Banana descrevendo composição, cores, mood, tipografia e detalhes específicos do formato ${fmt?.name}. Inclua aspect ratio ${opts.dimension}.",
+      "videoPrompt": "prompt em INGLÊS pronto para Sora/Runway/Veo descrevendo cenas, movimento de câmera, iluminação e duração total (~15s). Aspect ratio ${opts.dimension}.",
+      "visualPrompt": "(mesmo conteúdo de imagePrompt — manter retrocompatibilidade)",
       "estrutura": "descrição rápida da estrutura do criativo (camadas, ordem visual)",
       "emocao": "emoção dominante a evocar",
       "angulo": "ângulo criativo desta peça"

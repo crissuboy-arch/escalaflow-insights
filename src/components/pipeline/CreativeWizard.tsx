@@ -5,7 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowLeft, ArrowRight, Wand2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Loader2, ArrowLeft, ArrowRight, Wand2, Check, Info } from "lucide-react";
 import {
   ADS_FORMATS,
   DIMENSIONS,
@@ -20,8 +26,8 @@ import { Stepper, type Step } from "./Stepper";
 import { StandaloneBriefingForm } from "./StandaloneBriefingForm";
 import { CreativeCard } from "./CreativeCard";
 import {
-  generateCreative,
   generateCreativeVariations,
+  generateMultiFormatCreatives,
 } from "@/lib/ads-creative.functions";
 import type { Creative } from "@/lib/ads.server";
 import type { StandaloneBriefing } from "@/lib/standalone/briefing";
@@ -30,65 +36,84 @@ import { cn } from "@/lib/utils";
 const STEPS: Step[] = [
   { id: "platform", label: "Plataforma" },
   { id: "objective", label: "Objetivo" },
-  { id: "format", label: "Formato" },
+  { id: "format", label: "Formato (até 3)" },
   { id: "briefing", label: "Briefing" },
   { id: "result", label: "Resultado" },
 ];
 
+type ResultRow = { formatId: AdsFormatId; creative: Creative };
+
 export function CreativeWizard() {
-  const gen = useServerFn(generateCreative);
+  const genMulti = useServerFn(generateMultiFormatCreatives);
   const genVar = useServerFn(generateCreativeVariations);
 
   const [step, setStep] = useState(0);
   const [platform, setPlatform] = useState<PlatformId | null>(null);
   const [objective, setObjective] = useState<ObjectiveId | null>(null);
-  const [formatId, setFormatId] = useState<AdsFormatId | null>(null);
+  const [formatIds, setFormatIds] = useState<AdsFormatId[]>([]);
   const [dimension, setDimension] = useState<Dimension>("9:16");
   const [briefing, setBriefing] = useState<StandaloneBriefing | null>(null);
   const [busy, setBusy] = useState(false);
-  const [results, setResults] = useState<Creative[]>([]);
+  const [results, setResults] = useState<ResultRow[]>([]);
   const [search, setSearch] = useState("");
 
   const completed = useMemo(() => {
     const s = new Set<string>();
     if (platform) s.add("platform");
     if (objective) s.add("objective");
-    if (formatId) s.add("format");
+    if (formatIds.length) s.add("format");
     if (briefing) s.add("briefing");
     if (results.length) s.add("result");
     return s;
-  }, [platform, objective, formatId, briefing, results]);
+  }, [platform, objective, formatIds, briefing, results]);
 
-  const filteredFormats = ADS_FORMATS.filter((f) =>
-    !search ? true : (f.name + f.description).toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredFormats = ADS_FORMATS.filter((f) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      f.name.toLowerCase().includes(q) ||
+      f.description.toLowerCase().includes(q) ||
+      (f.gatilho ?? "").toLowerCase().includes(q)
+    );
+  });
+
+  const toggleFormat = (id: AdsFormatId) => {
+    setFormatIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 3) {
+        toast.warning("Você pode escolher no máximo 3 formatos.");
+        return prev;
+      }
+      return [...prev, id];
+    });
+  };
 
   const runGenerate = async (b: StandaloneBriefing) => {
-    if (!platform || !objective || !formatId) return;
+    if (!platform || !objective || !formatIds.length) return;
     setBriefing(b);
     setBusy(true);
     setResults([]);
     try {
-      const r = await gen({
+      const r = await genMulti({
         data: {
           source: { kind: "standalone", briefing: b },
           platform,
           objective,
-          formatId,
+          formatIds,
           dimension,
         },
       });
-      setResults([r.creative]);
+      setResults(r.results as ResultRow[]);
       setStep(4);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar criativo");
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar criativos");
     } finally {
       setBusy(false);
     }
   };
 
-  const runVariations = async () => {
-    if (!platform || !objective || !formatId || !briefing) return;
+  const runVariations = async (formatId: AdsFormatId) => {
+    if (!platform || !objective || !briefing) return;
     setBusy(true);
     try {
       const r = await genVar({
@@ -101,7 +126,10 @@ export function CreativeWizard() {
           count: 3,
         },
       });
-      setResults((prev) => [...prev, ...r.creatives]);
+      setResults((prev) => [
+        ...prev,
+        ...r.creatives.map((creative) => ({ formatId, creative })),
+      ]);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao gerar variações");
     } finally {
@@ -153,8 +181,8 @@ export function CreativeWizard() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar formato…"
-              className="max-w-xs"
+              placeholder="Buscar formato (nome, descrição, gatilho)…"
+              className="max-w-sm"
             />
             <div className="flex gap-1">
               {DIMENSIONS.map((d) => (
@@ -169,22 +197,33 @@ export function CreativeWizard() {
                 </Button>
               ))}
             </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Badge variant="secondary">{formatIds.length}/3 selecionados</Badge>
+              <Button
+                size="sm"
+                disabled={formatIds.length === 0}
+                onClick={() => setStep(3)}
+              >
+                Continuar <ArrowRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
           </div>
-          <Grid>
-            {filteredFormats.map((f) => (
-              <PickCard
-                key={f.id}
-                active={formatId === f.id}
-                title={f.name}
-                desc={f.description}
-                tag={f.emocao}
-                onClick={() => {
-                  setFormatId(f.id);
-                  setStep(3);
-                }}
-              />
-            ))}
-          </Grid>
+          <TooltipProvider delayDuration={150}>
+            <Grid>
+              {filteredFormats.map((f) => (
+                <FormatCard
+                  key={f.id}
+                  active={formatIds.includes(f.id as AdsFormatId)}
+                  title={f.name}
+                  desc={f.description}
+                  gatilho={f.gatilho}
+                  uso={f.uso}
+                  emocao={f.emocao}
+                  onClick={() => toggleFormat(f.id as AdsFormatId)}
+                />
+              ))}
+            </Grid>
+          </TooltipProvider>
         </div>
       )}
 
@@ -194,7 +233,13 @@ export function CreativeWizard() {
             items={[
               { label: "Plataforma", value: PLATFORMS.find((p) => p.id === platform)?.name },
               { label: "Objetivo", value: OBJECTIVES.find((o) => o.id === objective)?.name },
-              { label: "Formato", value: ADS_FORMATS.find((f) => f.id === formatId)?.name },
+              {
+                label: "Formatos",
+                value: formatIds
+                  .map((id) => ADS_FORMATS.find((f) => f.id === id)?.name)
+                  .filter(Boolean)
+                  .join(", "),
+              },
               { label: "Dimensão", value: dimension },
             ]}
           />
@@ -202,7 +247,7 @@ export function CreativeWizard() {
             module="criativos"
             onReady={runGenerate}
             busy={busy}
-            submitLabel="Gerar Criativo com IA"
+            submitLabel={`Gerar ${formatIds.length} criativo${formatIds.length > 1 ? "s" : ""} com IA`}
           />
         </div>
       )}
@@ -213,37 +258,41 @@ export function CreativeWizard() {
             items={[
               { label: "Plataforma", value: PLATFORMS.find((p) => p.id === platform)?.name },
               { label: "Objetivo", value: OBJECTIVES.find((o) => o.id === objective)?.name },
-              { label: "Formato", value: ADS_FORMATS.find((f) => f.id === formatId)?.name },
               { label: "Dimensão", value: dimension },
+              { label: "Total", value: `${results.length} peça(s)` },
             ]}
           />
           <div className="flex flex-wrap gap-2">
-            <Button onClick={runVariations} disabled={busy}>
-              {busy ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Wand2 className="mr-2 h-4 w-4" />
-              )}
-              Gerar 3 variações
-            </Button>
             <Button variant="outline" onClick={() => setStep(2)}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Trocar formato
+              <ArrowLeft className="mr-2 h-4 w-4" /> Trocar formatos
             </Button>
+            {busy && (
+              <span className="inline-flex items-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Gerando…
+              </span>
+            )}
           </div>
           <div className="space-y-4">
-            {results.map((c, i) => (
-              <CreativeCard
-                key={i}
-                id={`${formatId}-${i}-${Date.now()}`}
-                creative={c}
-                meta={{
-                  platform: PLATFORMS.find((p) => p.id === platform)?.name ?? "",
-                  objective: OBJECTIVES.find((o) => o.id === objective)?.name ?? "",
-                  format: ADS_FORMATS.find((f) => f.id === formatId)?.name ?? "",
-                  dimension,
-                }}
-              />
-            ))}
+            {results.map((row, i) => {
+              const fmt = ADS_FORMATS.find((f) => f.id === row.formatId);
+              return (
+                <CreativeCard
+                  key={`${row.formatId}-${i}`}
+                  id={`${row.formatId}-${i}`}
+                  creative={row.creative}
+                  meta={{
+                    platform: PLATFORMS.find((p) => p.id === platform)?.name ?? "",
+                    objective: OBJECTIVES.find((o) => o.id === objective)?.name ?? "",
+                    format: fmt?.name ?? row.formatId,
+                    dimension,
+                    gatilho: fmt?.gatilho,
+                    uso: fmt?.uso,
+                  }}
+                  onVariations={() => runVariations(row.formatId)}
+                  variationsBusy={busy}
+                />
+              );
+            })}
           </div>
         </div>
       )}
@@ -266,7 +315,7 @@ export function CreativeWizard() {
             step === STEPS.length - 1 ||
             (step === 0 && !platform) ||
             (step === 1 && !objective) ||
-            (step === 2 && !formatId) ||
+            (step === 2 && formatIds.length === 0) ||
             (step === 3 && !briefing)
           }
           onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
@@ -286,13 +335,11 @@ function PickCard({
   active,
   title,
   desc,
-  tag,
   onClick,
 }: {
   active: boolean;
   title: string;
   desc: string;
-  tag?: string;
   onClick: () => void;
 }) {
   return (
@@ -306,16 +353,76 @@ function PickCard({
           : "border-border/60 bg-card/40 hover:border-border",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="font-semibold">{title}</p>
-        {tag && (
-          <Badge variant="outline" className="text-[10px]">
-            {tag}
-          </Badge>
-        )}
-      </div>
+      <p className="font-semibold">{title}</p>
       <p className="mt-1 text-xs text-muted-foreground">{desc}</p>
     </button>
+  );
+}
+
+function FormatCard({
+  active,
+  title,
+  desc,
+  gatilho,
+  uso,
+  emocao,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  desc: string;
+  gatilho?: string;
+  uso?: string;
+  emocao?: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          className={cn(
+            "group relative rounded-xl border p-4 text-left transition",
+            active
+              ? "border-primary bg-card shadow-[0_0_24px_-12px_hsl(var(--primary)/0.6)] ring-1 ring-primary/40"
+              : "border-border/60 bg-card/40 hover:border-border",
+          )}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold leading-tight">{title}</p>
+            <div className="flex items-center gap-1">
+              {emocao && (
+                <Badge variant="outline" className="text-[10px]">
+                  {emocao}
+                </Badge>
+              )}
+              {active ? (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Check className="h-3 w-3" />
+                </span>
+              ) : (
+                <Info className="h-3.5 w-3.5 text-muted-foreground/60" />
+              )}
+            </div>
+          </div>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{desc}</p>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs space-y-1">
+        <p className="text-xs font-semibold">{title}</p>
+        {gatilho && (
+          <p className="text-xs">
+            <span className="font-medium text-primary">Gatilho:</span> {gatilho}
+          </p>
+        )}
+        {uso && (
+          <p className="text-xs">
+            <span className="font-medium text-primary">Uso:</span> {uso}
+          </p>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

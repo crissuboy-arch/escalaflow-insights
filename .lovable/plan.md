@@ -1,103 +1,118 @@
-## Finalizar módulos Criar Ebook e Criar Playbook
+## Escopo
 
-Escopo: completar campos faltantes, integrar entradas/saídas reais e fechar o que já existe. **Sem nova rota, sem novo módulo, sem mexer em visual.**
+Apenas dois módulos: **Copy de Vendas** (`/copy`) e **Criativos & Anúncios** (`/criativos`). Não toco em Página, Checkout, Escala, Auth ou Branding nesta rodada.
 
----
-
-### 1. Ebook — campos do autor
-
-`src/routes/_authenticated/produtos.ebook.tsx` + tipo `Briefing` local:
-
-- Adicionar painel **"Identidade do autor"** no Step 1 (Briefing): `authorName`, `authorBio`, `brand` (opcional). Persistido em `briefing.identity` (já é jsonb, não precisa migração).
-- Passar `identity` via `opts.identity` para `aiGenerateOutline` e `aiGenerateChapter` (server.ts já aceita).
-- Renderizado nos exports (ver §5).
-
-### 2. Ebook — seletor de páginas (20/30/60/80/100/120/150)
-
-`PRODUCT_SIZES` e `sizeSpec()` já existem em `src/lib/ebook/niches.ts` mas a UI só expõe `chapterCount`.
-
-- Substituir o `Input number` de capítulos no Step 2 por um grupo de chips com os 7 tamanhos.
-- Ao escolher tamanho: derivar `chapterCount = sizeSpec(pages).chapters`, salvar `pages` em `briefing.size = sizeSpec(pages)`.
-- Passar `size` para `aiGenerateChapter` (já aceita `opts.size`) — controla `wordsPerChapter` e blocos extras (storytelling/exemplo/exercício/FAQ/bônus).
-- Manter o input numérico de capítulos como ajuste fino, default vindo do tamanho.
-
-### 3. Ebook — catálogo de estilos cobrindo as 12 categorias pedidas
-
-`src/lib/ebook/styles.ts`:
-
-- Estender `STYLES[]` com: `low-ticket`, `apostila`, `planner`, `receita`, `emagrecimento`, `beleza`, `romance`, `negocio`, `plr` (KDP, premium, infantil já existem).
-- Cada um com `mode`/`layout`/`promptHint` adequados (KDP para apostila/planner/PLR; premium para receita/beleza/romance; etc.).
-- `EBOOK_CATEGORIES` ajustado para casar 1‑para‑1 com os IDs novos.
-
-### 4. Ebook — Sumário, Conclusão, Sobre o Autor, CTA final
-
-A função `aiGenerateBookExtras` em `ebook.server.ts` já existe e devolve `{ introduction, conclusion, aboutAuthor, bonus }` mas **nunca é chamada**.
-
-- Novo server fn `generateEbookExtras` em `src/lib/ebook.functions.ts` (wrapper).
-- No Step 4 (Capítulos & exportar): botão **"Gerar introdução, conclusão, sobre o autor e bônus"** + edição inline.
-- Estado novo `extras: BookExtras | null` salvo em `briefing.extras`.
-- Estender `DraftPayloadSchema` (briefing já é record genérico — só garantir que `extras` é serializado no autosave).
-- Adicionar campo separado **"CTA final"** (string editável, default `"Acesse [link] e dê o próximo passo."`) salvo em `briefing.finalCta`.
-
-### 5. Ebook — PDF/DOCX premium (sumário + extras + autor)
-
-`src/lib/ebook/pdf.ts` e `src/lib/ebook/docx.ts`:
-
-- **PDF**: capa com `identity.author`; nova página de **Sumário** numerada (parsea `chapters[].title`); página de **Introdução** antes do cap. 1; página de **Conclusão + CTA final** após o último capítulo; página de **Sobre o autor** com `authorName + authorBio`; página de **Bônus** se houver.
-- **DOCX**: usa `TableOfContents` (já importado mas não usado); paragráfos para intro/conclusão/CTA/autor/bônus; mantém imagens de capítulo se existentes.
-- Atualizar tipos `EbookPdfInput`/`EbookDocxInput` com `identity`, `extras`, `finalCta`.
-
-### 6. Playbook — criar a partir do Ebook
-
-`src/routes/_authenticated/produtos.ebook.tsx`:
-
-- Botão **"Criar Playbook a partir deste Ebook"** no Step 4, chama `navigate({ to: "/produtos/playbook/novo", search: { fromEbook: ebookId } })`.
-
-`src/routes/_authenticated/produtos.playbook.novo.tsx`:
-
-- Ao montar, ler `?fromEbook=<id>`. Se presente: chamar `loadEbookDraft({id})` (já existe), montar `briefing` Playbook com base no briefing do ebook (mapear `title/niche/promise/avatar/uniqueMechanism/pains/desires`) e pular Step 0 (anúncio). Skip do `selectedAd` (já trata `selectedAd` opcional na chamada `saveFn`).
-- Pré-popular `outline` com os títulos de `ebook.outline` se quiser ("usar capítulos como cenas").
-
-### 7. Playbook — criar do zero (sem anúncio)
-
-`src/routes/_authenticated/produtos.playbook.novo.tsx`:
-
-- No Step 0, adicionar botão **"Começar do zero"** ao lado do "Gerar briefing". Ao clicar: setar `briefing` vazio (`{ title:"", niche:"", promise:"", avatar:"", uniqueMechanism:"", pains:[], desires:[] }`) e ir direto para Step 1 (briefing manual).
-- `onOutline` já tem fallback local — funciona mesmo sem IA.
-- `selectedAd` continua opcional ao salvar (`source_ad_key` aceita `null`).
-
-### 8. Playbook — Estratégia já gera tudo pedido
-
-A função `aiGeneratePlaybookStrategy` já cobre: bigIdea, promise, uniqueMechanism, avatar, pains, desires, objections, mentalTriggers, headlines, vslStructure, pageStructure, funnel, offer, bonuses, stack, cta, scripts, angles, scale. Já existe botão **"Estratégia"** no leitor (`/produtos/playbook/$id`). **Sem mudança aqui** — apenas garantir que o sheet aparece e a chamada funciona (já testado com migração `has_role` corrigida).
-
-### 9. Correções diversas
-
-- Garantir que `i18n/locales/pt.json` tem chaves usadas em `PdfUploadCard` e no leitor de Playbook (assumir já existentes; se faltarem, adicionar).
-- Autosave do ebook: incluir `extras`, `identity`, `finalCta`, `pages` em `briefing` para não perder estado.
-- Tipo `Briefing` do route file: estender com `identity`, `extras`, `finalCta`, `size`.
+A infraestrutura existente é mantida — projeto vs avulso, gateway IA, persistência em `projects.meta` e `ai_history`. Apenas estendo schemas, catálogo e UI.
 
 ---
 
-### Arquivos editados
+## 1) Copy de Vendas
 
-- `src/routes/_authenticated/produtos.ebook.tsx` — identidade, seletor de páginas, extras, CTA final, botão "Criar Playbook a partir deste Ebook"
-- `src/routes/_authenticated/produtos.playbook.novo.tsx` — botão "Começar do zero", import por `?fromEbook=`
-- `src/lib/ebook.functions.ts` — novo `generateEbookExtras`
-- `src/lib/ebook/styles.ts` — 9 estilos novos + categorias
-- `src/lib/ebook/pdf.ts` — sumário, intro, conclusão+CTA, sobre o autor, bônus
-- `src/lib/ebook/docx.ts` — TableOfContents real, intro, conclusão+CTA, autor, bônus
+### Mudanças no servidor
+**`src/lib/copy.server.ts`**
+- Estender `SalesCopySchema` com novos campos:
+  - `vslScript: string` — roteiro de VSL (lead, dor, mecanismo, oferta, garantia, CTA)
+  - `shortCopy: string` — copy curta (anúncio/Stories ~300 caracteres)
+  - `longCopy: string` — copy longa (já existe como `fullCopy`; renomeio mental, mantenho `fullCopy` por retrocompat)
+  - `checkoutCopy: string` — copy de checkout (acima do botão, reforça oferta + garantia)
+- Atualizar `buildPrompt` para pedir todos os campos novos no JSON.
+- Atualizar `SYSTEM` para mencionar suporte a qualquer tipo de produto.
 
-### Arquivos novos
+**`src/lib/standalone/briefing.ts`**
+- Acrescentar enum sugerido de `productType` (UI vai sugerir, não bloquear): `ebook | curso | plr | fisico | amazon | shopee | saas | afiliado | servico | outro`. Mantém `z.string()` no schema (sem breaking change).
 
-Nenhum (tudo cabe nos arquivos existentes).
+### Mudanças na UI
+**`src/components/pipeline/StandaloneBriefingForm.tsx`**
+- Trocar input de "Tipo do produto" por `Select` shadcn com as 10 opções acima + "Outro" (free text quando "Outro").
 
-### Banco de dados
+**`src/components/pipeline/CopyResult.tsx`**
+- Adicionar 4 novos cards: "Copy Curta", "Copy de Checkout", "Roteiro VSL" e renomear seção da copy longa para "Copy Longa". Cada um com botão Copiar.
+- Tornar opcional o render quando o campo vier vazio (compatibilidade com gerações antigas em `projects.meta.copy`).
 
-Sem migração. `briefing` já é `jsonb`; `identity`, `extras`, `finalCta`, `size` ficam dentro dele.
+### Modo "projeto"
+Já funciona — só adapto o `CopyContext` para passar `productType` se vier do briefing do projeto.
 
-### O que não fazer
+---
 
-- Não criar nova rota.
-- Não alterar visual/branding.
-- Não mexer em outros módulos da esteira (copy, criativos, página, checkout, escala).
-- Não tocar em `client.ts`/`types.ts` Supabase.
+## 2) Criativos & Anúncios — 40 formatos
+
+### Catálogo
+**`src/lib/ads/catalog.ts`** — substituir `ADS_FORMATS` pelos exatos 40 itens enviados pelo usuário, na mesma ordem (1–40). Cada formato vira:
+```ts
+{ id, name, description, emocao, angulo, gatilho, uso }
+```
+Onde:
+- `gatilho` — gatilho mental dominante (ex: "prova social", "autoridade", "urgência", "curiosidade", "pertencimento").
+- `uso` — quando/como usar (ex: "topo de funil — alta retenção", "remarketing — fechar venda", "validação — feed orgânico").
+
+Os campos `gatilho` e `uso` alimentam o **Tooltip** na UI de seleção.
+
+### Schema do criativo
+**`src/lib/ads.server.ts`** — estender `CreativeSchema`:
+```ts
+{
+  hook, headline, body, cta,
+  caption,        // legenda pronta para Instagram/TikTok com hashtags
+  shortScript,    // roteiro curto 15–30s (cenas + falas)
+  imagePrompt,    // prompt MidJourney/DALL-E/Nano Banana para imagem
+  videoPrompt,    // prompt Sora/Runway para vídeo
+  estrutura, emocao, angulo
+}
+```
+Mantenho `visualPrompt` como alias de `imagePrompt` para retrocompat com criativos já salvos. `copy` legado vira `body`.
+
+Atualizar `userPrompt` para pedir todos os campos no JSON e mencionar gatilho/uso do formato selecionado.
+
+### Multi-seleção até 3 formatos
+**`src/lib/ads-creative.functions.ts`** — adicionar nova server fn:
+```ts
+generateMultiFormatCreatives({ source, platform, objective, formatIds: string[] (1-3), dimension })
+```
+Internamente itera por formato e chama `aiGenerateCreative` (Promise.all com cap de 3). Devolve `{ creatives: Array<{ formatId, creative }> }`. Persiste todas em `projects.meta.creatives` e em `ai_history`.
+
+### Wizard reformulado
+**`src/components/pipeline/CreativeWizard.tsx`** — passo "Formato" passa a:
+- Grid de 40 cards com ícone + nome + descrição curta.
+- `Tooltip` (shadcn) no hover com **Gatilho** e **Uso**.
+- Checkbox de seleção; até 3 simultâneos. Contador "2/3 selecionados".
+- Busca por nome/gatilho mantida.
+- Botão "Continuar" habilitado com 1–3 formatos.
+
+Passo "Resultado":
+- Renderiza um `CreativeCard` por formato gerado, com label do formato.
+- Botão "Gerar 3 variações" passa a operar **por card** (nova prop callback no `CreativeCard`).
+
+**`src/components/pipeline/CreativeCard.tsx`** — adicionar campos novos:
+- Seções: Headline, Corpo, CTA, Legenda, Roteiro Curto, Prompt de Imagem, Prompt de Vídeo.
+- Botão "Copiar prompt" individual em cada bloco de prompt.
+- Botão **Exportar** (popover): copia tudo como Markdown OU baixa `.txt` com nome `criativo-<formato>-<data>.txt`. Sem dependências novas — usa `Blob` + `URL.createObjectURL`.
+
+### Persistência
+- `projects.meta.creatives` já é `unknown[]`. Apenas adicionamos os novos campos; nada quebra.
+- `ai_history` continua recebendo prompt+response.
+
+---
+
+## 3) Verificação final
+
+1. `bun run build` deve passar sem erros — checar typecheck dos novos campos.
+2. Geração avulsa de copy com `productType="amazon"` retorna todos os 4 novos campos.
+3. Geração de criativos com 3 formatos selecionados retorna 3 cards distintos com gatilho/uso visível.
+4. Botões Copiar e Exportar funcionando.
+5. Sem regressão em projetos existentes (campos antigos continuam renderizando).
+
+---
+
+## Arquivos editados (estimativa)
+
+- `src/lib/copy.server.ts` — estender schema + prompt
+- `src/lib/standalone/briefing.ts` — sugestões de productType (sem breaking)
+- `src/lib/ads/catalog.ts` — 40 formatos com gatilho/uso
+- `src/lib/ads.server.ts` — estender CreativeSchema + prompt
+- `src/lib/ads-creative.functions.ts` — `generateMultiFormatCreatives`
+- `src/components/pipeline/StandaloneBriefingForm.tsx` — Select de tipo
+- `src/components/pipeline/CopyResult.tsx` — 4 novas seções
+- `src/components/pipeline/CreativeWizard.tsx` — multi-select + tooltips
+- `src/components/pipeline/CreativeCard.tsx` — novos campos + exportar
+
+Sem novas tabelas, sem novas migrações, sem novas dependências.

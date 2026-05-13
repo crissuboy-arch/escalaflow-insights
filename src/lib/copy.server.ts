@@ -79,6 +79,10 @@ export const SalesCopySchema = z.object({
   guarantee: z.string(),
   cta: z.string(),
   fullCopy: z.string(),
+  shortCopy: z.string().default(""),
+  longCopy: z.string().default(""),
+  checkoutCopy: z.string().default(""),
+  vslScript: z.string().default(""),
 });
 
 export type SalesCopy = z.infer<typeof SalesCopySchema>;
@@ -139,7 +143,11 @@ Devolva EXATAMENTE este JSON (sem nada antes ou depois):
   "offer": "descrição da oferta completa (produto + bônus + condição)",
   "guarantee": "frase de garantia",
   "cta": "CTA principal (até 60 chars)",
-  "fullCopy": "copy longa completa em markdown, pronta para colar numa página de vendas, com headline, subheadline, lead, dor, mecanismo, benefícios, prova, oferta, bônus, garantia, FAQ e CTA"
+  "fullCopy": "copy longa completa em markdown, pronta para colar numa página de vendas, com headline, subheadline, lead, dor, mecanismo, benefícios, prova, oferta, bônus, garantia, FAQ e CTA",
+  "shortCopy": "copy curta para anúncio/Stories (até 350 caracteres) com hook, dor, promessa e CTA",
+  "longCopy": "copy longa estendida em markdown (mais detalhada que fullCopy quando fizer sentido — pode repetir fullCopy se já estiver completa)",
+  "checkoutCopy": "bloco de copy curto para checkout: reforço da oferta + garantia + CTA acima do botão (até 600 caracteres em markdown)",
+  "vslScript": "roteiro completo de VSL em markdown com seções [HOOK 0-15s], [LEAD 15-60s], [DOR], [MECANISMO ÚNICO], [PROVA], [OFERTA], [BÔNUS], [GARANTIA], [CTA] — pronto para gravar"
 }`;
 }
 

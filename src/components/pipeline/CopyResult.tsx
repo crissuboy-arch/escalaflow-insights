@@ -118,7 +118,29 @@ export function CopyResult({ copy }: { copy: SalesCopy }) {
           </pre>
         </CardContent>
       </Card>
+
+      <LongTextCard title="Copy Curta (anúncio / Stories)" text={copy.shortCopy} />
+      <LongTextCard title="Copy Longa" text={copy.longCopy} />
+      <LongTextCard title="Copy de Checkout" text={copy.checkoutCopy} />
+      <LongTextCard title="Roteiro de VSL" text={copy.vslScript} accent />
     </div>
+  );
+}
+
+function LongTextCard({ title, text, accent }: { title: string; text?: string; accent?: boolean }) {
+  if (!text || !text.trim()) return null;
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-5">
+        <div className="flex items-center justify-between">
+          <Badge variant={accent ? "default" : "secondary"}>{title}</Badge>
+          <CopyBtn text={text} label="Copiar" />
+        </div>
+        <pre className="max-h-[500px] overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-4 text-sm leading-relaxed">
+          {text}
+        </pre>
+      </CardContent>
+    </Card>
   );
 }
 
