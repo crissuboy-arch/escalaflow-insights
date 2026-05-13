@@ -192,6 +192,13 @@ export const createProjectFromOffer = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
+    // Pre-populate downstream modules' seeds so Copy / Página / Criativos /
+    // Checkout / Escala already render meaningful defaults the moment the user
+    // opens the project.
+    await seedFromModule(context.supabase, context.userId, out.id as string, "ebook", {
+      briefing,
+      outline: [],
+    });
     return { id: out.id as string };
   });
 
