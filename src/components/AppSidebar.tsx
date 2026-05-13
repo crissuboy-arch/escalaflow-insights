@@ -38,6 +38,8 @@ import {
   initAdActionsCache,
   subscribeChange,
 } from "@/lib/queries";
+import logoHorizontal from "@/assets/brand/logo-horizontal.png";
+import logoMark from "@/assets/brand/logo-mark.png";
 
 export function AppSidebar() {
   const { t } = useTranslation();
@@ -86,16 +88,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2">
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground font-bold"
-            style={{ background: "var(--gradient-primary)" }}
-          >
-            E
-          </div>
-          <span className="font-bold tracking-tight group-data-[collapsible=icon]:hidden">
-            EscalaFlow
-          </span>
+        <Link to="/dashboard" className="flex items-center gap-2 px-2 py-2" aria-label="EscalaFlow">
+          <img
+            src={logoMark}
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 group-data-[collapsible=icon]:block hidden"
+          />
+          <img
+            src={logoHorizontal}
+            alt="EscalaFlow"
+            className="h-7 w-auto group-data-[collapsible=icon]:hidden dark:invert dark:brightness-200"
+          />
         </Link>
       </SidebarHeader>
       <SidebarContent>
