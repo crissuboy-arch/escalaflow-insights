@@ -113,5 +113,81 @@
     "loading": "Cargando...",
     "all": "Todos",
     "any": "Cualquiera"
+  },
+  "playbook": {
+    "library": "Biblioteca",
+    "edit": "Editar",
+    "export": "Exportar",
+    "copyContent": "Copiar contenido",
+    "copySuccess": "Contenido copiado",
+    "copyFailed": "Error al copiar",
+    "copied": "Copiado",
+    "copy": "Copiar",
+    "presentationSoon": "Presentación (próximamente)",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "carousel": "Carrusel (PNG)",
+    "videoScript": "Guion de video",
+    "regenerate": "Regenerar",
+    "loadFailed": "Error al cargar",
+    "backToLibrary": "Volver a la biblioteca",
+    "scene": "Escena",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "noScenes": "Sin escenas. Edita este playbook para agregar contenido.",
+    "stageInfo": "Sobre esta etapa",
+    "exercise": "Ejercicio",
+    "practicalAction": "Acción práctica",
+    "strategy": {
+      "button": "Estrategia",
+      "title": "Estrategia completa",
+      "intro": "Genera la estrategia completa: Big Idea, Promesa, Mecanismo, Avatar, Dolores, Deseos, Objeciones, Disparadores, Titulares, VSL, Página, Embudo, Oferta, Bonos, Stack, CTA, Guiones, Ángulos y Plan de Escala.",
+      "generate": "Generar estrategia con IA",
+      "generated": "Estrategia generada",
+      "failed": "Error al generar la estrategia",
+      "blocks": {
+        "bigIdea": "Big Idea",
+        "promise": "Promesa",
+        "uniqueMechanism": "Mecanismo Único",
+        "avatar": "Avatar",
+        "pains": "Dolores",
+        "desires": "Deseos",
+        "objections": "Objeciones",
+        "mentalTriggers": "Disparadores Mentales",
+        "headlines": "Titulares",
+        "vslStructure": "Estructura VSL",
+        "pageStructure": "Estructura de Página",
+        "funnel": "Embudo",
+        "offer": "Oferta",
+        "bonuses": "Bonos",
+        "stack": "Stack de Valor",
+        "cta": "CTA",
+        "scripts": "Guiones",
+        "angles": "Ángulos Creativos",
+        "scale": "Plan de Escala"
+      }
+    },
+    "toasts": {
+      "docxGenerating": "Generando DOCX…",
+      "docxDone": "DOCX descargado",
+      "scriptGenerating": "Generando guion…",
+      "scriptDone": "Guion exportado",
+      "failed": "Falló"
+    }
+  },
+  "ebook": {
+    "pdfImport": {
+      "title": "Importar PDF y generar Ebook Premium",
+      "description": "Sube un PDF de referencia y la IA creará un ebook premium completo a partir del contenido.",
+      "dropHere": "Arrastra el PDF aquí o haz clic para seleccionar",
+      "selectFile": "Seleccionar PDF",
+      "parsing": "Leyendo PDF…",
+      "analyzing": "Analizando con IA…",
+      "success": "Briefing listo desde el PDF",
+      "errorTooLarge": "PDF mayor a 10 MB",
+      "errorNotPdf": "El archivo debe ser un PDF",
+      "errorParse": "No se pudo extraer texto del PDF",
+      "errorEmpty": "El PDF no tiene texto extraíble (¿escaneado?)"
+    }
   }
 }
