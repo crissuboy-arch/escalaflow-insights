@@ -34,6 +34,14 @@ const VariationsInputSchema = InputSchema.extend({
   count: z.number().min(2).max(5).default(3),
 });
 
+const MultiFormatInputSchema = z.object({
+  source: SourceSchema,
+  platform: PlatformEnum,
+  objective: ObjectiveEnum,
+  formatIds: z.array(FormatEnum).min(1).max(3),
+  dimension: DimensionEnum,
+});
+
 async function resolveBriefing(
   supabase: any,
   userId: string,
