@@ -64,21 +64,21 @@ function safeJSON(raw: unknown): unknown {
 }
 
 export const SalesPageSchema = z.object({
-  hero: z.string(),
-  headline: z.string(),
-  subheadline: z.string(),
-  lead: z.string(),
-  dor: z.string(),
-  mecanismo: z.string(),
-  beneficios: z.array(z.string()).min(3),
+  hero: z.string().default(""),
+  headline: z.string().default(""),
+  subheadline: z.string().default(""),
+  lead: z.string().default(""),
+  dor: z.string().default(""),
+  mecanismo: z.string().default(""),
+  beneficios: z.array(z.string()).default([]),
   objecoes: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
   depoimentos: z.array(z.object({ nome: z.string(), texto: z.string() })).default([]),
-  oferta: z.string(),
+  oferta: z.string().default(""),
   bonus: z.array(z.string()).default([]),
-  garantia: z.string(),
+  garantia: z.string().default(""),
   faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
-  cta: z.string(),
-  estruturaVisual: z.string(),
+  cta: z.string().default(""),
+  estruturaVisual: z.string().default(""),
 });
 
 export type SalesPage = z.infer<typeof SalesPageSchema>;
