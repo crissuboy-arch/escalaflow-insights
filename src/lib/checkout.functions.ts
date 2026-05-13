@@ -9,6 +9,7 @@ import {
 } from "./checkout.server";
 import { StandaloneBriefingSchema } from "./standalone/briefing";
 import { recordAi } from "./ai/history.server";
+import { dlog } from "./debug/log.server";
 
 const InputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("project"), projectId: z.string().uuid() }),
@@ -55,6 +56,7 @@ export const generateCheckoutOffer = createServerFn({ method: "POST" })
         ...projectRow.meta,
         checkout: { ...prevCheckout, offer },
       };
+      dlog("persist", "checkout.save", { projectId: projectRow.id, metaKey: "checkout" });
       await supabase
         .from("projects")
         .update({ meta: meta as never })
