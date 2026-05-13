@@ -8,6 +8,7 @@ import {
   aiGenerateChapterImage,
   aiGenerateCover,
   aiGenerateOutline,
+  aiGenerateBookExtras,
   BriefingSchema,
   OutlineChapterSchema,
   type Briefing,
@@ -164,6 +165,31 @@ export const generateEbookChapterImage = createServerFn({ method: "POST" })
       return { dataUrl };
     } catch (e) {
       throw new Error(e instanceof Error ? e.message : "Falha ao gerar imagem do capítulo");
+    }
+  });
+
+const IdentitySchema = z
+  .object({
+    author: z.string().max(120).optional(),
+    brand: z.string().max(120).optional(),
+    bio: z.string().max(2000).optional(),
+  })
+  .optional();
+
+export const generateEbookExtras = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { briefing: Briefing; identity?: { author?: string; brand?: string; bio?: string } }) =>
+      z
+        .object({ briefing: BriefingSchema, identity: IdentitySchema })
+        .parse(d),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const extras = await aiGenerateBookExtras(data.briefing, data.identity);
+      return extras;
+    } catch (e) {
+      throw new Error(e instanceof Error ? e.message : "Falha ao gerar conteúdos extras");
     }
   });
 
