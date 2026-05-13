@@ -99,9 +99,35 @@ function QABlock({ title, items }: { title: string; items: Array<{ q: string; a:
   );
 }
 
-export function SalesPageResult({ page, prompts }: { page: SalesPage; prompts: Prompts }) {
+export function SalesPageResult({
+  page,
+  prompts,
+  title,
+}: {
+  page: SalesPage;
+  prompts: Prompts;
+  title?: string;
+}) {
+  const [exporting, setExporting] = useState(false);
+  async function downloadDocx() {
+    setExporting(true);
+    try {
+      await exportSalesPageDocx(title || page.headline.slice(0, 60) || "pagina-de-vendas", page);
+      toast.success("DOCX exportado.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao exportar");
+    } finally {
+      setExporting(false);
+    }
+  }
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button onClick={downloadDocx} disabled={exporting} variant="outline" size="sm">
+          <FileDown className="mr-2 h-4 w-4" />
+          {exporting ? "Exportando…" : "Exportar DOCX"}
+        </Button>
+      </div>
       <Card>
         <CardContent className="space-y-3 p-5">
           <div className="flex items-start justify-between gap-3">
@@ -154,7 +180,7 @@ export function SalesPageResult({ page, prompts }: { page: SalesPage; prompts: P
             <h3 className="text-base font-semibold">Prompts para IA externa</h3>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cole em Lovable, Google AI Studio, V0 ou Claude para gerar a página visual completa.
+            Cole em Lovable, Google AI Studio ou use o prompt HTML autocontido para gerar a página visual completa. V0 e Claude como extras.
           </p>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <CopyBtn text={prompts.lovable} label="Copiar Prompt Lovable" className="justify-start" />
@@ -163,6 +189,7 @@ export function SalesPageResult({ page, prompts }: { page: SalesPage; prompts: P
               label="Copiar Prompt Google AI Studio"
               className="justify-start"
             />
+            <CopyBtn text={prompts.html} label="Copiar Prompt HTML" className="justify-start" />
             <CopyBtn text={prompts.v0} label="Copiar Prompt V0" className="justify-start" />
             <CopyBtn text={prompts.claude} label="Copiar Prompt Claude" className="justify-start" />
           </div>
