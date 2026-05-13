@@ -138,6 +138,63 @@ export const listProjects = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+// Create a project pre-seeded from a mined offer / analysis selected by the user.
+const FromOfferSchema = z.object({
+  title: z.string().min(1),
+  niche: z.string().min(1),
+  promise: z.string().default(""),
+  avatar: z.string().default(""),
+  uniqueMechanism: z.string().default(""),
+  pains: z.array(z.string()).default([]),
+  desires: z.array(z.string()).default([]),
+  source_ad_key: z.string().optional(),
+  cover_url: z.string().nullable().optional(),
+  advertiser: z.string().optional(),
+  platform: z.string().optional(),
+  country: z.string().optional(),
+});
+
+export const createProjectFromOffer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof FromOfferSchema>) => FromOfferSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const briefing = {
+      title: data.title,
+      subtitle: data.promise,
+      niche: data.niche,
+      promise: data.promise,
+      avatar: data.avatar,
+      uniqueMechanism: data.uniqueMechanism,
+      pains: data.pains,
+      desires: data.desires,
+      type: "infoproduto",
+    };
+    const row = {
+      user_id: context.userId,
+      title: data.title,
+      niche: data.niche,
+      source_ad_key: data.source_ad_key ?? null,
+      briefing: briefing as never,
+      outline: [] as never,
+      mode: "combo",
+      cover_url: data.cover_url ?? null,
+      meta: {
+        origin: "mined-offer",
+        advertiser: data.advertiser ?? null,
+        platform: data.platform ?? null,
+        country: data.country ?? null,
+      } as never,
+      step: 2,
+    };
+    const { data: out, error } = await context.supabase
+      .from("projects")
+      .insert(row as never)
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return { id: out.id as string };
+  });
+
 export const loadProject = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
