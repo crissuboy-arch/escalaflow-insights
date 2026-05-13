@@ -143,6 +143,9 @@ export function EbookHub({ onUseMined, onScratch, onAiGenerate, onPdfImport, bus
           </Button>
         </CardContent>
       </Card>
+
+      {/* Card 4 - PDF Import */}
+      <PdfUploadCard onReady={onPdfImport} busy={busy} />
     </motion.div>
   );
 }
