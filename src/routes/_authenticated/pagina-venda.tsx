@@ -1,7 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { LayoutTemplate } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PipelineHub } from "@/components/PipelineHub";
+import { DualModeHub } from "@/components/pipeline/DualModeHub";
+import { StandaloneSalesPage } from "@/components/pipeline/StandaloneSalesPage";
 
 export const Route = createFileRoute("/_authenticated/pagina-venda")({
   beforeLoad: async () => {
@@ -13,13 +14,14 @@ export const Route = createFileRoute("/_authenticated/pagina-venda")({
 
 function PaginaVendaHubPage() {
   return (
-    <PipelineHub
+    <DualModeHub
       title="Página de Venda"
       description="Estrutura completa em blocos: Hero · Dor · Promessa · Mecanismo · Benefícios · Prova · Oferta · Bônus · Garantia · FAQ · CTA."
       icon={LayoutTemplate}
       tab="pagina"
       metaKey="salesPage"
       accent="linear-gradient(135deg, #4f46e5, #06b6d4)"
+      standalone={<StandaloneSalesPage />}
     />
   );
 }

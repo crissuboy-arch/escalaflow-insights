@@ -1,7 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PipelineHub } from "@/components/PipelineHub";
+import { DualModeHub } from "@/components/pipeline/DualModeHub";
+import { StandaloneEscala } from "@/components/pipeline/StandaloneEscala";
 
 export const Route = createFileRoute("/_authenticated/escala")({
   beforeLoad: async () => {
@@ -13,13 +14,14 @@ export const Route = createFileRoute("/_authenticated/escala")({
 
 function EscalaHubPage() {
   return (
-    <PipelineHub
+    <DualModeHub
       title="Escala do Produto"
       description="Checklist final de publicação: ebook, playbook, copy, criativos, página, checkout. Ideias de anúncios e próximos passos de tráfego."
       icon={Rocket}
       tab="escala"
       metaKey="scale"
       accent="linear-gradient(135deg, #a855f7, #ec4899)"
+      standalone={<StandaloneEscala />}
     />
   );
 }
