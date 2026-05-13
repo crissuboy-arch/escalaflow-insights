@@ -361,6 +361,38 @@ function EbookPage() {
     }
   };
 
+  const onPagesChange = (p: ProductSize) => {
+    setPages(p);
+    const spec = sizeSpec(p);
+    setChapterCount(spec.chapters);
+  };
+
+  const onGenerateExtras = async () => {
+    if (!briefing) return;
+    setBusy("Gerando introdução, conclusão, sobre o autor e bônus…");
+    try {
+      const r = await fnExtras({
+        data: { briefing, identity },
+      });
+      setExtras(r);
+      toast.success("Conteúdos extras gerados");
+    } catch (e) {
+      toast.error(await errMsg(e, "Falha ao gerar extras"));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onCreatePlaybookFromEbook = async () => {
+    if (!briefing) return;
+    await saveDraft();
+    if (!ebookId) {
+      toast.error("Salve o rascunho primeiro");
+      return;
+    }
+    navigate({ to: "/produtos/playbook/novo", search: { fromEbook: ebookId } as never });
+  };
+
   const onCover = async () => {
     if (!briefing) return;
     setBusy("Gerando capa com IA…");
