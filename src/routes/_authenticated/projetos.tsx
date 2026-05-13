@@ -23,6 +23,10 @@ export const Route = createFileRoute("/_authenticated/projetos")({
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/login" });
   },
+  validateSearch: (s: Record<string, unknown>) => ({
+    novo: s.novo === 1 || s.novo === "1" ? 1 : undefined,
+    tab: typeof s.tab === "string" ? (s.tab as string) : undefined,
+  }),
   component: ProjectsHubPage,
 });
 
@@ -62,6 +66,7 @@ type Row = {
 
 function ProjectsHubPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch() as { novo?: 1; tab?: string };
   const list = useServerFn(listProjects);
   const create = useServerFn(createProject);
   const remove = useServerFn(deleteProject);
@@ -100,7 +105,11 @@ function ProjectsHubPage() {
           category,
         },
       });
-      navigate({ to: "/projetos/$id", params: { id } });
+      navigate({
+        to: "/projetos/$id",
+        params: { id },
+        search: search.tab ? ({ tab: search.tab } as never) : (undefined as never),
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao criar projeto");
     } finally {
@@ -118,7 +127,11 @@ function ProjectsHubPage() {
       const { id } = await create({
         data: { source: "ai", mode, kickstart: ai },
       });
-      navigate({ to: "/projetos/$id", params: { id } });
+      navigate({
+        to: "/projetos/$id",
+        params: { id },
+        search: search.tab ? ({ tab: search.tab } as never) : (undefined as never),
+      });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao gerar projeto");
     } finally {
@@ -131,6 +144,16 @@ function ProjectsHubPage() {
     await remove({ data: { id } });
     refresh();
   }
+
+  // Auto-trigger creation when arriving with ?novo=1
+  const autoTriggered = useState({ done: false })[0];
+  useEffect(() => {
+    if (search.novo === 1 && !autoTriggered.done && !busy) {
+      autoTriggered.done = true;
+      startScratch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.novo]);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6">
