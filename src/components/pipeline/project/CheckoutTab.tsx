@@ -52,7 +52,10 @@ export function CheckoutTab({
   async function save() {
     setBusy(true);
     try {
-      await update({ data: { id: projectId, patch: { meta: { checkout: data } } } });
+      // Preserve sibling fields persisted by other flows (e.g. AI-generated
+      // `offer`) by merging on top of the original meta.checkout blob.
+      const merged = { ...(initial ?? {}), ...data };
+      await update({ data: { id: projectId, patch: { meta: { checkout: merged } } } });
       onSaved?.(data);
       toast.success("Checkout salvo no projeto.");
     } catch (e) {
