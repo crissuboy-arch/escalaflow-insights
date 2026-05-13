@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { aiAnalyzeScale, ScaleAnalysisSchema, type ScaleContext } from "./scale.server";
 import { recordAi } from "./ai/history.server";
+import { dlog } from "./debug/log.server";
 
 const InputSchema = z.object({
   projectId: z.string().uuid().optional(),
@@ -75,6 +76,7 @@ export const analyzeAdsPerformance = createServerFn({ method: "POST" })
           ].slice(0, 20),
         },
       };
+      dlog("persist", "scale.save", { projectId: data.projectId, metaKey: "scale" });
       await supabase.from("projects").update({ meta: nextMeta as never }).eq("id", data.projectId);
       await recordAi(supabase, userId, {
         projectId: data.projectId,
