@@ -159,6 +159,7 @@ export async function aiGenerateSalesPage(ctx: PageContext): Promise<SalesPage> 
 export type ExternalPrompts = {
   lovable: string;
   googleAiStudio: string;
+  html: string;
   v0: string;
   claude: string;
 };
@@ -239,5 +240,13 @@ Conteúdo:
 
 ${blueprint}`;
 
-  return { lovable, googleAiStudio, v0, claude };
+  const html = `Gere um arquivo HTML único, completo e autocontido (doctype, head, body) para uma página de vendas longa, dark mode com acentos vibrantes, mobile-first. Use apenas Tailwind via CDN (https://cdn.tailwindcss.com), Google Font Inter, ícones via SVG inline. Inclua: hero com gradient, seção dor, mecanismo, benefícios em grid, prova social, oferta com stack de valor, bônus em cards, garantia destacada, FAQ accordion (details/summary), CTA fixo no mobile (sticky bottom). Sem JS externo, sem dependências além do Tailwind CDN.
+
+Conteúdo da página:
+
+${blueprint}
+
+Devolva APENAS o HTML completo entre \`\`\`html ... \`\`\`, sem comentários extras.`;
+
+  return { lovable, googleAiStudio, html, v0, claude };
 }
