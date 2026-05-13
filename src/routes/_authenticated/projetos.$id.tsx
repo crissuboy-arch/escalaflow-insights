@@ -461,6 +461,11 @@ function ProjectWorkspace() {
         </TabsContent>
         <TabsContent value="escala">
           <EscalaTab
+            projectId={id}
+            initialAnalysis={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.lastAnalysis as never) ??
+              null
+            }
             hasEbook={!!project.ebook_id}
             hasPlaybook={!!project.playbook_id}
             hasCopy={!!project.meta?.copy}
