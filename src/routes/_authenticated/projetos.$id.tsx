@@ -29,6 +29,13 @@ import {
   generateProjectEbook,
   generateProjectPlaybook,
 } from "@/lib/project.functions";
+import { CopyTab } from "@/components/pipeline/project/CopyTab";
+import { SalesPageTab } from "@/components/pipeline/project/SalesPageTab";
+import { CreativesTab } from "@/components/pipeline/project/CreativesTab";
+import { CheckoutTab, type CheckoutDraft } from "@/components/pipeline/project/CheckoutTab";
+import { EscalaTab } from "@/components/pipeline/project/EscalaTab";
+import type { SalesCopy } from "@/lib/copy.server";
+import type { SalesPage } from "@/lib/sales-page.server";
 
 export const Route = createFileRoute("/_authenticated/projetos/$id")({
   beforeLoad: async () => {
@@ -78,7 +85,27 @@ function ProjectWorkspace() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | "ebook" | "playbook" | "combo">(null);
-  const initialTab = (search.tab && ["briefing","estrutura","ebook","playbook","copy","criativos","pagina","checkout","escala","exportar"].includes(search.tab)) ? search.tab : "briefing";
+  const TABS = [
+    "briefing",
+    "estrutura",
+    "ebook",
+    "playbook",
+    "copy",
+    "criativos",
+    "pagina",
+    "checkout",
+    "escala",
+    "exportar",
+  ] as const;
+  const initialTab =
+    search.tab && (TABS as readonly string[]).includes(search.tab) ? search.tab : "briefing";
+  const [tab, setTab] = useState<string>(initialTab);
+  useEffect(() => {
+    if (search.tab && (TABS as readonly string[]).includes(search.tab)) {
+      setTab(search.tab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.tab]);
 
   async function refresh() {
     try {
@@ -208,6 +235,7 @@ function ProjectWorkspace() {
       </div>
 
       <Tabs defaultValue={initialTab}>
+      </Tabs>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="briefing">Briefing</TabsTrigger>
           <TabsTrigger value="estrutura">Estrutura</TabsTrigger>
