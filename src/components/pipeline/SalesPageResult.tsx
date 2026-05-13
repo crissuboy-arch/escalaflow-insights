@@ -2,10 +2,18 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Sparkles } from "lucide-react";
+import { Copy, Check, Sparkles, FileDown } from "lucide-react";
 import type { SalesPage } from "@/lib/sales-page.server";
+import { exportSalesPageDocx } from "@/lib/sales-page/docx";
+import { toast } from "sonner";
 
-type Prompts = { lovable: string; googleAiStudio: string; v0: string; claude: string };
+type Prompts = {
+  lovable: string;
+  googleAiStudio: string;
+  html: string;
+  v0: string;
+  claude: string;
+};
 
 function CopyBtn({ text, label = "Copiar", className }: { text: string; label?: string; className?: string }) {
   const [done, setDone] = useState(false);
