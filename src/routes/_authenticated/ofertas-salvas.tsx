@@ -5,10 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search } from "lucide-react";
+import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search, FolderPlus } from "lucide-react";
 import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
 import { openAdLink } from "@/lib/external";
+import { useServerFn } from "@tanstack/react-start";
+import { createProjectFromOffer } from "@/lib/project.functions";
 
 export const Route = createFileRoute("/_authenticated/ofertas-salvas")({ component: SavedPage });
 
@@ -16,6 +18,8 @@ function SavedPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [ads, setAds] = useState<PersistedAd[]>([]);
+  const createFromOffer = useServerFn(createProjectFromOffer);
+  const [creating, setCreating] = useState<string | null>(null);
 
   const load = async () => setAds(await fetchSavedAds());
   useEffect(() => {
@@ -31,6 +35,34 @@ function SavedPage() {
   const onAnalyze = async (a: PersistedAd) => {
     await rememberAdForAnalysis(a);
     navigate({ to: "/analise-ia", search: { ad: a.key } as never });
+  };
+
+  const onUseAsProject = async (a: PersistedAd) => {
+    setCreating(a.key);
+    try {
+      const r = await createFromOffer({
+        data: {
+          title: `${a.advertiser} — ${a.niche}`,
+          niche: a.niche,
+          promise: a.headline,
+          avatar: `Pessoas interessadas em ${a.niche}`,
+          uniqueMechanism: "",
+          pains: [],
+          desires: [],
+          source_ad_key: a.key,
+          cover_url: a.image_url ?? null,
+          advertiser: a.advertiser,
+          platform: a.platform,
+          country: a.country,
+        },
+      });
+      toast.success("Projeto criado a partir da oferta");
+      navigate({ to: "/projetos/$id", params: { id: r.id }, search: { tab: "briefing" } as never });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao criar projeto");
+    } finally {
+      setCreating(null);
+    }
   };
 
   return (
@@ -81,6 +113,16 @@ function SavedPage() {
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => onRemove(a)}>
                       <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> Remover
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="col-span-2"
+                      disabled={creating === a.key}
+                      onClick={() => onUseAsProject(a)}
+                    >
+                      <FolderPlus className="mr-1 h-3.5 w-3.5" />
+                      {creating === a.key ? "Criando…" : "Usar como projeto"}
                     </Button>
                     <Button
                       size="sm"
