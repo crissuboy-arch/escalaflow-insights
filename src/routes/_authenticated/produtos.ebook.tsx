@@ -166,12 +166,19 @@ function EbookPage() {
   const saveDraft = async (overrides?: { step?: number; status?: "draft" | "ready" }) => {
     if (!briefing && !selectedAd) return;
     try {
+      const briefingPayload = {
+        ...(briefing ?? {}),
+        identity,
+        extras: extras ?? undefined,
+        finalCta,
+        pages,
+      } as Record<string, unknown>;
       const payload = {
         source_ad_key: selectedAd?.key ?? null,
         title: briefing?.title || selectedAd?.headline?.slice(0, 80) || "Novo Ebook",
         subtitle: briefing?.subtitle ?? null,
         niche: briefing?.niche ?? selectedAd?.niche ?? null,
-        briefing: (briefing ?? {}) as Record<string, unknown>,
+        briefing: briefingPayload,
         outline,
         chapters,
         layout,
@@ -212,7 +219,7 @@ function EbookPage() {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [briefing, outline, chapters, layout, coverUrl, chapterCount, mode]);
+  }, [briefing, outline, chapters, layout, coverUrl, chapterCount, mode, identity, extras, finalCta, pages]);
 
   // Local backup so a refresh before the first remote save doesn't lose work
   useEffect(() => {
