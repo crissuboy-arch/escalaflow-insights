@@ -167,3 +167,53 @@ export const generateCreativeVariations = createServerFn({ method: "POST" })
     }
     return { creatives };
   });
+
+export const generateMultiFormatCreatives = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MultiFormatInputSchema>) =>
+    MultiFormatInputSchema.parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { briefing, projectId, meta } = await resolveBriefing(supabase, userId, data.source);
+    const results = await Promise.all(
+      data.formatIds.map(async (formatId) => {
+        const creative = await aiGenerateCreative({
+          briefing,
+          platform: data.platform as never,
+          objective: data.objective as never,
+          formatId: formatId as never,
+          dimension: data.dimension as never,
+        });
+        return { formatId, creative };
+      }),
+    );
+    if (projectId) {
+      await appendCreatives(
+        supabase,
+        projectId,
+        meta,
+        results.map(({ formatId, creative }) => ({
+          ...creative,
+          platform: data.platform,
+          objective: data.objective,
+          formatId,
+          dimension: data.dimension,
+          createdAt: new Date().toISOString(),
+        })),
+      );
+      await recordAi(supabase, userId, {
+        projectId,
+        module: "creative",
+        prompt: { platform: data.platform, formatIds: data.formatIds },
+        response: { results },
+      });
+    } else {
+      await recordAi(supabase, userId, {
+        module: "creative",
+        prompt: { platform: data.platform, formatIds: data.formatIds },
+        response: { results },
+      });
+    }
+    return { results };
+  });
