@@ -17,6 +17,7 @@ import {
 } from "./playbook.server";
 import { seedFromModule } from "./project/seeding.server";
 import { recordAi } from "./ai/history.server";
+import { dlog, metaKeysOf } from "./debug/log.server";
 
 const AdInputSchema = z.object({
   headline: z.string().optional(),
@@ -211,7 +212,15 @@ export const loadProject = createServerFn({ method: "POST" })
       .select("*")
       .eq("id", data.id)
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      dlog("read-fail", "project.load", { id: data.id, error: error.message });
+      throw new Error(error.message);
+    }
+    dlog("hydrate", "project.load", {
+      id: data.id,
+      hasMeta: !!row?.meta,
+      metaKeys: metaKeysOf(row?.meta),
+    });
     return row;
   });
 
@@ -247,12 +256,20 @@ export const updateProject = createServerFn({ method: "POST" })
       const existing = (row?.meta ?? {}) as Record<string, unknown>;
       patch.meta = { ...existing, ...(patch.meta as Record<string, unknown>) };
     }
+    dlog("persist", "project.update", {
+      id: data.id,
+      patchKeys: Object.keys(data.patch),
+      mergedMetaKeys: metaKeysOf(patch.meta),
+    });
     const { error } = await supabase
       .from("projects")
       .update({ ...patch, updated_at: new Date().toISOString() } as never)
       .eq("id", data.id)
       .eq("user_id", userId);
-    if (error) throw new Error(error.message);
+    if (error) {
+      dlog("read-fail", "project.update", { id: data.id, error: error.message });
+      throw new Error(error.message);
+    }
     return { ok: true };
   });
 
