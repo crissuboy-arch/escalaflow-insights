@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
 import { useAuth } from "@/providers/AuthProvider";
+import logoMark from "@/assets/brand/logo-mark.png";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthenticatedLayout });
 
@@ -14,7 +15,12 @@ function AuthenticatedLayout() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <div className="flex flex-col items-center gap-4">
+          <img src={logoMark} alt="EscalaFlow" width={48} height={48} className="h-12 w-12 opacity-90" />
+          <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
+            <div className="h-full w-1/2 animate-[shimmer_1.4s_ease_infinite] rounded-full bg-primary" />
+          </div>
+        </div>
       </div>
     );
   }

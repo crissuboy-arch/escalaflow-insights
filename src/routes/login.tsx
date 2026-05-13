@@ -11,6 +11,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
+import logoHorizontal from "@/assets/brand/logo-horizontal.png";
 
 export const Route = createFileRoute("/login")({ component: LoginPage });
 
@@ -58,8 +59,11 @@ function LoginPage() {
       <div className="absolute right-4 top-4 flex gap-1"><LanguageSwitcher /><ThemeToggle /></div>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-primary-foreground text-xl font-bold shadow-[var(--shadow-glow)]" style={{ background: "var(--gradient-primary)" }}>E</div>
-          <h1 className="text-3xl font-bold tracking-tight">EscalaFlow</h1>
+          <img
+            src={logoHorizontal}
+            alt="EscalaFlow"
+            className="mx-auto mb-4 h-9 w-auto dark:invert dark:brightness-200"
+          />
           <p className="mt-1 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
         </div>
         <Card className="border-border/60 backdrop-blur">
@@ -107,7 +111,7 @@ function LoginPage() {
                   </button>
                 </div>
               </div>
-              <Button type="submit" disabled={loading} className="w-full text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
+              <Button type="submit" disabled={loading} className="w-full">
                 {loading ? "..." : mode === "signin" ? t("auth.signIn") : t("auth.signUp")}
               </Button>
             </form>
