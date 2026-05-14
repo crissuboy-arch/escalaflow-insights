@@ -24,7 +24,7 @@ import {
   loadEbookDraft,
   deleteEbookDraft,
 } from "@/lib/ebook.functions";
-import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
+import { LAYOUTS, type EbookLayout, type RenderMode } from "@/lib/ebook/layouts";
 import {
   STYLES,
   PALETTES,
@@ -62,7 +62,15 @@ type Briefing = {
   uniqueMechanism: string;
 };
 type Extras = { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
-type Identity = { author?: string; brand?: string; bio?: string };
+type Identity = {
+  author?: string;
+  brand?: string;
+  bio?: string;
+  copyright?: string;
+  disclaimer?: string;
+  dedication?: string;
+  subtitleLine?: string;
+};
 type Outline = { title: string; bullets: string[] }[];
 type Chapter = { title: string; markdown: string; imageUrl?: string | null };
 type EbookMode = "kdp" | "premium" | "playbook";
@@ -118,6 +126,7 @@ function EbookPage() {
   const [layout, setLayout] = useState<EbookLayout>("classico");
   const [style, setStyle] = useState<EbookStyle>("clean");
   const [palette, setPalette] = useState<EbookPalette>("minimalista");
+  const [renderMode, setRenderMode] = useState<RenderMode>("digital");
   const [entryStarted, setEntryStarted] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
@@ -271,7 +280,16 @@ function EbookPage() {
       setEbookId(id);
       const b = (row.briefing as (Briefing & { identity?: Identity; extras?: Extras; finalCta?: string; pages?: ProductSize }) | null) ?? null;
       setBriefing(b);
-      if (b?.identity) setIdentity({ author: b.identity.author ?? "", brand: b.identity.brand ?? "", bio: b.identity.bio ?? "" });
+      if (b?.identity)
+        setIdentity({
+          author: b.identity.author ?? "",
+          brand: b.identity.brand ?? "",
+          bio: b.identity.bio ?? "",
+          copyright: b.identity.copyright ?? "",
+          disclaimer: b.identity.disclaimer ?? "",
+          dedication: b.identity.dedication ?? "",
+          subtitleLine: b.identity.subtitleLine ?? "",
+        });
       if (b?.extras) setExtras(b.extras);
       if (typeof b?.finalCta === "string") setFinalCta(b.finalCta);
       if (b?.pages && (PRODUCT_SIZES as readonly number[]).includes(b.pages)) setPages(b.pages as ProductSize);
