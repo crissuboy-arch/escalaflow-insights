@@ -509,6 +509,7 @@ function EbookPage() {
         title: briefing.title,
         subtitle: briefing.subtitle,
         layout,
+        renderMode,
         coverUrl,
         chapters,
         identity,
@@ -558,6 +559,8 @@ function EbookPage() {
         subtitle: briefing.subtitle,
         coverUrl,
         chapters,
+        identity,
+        renderMode,
       });
       downloadBlob(blob, `${slug(briefing.title)}.epub`);
       await saveDraft({ status: "ready" });
