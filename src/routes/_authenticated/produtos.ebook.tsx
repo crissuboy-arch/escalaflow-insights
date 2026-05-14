@@ -894,6 +894,14 @@ function EbookPage() {
                   <div className="md:col-span-2">
                     <Field label="Bio do autor" value={identity.bio ?? ""} onChange={(v) => setIdentity({ ...identity, bio: v })} multiline />
                   </div>
+                  <Field label="Subtítulo (folha de rosto)" value={identity.subtitleLine ?? ""} onChange={(v) => setIdentity({ ...identity, subtitleLine: v })} />
+                  <Field label="Copyright" value={identity.copyright ?? ""} onChange={(v) => setIdentity({ ...identity, copyright: v })} />
+                  <div className="md:col-span-2">
+                    <Field label="Disclaimer / Aviso legal" value={identity.disclaimer ?? ""} onChange={(v) => setIdentity({ ...identity, disclaimer: v })} multiline />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Field label="Dedicatória" value={identity.dedication ?? ""} onChange={(v) => setIdentity({ ...identity, dedication: v })} multiline />
+                  </div>
                 </div>
               </div>
             )}
@@ -1080,6 +1088,21 @@ function EbookPage() {
                 <Wand2 className="mr-2 h-4 w-4" />
                 {chapters.length ? "Regerar capítulos" : "Gerar capítulos completos"}
               </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 p-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Modo do ebook</Label>
+              {(["digital", "print", "kdp"] as RenderMode[]).map((m) => (
+                <Badge
+                  key={m}
+                  variant={renderMode === m ? "default" : "outline"}
+                  onClick={() => setRenderMode(m)}
+                  className="cursor-pointer"
+                >
+                  {m === "digital" ? "Digital" : m === "print" ? "Impresso" : "Amazon KDP"}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
               {mode === "premium" && chapters.length > 0 && (
                 <Button onClick={onGenerateAllChapterImages} disabled={!!busy} variant="outline">
                   <ImageIcon className="mr-2 h-4 w-4" /> Gerar imagens dos capítulos
