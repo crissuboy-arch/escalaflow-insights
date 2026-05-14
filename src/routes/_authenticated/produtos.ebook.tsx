@@ -24,7 +24,7 @@ import {
   loadEbookDraft,
   deleteEbookDraft,
 } from "@/lib/ebook.functions";
-import { LAYOUTS, type EbookLayout } from "@/lib/ebook/layouts";
+import { LAYOUTS, type EbookLayout, type RenderMode } from "@/lib/ebook/layouts";
 import {
   STYLES,
   PALETTES,
@@ -62,7 +62,15 @@ type Briefing = {
   uniqueMechanism: string;
 };
 type Extras = { introduction?: string; conclusion?: string; aboutAuthor?: string; bonus?: string };
-type Identity = { author?: string; brand?: string; bio?: string };
+type Identity = {
+  author?: string;
+  brand?: string;
+  bio?: string;
+  copyright?: string;
+  disclaimer?: string;
+  dedication?: string;
+  subtitleLine?: string;
+};
 type Outline = { title: string; bullets: string[] }[];
 type Chapter = { title: string; markdown: string; imageUrl?: string | null };
 type EbookMode = "kdp" | "premium" | "playbook";
@@ -118,6 +126,7 @@ function EbookPage() {
   const [layout, setLayout] = useState<EbookLayout>("classico");
   const [style, setStyle] = useState<EbookStyle>("clean");
   const [palette, setPalette] = useState<EbookPalette>("minimalista");
+  const [renderMode, setRenderMode] = useState<RenderMode>("digital");
   const [entryStarted, setEntryStarted] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPrompt, setCoverPrompt] = useState("");
@@ -271,7 +280,16 @@ function EbookPage() {
       setEbookId(id);
       const b = (row.briefing as (Briefing & { identity?: Identity; extras?: Extras; finalCta?: string; pages?: ProductSize }) | null) ?? null;
       setBriefing(b);
-      if (b?.identity) setIdentity({ author: b.identity.author ?? "", brand: b.identity.brand ?? "", bio: b.identity.bio ?? "" });
+      if (b?.identity)
+        setIdentity({
+          author: b.identity.author ?? "",
+          brand: b.identity.brand ?? "",
+          bio: b.identity.bio ?? "",
+          copyright: b.identity.copyright ?? "",
+          disclaimer: b.identity.disclaimer ?? "",
+          dedication: b.identity.dedication ?? "",
+          subtitleLine: b.identity.subtitleLine ?? "",
+        });
       if (b?.extras) setExtras(b.extras);
       if (typeof b?.finalCta === "string") setFinalCta(b.finalCta);
       if (b?.pages && (PRODUCT_SIZES as readonly number[]).includes(b.pages)) setPages(b.pages as ProductSize);
@@ -491,6 +509,7 @@ function EbookPage() {
         title: briefing.title,
         subtitle: briefing.subtitle,
         layout,
+        renderMode,
         coverUrl,
         chapters,
         identity,
@@ -540,6 +559,8 @@ function EbookPage() {
         subtitle: briefing.subtitle,
         coverUrl,
         chapters,
+        identity,
+        renderMode,
       });
       downloadBlob(blob, `${slug(briefing.title)}.epub`);
       await saveDraft({ status: "ready" });
@@ -873,6 +894,14 @@ function EbookPage() {
                   <div className="md:col-span-2">
                     <Field label="Bio do autor" value={identity.bio ?? ""} onChange={(v) => setIdentity({ ...identity, bio: v })} multiline />
                   </div>
+                  <Field label="Subtítulo (folha de rosto)" value={identity.subtitleLine ?? ""} onChange={(v) => setIdentity({ ...identity, subtitleLine: v })} />
+                  <Field label="Copyright" value={identity.copyright ?? ""} onChange={(v) => setIdentity({ ...identity, copyright: v })} />
+                  <div className="md:col-span-2">
+                    <Field label="Disclaimer / Aviso legal" value={identity.disclaimer ?? ""} onChange={(v) => setIdentity({ ...identity, disclaimer: v })} multiline />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Field label="Dedicatória" value={identity.dedication ?? ""} onChange={(v) => setIdentity({ ...identity, dedication: v })} multiline />
+                  </div>
                 </div>
               </div>
             )}
@@ -1059,6 +1088,21 @@ function EbookPage() {
                 <Wand2 className="mr-2 h-4 w-4" />
                 {chapters.length ? "Regerar capítulos" : "Gerar capítulos completos"}
               </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 p-3">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Modo do ebook</Label>
+              {(["digital", "print", "kdp"] as RenderMode[]).map((m) => (
+                <Badge
+                  key={m}
+                  variant={renderMode === m ? "default" : "outline"}
+                  onClick={() => setRenderMode(m)}
+                  className="cursor-pointer"
+                >
+                  {m === "digital" ? "Digital" : m === "print" ? "Impresso" : "Amazon KDP"}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
               {mode === "premium" && chapters.length > 0 && (
                 <Button onClick={onGenerateAllChapterImages} disabled={!!busy} variant="outline">
                   <ImageIcon className="mr-2 h-4 w-4" /> Gerar imagens dos capítulos

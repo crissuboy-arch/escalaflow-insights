@@ -1,17 +1,17 @@
 export type EbookLayout = "classico" | "moderno" | "minimalista";
+export type RenderMode = "digital" | "print" | "kdp";
 
 export interface LayoutSpec {
   id: EbookLayout;
   label: string;
   description: string;
-  // PDF rendering
   fontFamily: "serif" | "sans";
-  margin: number; // points
+  margin: number;
   titleSize: number;
   headingSize: number;
   bodySize: number;
   lineGap: number;
-  accent: [number, number, number]; // 0..1 RGB
+  accent: [number, number, number];
   coverBg: [number, number, number];
   coverText: [number, number, number];
 }
@@ -58,5 +58,85 @@ export const LAYOUTS: Record<EbookLayout, LayoutSpec> = {
     accent: [0, 0, 0],
     coverBg: [1, 1, 1],
     coverText: [0, 0, 0],
+  },
+};
+
+/** Editorial preset: physical / digital production rules. */
+export interface ModeSpec {
+  id: RenderMode;
+  label: string;
+  pageSize: { w: number; h: number }; // points
+  family: "serif" | "sans";
+  bodySize: number;
+  lineHeight: number; // multiplier on bodySize
+  margins: { top: number; right: number; bottom: number; left: number };
+  justify: boolean;
+  firstLineIndent: number; // points
+  dropCap: boolean;
+  runningHeader: boolean;
+  blankBetweenChapters: boolean;
+  chapterOpensRecto: boolean; // open on odd page
+  chapterTopMargin: number; // extra top whitespace at chapter open
+  fullFrontmatter: boolean; // KDP-grade
+  paragraphGap: number; // extra space between paragraphs
+}
+
+const A4 = { w: 595.28, h: 841.89 };
+const KDP_6x9 = { w: 432, h: 648 };
+
+export const MODES: Record<RenderMode, ModeSpec> = {
+  digital: {
+    id: "digital",
+    label: "Ebook Digital",
+    pageSize: A4,
+    family: "sans",
+    bodySize: 12,
+    lineHeight: 1.6,
+    margins: { top: 64, right: 56, bottom: 64, left: 56 },
+    justify: false,
+    firstLineIndent: 0,
+    dropCap: false,
+    runningHeader: false,
+    blankBetweenChapters: false,
+    chapterOpensRecto: false,
+    chapterTopMargin: 100,
+    fullFrontmatter: false,
+    paragraphGap: 6,
+  },
+  print: {
+    id: "print",
+    label: "Livro Impresso",
+    pageSize: A4,
+    family: "serif",
+    bodySize: 11,
+    lineHeight: 1.45,
+    margins: { top: 72, right: 64, bottom: 72, left: 64 },
+    justify: true,
+    firstLineIndent: 18,
+    dropCap: true,
+    runningHeader: true,
+    blankBetweenChapters: true,
+    chapterOpensRecto: true,
+    chapterTopMargin: 200,
+    fullFrontmatter: true,
+    paragraphGap: 0,
+  },
+  kdp: {
+    id: "kdp",
+    label: "Amazon KDP",
+    pageSize: KDP_6x9,
+    family: "serif",
+    bodySize: 10.5,
+    lineHeight: 1.4,
+    margins: { top: 72, right: 54, bottom: 72, left: 72 }, // gutter on left
+    justify: true,
+    firstLineIndent: 16,
+    dropCap: true,
+    runningHeader: true,
+    blankBetweenChapters: true,
+    chapterOpensRecto: true,
+    chapterTopMargin: 180,
+    fullFrontmatter: true,
+    paragraphGap: 0,
   },
 };
