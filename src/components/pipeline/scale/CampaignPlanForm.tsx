@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,22 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Upload, X } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { createCampaignPlan } from "@/lib/scale.functions";
 import type { CampaignPlan } from "@/lib/scale.server";
 import { CountryMultiSelect } from "./CountryMultiSelect";
 import { CurrencySelect } from "./CurrencySelect";
 import { PlatformPicker } from "./PlatformPicker";
+import { ImageUploader } from "./ImageUploader";
 import { countryByCode, currencyByCode } from "@/lib/scale/i18n";
-
-function fileToDataUrl(f: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(String(r.result));
-    r.onerror = rej;
-    r.readAsDataURL(f);
-  });
-}
 
 export function CampaignPlanForm({
   projectId,
@@ -31,7 +23,6 @@ export function CampaignPlanForm({
   onPlan: (p: CampaignPlan) => void;
 }) {
   const run = useServerFn(createCampaignPlan);
-  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [form, setForm] = useState({
@@ -59,22 +50,6 @@ export function CampaignPlanForm({
   }
 
   const currencyMeta = currencyByCode(currency);
-
-  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
-    const remaining = 6 - images.length;
-    const accepted = files.slice(0, remaining);
-    const next: string[] = [];
-    for (const f of accepted) {
-      if (f.size > 5 * 1024 * 1024) {
-        toast.error(`${f.name} > 5 MB. Ignorada.`);
-        continue;
-      }
-      next.push(await fileToDataUrl(f));
-    }
-    setImages((cur) => [...cur, ...next]);
-  }
 
   async function go() {
     setBusy(true);
@@ -146,25 +121,10 @@ export function CampaignPlanForm({
         </Field>
 
         <div className="space-y-2">
-          <Label className="text-xs uppercase text-muted-foreground">Imagens (até 6 · 5 MB cada)</Label>
-          <div className="flex flex-wrap items-center gap-2">
-            <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
-            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={images.length >= 6}>
-              <Upload className="mr-2 h-4 w-4" /> Upload
-            </Button>
-            {images.map((u, i) => (
-              <div key={i} className="relative">
-                <img src={u} alt="" className="h-14 w-20 rounded border border-border/60 object-cover" />
-                <button
-                  type="button"
-                  className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground"
-                  onClick={() => setImages(images.filter((_, j) => j !== i))}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
+          <Label className="text-xs uppercase text-muted-foreground">
+            Imagens da página, checkout, anúncio, criativos e métricas (até 6)
+          </Label>
+          <ImageUploader value={images} onChange={setImages} maxFiles={6} />
         </div>
 
         <div className="flex justify-end">
