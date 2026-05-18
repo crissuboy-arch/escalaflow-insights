@@ -8,22 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Upload, Sparkles, AlertTriangle, TrendingUp, X } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, TrendingUp } from "lucide-react";
 import { analyzeAdsPerformance } from "@/lib/scale.functions";
 import type { CampaignPlan, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
 import { CampaignPlanForm } from "./scale/CampaignPlanForm";
 import { CampaignPlanResult } from "./scale/CampaignPlanResult";
 import { NextStepsPanel } from "./scale/NextStepsPanel";
+import { ImageUploader } from "./scale/ImageUploader";
 import { SaveToProjectButton } from "./SaveToProjectButton";
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
 
 export function ScaleAnalyzer({
   projectId,
@@ -99,13 +91,6 @@ function MetricsAnalyzerInner({
   const [busy, setBusy] = useState(false);
   const [analysis, setAnalysis] = useState<ScaleAnalysis | null>(initial);
 
-  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { toast.error("Imagem > 5 MB."); return; }
-    setImageDataUrl(await fileToDataUrl(f));
-  }
-
   async function analyze() {
     setBusy(true);
     try {
@@ -152,18 +137,14 @@ function MetricsAnalyzerInner({
             <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="inline-flex">
-              <input type="file" accept="image/*" hidden onChange={onPickFile} />
-              <Button asChild variant="outline" size="sm"><span><Upload className="mr-2 h-4 w-4" /> Upload screenshot</span></Button>
-            </label>
-            {imageDataUrl && (
-              <div className="relative">
-                <img src={imageDataUrl} alt="" className="h-16 w-28 rounded border border-border/60 object-cover" />
-                <button className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground" onClick={() => setImageDataUrl(null)}><X className="h-3 w-3" /></button>
-              </div>
-            )}
-            <div className="flex-1" />
+          <ImageUploader
+            value={imageDataUrl ? [imageDataUrl] : []}
+            onChange={(arr) => setImageDataUrl(arr[0] ?? null)}
+            maxFiles={1}
+            label="Screenshot do Gerenciador"
+          />
+
+          <div className="flex justify-end">
             <Button onClick={analyze} disabled={busy}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Analisar Métricas
