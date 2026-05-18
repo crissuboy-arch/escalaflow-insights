@@ -1,60 +1,68 @@
-# Uploader robusto — Escala do Produto
+## Problema
 
-Hoje há dois uploaders no módulo, ambos com limite duro de 5MB e descarte silencioso de qualquer print maior. Vou corrigir os dois pontos com um componente compartilhado.
+O `createCampaignPlan` chama `google/gemini-2.5-pro` com até 6 imagens base64 numa única request síncrona. O Worker (Cloudflare) tem limite de ~100s por subrequest — Pro + imagens grandes estoura → `upstream request timeout`.
 
-## Arquivos envolvidos
+Streaming SSE pelo TanStack server function não é viável (serverFn retorna JSON). Em vez de reescrever a infra, vamos atacar as causas reais.
 
-- `src/components/pipeline/scale/CampaignPlanForm.tsx` — upload de até 6 imagens (página, checkout, anúncio, criativo).
-- `src/components/pipeline/ScaleAnalyzer.tsx` (`MetricsAnalyzerInner`) — upload de 1 screenshot de métricas.
-- `src/lib/scale.server.ts` — prompts da IA (texto enviado ao Gemini junto com as imagens).
+## O que mudar
 
-## O que vou implementar
+### 1. `src/lib/scale.server.ts` — modelo + timeout + retry + fallback
 
-### 1. Novo componente `src/components/pipeline/scale/ImageUploader.tsx`
-- Aceita PNG, JPG, JPEG, WEBP (`accept="image/png,image/jpeg,image/webp"`).
-- Drag & drop + clique + colar (Ctrl+V) + botão "Selecionar".
-- Limite de entrada: **25MB por arquivo**. Acima disso, toast amigável: "Sua imagem está muito pesada. Compactamos automaticamente para continuar." e segue tentando comprimir; só rejeita se mesmo após compressão ficar > ~8MB final.
-- Múltiplas imagens com `maxFiles` configurável (1 nas métricas, 6 no plano).
-- Preview em grid: miniatura, nome, tamanho original → tamanho final, status (comprimindo / pronto / erro), botão remover (X).
+- Novo helper `callGateway(messages, { model, timeoutMs, retries })`:
+  - `AbortController` com timeout configurável (default **110s**, abaixo do limite do Worker).
+  - `retries: 2` com backoff (1s, 3s) em: `429`, `408`, `502/503/504`, network/abort.
+  - Logs `dlog("hydrate", "ai.call", { model, attempt, ms, status })`.
+- `aiCreateCampaignPlan`: trocar `gemini-2.5-pro` por **`google/gemini-2.5-flash`** (multimodal, muito mais rápido, mesmo gateway). Pro fica como fallback opcional só se Flash falhar com erro de qualidade — não por timeout.
+- `aiAnalyzeScale`, `aiNextTests`, `aiScalePlan`: também migrar para `gemini-2.5-flash` (já são tarefas curtas; Pro era exagero).
+- Cap defensivo no servidor: se alguma `imageDataUrl` > ~3MB base64, recortar a lista (logar warning) — o cliente já comprime, isso é cinto+suspensório.
 
-### 2. Compressão automática `src/lib/scale/compressImage.ts`
-- Usa `createImageBitmap` + `OffscreenCanvas` (fallback `<canvas>`) — zero dependência nova.
-- Pipeline:
-  1. Lê dimensões originais (suporta prints verticais longos: 4000px+ de altura).
-  2. Redimensiona mantendo proporção para **lado maior ≤ 2000px** (mantém legibilidade de headline/CTA/preço para OCR).
-  3. Para screenshots muito verticais (ratio > 3:1), preserva largura ≥ 1080px e permite altura grande (até ~6000px) — não corta scroll screenshots.
-  4. Tenta WebP qualidade 0.82 → 0.7 → 0.6 até ficar ≤ 2MB; se navegador não suporta WebP, cai para JPEG 0.8 → 0.65.
-  5. Retorna `{ dataUrl, originalSize, finalSize, mime, width, height }`.
-- Erros (decode falhou, formato inválido) viram toast claro, não silêncio.
+### 2. `src/lib/scale.functions.ts` — quebrar em 2 etapas + status
 
-### 3. Integração
+Em vez de uma chamada gigante, dividir o "Criar Plano" em etapas independentes, cada uma curta:
 
-**`CampaignPlanForm.tsx`**
-- Substituir o bloco atual de file input + map de previews pelo `<ImageUploader maxFiles={6} value={images} onChange={setImages} />`.
-- Remover `fileToDataUrl` local e o check `> 5 MB`.
-- Label vira "Imagens da página, checkout, anúncio, criativos e métricas (até 6)".
+- **Etapa A — `extractCreativeContext`** (nova serverFn): recebe `imageDataUrls` + url/preço/oferta, chama Flash só para OCR/leitura visual e devolve um JSON pequeno (`headline`, `cta`, `precoVisivel`, `bonus`, `prova`, `layout`, `criativos[]`, `metricas?`). Timeout 60s, sem schema pesado.
+- **Etapa B — `createCampaignPlan`** (existente, refatorada): passa a receber `extractedContext` em texto e **não recebe mais imagens** quando o cliente já chamou a etapa A. Prompt fica menor, resposta muito mais rápida.
+- Compatibilidade: se cliente mandar só `imageDataUrls` (sem `extractedContext`), o servidor faz as duas etapas em sequência (mesma URL, sem mudar contrato externo).
 
-**`ScaleAnalyzer.tsx` → `MetricsAnalyzerInner`**
-- Substituir `onPickFile` + thumb manual por `<ImageUploader maxFiles={1} value={imageDataUrl ? [imageDataUrl] : []} onChange={(arr) => setImageDataUrl(arr[0] ?? null)} />`.
-- Remover `fileToDataUrl` e check de 5MB.
+### 3. `CampaignPlanForm.tsx` — progresso visual real
 
-### 4. IA / OCR
+- Estado `stage: "idle" | "reading" | "planning" | "done"`.
+- Fluxo do botão:
+  1. Se houver imagens → `await extractCreativeContext({ imageDataUrls, ... })`, mostra "Lendo imagens e página…".
+  2. `await createCampaignPlan({ extractedContext, ... })`, mostra "Gerando plano de campanha…".
+- Substituir spinner único por um bloco com 2 linhas que ficam ✓ ao completar. Toast de erro amigável por etapa, com retry no botão.
+- Sem trava de tela; estado `busy` continua bloqueando só o botão.
 
-A IA já recebe as imagens via `image_url` (Gemini 2.5 Flash, multimodal — já lê headline, CTA, copy, preço, layout). Vou reforçar isso no prompt em `src/lib/scale.server.ts`:
+### 4. Logs (`dlog`) em pontos-chave
 
-- No `buildPlanMessages` (já injeta `imageDataUrls`): adicionar instrução explícita no texto do usuário pedindo à IA para **extrair textualmente** headline, CTA principal, preço visível, blocos da página, elementos do criativo e estrutura visual antes de gerar o plano, e usar isso para nicho/ângulos/copy.
-- Mesma instrução compacta no `buildMetricsMessages` para o print do Gerenciador (KPIs visíveis, nome do criativo, etc.).
-- Aumentar `slice(0, 6)` continua igual (6 imagens), e o limite `z.array(...).max(6)` no `scale.functions.ts` permanece.
+- `scale.plan.start { images, hasContext }`
+- `scale.plan.extract.ok { ms, bytesIn }`
+- `scale.plan.ai.start { model, attempt }`
+- `scale.plan.ai.ok { ms }` / `scale.plan.ai.timeout { ms, attempt }` / `scale.plan.ai.retry`
+- `scale.plan.done { totalMs }`
 
-Nenhuma mudança em banco, auth ou outros módulos.
+### 5. Cliente — compressão já existe, ajuste fino
+
+`src/lib/scale/compressImage.ts` já comprime para ~2MB WebP. Manter; apenas:
+- Forçar `maxBytes = 1.5 * 1024 * 1024` quando `images.length > 2` (várias imagens = menos bytes cada).
+- Mensagem clara se uma imagem não comprimir abaixo do limite.
 
 ## Fora de escopo
-- Não mexer em outros uploaders do app (ebook/playbook).
-- Não trocar provider de IA nem adicionar pacote npm novo.
-- Não criar bucket de Storage — as imagens continuam sendo enviadas inline (base64) para o Vision, como hoje.
 
-## Mensagens ao usuário (PT-BR)
-- Arquivo > 25MB cru: "Imagem muito grande (>25MB). Tente um print menor."
-- Formato inválido: "Formato não suportado. Use PNG, JPG ou WEBP."
-- Comprimida: toast info "Imagem otimizada: 14.2MB → 1.8MB".
-- Falha de decode: "Não consegui ler essa imagem. Tente outra."
+- Streaming SSE real (exigiria sair de `createServerFn` para `createFileRoute` API + EventSource no cliente — overkill agora; o split em 2 etapas + Flash resolve o sintoma).
+- Fila/jobs em background com polling (não há tabela `jobs` e o tempo final esperado com Flash + split fica ~15–40s, dentro do limite confortável).
+- Mudar `aiAnalyzeScale` (1 imagem só) para etapas — já é curto.
+
+## Critérios de aceite
+
+- Gerar plano com 6 prints grandes não retorna mais `upstream request timeout`.
+- UI mostra "Lendo imagens… → Gerando plano…" com checkmarks.
+- Falha de rede num passo permite re-clicar sem reenviar tudo (etapa A em cache de estado local até nova edição de imagens).
+- Logs no `stack_modern--server-function-logs` mostram a sequência das etapas com duração.
+
+## Arquivos afetados
+
+- `src/lib/scale.server.ts` (helper de gateway, modelo, novo `aiExtractCreativeContext`).
+- `src/lib/scale.functions.ts` (nova serverFn `extractCreativeContext`, refator de `createCampaignPlan`).
+- `src/components/pipeline/scale/CampaignPlanForm.tsx` (fluxo em 2 etapas + UI de progresso).
+- `src/lib/scale/compressImage.ts` (cap dinâmico por nº de imagens).
