@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlaybookIdRouteImport } from './routes/playbook.$id'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
@@ -39,6 +40,8 @@ import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authen
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 import { Route as AuthenticatedProdutosPlaybookNovoRouteImport } from './routes/_authenticated/produtos.playbook.novo'
 import { Route as AuthenticatedProdutosPlaybookIdRouteImport } from './routes/_authenticated/produtos.playbook.$id'
+import { Route as AuthenticatedProdutosPlaybookEditorNovoRouteImport } from './routes/_authenticated/produtos.playbook.editor.novo'
+import { Route as AuthenticatedProdutosPlaybookEditorIdRouteImport } from './routes/_authenticated/produtos.playbook.editor.$id'
 import { Route as AuthenticatedProdutosPlaybookIdEditarRouteImport } from './routes/_authenticated/produtos.playbook.$id.editar'
 
 const LoginRoute = LoginRouteImport.update({
@@ -53,6 +56,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlaybookIdRoute = PlaybookIdRouteImport.update({
+  id: '/playbook/$id',
+  path: '/playbook/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
@@ -202,6 +210,18 @@ const AuthenticatedProdutosPlaybookIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
   } as any)
+const AuthenticatedProdutosPlaybookEditorNovoRoute =
+  AuthenticatedProdutosPlaybookEditorNovoRouteImport.update({
+    id: '/editor/novo',
+    path: '/editor/novo',
+    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
+  } as any)
+const AuthenticatedProdutosPlaybookEditorIdRoute =
+  AuthenticatedProdutosPlaybookEditorIdRouteImport.update({
+    id: '/editor/$id',
+    path: '/editor/$id',
+    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
+  } as any)
 const AuthenticatedProdutosPlaybookIdEditarRoute =
   AuthenticatedProdutosPlaybookIdEditarRouteImport.update({
     id: '/editar',
@@ -231,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
+  '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -240,6 +261,8 @@ export interface FileRoutesByFullPath {
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
   '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
+  '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
+  '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -263,6 +286,7 @@ export interface FileRoutesByTo {
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
+  '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -272,6 +296,8 @@ export interface FileRoutesByTo {
   '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
   '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
+  '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
+  '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -297,6 +323,7 @@ export interface FileRoutesById {
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/api/ingest': typeof ApiIngestRoute
+  '/playbook/$id': typeof PlaybookIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -306,6 +333,8 @@ export interface FileRoutesById {
   '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
   '/_authenticated/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
+  '/_authenticated/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
+  '/_authenticated/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -331,6 +360,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/storybook'
     | '/api/ingest'
+    | '/playbook/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
@@ -340,6 +370,8 @@ export interface FileRouteTypes {
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
     | '/produtos/playbook/$id/editar'
+    | '/produtos/playbook/editor/$id'
+    | '/produtos/playbook/editor/novo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -363,6 +395,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/storybook'
     | '/api/ingest'
+    | '/playbook/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/produtos/playbook'
@@ -372,6 +405,8 @@ export interface FileRouteTypes {
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
     | '/produtos/playbook/$id/editar'
+    | '/produtos/playbook/editor/$id'
+    | '/produtos/playbook/editor/novo'
   id:
     | '__root__'
     | '/'
@@ -396,6 +431,7 @@ export interface FileRouteTypes {
     | '/_authenticated/radar'
     | '/_authenticated/storybook'
     | '/api/ingest'
+    | '/playbook/$id'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/produtos/playbook'
@@ -405,6 +441,8 @@ export interface FileRouteTypes {
     | '/_authenticated/produtos/playbook/$id'
     | '/_authenticated/produtos/playbook/novo'
     | '/_authenticated/produtos/playbook/$id/editar'
+    | '/_authenticated/produtos/playbook/editor/$id'
+    | '/_authenticated/produtos/playbook/editor/novo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -412,6 +450,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  PlaybookIdRoute: typeof PlaybookIdRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
 }
 
@@ -436,6 +475,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/playbook/$id': {
+      id: '/playbook/$id'
+      path: '/playbook/$id'
+      fullPath: '/playbook/$id'
+      preLoaderRoute: typeof PlaybookIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ingest': {
@@ -627,6 +673,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdRouteImport
       parentRoute: typeof AuthenticatedProdutosPlaybookRoute
     }
+    '/_authenticated/produtos/playbook/editor/novo': {
+      id: '/_authenticated/produtos/playbook/editor/novo'
+      path: '/editor/novo'
+      fullPath: '/produtos/playbook/editor/novo'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookEditorNovoRouteImport
+      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
+    }
+    '/_authenticated/produtos/playbook/editor/$id': {
+      id: '/_authenticated/produtos/playbook/editor/$id'
+      path: '/editor/$id'
+      fullPath: '/produtos/playbook/editor/$id'
+      preLoaderRoute: typeof AuthenticatedProdutosPlaybookEditorIdRouteImport
+      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
+    }
     '/_authenticated/produtos/playbook/$id/editar': {
       id: '/_authenticated/produtos/playbook/$id/editar'
       path: '/editar'
@@ -682,6 +742,8 @@ const AuthenticatedProdutosPlaybookIdRouteWithChildren =
 interface AuthenticatedProdutosPlaybookRouteChildren {
   AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
   AuthenticatedProdutosPlaybookNovoRoute: typeof AuthenticatedProdutosPlaybookNovoRoute
+  AuthenticatedProdutosPlaybookEditorIdRoute: typeof AuthenticatedProdutosPlaybookEditorIdRoute
+  AuthenticatedProdutosPlaybookEditorNovoRoute: typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 
 const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookRouteChildren =
@@ -690,6 +752,10 @@ const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookR
       AuthenticatedProdutosPlaybookIdRouteWithChildren,
     AuthenticatedProdutosPlaybookNovoRoute:
       AuthenticatedProdutosPlaybookNovoRoute,
+    AuthenticatedProdutosPlaybookEditorIdRoute:
+      AuthenticatedProdutosPlaybookEditorIdRoute,
+    AuthenticatedProdutosPlaybookEditorNovoRoute:
+      AuthenticatedProdutosPlaybookEditorNovoRoute,
   }
 
 const AuthenticatedProdutosPlaybookRouteWithChildren =
@@ -755,6 +821,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiIngestRoute: ApiIngestRoute,
+  PlaybookIdRoute: PlaybookIdRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
 }
 export const routeTree = rootRouteImport
