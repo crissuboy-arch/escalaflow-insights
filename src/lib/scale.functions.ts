@@ -4,13 +4,16 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   aiAnalyzeScale,
   aiCreateCampaignPlan,
+  aiExtractCreativeContext,
   aiNextTests,
   aiScalePlan,
   CampaignPlanSchema,
+  CreativeContextSchema,
   NextTestsSchema,
   ScaleAnalysisSchema,
   ScalePlanSchema,
   type CampaignPlan,
+  type CreativeContext,
   type ScaleAnalysis,
   type ScaleContext,
 } from "./scale.server";
@@ -122,7 +125,31 @@ const PlanInputSchema = z.object({
   dailyBudget: z.string().optional(),
   offerText: z.string().optional(),
   imageDataUrls: z.array(z.string()).max(6).optional(),
+  extractedContext: z.unknown().optional(),
 });
+
+const ExtractInputSchema = z.object({
+  imageDataUrls: z.array(z.string()).max(6),
+  pageUrl: z.string().optional(),
+  price: z.string().optional(),
+  offerText: z.string().optional(),
+});
+
+export const extractCreativeContext = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof ExtractInputSchema>) => ExtractInputSchema.parse(d))
+  .handler(async ({ data }) => {
+    dlog("hydrate", "scale.extract.start", { images: data.imageDataUrls.length });
+    const t0 = Date.now();
+    const context = await aiExtractCreativeContext({
+      imageDataUrls: data.imageDataUrls,
+      pageUrl: data.pageUrl,
+      price: data.price,
+      offerText: data.offerText,
+    });
+    dlog("hydrate", "scale.extract.done", { ms: Date.now() - t0 });
+    return { context: CreativeContextSchema.parse(context) };
+  });
 
 async function loadScaleMeta(supabase: any, projectId: string, userId: string) {
   const { data: row } = await supabase
@@ -152,6 +179,21 @@ export const createCampaignPlan = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof PlanInputSchema>) => PlanInputSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const t0 = Date.now();
+    dlog("hydrate", "scale.plan.start", {
+      images: data.imageDataUrls?.length ?? 0,
+      hasContext: !!data.extractedContext,
+    });
+    // If client passed images without pre-extracted context, do stage A inline.
+    let extracted = data.extractedContext as CreativeContext | undefined;
+    if (!extracted && data.imageDataUrls?.length) {
+      extracted = await aiExtractCreativeContext({
+        imageDataUrls: data.imageDataUrls,
+        pageUrl: data.pageUrl,
+        price: data.price,
+        offerText: data.offerText,
+      });
+    }
     const plan = await aiCreateCampaignPlan({
       productName: data.productName,
       pageUrl: data.pageUrl,
@@ -163,17 +205,19 @@ export const createCampaignPlan = createServerFn({ method: "POST" })
       platforms: data.platforms,
       dailyBudget: data.dailyBudget,
       offerText: data.offerText,
-      imageDataUrls: data.imageDataUrls,
+      imageDataUrls: extracted ? undefined : data.imageDataUrls,
+      extractedContext: extracted,
     });
+    dlog("hydrate", "scale.plan.done", { totalMs: Date.now() - t0 });
 
     if (data.projectId) {
       const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
       const prevPlans = Array.isArray(scale.plans) ? (scale.plans as unknown[]) : [];
       await saveScaleMeta(supabase, data.projectId, userId, {
         plan,
-        lastPlanInput: { ...data, imageDataUrls: undefined },
+        lastPlanInput: { ...data, imageDataUrls: undefined, extractedContext: undefined },
         plans: [
-          { at: new Date().toISOString(), plan, input: { ...data, imageDataUrls: undefined } },
+          { at: new Date().toISOString(), plan, input: { ...data, imageDataUrls: undefined, extractedContext: undefined } },
           ...prevPlans,
         ].slice(0, 10),
       });
@@ -182,7 +226,7 @@ export const createCampaignPlan = createServerFn({ method: "POST" })
     await recordAi(supabase, userId, {
       projectId: data.projectId ?? null,
       module: "escala",
-      prompt: { kind: "plan", ...data, imageDataUrls: (data.imageDataUrls?.length ?? 0) > 0 ? `[${data.imageDataUrls?.length} images]` : undefined },
+      prompt: { kind: "plan", ...data, imageDataUrls: (data.imageDataUrls?.length ?? 0) > 0 ? `[${data.imageDataUrls?.length} images]` : undefined, extractedContext: extracted ? "[extracted]" : undefined },
       response: plan,
     });
     return { plan: CampaignPlanSchema.parse(plan) };

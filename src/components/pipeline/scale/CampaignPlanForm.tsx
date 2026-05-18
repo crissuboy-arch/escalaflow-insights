@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles } from "lucide-react";
-import { createCampaignPlan } from "@/lib/scale.functions";
+import { Check, Loader2, Sparkles } from "lucide-react";
+import { createCampaignPlan, extractCreativeContext } from "@/lib/scale.functions";
 import type { CampaignPlan } from "@/lib/scale.server";
 import { CountryMultiSelect } from "./CountryMultiSelect";
 import { CurrencySelect } from "./CurrencySelect";
@@ -23,8 +23,12 @@ export function CampaignPlanForm({
   onPlan: (p: CampaignPlan) => void;
 }) {
   const run = useServerFn(createCampaignPlan);
+  const runExtract = useServerFn(extractCreativeContext);
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<"idle" | "reading" | "planning" | "done">("idle");
   const [images, setImages] = useState<string[]>([]);
+  const [cachedContext, setCachedContext] = useState<unknown | null>(null);
+  const [cachedKey, setCachedKey] = useState<string>("");
   const [form, setForm] = useState({
     productName: "",
     pageUrl: "",
@@ -32,6 +36,15 @@ export function CampaignPlanForm({
     dailyBudget: "",
     offerText: "",
   });
+
+  // Invalidate cached extraction when images change
+  useEffect(() => {
+    const key = images.join("|");
+    if (key !== cachedKey) {
+      setCachedContext(null);
+      setCachedKey(key);
+    }
+  }, [images, cachedKey]);
   const [countryCodes, setCountryCodes] = useState<string[]>(["BR"]);
   const [currency, setCurrency] = useState<string>("BRL");
   const [currencyTouched, setCurrencyTouched] = useState(false);
@@ -53,8 +66,37 @@ export function CampaignPlanForm({
 
   async function go() {
     setBusy(true);
+    setStage("idle");
     try {
       const countryNames = countryCodes.map((c) => countryByCode(c)?.name || c);
+
+      // Stage A: extract context from images (skip if no images or already cached)
+      let extracted = cachedContext;
+      if (images.length && !extracted) {
+        setStage("reading");
+        try {
+          const ex = await runExtract({
+            data: {
+              imageDataUrls: images,
+              pageUrl: form.pageUrl || undefined,
+              price: form.price || undefined,
+              offerText: form.offerText || undefined,
+            },
+          });
+          extracted = ex.context;
+          setCachedContext(extracted);
+        } catch (e) {
+          toast.error(
+            e instanceof Error
+              ? `Falha ao ler imagens: ${e.message}`
+              : "Falha ao ler imagens. Tente novamente.",
+          );
+          throw e;
+        }
+      }
+
+      // Stage B: generate plan
+      setStage("planning");
       const r = await run({
         data: {
           projectId,
@@ -68,13 +110,18 @@ export function CampaignPlanForm({
           platforms: platforms.length ? platforms : undefined,
           dailyBudget: form.dailyBudget || undefined,
           offerText: form.offerText || undefined,
-          imageDataUrls: images.length ? images : undefined,
+          imageDataUrls: extracted ? undefined : images.length ? images : undefined,
+          extractedContext: extracted ?? undefined,
         },
       });
+      setStage("done");
       onPlan(r.plan);
       toast.success("Plano de campanha gerado.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao gerar plano");
+      // Stage-A error already toasted; only toast B-stage errors here
+      if (stage !== "reading") {
+        toast.error(e instanceof Error ? e.message : "Falha ao gerar plano");
+      }
     } finally {
       setBusy(false);
     }
@@ -133,8 +180,40 @@ export function CampaignPlanForm({
             Criar Plano de Campanha
           </Button>
         </div>
+
+        {busy && (
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm">
+            <ProgressLine
+              active={stage === "reading"}
+              done={stage === "planning" || stage === "done"}
+              label={images.length ? "Lendo imagens e página…" : "Sem imagens — pulando leitura"}
+            />
+            <ProgressLine
+              active={stage === "planning"}
+              done={stage === "done"}
+              label="Gerando plano de campanha…"
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function ProgressLine({ active, done, label }: { active: boolean; done: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      {done ? (
+        <Check className="h-4 w-4 text-emerald-500" />
+      ) : active ? (
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+      ) : (
+        <span className="inline-block h-4 w-4 rounded-full border border-border" />
+      )}
+      <span className={done ? "text-muted-foreground line-through" : active ? "" : "text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
   );
 }
 
