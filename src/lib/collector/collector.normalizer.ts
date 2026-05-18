@@ -286,7 +286,7 @@ export function normalize(
   }
 
   const seen = new Set<string>();
-  return out.filter((a) => {
+  const deduped = out.filter((a) => {
     const key =
       a.adLibraryId ||
       a.adUrl ||
@@ -295,4 +295,41 @@ export function normalize(
     seen.add(key);
     return true;
   });
+
+  // ---------- Pattern detection (VSL, hook repetido, padrão viral) ----------
+  const hookCounts = new Map<string, number>();
+  const headlineCounts = new Map<string, number>();
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  for (const a of deduped) {
+    const hook = norm((a.copy || a.headline).slice(0, 80));
+    if (hook) hookCounts.set(hook, (hookCounts.get(hook) ?? 0) + 1);
+    const h = norm(a.headline);
+    if (h) headlineCounts.set(h, (headlineCounts.get(h) ?? 0) + 1);
+  }
+  for (const a of deduped) {
+    const txt = `${a.headline}\n${a.copy}`.toLowerCase();
+    const isVideo = !!a.videoUrl;
+    const longCopy = (a.copy || "").length > 600;
+    const vslWords = /\bvsl\b|vídeo de vendas|carta em vídeo|assista at[eé] o final|aperte o play/i.test(txt);
+    a.isVsl = isVideo && (vslWords || longCopy);
+    a.vslScaling = !!a.isVsl && (a.score ?? 0) >= 75;
+    const hook = norm((a.copy || a.headline).slice(0, 80));
+    const hookReps = hookCounts.get(hook) ?? 0;
+    a.hookText = hook || undefined;
+    a.hookRepeated = hookReps >= 2;
+    const headlineReps = headlineCounts.get(norm(a.headline)) ?? 0;
+    a.copyPattern = headlineReps >= 2;
+    a.viralStructure =
+      /(antes\s*x\s*depois|antes e depois|prova social|depoimento|comprovado|método\s+\d|passo\s+1)/i.test(txt) &&
+      (a.score ?? 0) >= 70;
+    const tags = a.tags ? [...a.tags] : [];
+    if (a.isVsl) tags.push("VSL");
+    if (a.vslScaling) tags.push("VSL escalando");
+    if (a.hookRepeated) tags.push("Hook repetido");
+    if (a.copyPattern) tags.push("Padrão de copy");
+    if (a.viralStructure) tags.push("Estrutura viral");
+    a.tags = Array.from(new Set(tags));
+  }
+
+  return deduped;
 }
