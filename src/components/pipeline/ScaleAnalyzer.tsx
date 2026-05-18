@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, AlertTriangle, TrendingUp, FileDown } from "lucide-react";
-import { analyzeAdsPerformance } from "@/lib/scale.functions";
+import { Loader2, Sparkles, AlertTriangle, TrendingUp, FileDown, History } from "lucide-react";
+import { analyzeAdsPerformance, saveScaleDraft } from "@/lib/scale.functions";
 import type { CampaignPlan, FullDiagnosis, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
 import { CampaignPlanForm } from "./scale/CampaignPlanForm";
 import { CampaignPlanResult } from "./scale/CampaignPlanResult";
@@ -18,6 +18,7 @@ import { NextStepsPanel } from "./scale/NextStepsPanel";
 import { ImageUploader } from "./scale/ImageUploader";
 import { SaveToProjectButton } from "./SaveToProjectButton";
 import { exportElementToPdf } from "@/lib/scale/pdf";
+import { PlanVersionsDialog, type PlanVersion } from "./scale/PlanVersionsDialog";
 
 export function ScaleAnalyzer({
   projectId,
@@ -29,6 +30,8 @@ export function ScaleAnalyzer({
   initialInput,
   initialImages,
   initialContext,
+  initialPlanVersions,
+  initialView,
   onSaved,
 }: {
   projectId?: string;
@@ -40,6 +43,8 @@ export function ScaleAnalyzer({
   initialInput?: Record<string, unknown> | null;
   initialImages?: string[] | null;
   initialContext?: unknown | null;
+  initialPlanVersions?: PlanVersion[] | null;
+  initialView?: { stage?: "form" | "result" | "diagnosis"; resultTab?: "plan" | "metrics" | "next" } | null;
   onSaved?: (a: ScaleAnalysis) => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(initialPlan ?? null);
@@ -47,6 +52,23 @@ export function ScaleAnalyzer({
   const [diagnosis, setDiagnosis] = useState<FullDiagnosis | null>(initialDiagnosis ?? null);
   const reportRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [tab, setTab] = useState<string>(initialView?.resultTab ?? "plan");
+  const saveDraft = useServerFn(saveScaleDraft);
+  const versions = useMemo<PlanVersion[]>(() => initialPlanVersions ?? [], [initialPlanVersions]);
+
+  // Persist lastView (which result tab) so we resume exactly where the user stopped.
+  useEffect(() => {
+    if (!projectId) return;
+    const stage: "form" | "result" | "diagnosis" = diagnosis ? "diagnosis" : plan ? "result" : "form";
+    saveDraft({
+      data: {
+        projectId,
+        lastView: { stage, resultTab: tab as "plan" | "metrics" | "next" },
+      },
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, !!plan, !!diagnosis]);
 
   async function onExportPdf() {
     if (!reportRef.current) return;
@@ -63,7 +85,7 @@ export function ScaleAnalyzer({
   }
 
   return (
-    <Tabs defaultValue="plan" className="space-y-4">
+    <Tabs value={tab} onValueChange={setTab} className="space-y-4">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="plan">Plano</TabsTrigger>
         <TabsTrigger value="metrics">Métricas</TabsTrigger>
@@ -81,6 +103,12 @@ export function ScaleAnalyzer({
         />
         {(diagnosis || plan) && (
           <div className="flex flex-wrap justify-end gap-2">
+            {projectId && versions.length >= 2 && (
+              <Button size="sm" variant="outline" onClick={() => setVersionsOpen(true)}>
+                <History className="mr-2 h-4 w-4" />
+                Comparar versões ({versions.length})
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={onExportPdf} disabled={exporting}>
               {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
               Exportar PDF
@@ -109,6 +137,14 @@ export function ScaleAnalyzer({
           initialScalePlan={initialScalePlan ?? null}
         />
       </TabsContent>
+
+      <PlanVersionsDialog
+        open={versionsOpen}
+        onOpenChange={setVersionsOpen}
+        projectId={projectId}
+        versions={versions}
+        onRestored={(p) => setPlan(p)}
+      />
     </Tabs>
   );
 }
