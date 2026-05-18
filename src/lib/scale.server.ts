@@ -300,7 +300,14 @@ export type ScaleContext = {
 
 const SYSTEM = `Você é um media buyer sênior especialista em Facebook/Instagram Ads para infoprodutos. Lê métricas e screenshots do gerenciador de anúncios e devolve diagnóstico claro em PT-BR. Sempre responde JSON válido conforme o schema, sem markdown.`;
 
-const PLAN_SYSTEM = `Você é um gestor de tráfego sênior especialista em Meta Ads, Google Ads e Instagram Ads para infoprodutos e e-commerce. Cria planos de campanha completos e executáveis em PT-BR. Sempre responde JSON válido conforme o schema, sem markdown, sem texto fora do JSON.`;
+const PLAN_SYSTEM = `Você é uma agência de performance milionária especializada em escala de infoprodutos. Atua simultaneamente como: media buyer sênior (Meta/Google/Instagram/TikTok), copywriter direct-response, estrategista de funil, analista de CRO e growth hacker.
+
+REGRAS DE OURO:
+1. NUNCA responda como ChatGPT genérico. Nada de "varie criativos", "teste públicos", "use copy persuasiva" sem detalhar O QUE, COMO e POR QUÊ.
+2. Sempre adapte CPM/CPC/CPA/ROAS ao país real do mercado (BR/LATAM CPM baixo, US/UK/DE/CH altos, JP médio-alto, IN baixo) e ao ticket do produto (low-ticket <R$100, mid R$100-997, high >R$997).
+3. Diagnostique antes de planejar: oferta, criativo, copy, página, funil, escala.
+4. Use linguagem de quem opera: "CBO com 3 conjuntos de R$50, criativo principal hook 0-3s mostrando antes/depois, exclusão de compradores 180d".
+5. Sempre devolva JSON válido completo, sem markdown, sem texto fora do JSON.`;
 
 type GatewayOpts = { model?: string; timeoutMs?: number; retries?: number; tag?: string };
 
@@ -456,6 +463,7 @@ ${intlBlock}
 
 Retorne APENAS este JSON:
 {
+  "strategicSummary": "diagnóstico estratégico em 2-3 frases: maior gargalo + maior oportunidade",
   "campaignName": "...",
   "objective": "conversões | vendas | tráfego | leads | ...",
   "totalBudgetDaily": "${ctx.currencySymbol || ctx.currency || "$"} ... / dia",
@@ -464,30 +472,108 @@ Retorne APENAS este JSON:
     "structure": "explicação curta da estrutura Meta Ads",
     "campaigns": 0, "adsets": 0, "ads": 0,
     "budgetPerCampaign": "...",
-    "audiences": [{"name":"...","targeting":"interesses/lookalike/idade/gênero/país"}]
+    "audiences": [{"name":"...","targeting":"interesses/lookalike/idade/gênero/país"}],
+    "cbo": true,
+    "creativesPerAdset": 3,
+    "budgetDistribution": "como dividir o orçamento entre conjuntos",
+    "remarketing": "quem retargetear e janelas (180d página, 75% vídeo, etc)",
+    "lookalike": "% e base (LAL 1% compradores BR)",
+    "coldAudience": "como prospectar tráfego frio",
+    "exclusions": ["compradores 180d","leads ativos","..."],
+    "idealFrequency": "1.8-2.5"
   },
   "google": {
     "structure": "Search | PMax | Demand Gen | ...",
     "campaigns": 0, "adGroups": 0, "ads": 0,
     "budgetPerCampaign": "...",
     "keywords": ["..."],
-    "audiences": ["..."]
+    "audiences": ["..."],
+    "search": "estratégia Search específica ou vazio",
+    "pmax": "estratégia PMax ou vazio",
+    "youtube": "estratégia YouTube ou vazio",
+    "shopping": "estratégia Shopping ou vazio",
+    "display": "estratégia Display ou vazio",
+    "buyingIntent": "alta | média | baixa intenção de compra"
   },
   "instagram": {
     "structure": "reels | stories | feed | ...",
     "formats": ["..."],
     "budgetPerCampaign": "...",
-    "audiences": ["..."]
+    "audiences": ["..."],
+    "feed":    {"creativeType":"carrossel | imagem | vídeo curto","hook":"primeira frase","duration":"15s | estático","cta":"..."},
+    "reels":   {"creativeType":"UGC | VSL curta | trend","hook":"0-3s","duration":"15-30s","cta":"..."},
+    "stories": {"creativeType":"slide rápido | enquete | swipe-up","hook":"...","duration":"5-15s","cta":"..."}
   },
   "creatives": [{"format":"reels 9:16 | imagem 1:1 | carrossel","angle":"...","description":"o que mostrar"}],
+  "creativesAdvanced": [{
+    "format":"reels 9:16 | imagem 1:1 | carrossel | VSL",
+    "placement":"reels | feed | stories | youtube | tiktok | search | pmax",
+    "type":"ugc | vsl | reels_viral | carrossel | imagem",
+    "hook3s":"primeira frase + ação visual 0-3s",
+    "patternBreak":"o que quebra o padrão do feed",
+    "script":"roteiro completo cena a cena",
+    "onScreenText":"texto que aparece na tela",
+    "caption":"legenda do post",
+    "cta":"...",
+    "dominantEmotion":"medo | desejo | curiosidade | raiva | esperança",
+    "editStyle":"corte seco | jump cut | zoom in | b-roll intercalado",
+    "pace":"rápido | médio | lento",
+    "cuts":"nº aproximado de cortes",
+    "soundtrack":"tipo de trilha + referência",
+    "brollSuggestions":["..."],
+    "viralScore": 0,
+    "conversionScore": 0
+  }],
   "copyAngles": ["..."],
   "hooks": ["3-5 hooks fortes em PT-BR"],
   "cta": "...",
-  "expectedKpis": {"ctr":"1.5-2.5%","cpc":"${ctx.currencySymbol || ""} ...","cpm":"${ctx.currencySymbol || ""} ...","cpa":"${ctx.currencySymbol || ""} ...","roas":"1.8-2.5"},
+  "expectedKpis": {
+    "ctr":"faixa min-max % adaptada ao nicho/país",
+    "cpc":"${ctx.currencySymbol || ""} faixa real do país",
+    "cpm":"${ctx.currencySymbol || ""} faixa real do país",
+    "cpa":"${ctx.currencySymbol || ""} CPA alvo baseado no ticket",
+    "roas":"alvo realista 1.5-3+",
+    "cpmByCountry":[{"country":"BR","value":"R$ 15-30"},{"country":"US","value":"$ 18-45"}],
+    "nicheBenchmark":"benchmark resumido do nicho"
+  },
   "day1": "o que fazer no dia 1",
   "day2": "o que fazer no dia 2",
   "day3": "o que fazer no dia 3",
-  "warnings": ["alertas: orçamento baixo, falta de pixel, etc"]
+  "warnings": ["alertas: orçamento baixo, falta de pixel, etc"],
+  "visualDiagnosis": {
+    "strengths":["..."],"weaknesses":["..."],"reducesConversion":["..."],"increasesTrust":["..."],
+    "headline":"avaliação do headline","subheadline":"...","cta":"avaliação do CTA","colors":"paleta dominante e crítica",
+    "contrast":"alto/médio/baixo + crítica","informationOverload":"sim/não + onde","socialProof":"presença e força",
+    "scarcity":"presença e tipo","bonuses":"clareza e atratividade","blockOrder":"ordem dos blocos e se faz sentido",
+    "promiseClarity":"clareza da promessa","designLevel":"amador | intermediario | profissional",
+    "visualTrust":"confiança transmitida","mobileLegibility":"legibilidade mobile",
+    "score": 0, "scoreColor":"green | yellow | red"
+  },
+  "offerDiagnosis": {
+    "promiseLevel":"...","mechanismStrength":"...","transformationClarity":"...","perceivedValue":"...",
+    "perceivedRisk":"...","viralPotential":"alto/medio/baixo","cpmPotential":"...","ctrPotential":"...","saturationLevel":"...",
+    "verdict":"fraca | media | forte","urgencyLevel":"...","conversionProbability":"...",
+    "score": 0, "scoreColor":"green | yellow | red"
+  },
+  "scores": {
+    "offer":   {"value":0,"color":"green|yellow|red","reason":"..."},
+    "creative":{"value":0,"color":"green|yellow|red","reason":"..."},
+    "copy":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "funnel":  {"value":0,"color":"green|yellow|red","reason":"..."},
+    "page":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "scale":   {"value":0,"color":"green|yellow|red","reason":"..."}
+  },
+  "scaleByDay": {
+    "day1": {"objective":"...","expectedMetrics":"CTR/CPM/CPA/ROAS esperados","positiveSignals":["..."],"negativeSignals":["..."]},
+    "day2": {"whenPause":["regra exata"],"whenScale":["regra exata"],"whenSwapCreative":["regra exata"]},
+    "day3": {"decisionRules":["..."],"budgetIncrease":"% por dia","duplication":"quando duplicar","horizontalScaling":"como","verticalScaling":"como"}
+  },
+  "criticalAlerts": {
+    "alerts":["o que está impedindo escalar AGORA"],
+    "priorityImprovements":["melhorias por ordem de impacto"],
+    "biggestBottleneck":"o maior gargalo em 1 frase",
+    "nextSteps":["próximas 3-5 ações concretas"]
+  }
 }
 
 CONTEXTO:
