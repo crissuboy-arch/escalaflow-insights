@@ -122,7 +122,7 @@ const PlanInputSchema = z.object({
   imageDataUrls: z.array(z.string()).max(6).optional(),
 });
 
-async function loadScaleMeta(supabase: ReturnType<typeof requireSupabaseAuth> extends never ? never : any, projectId: string, userId: string) {
+async function loadScaleMeta(supabase: any, projectId: string, userId: string) {
   const { data: row } = await supabase
     .from("projects")
     .select("meta")
