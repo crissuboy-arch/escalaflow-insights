@@ -71,7 +71,7 @@ async function encode(canvas: HTMLCanvasElement, mime: string, quality: number):
   return canvas.toDataURL(mime, quality);
 }
 
-export async function compressImage(file: File): Promise<CompressResult> {
+export async function compressImage(file: File, opts?: { maxBytes?: number }): Promise<CompressResult> {
   if (!ACCEPTED.includes(file.type)) {
     throw new Error("unsupported_format");
   }
@@ -92,11 +92,12 @@ export async function compressImage(file: File): Promise<CompressResult> {
   const useWebP = supportsWebP();
   const mime = useWebP ? "image/webp" : "image/jpeg";
   const qualities = useWebP ? [0.82, 0.7, 0.6, 0.5] : [0.8, 0.7, 0.6, 0.5];
+  const target = opts?.maxBytes ?? TARGET_BYTES;
 
   let best = "";
   for (const q of qualities) {
     best = await encode(canvas, mime, q);
-    if (dataUrlBytes(best) <= TARGET_BYTES) break;
+    if (dataUrlBytes(best) <= target) break;
   }
 
   const finalSize = dataUrlBytes(best);
