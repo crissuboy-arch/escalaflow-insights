@@ -1,9 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Globe2 } from "lucide-react";
 import type { CampaignPlan } from "@/lib/scale.server";
 
 export function CampaignPlanResult({ plan }: { plan: CampaignPlan }) {
+  const loc = plan.localization;
+  const hasLoc = !!(loc?.language || loc?.currency || loc?.marketNotes);
   return (
     <div className="space-y-4">
       <Card>
@@ -13,11 +15,30 @@ export function CampaignPlanResult({ plan }: { plan: CampaignPlan }) {
               <p className="text-xs uppercase text-muted-foreground">Campanha</p>
               <p className="text-lg font-semibold">{plan.campaignName || "—"}</p>
             </div>
-            <Badge variant="secondary">{plan.objective || "objetivo"}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              {loc?.currency && <Badge variant="outline">{loc.currency}</Badge>}
+              {loc?.language && <Badge variant="outline">{loc.language}</Badge>}
+              <Badge variant="secondary">{plan.objective || "objetivo"}</Badge>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">Orçamento diário total: <strong>{plan.totalBudgetDaily || "—"}</strong></p>
         </CardContent>
       </Card>
+
+      {hasLoc && (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Globe2 className="h-4 w-4 text-primary" /> Adaptação internacional
+            </div>
+            <div className="grid gap-2 text-xs text-muted-foreground md:grid-cols-3">
+              <div><span className="uppercase">Idioma:</span> <span className="text-foreground">{loc.language || "—"}</span></div>
+              <div><span className="uppercase">Moeda:</span> <span className="text-foreground">{loc.currency || "—"}</span></div>
+            </div>
+            {loc.marketNotes && <p className="text-sm">{loc.marketNotes}</p>}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-3 md:grid-cols-3">
         <Platform name="Meta Ads" data={{
