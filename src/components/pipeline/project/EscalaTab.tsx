@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Rocket } from "lucide-react";
 import { ScaleAnalyzer } from "@/components/pipeline/ScaleAnalyzer";
 import type { CampaignPlan, FullDiagnosis, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
+import type { PlanVersion } from "@/components/pipeline/scale/PlanVersionsDialog";
 
 type Item = {
   key: string;
@@ -32,6 +33,8 @@ export function EscalaTab({
   initialInput,
   initialImages,
   initialContext,
+  initialPlanVersions,
+  initialView,
 }: {
   hasEbook: boolean;
   hasPlaybook: boolean;
@@ -50,6 +53,8 @@ export function EscalaTab({
   initialInput?: Record<string, unknown> | null;
   initialImages?: string[] | null;
   initialContext?: unknown | null;
+  initialPlanVersions?: PlanVersion[] | null;
+  initialView?: { stage?: "form" | "result" | "diagnosis"; resultTab?: "plan" | "metrics" | "next" } | null;
 }) {
   const items: Item[] = [
     {
@@ -118,6 +123,8 @@ export function EscalaTab({
         initialInput={initialInput ?? null}
         initialImages={initialImages ?? null}
         initialContext={initialContext ?? null}
+        initialPlanVersions={initialPlanVersions ?? null}
+        initialView={initialView ?? null}
       />
 
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
