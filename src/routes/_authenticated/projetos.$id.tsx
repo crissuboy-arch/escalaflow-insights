@@ -466,6 +466,15 @@ function ProjectWorkspace() {
               ((project.meta?.scale as Record<string, unknown> | undefined)?.lastAnalysis as never) ??
               null
             }
+            initialPlan={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.plan as never) ?? null
+            }
+            initialNextTests={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.nextTests as never) ?? null
+            }
+            initialScalePlan={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.scalePlan as never) ?? null
+            }
             hasEbook={!!project.ebook_id}
             hasPlaybook={!!project.playbook_id}
             hasCopy={!!project.meta?.copy}
