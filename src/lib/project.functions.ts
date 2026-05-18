@@ -282,6 +282,40 @@ export const deleteProject = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const duplicateProject = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: src, error: e1 } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", userId)
+      .single();
+    if (e1 || !src) throw new Error(e1?.message ?? "Projeto não encontrado");
+    const row = {
+      user_id: userId,
+      title: `${src.title} (cópia)`,
+      niche: src.niche,
+      source_ad_key: src.source_ad_key,
+      briefing: (src.briefing ?? {}) as never,
+      outline: (src.outline ?? []) as never,
+      mode: src.mode,
+      cover_url: src.cover_url,
+      meta: (src.meta ?? {}) as never,
+      step: src.step ?? 0,
+      status: "draft",
+    };
+    const { data: ins, error: e2 } = await supabase
+      .from("projects")
+      .insert(row as never)
+      .select("id")
+      .single();
+    if (e2) throw new Error(e2.message);
+    return { id: ins.id as string };
+  });
+
 async function ensureBriefing(supabase: any, userId: string, id: string) {
   const { data, error } = await supabase
     .from("projects")
