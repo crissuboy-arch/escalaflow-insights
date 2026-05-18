@@ -53,7 +53,7 @@ function PlaybookLibraryPage() {
           size="lg"
           className="bg-[var(--gradient-playbook)] text-white shadow-[var(--shadow-neon)] hover:opacity-90"
           style={{ background: "var(--gradient-playbook)" }}
-          onClick={() => navigate({ to: "/produtos/playbook/novo" })}
+          onClick={() => navigate({ to: "/produtos/playbook/editor/novo" })}
         >
           <Plus className="mr-2 h-4 w-4" /> Novo Playbook
         </Button>
@@ -65,7 +65,7 @@ function PlaybookLibraryPage() {
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando…
           </div>
         ) : rows.length === 0 ? (
-          <EmptyState onCreate={() => navigate({ to: "/produtos/playbook/novo" })} />
+          <EmptyState onCreate={() => navigate({ to: "/produtos/playbook/editor/novo" })} />
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((r, i) => (
@@ -110,7 +110,7 @@ function PlaybookLibraryPage() {
                       </Link>
                     </Button>
                     <Button asChild size="sm" variant="outline">
-                      <Link to="/produtos/playbook/$id/editar" params={{ id: r.id }}>
+                      <Link to="/produtos/playbook/editor/$id" params={{ id: r.id }}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Link>
                     </Button>
@@ -120,13 +120,28 @@ function PlaybookLibraryPage() {
                       title={r.status === "published" ? "Despublicar" : "Publicar"}
                       onClick={async () => {
                         try {
+                          const newStatus = r.status === "published" ? "draft" : "published";
                           await setStatus({
                             data: {
                               id: r.id,
-                              status: r.status === "published" ? "draft" : "published",
+                              status: newStatus,
                             },
                           });
-                          toast.success(r.status === "published" ? "Despublicado" : "Publicado");
+                          if (newStatus === "published") {
+                            const url = `${window.location.origin}/playbook/${r.id}`;
+                            toast.success("Publicado!", {
+                              description: url,
+                              action: {
+                                label: "Copiar",
+                                onClick: () => {
+                                  void navigator.clipboard.writeText(url);
+                                  toast.success("Link copiado");
+                                },
+                              },
+                            });
+                          } else {
+                            toast.success("Despublicado");
+                          }
                           await refresh();
                         } catch (e) {
                           toast.error(e instanceof Error ? e.message : "Falhou");
