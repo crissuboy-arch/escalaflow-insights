@@ -242,7 +242,13 @@ Preço: ${ctx.price || "—"} ${currencyTag}
 Orçamento diário disponível: ${ctx.dailyBudget || "—"} (${ctx.currency || ""})
 Texto da oferta: ${ctx.offerText || "—"}
 
-Se houver imagens (print do produto, da página, do anúncio ou criativos), use-as para inferir nicho, público e ângulos. Se a plataforma não foi escolhida pelo usuário, ainda preencha as 3 seções (meta/google/instagram) com recomendações.`;
+Se houver imagens anexadas (prints da página de vendas, checkout, anúncio, criativos, métricas), faça OCR e leitura visual completa ANTES de gerar o plano:
+- extraia headline principal, sub-headline e CTA visível;
+- leia preço, garantia, bônus, prova social e selos;
+- identifique estrutura/layout da página (seções, ordem, blocos);
+- nos criativos, descreva formato (reels/feed/carrossel), ângulo, gancho visual, texto sobreposto;
+- em prints de métricas, leia CTR, CPC, CPM, ROAS, gasto e nome do criativo.
+Use esses dados reais para inferir nicho, público, ângulos e copy. Se a plataforma não foi escolhida pelo usuário, ainda preencha as 3 seções (meta/google/instagram) com recomendações.`;
 
   const userContent: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
   for (const url of (ctx.imageDataUrls ?? []).slice(0, 6)) {
@@ -338,7 +344,7 @@ Gasto: ${ctx.spend || "—"}
 Dias rodando: ${ctx.daysRunning || "—"}
 Notas / resultados colados: ${ctx.notes || "—"}
 
-Se houver screenshot anexado, use-o como fonte primária e extraia métricas reais dele.`;
+Se houver screenshot do Gerenciador anexado, use-o como fonte primária: faça OCR e extraia CTR, CPC, CPM, ROAS, frequência, gasto, dias rodando, nome do criativo vencedor e qualquer indicador visível. Confronte com os campos preenchidos pelo usuário e prefira os valores do print quando divergirem.`;
 
   const userContent: Array<Record<string, unknown>> = [{ type: "text", text: textPrompt }];
   if (ctx.imageDataUrl) {
