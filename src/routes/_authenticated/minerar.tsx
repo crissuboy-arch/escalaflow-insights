@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar } from "lucide-react";
+import { Search, Sparkles, Flame, TrendingUp, TrendingDown, Minus, Loader2, Wand2, Radar, Rocket } from "lucide-react";
 import { toggleSaveOffer, subscribeChange, fetchSavedIds, fetchFavIds, getAITrends, toggleFavorite, saveCollectedAd, favoriteCollectedAd, rememberAdForAnalysis, type AITrends, type PersistedAd } from "@/lib/queries";
 import { useAuth } from "@/providers/AuthProvider";
 import { toast } from "sonner";
@@ -22,6 +22,8 @@ import { ExternalLink, Flame as FlameIcon, Image as ImageIcon, Globe2, BookmarkC
 import { Skeleton } from "@/components/ui/skeleton";
 import { openAdLink } from "@/lib/external";
 import { CATEGORY_LIST, KEYWORD_CATEGORIES, type CategoryId } from "@/lib/mining/keywords";
+import { useServerFn } from "@tanstack/react-start";
+import { createProjectFromOffer } from "@/lib/project.functions";
 
 type CollectedAd = {
   id: string;
@@ -46,6 +48,11 @@ type CollectedAd = {
   scale_level?: "cold" | "warming" | "hot" | "scaled" | null;
   promise?: string | null;
   emotion?: string | null;
+  isVsl?: boolean;
+  vslScaling?: boolean;
+  hookRepeated?: boolean;
+  viralStructure?: boolean;
+  copyPattern?: boolean;
 };
 
 export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
@@ -54,6 +61,8 @@ function MinePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const createFromOffer = useServerFn(createProjectFromOffer);
+  const [modeling, setModeling] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [niche, setNiche] = useState("all");
   const [country, setCountry] = useState("all");
@@ -138,6 +147,11 @@ function MinePage() {
           scale_level: (e.scaleLevel as CollectedAd["scale_level"]) ?? null,
           promise: (e.promise as string | null | undefined) ?? null,
           emotion: (e.emotion as string | null | undefined) ?? null,
+          isVsl: !!e.isVsl,
+          vslScaling: !!e.vslScaling,
+          hookRepeated: !!e.hookRepeated,
+          viralStructure: !!e.viralStructure,
+          copyPattern: !!e.copyPattern,
         } as CollectedAd;
       });
       setCollected(enriched);
