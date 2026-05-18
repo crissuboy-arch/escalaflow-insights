@@ -314,9 +314,8 @@ function ProjectsHubPage() {
             {rows.map((r) => {
               const scale = (r.meta?.scale ?? {}) as Record<string, unknown>;
               const hasStrategy = !!(scale.plan || scale.fullDiagnosis);
-              const country = (r.meta?.country as string) || (scale.lastPlanInput as Record<string, unknown> | undefined)?.countries
-                ? ((scale.lastPlanInput as Record<string, unknown>)?.countries as string[])?.[0]
-                : undefined;
+              const lastInputCountries = (scale.lastPlanInput as Record<string, unknown> | undefined)?.countries as string[] | undefined;
+              const country = (r.meta?.country as string) || lastInputCountries?.[0];
               const updated = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "—";
               return (
                 <Card key={r.id} className="overflow-hidden">
