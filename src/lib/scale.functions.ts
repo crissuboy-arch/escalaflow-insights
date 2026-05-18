@@ -137,6 +137,12 @@ const DraftInputSchema = z.object({
   input: z.record(z.string(), z.unknown()).optional(),
   imageDataUrls: z.array(z.string()).max(6).optional(),
   extractedContext: z.unknown().optional(),
+  lastView: z
+    .object({
+      stage: z.enum(["form", "result", "diagnosis"]),
+      resultTab: z.enum(["plan", "metrics", "next"]).optional(),
+    })
+    .optional(),
 });
 
 export const saveScaleDraft = createServerFn({ method: "POST" })
@@ -150,6 +156,7 @@ export const saveScaleDraft = createServerFn({ method: "POST" })
     if (data.input) patch.lastPlanInput = data.input;
     if (data.imageDataUrls) patch.lastImages = data.imageDataUrls;
     if (data.extractedContext) patch.lastExtractedContext = data.extractedContext;
+    if (data.lastView) patch.lastView = data.lastView;
     await saveScaleMeta(supabase, data.projectId, userId, patch);
     // bump updated_at so the project list reflects activity
     await supabase
@@ -158,6 +165,36 @@ export const saveScaleDraft = createServerFn({ method: "POST" })
       .eq("id", data.projectId)
       .eq("user_id", userId);
     return { ok: true };
+  });
+
+// Restore a saved plan version into meta.scale.plan without losing the
+// versions history. Reads meta.scale.plans[index] (where 0 = most recent).
+const RestoreInputSchema = z.object({
+  projectId: z.string().uuid(),
+  index: z.number().int().min(0).max(20),
+});
+
+export const restoreScaleVersion = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof RestoreInputSchema>) => RestoreInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
+    const plans = Array.isArray(scale.plans) ? (scale.plans as Array<{ plan: unknown; input?: unknown }>) : [];
+    const target = plans[data.index];
+    if (!target?.plan) throw new Error("Versão não encontrada");
+    await saveScaleMeta(supabase, data.projectId, userId, {
+      plan: target.plan,
+      lastPlanInput: target.input ?? {},
+      restoredAt: new Date().toISOString(),
+      restoredFromIndex: data.index,
+    });
+    await supabase
+      .from("projects")
+      .update({ updated_at: new Date().toISOString() } as never)
+      .eq("id", data.projectId)
+      .eq("user_id", userId);
+    return { ok: true, plan: target.plan };
   });
 
 const ExtractInputSchema = z.object({
