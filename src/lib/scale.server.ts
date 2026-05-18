@@ -266,6 +266,8 @@ export async function aiNextTests(args: {
   "notes": "observações gerais"
 }
 
+IMPORTANTE: mantenha a MOEDA e o IDIOMA do plano (campo "localization"). Não troque a moeda do orçamento.
+
 PLANO ATUAL: ${args.plan ? JSON.stringify(args.plan).slice(0, 3000) : "—"}
 ÚLTIMA ANÁLISE: ${args.analysis ? JSON.stringify(args.analysis).slice(0, 3000) : "—"}
 NOTAS: ${args.notes || "—"}`;
@@ -294,6 +296,8 @@ Diga o que pausar, duplicar, escalar (2x/CBO), trocar criativo e ajustar públic
   "next3Days": {"day1":"...","day2":"...","day3":"..."},
   "warnings": ["..."]
 }
+
+IMPORTANTE: mantenha a MOEDA e o IDIOMA do plano (campo "localization"). Adapte recomendações ao(s) país(es)-alvo.
 
 PLANO: ${args.plan ? JSON.stringify(args.plan).slice(0, 3000) : "—"}
 ANÁLISE: ${args.analysis ? JSON.stringify(args.analysis).slice(0, 3000) : "—"}
