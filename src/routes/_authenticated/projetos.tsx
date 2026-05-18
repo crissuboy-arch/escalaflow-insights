@@ -61,6 +61,43 @@ const MODE_LABEL: Record<string, string> = {
   combo: "Combo",
 };
 
+const STATUS_OPTIONS = [
+  "draft",
+  "em_analise",
+  "pausado",
+  "escalando",
+  "vencedor",
+  "arquivado",
+] as const;
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Rascunho",
+  ready: "Pronto",
+  published: "Publicado",
+  em_analise: "Em análise",
+  pausado: "Pausado",
+  escalando: "Escalando",
+  vencedor: "Vencedor",
+  arquivado: "Arquivado",
+};
+
+const STATUS_TONE: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  draft: "outline",
+  em_analise: "secondary",
+  pausado: "outline",
+  escalando: "default",
+  vencedor: "default",
+  arquivado: "outline",
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  escalando: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+  vencedor: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
+  arquivado: "bg-muted text-muted-foreground",
+  em_analise: "bg-blue-500/15 text-blue-600 border-blue-500/30",
+  pausado: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
+};
+
 type Row = {
   id: string;
   title: string;
