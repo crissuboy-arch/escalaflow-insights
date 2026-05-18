@@ -736,6 +736,41 @@ function MinePage() {
                         <Button size="sm" variant="outline" onClick={() => onSaveCollected(a)}>
                           <BookmarkCheck className="mr-1 h-3.5 w-3.5" /> {savedIds.has(key) ? "Salvo" : "Salvar"}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="sm:col-span-2"
+                          disabled={modeling === key}
+                          onClick={async () => {
+                            setModeling(key);
+                            try {
+                              const r = await createFromOffer({
+                                data: {
+                                  title: `${a.advertiser} — ${a.niche}`,
+                                  niche: a.niche,
+                                  promise: a.headline,
+                                  avatar: `Pessoas interessadas em ${a.niche}`,
+                                  uniqueMechanism: a.promise ?? "",
+                                  pains: [],
+                                  desires: [],
+                                  source_ad_key: key,
+                                  cover_url: a.image_url ?? null,
+                                  advertiser: a.advertiser,
+                                  platform: a.platform,
+                                  country: a.country,
+                                },
+                              });
+                              toast.success("Estratégia modelada");
+                              navigate({ to: "/projetos/$id", params: { id: r.id }, search: { tab: "escala" } as never });
+                            } catch (e) {
+                              toast.error(e instanceof Error ? e.message : "Falha ao modelar");
+                            } finally {
+                              setModeling(null);
+                            }
+                          }}
+                        >
+                          <Rocket className="mr-1 h-3.5 w-3.5" /> {modeling === key ? "Modelando…" : "Modelar Estratégia"}
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => onFavoriteCollected(a)}>
                           <Star className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`} /> Favoritar
                         </Button>
