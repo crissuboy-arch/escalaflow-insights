@@ -5,7 +5,11 @@ export type CategoryId =
   | "dinheiro" | "ia" | "automacao" | "infoproduto" | "tiktok" | "instagram"
   | "ebook" | "playbook" | "plr" | "fisico" | "emagrecimento" | "beleza"
   | "branding" | "saas" | "apps" | "whatsapp" | "figurinhas" | "cursos"
-  | "lowTicket" | "highTicket" | "rendaExtra" | "copy";
+  | "lowTicket" | "highTicket" | "rendaExtra" | "copy"
+  | "lead" | "vsl" | "webinar" | "quiz" | "dropshipping" | "afiliado"
+  | "black" | "white" | "nutra" | "financeiro" | "relacionamento"
+  | "desenvolvimentoPessoal" | "educacao" | "infantil" | "cristao"
+  | "ecommerce" | "marketplace" | "viral" | "ugc" | "tiktokViral";
 
 export interface Category {
   id: CategoryId;
@@ -143,6 +147,86 @@ export const KEYWORD_CATEGORIES: Record<CategoryId, Category> = {
       "método oculto", "descoberta", "hack", "fórmula secreta", "simples",
       "rápido", "validado", "comprovado", "sem aparecer", "sem experiência",
     ],
+  },
+  lead: {
+    id: "lead", label: "Lead", emoji: "🎯",
+    keywords: ["captura de lead", "isca digital", "lead magnet", "geração de leads", "formulário", "opt-in"],
+  },
+  vsl: {
+    id: "vsl", label: "VSL", emoji: "🎥",
+    keywords: ["vsl", "video sales letter", "vídeo de vendas", "carta de vendas em vídeo", "vsl curta", "vsl longa"],
+  },
+  webinar: {
+    id: "webinar", label: "Webinar", emoji: "🖥️",
+    keywords: ["webinar", "aula ao vivo", "evento online", "masterclass", "workshop"],
+  },
+  quiz: {
+    id: "quiz", label: "Quiz", emoji: "❓",
+    keywords: ["quiz", "teste", "descubra qual", "responda", "qual o seu"],
+  },
+  dropshipping: {
+    id: "dropshipping", label: "Dropshipping", emoji: "📦",
+    keywords: ["dropshipping", "drop", "shopify", "produto viral", "aliexpress"],
+  },
+  afiliado: {
+    id: "afiliado", label: "Afiliado", emoji: "🤝",
+    keywords: ["afiliado", "marketing de afiliados", "hotmart", "monetizze", "kiwify", "eduzz", "braip"],
+  },
+  black: {
+    id: "black", label: "Black", emoji: "🖤",
+    keywords: ["método black", "agressivo", "polêmico", "proibido", "censurado", "underground"],
+  },
+  white: {
+    id: "white", label: "White", emoji: "🤍",
+    keywords: ["método white", "ético", "conformidade", "compliance", "aprovado"],
+  },
+  nutra: {
+    id: "nutra", label: "Nutra", emoji: "💊",
+    keywords: ["suplemento", "emagrecedor", "termogênico", "natural", "fórmula natural", "vitamina", "nutra"],
+  },
+  financeiro: {
+    id: "financeiro", label: "Financeiro", emoji: "💵",
+    keywords: ["investimento", "renda fixa", "ações", "cripto", "bitcoin", "trader", "day trade", "finanças pessoais"],
+  },
+  relacionamento: {
+    id: "relacionamento", label: "Relacionamento", emoji: "❤️",
+    keywords: ["reconquistar", "relacionamento", "ex", "casamento", "namoro", "sedução", "atração"],
+  },
+  desenvolvimentoPessoal: {
+    id: "desenvolvimentoPessoal", label: "Desenvolvimento pessoal", emoji: "🌱",
+    keywords: ["autoestima", "produtividade", "mindset", "alta performance", "disciplina", "hábitos"],
+  },
+  educacao: {
+    id: "educacao", label: "Educação", emoji: "🎒",
+    keywords: ["concurso", "vestibular", "enem", "idiomas", "inglês", "espanhol", "redação"],
+  },
+  infantil: {
+    id: "infantil", label: "Infantil", emoji: "🧒",
+    keywords: ["infantil", "criança", "alfabetização", "atividades para crianças", "educação infantil"],
+  },
+  cristao: {
+    id: "cristao", label: "Cristão", emoji: "✝️",
+    keywords: ["cristão", "bíblia", "evangélico", "oração", "fé", "devocional"],
+  },
+  ecommerce: {
+    id: "ecommerce", label: "Ecommerce", emoji: "🛒",
+    keywords: ["loja virtual", "ecommerce", "shopify", "woocommerce", "nuvemshop", "produto físico"],
+  },
+  marketplace: {
+    id: "marketplace", label: "Marketplace", emoji: "🏬",
+    keywords: ["mercado livre", "shopee", "amazon", "vender no marketplace", "magalu"],
+  },
+  viral: {
+    id: "viral", label: "Viral", emoji: "🌪️",
+    keywords: ["viral", "viralizou", "milhões de views", "explodiu", "tendência"],
+  },
+  ugc: {
+    id: "ugc", label: "UGC", emoji: "🎙️",
+    keywords: ["ugc", "user generated", "depoimento real", "criador de conteúdo", "review autêntico"],
+  },
+  tiktokViral: {
+    id: "tiktokViral", label: "TikTok Viral", emoji: "🚀",
+    keywords: ["tiktok viral", "viral no tiktok", "trend tiktok", "fyp", "for you page"],
   },
 };
 
