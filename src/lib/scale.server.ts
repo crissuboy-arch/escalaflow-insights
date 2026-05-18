@@ -46,6 +46,11 @@ export const CampaignPlanSchema = z.object({
   campaignName: z.string().default(""),
   objective: z.string().default(""),
   totalBudgetDaily: z.string().default(""),
+  localization: z.object({
+    language: z.string().default(""),
+    currency: z.string().default(""),
+    marketNotes: z.string().default(""),
+  }).default({}),
   meta: z.object({
     structure: z.string().default(""),
     campaigns: z.number().default(0),
@@ -127,7 +132,9 @@ export type CampaignPlanContext = {
   pageUrl?: string;
   price?: string;
   currency?: string;
+  currencySymbol?: string;
   countries?: string[];
+  countryCodes?: string[];
   platforms?: string[];
   dailyBudget?: string;
   offerText?: string;
@@ -174,13 +181,30 @@ async function callGateway(messages: unknown[]): Promise<string> {
 }
 
 export async function aiCreateCampaignPlan(ctx: CampaignPlanContext): Promise<CampaignPlan> {
+  const currencyTag = `${ctx.currency || "?"}${ctx.currencySymbol ? ` (${ctx.currencySymbol})` : ""}`;
+  const intlBlock = `
+INTERNACIONALIZAÇÃO (regras OBRIGATÓRIAS):
+- Países-alvo: ${(ctx.countries ?? []).join(", ") || "—"} ${ctx.countryCodes?.length ? `[${ctx.countryCodes.join(",")}]` : ""}
+- Moeda: use SEMPRE ${currencyTag} em orçamento, CPA, CPC, CPM, ROAS. NUNCA use outra moeda.
+- Faixas de CPM/CPC devem refletir o mercado real do país (BR/LATAM CPM baixo, US/UK/DE/CH altos, JP médio-alto, IN baixo).
+- Idioma da copy/hooks/CTA: idioma oficial do mercado primário (BR=PT-BR, PT=PT-PT, ES=ES, US/GB=EN, FR=FR, DE=DE, IT=IT, JP=JA, MX/AR/CL/CO/PE/UY=ES). Se múltiplos mercados, escreva no idioma do mercado dominante e adicione variações nos demais idiomas em "copyAngles".
+- Para presets multi-país (LATAM, Europa, Global), gere 1 campanha por cluster e explique a segmentação por país/idioma.
+- Adapte tom: ES=emocional/poético, DE=técnico/direto, US=benefício+social proof, JP=respeitoso/discreto, BR=conversacional/urgência.
+- Preencha "localization" com {language, currency, marketNotes} resumindo as escolhas.
+
+PLACEMENTS solicitados: ${(ctx.platforms ?? []).join(", ") || "Meta, Google, Instagram (default)"}
+- Detalhe estrutura por placement quando o usuário escolher Reels, Stories, YouTube, PMax, Spark Ads etc.
+- Se TikTok/Kwai/Pinterest/LinkedIn estiverem nos placements, gere recomendações dentro de "instagram.formats" ou "creatives" rotulando claramente a plataforma.
+`;
   const prompt = `Crie um plano de campanha de tráfego pago completo, executável, para os primeiros 3 dias.
+${intlBlock}
 
 Retorne APENAS este JSON:
 {
   "campaignName": "...",
   "objective": "conversões | vendas | tráfego | leads | ...",
-  "totalBudgetDaily": "R$ ... / dia",
+  "totalBudgetDaily": "${ctx.currencySymbol || ctx.currency || "$"} ... / dia",
+  "localization": {"language":"pt-BR | en | es | ...","currency":"${ctx.currency || ""}","marketNotes":"adaptações por país/idioma"},
   "meta": {
     "structure": "explicação curta da estrutura Meta Ads",
     "campaigns": 0, "adsets": 0, "ads": 0,
@@ -204,7 +228,7 @@ Retorne APENAS este JSON:
   "copyAngles": ["..."],
   "hooks": ["3-5 hooks fortes em PT-BR"],
   "cta": "...",
-  "expectedKpis": {"ctr":"1.5-2.5%","cpc":"R$ ...","cpm":"R$ ...","cpa":"R$ ...","roas":"1.8-2.5"},
+  "expectedKpis": {"ctr":"1.5-2.5%","cpc":"${ctx.currencySymbol || ""} ...","cpm":"${ctx.currencySymbol || ""} ...","cpa":"${ctx.currencySymbol || ""} ...","roas":"1.8-2.5"},
   "day1": "o que fazer no dia 1",
   "day2": "o que fazer no dia 2",
   "day3": "o que fazer no dia 3",
@@ -214,10 +238,8 @@ Retorne APENAS este JSON:
 CONTEXTO:
 Produto: ${ctx.productName || "—"}
 Página: ${ctx.pageUrl || "—"}
-Preço: ${ctx.price || "—"} ${ctx.currency || ""}
-Países: ${(ctx.countries ?? []).join(", ") || "—"}
-Plataformas desejadas: ${(ctx.platforms ?? []).join(", ") || "Meta, Google, Instagram"}
-Orçamento diário disponível: ${ctx.dailyBudget || "—"}
+Preço: ${ctx.price || "—"} ${currencyTag}
+Orçamento diário disponível: ${ctx.dailyBudget || "—"} (${ctx.currency || ""})
 Texto da oferta: ${ctx.offerText || "—"}
 
 Se houver imagens (print do produto, da página, do anúncio ou criativos), use-as para inferir nicho, público e ângulos. Se a plataforma não foi escolhida pelo usuário, ainda preencha as 3 seções (meta/google/instagram) com recomendações.`;
@@ -243,6 +265,8 @@ export async function aiNextTests(args: {
   "tests": [{"title":"...","hypothesis":"...","howTo":"passo a passo","budget":"R$/dia","successMetric":"CTR>2% / CPA<R$X / ROAS>2"}],
   "notes": "observações gerais"
 }
+
+IMPORTANTE: mantenha a MOEDA e o IDIOMA do plano (campo "localization"). Não troque a moeda do orçamento.
 
 PLANO ATUAL: ${args.plan ? JSON.stringify(args.plan).slice(0, 3000) : "—"}
 ÚLTIMA ANÁLISE: ${args.analysis ? JSON.stringify(args.analysis).slice(0, 3000) : "—"}
@@ -272,6 +296,8 @@ Diga o que pausar, duplicar, escalar (2x/CBO), trocar criativo e ajustar públic
   "next3Days": {"day1":"...","day2":"...","day3":"..."},
   "warnings": ["..."]
 }
+
+IMPORTANTE: mantenha a MOEDA e o IDIOMA do plano (campo "localization"). Adapte recomendações ao(s) país(es)-alvo.
 
 PLANO: ${args.plan ? JSON.stringify(args.plan).slice(0, 3000) : "—"}
 ANÁLISE: ${args.analysis ? JSON.stringify(args.analysis).slice(0, 3000) : "—"}
