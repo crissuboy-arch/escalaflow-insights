@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, Loader2, Sparkles } from "lucide-react";
-import { createCampaignPlan, extractCreativeContext } from "@/lib/scale.functions";
-import type { CampaignPlan } from "@/lib/scale.server";
+import { Check, Loader2, Sparkles, Stethoscope } from "lucide-react";
+import { createCampaignPlan, extractCreativeContext, fullDiagnosis } from "@/lib/scale.functions";
+import type { CampaignPlan, FullDiagnosis } from "@/lib/scale.server";
 import { CountryMultiSelect } from "./CountryMultiSelect";
 import { CurrencySelect } from "./CurrencySelect";
 import { PlatformPicker } from "./PlatformPicker";
@@ -18,13 +18,17 @@ import { countryByCode, currencyByCode } from "@/lib/scale/i18n";
 export function CampaignPlanForm({
   projectId,
   onPlan,
+  onDiagnosis,
 }: {
   projectId?: string;
   onPlan: (p: CampaignPlan) => void;
+  onDiagnosis?: (d: FullDiagnosis) => void;
 }) {
   const run = useServerFn(createCampaignPlan);
   const runExtract = useServerFn(extractCreativeContext);
+  const runDiag = useServerFn(fullDiagnosis);
   const [busy, setBusy] = useState(false);
+  const [busyDiag, setBusyDiag] = useState(false);
   const [stage, setStage] = useState<"idle" | "reading" | "planning" | "done">("idle");
   const [images, setImages] = useState<string[]>([]);
   const [cachedContext, setCachedContext] = useState<unknown | null>(null);
@@ -59,6 +63,52 @@ export function CampaignPlanForm({
     if (!currencyTouched && codes[0]) {
       const c = countryByCode(codes[0]);
       if (c) setCurrency(c.defaultCurrency);
+    }
+  }
+
+  async function runFullDiagnosis() {
+    setBusyDiag(true);
+    try {
+      const countryNames = countryCodes.map((c) => countryByCode(c)?.name || c);
+      let extracted = cachedContext;
+      if (images.length && !extracted) {
+        try {
+          const ex = await runExtract({
+            data: {
+              imageDataUrls: images,
+              pageUrl: form.pageUrl || undefined,
+              price: form.price || undefined,
+              offerText: form.offerText || undefined,
+            },
+          });
+          extracted = ex.context;
+          setCachedContext(extracted);
+        } catch (e) {
+          toast.error(e instanceof Error ? `Falha ao ler imagens: ${e.message}` : "Falha ao ler imagens.");
+          throw e;
+        }
+      }
+      const r = await runDiag({
+        data: {
+          projectId,
+          productName: form.productName || undefined,
+          pageUrl: form.pageUrl || undefined,
+          price: form.price || undefined,
+          currency: currency || undefined,
+          countries: countryNames.length ? countryNames : undefined,
+          offerText: form.offerText || undefined,
+          imageDataUrls: extracted ? undefined : images.length ? images : undefined,
+          extractedContext: extracted ?? undefined,
+        },
+      });
+      onDiagnosis?.(r.diagnosis);
+      toast.success("Diagnóstico completo gerado.");
+    } catch (e) {
+      if (!(e instanceof Error) || !/imagens/i.test(e.message)) {
+        toast.error(e instanceof Error ? e.message : "Falha no diagnóstico");
+      }
+    } finally {
+      setBusyDiag(false);
     }
   }
 
@@ -174,8 +224,12 @@ export function CampaignPlanForm({
           <ImageUploader value={images} onChange={setImages} maxFiles={6} />
         </div>
 
-        <div className="flex justify-end">
-          <Button onClick={go} disabled={busy}>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button onClick={runFullDiagnosis} disabled={busy || busyDiag} variant="secondary">
+            {busyDiag ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Stethoscope className="mr-2 h-4 w-4" />}
+            Diagnóstico Completo
+          </Button>
+          <Button onClick={go} disabled={busy || busyDiag}>
             {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             Criar Plano de Campanha
           </Button>

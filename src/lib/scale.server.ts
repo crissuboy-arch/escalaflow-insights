@@ -64,6 +64,14 @@ export const CampaignPlanSchema = z.object({
       name: z.string().default(""),
       targeting: z.string().default(""),
     })).default([]),
+    cbo: z.boolean().optional(),
+    creativesPerAdset: z.number().optional(),
+    budgetDistribution: z.string().optional(),
+    remarketing: z.string().optional(),
+    lookalike: z.string().optional(),
+    coldAudience: z.string().optional(),
+    exclusions: z.array(z.string()).optional(),
+    idealFrequency: z.string().optional(),
   }).default({}),
   google: z.object({
     structure: z.string().default(""),
@@ -73,18 +81,46 @@ export const CampaignPlanSchema = z.object({
     budgetPerCampaign: z.string().default(""),
     keywords: z.array(z.string()).default([]),
     audiences: z.array(z.string()).default([]),
+    search: z.string().optional(),
+    pmax: z.string().optional(),
+    youtube: z.string().optional(),
+    shopping: z.string().optional(),
+    display: z.string().optional(),
+    buyingIntent: z.string().optional(),
   }).default({}),
   instagram: z.object({
     structure: z.string().default(""),
     formats: z.array(z.string()).default([]),
     budgetPerCampaign: z.string().default(""),
     audiences: z.array(z.string()).default([]),
+    feed: z.object({ creativeType: z.string().default(""), hook: z.string().default(""), duration: z.string().default(""), cta: z.string().default("") }).optional(),
+    reels: z.object({ creativeType: z.string().default(""), hook: z.string().default(""), duration: z.string().default(""), cta: z.string().default("") }).optional(),
+    stories: z.object({ creativeType: z.string().default(""), hook: z.string().default(""), duration: z.string().default(""), cta: z.string().default("") }).optional(),
   }).default({}),
   creatives: z.array(z.object({
     format: z.string().default(""),
     angle: z.string().default(""),
     description: z.string().default(""),
   })).default([]),
+  creativesAdvanced: z.array(z.object({
+    format: z.string().default(""),
+    placement: z.string().default(""),
+    type: z.string().default(""),
+    hook3s: z.string().default(""),
+    patternBreak: z.string().default(""),
+    script: z.string().default(""),
+    onScreenText: z.string().default(""),
+    caption: z.string().default(""),
+    cta: z.string().default(""),
+    dominantEmotion: z.string().default(""),
+    editStyle: z.string().default(""),
+    pace: z.string().default(""),
+    cuts: z.string().default(""),
+    soundtrack: z.string().default(""),
+    brollSuggestions: z.array(z.string()).default([]),
+    viralScore: z.number().default(0),
+    conversionScore: z.number().default(0),
+  })).optional(),
   copyAngles: z.array(z.string()).default([]),
   hooks: z.array(z.string()).default([]),
   cta: z.string().default(""),
@@ -94,11 +130,86 @@ export const CampaignPlanSchema = z.object({
     cpm: z.string().default(""),
     cpa: z.string().default(""),
     roas: z.string().default(""),
+    cpmByCountry: z.array(z.object({ country: z.string().default(""), value: z.string().default("") })).optional(),
+    nicheBenchmark: z.string().optional(),
   }).default({}),
   day1: z.string().default(""),
   day2: z.string().default(""),
   day3: z.string().default(""),
   warnings: z.array(z.string()).default([]),
+  strategicSummary: z.string().optional(),
+  visualDiagnosis: z.object({
+    strengths: z.array(z.string()).default([]),
+    weaknesses: z.array(z.string()).default([]),
+    reducesConversion: z.array(z.string()).default([]),
+    increasesTrust: z.array(z.string()).default([]),
+    headline: z.string().default(""),
+    subheadline: z.string().default(""),
+    cta: z.string().default(""),
+    colors: z.string().default(""),
+    contrast: z.string().default(""),
+    informationOverload: z.string().default(""),
+    socialProof: z.string().default(""),
+    scarcity: z.string().default(""),
+    bonuses: z.string().default(""),
+    blockOrder: z.string().default(""),
+    promiseClarity: z.string().default(""),
+    designLevel: z.string().default(""),
+    visualTrust: z.string().default(""),
+    mobileLegibility: z.string().default(""),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+  }).optional(),
+  offerDiagnosis: z.object({
+    promiseLevel: z.string().default(""),
+    mechanismStrength: z.string().default(""),
+    transformationClarity: z.string().default(""),
+    perceivedValue: z.string().default(""),
+    perceivedRisk: z.string().default(""),
+    viralPotential: z.string().default(""),
+    cpmPotential: z.string().default(""),
+    ctrPotential: z.string().default(""),
+    saturationLevel: z.string().default(""),
+    verdict: z.string().default(""),
+    urgencyLevel: z.string().default(""),
+    conversionProbability: z.string().default(""),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+  }).optional(),
+  scores: z.object({
+    offer: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+    creative: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+    copy: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+    funnel: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+    page: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+    scale: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).optional(),
+  }).optional(),
+  scaleByDay: z.object({
+    day1: z.object({
+      objective: z.string().default(""),
+      expectedMetrics: z.string().default(""),
+      positiveSignals: z.array(z.string()).default([]),
+      negativeSignals: z.array(z.string()).default([]),
+    }).optional(),
+    day2: z.object({
+      whenPause: z.array(z.string()).default([]),
+      whenScale: z.array(z.string()).default([]),
+      whenSwapCreative: z.array(z.string()).default([]),
+    }).optional(),
+    day3: z.object({
+      decisionRules: z.array(z.string()).default([]),
+      budgetIncrease: z.string().default(""),
+      duplication: z.string().default(""),
+      horizontalScaling: z.string().default(""),
+      verticalScaling: z.string().default(""),
+    }).optional(),
+  }).optional(),
+  criticalAlerts: z.object({
+    alerts: z.array(z.string()).default([]),
+    priorityImprovements: z.array(z.string()).default([]),
+    biggestBottleneck: z.string().default(""),
+    nextSteps: z.array(z.string()).default([]),
+  }).optional(),
 });
 export type CampaignPlan = z.infer<typeof CampaignPlanSchema>;
 
@@ -189,7 +300,14 @@ export type ScaleContext = {
 
 const SYSTEM = `Você é um media buyer sênior especialista em Facebook/Instagram Ads para infoprodutos. Lê métricas e screenshots do gerenciador de anúncios e devolve diagnóstico claro em PT-BR. Sempre responde JSON válido conforme o schema, sem markdown.`;
 
-const PLAN_SYSTEM = `Você é um gestor de tráfego sênior especialista em Meta Ads, Google Ads e Instagram Ads para infoprodutos e e-commerce. Cria planos de campanha completos e executáveis em PT-BR. Sempre responde JSON válido conforme o schema, sem markdown, sem texto fora do JSON.`;
+const PLAN_SYSTEM = `Você é uma agência de performance milionária especializada em escala de infoprodutos. Atua simultaneamente como: media buyer sênior (Meta/Google/Instagram/TikTok), copywriter direct-response, estrategista de funil, analista de CRO e growth hacker.
+
+REGRAS DE OURO:
+1. NUNCA responda como ChatGPT genérico. Nada de "varie criativos", "teste públicos", "use copy persuasiva" sem detalhar O QUE, COMO e POR QUÊ.
+2. Sempre adapte CPM/CPC/CPA/ROAS ao país real do mercado (BR/LATAM CPM baixo, US/UK/DE/CH altos, JP médio-alto, IN baixo) e ao ticket do produto (low-ticket <R$100, mid R$100-997, high >R$997).
+3. Diagnostique antes de planejar: oferta, criativo, copy, página, funil, escala.
+4. Use linguagem de quem opera: "CBO com 3 conjuntos de R$50, criativo principal hook 0-3s mostrando antes/depois, exclusão de compradores 180d".
+5. Sempre devolva JSON válido completo, sem markdown, sem texto fora do JSON.`;
 
 type GatewayOpts = { model?: string; timeoutMs?: number; retries?: number; tag?: string };
 
@@ -345,6 +463,7 @@ ${intlBlock}
 
 Retorne APENAS este JSON:
 {
+  "strategicSummary": "diagnóstico estratégico em 2-3 frases: maior gargalo + maior oportunidade",
   "campaignName": "...",
   "objective": "conversões | vendas | tráfego | leads | ...",
   "totalBudgetDaily": "${ctx.currencySymbol || ctx.currency || "$"} ... / dia",
@@ -353,30 +472,108 @@ Retorne APENAS este JSON:
     "structure": "explicação curta da estrutura Meta Ads",
     "campaigns": 0, "adsets": 0, "ads": 0,
     "budgetPerCampaign": "...",
-    "audiences": [{"name":"...","targeting":"interesses/lookalike/idade/gênero/país"}]
+    "audiences": [{"name":"...","targeting":"interesses/lookalike/idade/gênero/país"}],
+    "cbo": true,
+    "creativesPerAdset": 3,
+    "budgetDistribution": "como dividir o orçamento entre conjuntos",
+    "remarketing": "quem retargetear e janelas (180d página, 75% vídeo, etc)",
+    "lookalike": "% e base (LAL 1% compradores BR)",
+    "coldAudience": "como prospectar tráfego frio",
+    "exclusions": ["compradores 180d","leads ativos","..."],
+    "idealFrequency": "1.8-2.5"
   },
   "google": {
     "structure": "Search | PMax | Demand Gen | ...",
     "campaigns": 0, "adGroups": 0, "ads": 0,
     "budgetPerCampaign": "...",
     "keywords": ["..."],
-    "audiences": ["..."]
+    "audiences": ["..."],
+    "search": "estratégia Search específica ou vazio",
+    "pmax": "estratégia PMax ou vazio",
+    "youtube": "estratégia YouTube ou vazio",
+    "shopping": "estratégia Shopping ou vazio",
+    "display": "estratégia Display ou vazio",
+    "buyingIntent": "alta | média | baixa intenção de compra"
   },
   "instagram": {
     "structure": "reels | stories | feed | ...",
     "formats": ["..."],
     "budgetPerCampaign": "...",
-    "audiences": ["..."]
+    "audiences": ["..."],
+    "feed":    {"creativeType":"carrossel | imagem | vídeo curto","hook":"primeira frase","duration":"15s | estático","cta":"..."},
+    "reels":   {"creativeType":"UGC | VSL curta | trend","hook":"0-3s","duration":"15-30s","cta":"..."},
+    "stories": {"creativeType":"slide rápido | enquete | swipe-up","hook":"...","duration":"5-15s","cta":"..."}
   },
   "creatives": [{"format":"reels 9:16 | imagem 1:1 | carrossel","angle":"...","description":"o que mostrar"}],
+  "creativesAdvanced": [{
+    "format":"reels 9:16 | imagem 1:1 | carrossel | VSL",
+    "placement":"reels | feed | stories | youtube | tiktok | search | pmax",
+    "type":"ugc | vsl | reels_viral | carrossel | imagem",
+    "hook3s":"primeira frase + ação visual 0-3s",
+    "patternBreak":"o que quebra o padrão do feed",
+    "script":"roteiro completo cena a cena",
+    "onScreenText":"texto que aparece na tela",
+    "caption":"legenda do post",
+    "cta":"...",
+    "dominantEmotion":"medo | desejo | curiosidade | raiva | esperança",
+    "editStyle":"corte seco | jump cut | zoom in | b-roll intercalado",
+    "pace":"rápido | médio | lento",
+    "cuts":"nº aproximado de cortes",
+    "soundtrack":"tipo de trilha + referência",
+    "brollSuggestions":["..."],
+    "viralScore": 0,
+    "conversionScore": 0
+  }],
   "copyAngles": ["..."],
   "hooks": ["3-5 hooks fortes em PT-BR"],
   "cta": "...",
-  "expectedKpis": {"ctr":"1.5-2.5%","cpc":"${ctx.currencySymbol || ""} ...","cpm":"${ctx.currencySymbol || ""} ...","cpa":"${ctx.currencySymbol || ""} ...","roas":"1.8-2.5"},
+  "expectedKpis": {
+    "ctr":"faixa min-max % adaptada ao nicho/país",
+    "cpc":"${ctx.currencySymbol || ""} faixa real do país",
+    "cpm":"${ctx.currencySymbol || ""} faixa real do país",
+    "cpa":"${ctx.currencySymbol || ""} CPA alvo baseado no ticket",
+    "roas":"alvo realista 1.5-3+",
+    "cpmByCountry":[{"country":"BR","value":"R$ 15-30"},{"country":"US","value":"$ 18-45"}],
+    "nicheBenchmark":"benchmark resumido do nicho"
+  },
   "day1": "o que fazer no dia 1",
   "day2": "o que fazer no dia 2",
   "day3": "o que fazer no dia 3",
-  "warnings": ["alertas: orçamento baixo, falta de pixel, etc"]
+  "warnings": ["alertas: orçamento baixo, falta de pixel, etc"],
+  "visualDiagnosis": {
+    "strengths":["..."],"weaknesses":["..."],"reducesConversion":["..."],"increasesTrust":["..."],
+    "headline":"avaliação do headline","subheadline":"...","cta":"avaliação do CTA","colors":"paleta dominante e crítica",
+    "contrast":"alto/médio/baixo + crítica","informationOverload":"sim/não + onde","socialProof":"presença e força",
+    "scarcity":"presença e tipo","bonuses":"clareza e atratividade","blockOrder":"ordem dos blocos e se faz sentido",
+    "promiseClarity":"clareza da promessa","designLevel":"amador | intermediario | profissional",
+    "visualTrust":"confiança transmitida","mobileLegibility":"legibilidade mobile",
+    "score": 0, "scoreColor":"green | yellow | red"
+  },
+  "offerDiagnosis": {
+    "promiseLevel":"...","mechanismStrength":"...","transformationClarity":"...","perceivedValue":"...",
+    "perceivedRisk":"...","viralPotential":"alto/medio/baixo","cpmPotential":"...","ctrPotential":"...","saturationLevel":"...",
+    "verdict":"fraca | media | forte","urgencyLevel":"...","conversionProbability":"...",
+    "score": 0, "scoreColor":"green | yellow | red"
+  },
+  "scores": {
+    "offer":   {"value":0,"color":"green|yellow|red","reason":"..."},
+    "creative":{"value":0,"color":"green|yellow|red","reason":"..."},
+    "copy":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "funnel":  {"value":0,"color":"green|yellow|red","reason":"..."},
+    "page":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "scale":   {"value":0,"color":"green|yellow|red","reason":"..."}
+  },
+  "scaleByDay": {
+    "day1": {"objective":"...","expectedMetrics":"CTR/CPM/CPA/ROAS esperados","positiveSignals":["..."],"negativeSignals":["..."]},
+    "day2": {"whenPause":["regra exata"],"whenScale":["regra exata"],"whenSwapCreative":["regra exata"]},
+    "day3": {"decisionRules":["..."],"budgetIncrease":"% por dia","duplication":"quando duplicar","horizontalScaling":"como","verticalScaling":"como"}
+  },
+  "criticalAlerts": {
+    "alerts":["o que está impedindo escalar AGORA"],
+    "priorityImprovements":["melhorias por ordem de impacto"],
+    "biggestBottleneck":"o maior gargalo em 1 frase",
+    "nextSteps":["próximas 3-5 ações concretas"]
+  }
 }
 
 CONTEXTO:
@@ -501,4 +698,122 @@ Se houver screenshot do Gerenciador anexado, use-o como fonte primária: faça O
     { tag: "scale.analyze", timeoutMs: 90_000, retries: 2 },
   );
   return ScaleAnalysisSchema.parse(safeJSON(content));
+}
+
+// ============= Full Diagnosis (Modo Consultor) =============
+
+export const FullDiagnosisSchema = z.object({
+  strategicSummary: z.string().default(""),
+  visualDiagnosis: z.object({
+    strengths: z.array(z.string()).default([]),
+    weaknesses: z.array(z.string()).default([]),
+    reducesConversion: z.array(z.string()).default([]),
+    increasesTrust: z.array(z.string()).default([]),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+    notes: z.string().default(""),
+  }).default({}),
+  offerDiagnosis: z.object({
+    verdict: z.string().default(""),
+    promiseLevel: z.string().default(""),
+    mechanismStrength: z.string().default(""),
+    transformationClarity: z.string().default(""),
+    perceivedValue: z.string().default(""),
+    perceivedRisk: z.string().default(""),
+    viralPotential: z.string().default(""),
+    saturationLevel: z.string().default(""),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+  }).default({}),
+  scores: z.object({
+    offer:    z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    creative: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    copy:     z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    funnel:   z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    page:     z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    scale:    z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+  }).default({}),
+  criticalAlerts: z.object({
+    alerts: z.array(z.string()).default([]),
+    priorityImprovements: z.array(z.string()).default([]),
+    biggestBottleneck: z.string().default(""),
+    nextSteps: z.array(z.string()).default([]),
+  }).default({}),
+});
+export type FullDiagnosis = z.infer<typeof FullDiagnosisSchema>;
+
+const DIAG_SYSTEM = `Você é o head de performance de uma agência top-tier de infoprodutos. Faz diagnóstico cirúrgico de oferta, criativo, copy, página, funil e potencial de escala. Aponta o MAIOR gargalo e o que destravar para escalar. Sempre PT-BR, JSON válido, sem markdown.`;
+
+export async function aiFullDiagnosis(args: {
+  context?: CreativeContext;
+  productName?: string;
+  pageUrl?: string;
+  price?: string;
+  currency?: string;
+  countries?: string[];
+  niche?: string;
+  offerText?: string;
+  briefing?: string;
+  history?: unknown;
+}): Promise<FullDiagnosis> {
+  const ctxJson = args.context ? JSON.stringify(args.context).slice(0, 4000) : "—";
+  const histJson = args.history ? JSON.stringify(args.history).slice(0, 2000) : "—";
+  const prompt = `Faça um DIAGNÓSTICO COMPLETO desta operação para identificar o maior gargalo de escala e o que mudar primeiro.
+
+Retorne APENAS este JSON:
+{
+  "strategicSummary":"2-3 frases: situação atual + maior gargalo + maior oportunidade",
+  "visualDiagnosis":{
+    "strengths":["..."],"weaknesses":["..."],
+    "reducesConversion":["..."],"increasesTrust":["..."],
+    "score":0,"scoreColor":"green|yellow|red",
+    "notes":"observações da página/criativos"
+  },
+  "offerDiagnosis":{
+    "verdict":"fraca|media|forte",
+    "promiseLevel":"...","mechanismStrength":"...","transformationClarity":"...",
+    "perceivedValue":"...","perceivedRisk":"...","viralPotential":"...","saturationLevel":"...",
+    "score":0,"scoreColor":"green|yellow|red"
+  },
+  "scores":{
+    "offer":   {"value":0,"color":"green|yellow|red","reason":"..."},
+    "creative":{"value":0,"color":"green|yellow|red","reason":"..."},
+    "copy":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "funnel":  {"value":0,"color":"green|yellow|red","reason":"..."},
+    "page":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "scale":   {"value":0,"color":"green|yellow|red","reason":"..."}
+  },
+  "criticalAlerts":{
+    "alerts":["o que está impedindo escala AGORA"],
+    "priorityImprovements":["lista por ordem de impacto"],
+    "biggestBottleneck":"o maior gargalo em 1 frase",
+    "nextSteps":["3-5 próximas ações concretas"]
+  }
+}
+
+REGRAS: cor "green" para score 75+, "yellow" para 50-74, "red" para <50. Adapte CPM/CPC/CPA ao país real. NÃO use respostas genéricas.
+
+CONTEXTO TEXTUAL:
+- Produto: ${args.productName || "—"}
+- Nicho: ${args.niche || "—"}
+- Países: ${(args.countries ?? []).join(", ") || "—"}
+- Preço: ${args.price || "—"} ${args.currency || ""}
+- URL: ${args.pageUrl || "—"}
+- Oferta: ${args.offerText || "—"}
+- Briefing: ${args.briefing || "—"}
+
+CONTEXTO EXTRAÍDO DAS IMAGENS (OCR + leitura visual):
+${ctxJson}
+
+HISTÓRICO DE PLANOS/ANÁLISES ANTERIORES (compare evolução se houver):
+${histJson}`;
+
+  const content = await callGateway(
+    [
+      { role: "system", content: DIAG_SYSTEM },
+      { role: "user", content: prompt },
+    ],
+    { tag: "scale.fullDiagnosis", timeoutMs: 110_000, retries: 2 },
+  );
+  return FullDiagnosisSchema.parse(safeJSON(content));
 }
