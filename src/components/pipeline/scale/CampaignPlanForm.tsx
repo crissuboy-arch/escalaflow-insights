@@ -9,6 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, Upload, X } from "lucide-react";
 import { createCampaignPlan } from "@/lib/scale.functions";
 import type { CampaignPlan } from "@/lib/scale.server";
+import { CountryMultiSelect } from "./CountryMultiSelect";
+import { CurrencySelect } from "./CurrencySelect";
+import { PlatformPicker } from "./PlatformPicker";
+import { countryByCode, currencyByCode } from "@/lib/scale/i18n";
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -18,8 +22,6 @@ function fileToDataUrl(f: File): Promise<string> {
     r.readAsDataURL(f);
   });
 }
-
-const PLATFORMS = ["Meta", "Google", "Instagram"] as const;
 
 export function CampaignPlanForm({
   projectId,
@@ -36,16 +38,27 @@ export function CampaignPlanForm({
     productName: "",
     pageUrl: "",
     price: "",
-    currency: "BRL",
-    countries: "Brasil",
     dailyBudget: "",
     offerText: "",
   });
-  const [platforms, setPlatforms] = useState<string[]>([...PLATFORMS]);
+  const [countryCodes, setCountryCodes] = useState<string[]>(["BR"]);
+  const [currency, setCurrency] = useState<string>("BRL");
+  const [currencyTouched, setCurrencyTouched] = useState(false);
+  const [platforms, setPlatforms] = useState<string[]>([
+    "Meta · Instagram Feed",
+    "Meta · Reels",
+    "Meta · Stories",
+  ]);
 
-  function togglePlatform(p: string) {
-    setPlatforms((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
+  function handleCountries(codes: string[]) {
+    setCountryCodes(codes);
+    if (!currencyTouched && codes[0]) {
+      const c = countryByCode(codes[0]);
+      if (c) setCurrency(c.defaultCurrency);
+    }
   }
+
+  const currencyMeta = currencyByCode(currency);
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -66,14 +79,17 @@ export function CampaignPlanForm({
   async function go() {
     setBusy(true);
     try {
+      const countryNames = countryCodes.map((c) => countryByCode(c)?.name || c);
       const r = await run({
         data: {
           projectId,
           productName: form.productName || undefined,
           pageUrl: form.pageUrl || undefined,
           price: form.price || undefined,
-          currency: form.currency || undefined,
-          countries: form.countries ? form.countries.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+          currency: currency || undefined,
+          currencySymbol: currencyMeta?.symbol,
+          countries: countryNames.length ? countryNames : undefined,
+          countryCodes: countryCodes.length ? countryCodes : undefined,
           platforms: platforms.length ? platforms : undefined,
           dailyBudget: form.dailyBudget || undefined,
           offerText: form.offerText || undefined,
@@ -106,34 +122,23 @@ export function CampaignPlanForm({
           <Field label="Link da página de vendas">
             <Input placeholder="https://..." value={form.pageUrl} onChange={(e) => setForm({ ...form, pageUrl: e.target.value })} />
           </Field>
-          <Field label="Preço">
+          <Field label={`Preço${currencyMeta ? ` (${currencyMeta.symbol})` : ""}`}>
             <Input placeholder="97" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           </Field>
           <Field label="Moeda">
-            <Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} />
+            <CurrencySelect value={currency} onChange={(c) => { setCurrency(c); setCurrencyTouched(true); }} />
           </Field>
-          <Field label="Países (separe por vírgula)">
-            <Input value={form.countries} onChange={(e) => setForm({ ...form, countries: e.target.value })} />
-          </Field>
-          <Field label="Orçamento diário">
+          <Field label={`Orçamento diário${currencyMeta ? ` (${currencyMeta.code})` : ""}`}>
             <Input placeholder="R$ 100/dia" value={form.dailyBudget} onChange={(e) => setForm({ ...form, dailyBudget: e.target.value })} />
+          </Field>
+          <Field label="Países-alvo">
+            <CountryMultiSelect value={countryCodes} onChange={handleCountries} />
           </Field>
         </div>
 
         <div className="space-y-1">
-          <Label className="text-xs uppercase text-muted-foreground">Plataformas</Label>
-          <div className="flex flex-wrap gap-2">
-            {PLATFORMS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => togglePlatform(p)}
-                className={`rounded-full border px-3 py-1 text-xs ${platforms.includes(p) ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"}`}
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          <Label className="text-xs uppercase text-muted-foreground">Plataformas & placements</Label>
+          <PlatformPicker value={platforms} onChange={setPlatforms} />
         </div>
 
         <Field label="Texto da oferta / promessa">
