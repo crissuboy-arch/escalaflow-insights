@@ -1,70 +1,82 @@
-## Plano de implementação
+## Objetivo
 
-### Prioridade 1 — Corrigir continuidade real da Escala de Produto
-1. **Persistência completa do estado da Escala**
-   - Salvar automaticamente no projeto: inputs do formulário, países, moeda, plataformas, prints enviados, contexto OCR extraído, diagnóstico completo, plano gerado, KPIs, criativos avançados, plano D1/D2/D3, alertas e histórico.
-   - Manter também um rascunho local com debounce para recuperação se a conexão falhar.
-   - Atualizar `updated_at` do projeto em toda geração/autosave para a lista “Projetos” refletir atividade real.
+1. Comparar lado a lado as versões salvas do plano da Escala — KPIs e o plano D1/D2/D3 — para enxergar evolução entre gerações.
+2. Botão **Abrir estratégia** que reabre o projeto exatamente no ponto em que o usuário parou (mesma aba, mesma seção, mesmo resultado/diagnóstico carregado).
 
-2. **Hidratação ao reabrir projeto**
-   - Fazer o formulário da Escala carregar `lastPlanInput`, prints/contexto salvo e diagnóstico anterior quando entrar em `/projetos/:id?tab=escala`.
-   - Garantir que `ScaleAnalyzer` sincronize estado quando `initialPlan`, `initialAnalysis` ou diagnóstico forem carregados do projeto.
-   - Exibir “rascunho recuperado” quando houver cache local mais recente.
+Hoje cada geração do plano já é empilhada em `projects.meta.scale.plans[]` (até 10 últimas), e `lastPlanInput`, `lastImages`, `lastExtractedContext`, `plan`, `fullDiagnosis` já são persistidos. A base existe; falta UI de comparação e um deep-link de retomada confiável.
 
-3. **Ações de projeto**
-   - Adicionar na lista de Projetos: **Continuar projeto**, **Abrir estratégia**, **Editar**, **Duplicar**, **Excluir** com confirmação.
-   - Criar server function para duplicar projeto preservando `meta.scale` e conteúdo estratégico.
-   - Melhorar card do projeto com thumbnail, data, país, nicho, score, plataforma e status.
-   - Status visual: em análise, pausado, escalando, vencedor, arquivado. Como o banco hoje só aceita texto, usarei o campo `status` existente sem migração estrutural, validando esses novos valores no código.
+---
 
-### Prioridade 2 — PDF baixável do diagnóstico/plano
-4. **Exportar diagnóstico para PDF**
-   - Adicionar utilitário client-side `src/lib/scale/pdf.ts` usando `html2canvas` + `jsPDF`.
-   - Criar botão **Exportar PDF** no resultado da Escala.
-   - Exportar apenas as seções estratégicas: scores, diagnóstico visual, diagnóstico da oferta, Meta/Google/Instagram, criativos, KPIs, plano D1/D2/D3 e alertas.
-   - Tratar conteúdo longo em múltiplas páginas e mostrar toast de erro/sucesso.
-   - Se as dependências não existirem, instalar `jspdf` e `html2canvas`.
+## 1. Tela "Comparar versões" da Escala
 
-### Prioridade 3 — Melhorar Minerar Ofertas
-5. **Novas categorias inteligentes**
-   - Expandir `src/lib/mining/keywords.ts` com: Lead, VSL, Webinar, Quiz, Low ticket, High ticket, PLR, Dropshipping, SaaS, Afiliado, Black, White, Nutra, Financeiro, Relacionamento, Desenvolvimento pessoal, IA, Educação, Infantil, Cristão, Ecommerce, Marketplace, Automação, Copy, Branding, Viral, UGC, TikTok Viral.
-   - Ajustar filtros/chips para essas categorias aparecerem e filtrarem anúncios já coletados.
+### Onde
+- Novo botão **Comparar versões** no header do `CampaignPlanResult` (aba Escala do projeto), ao lado de Exportar PDF.
+- Abre um `Dialog` em tela cheia (`max-w-6xl`) com a comparação.
 
-6. **Detecção de VSL e padrões fortes**
-   - Enriquecer normalização do coletor para detectar: VSL escalando, hook repetido, estrutura viral, padrão de copy, promessa, mecanismo, CTA, ritmo/estilo aproximado e palavras/headlines repetidas.
-   - Persistir esses sinais em `raw.enriched` dos anúncios coletados sem criar nova tabela.
-   - Mostrar badges no card: **VSL escalando**, **Hook repetido**, **Estrutura viral detectada**, **Padrão de copy detectado**.
+### Funcionamento
+- Lê `meta.scale.plans` do projeto (já existe; ordenado do mais recente para o mais antigo, com `{ at, plan, input }`).
+- Dois `Select` no topo: **Versão A** e **Versão B**, pré-selecionando as duas mais recentes; rótulo `"Versão N — DD/MM HH:mm"`.
+- Layout em 2 colunas com seções espelhadas:
+  - **KPIs**: CPM, CTR, CPC, CPA, ROAS, Frequência. Para cada métrica mostro valor A, valor B e o delta colorido (verde quando melhora, vermelho quando piora — considerando se a métrica é "quanto menor melhor" como CPA/CPM ou "quanto maior melhor" como ROAS/CTR).
+  - **Plano D1 / D2 / D3**: três blocos, um por dia. Em cada bloco listo os campos do `ScaleDayCard` (objetivo, budget, estrutura CBO/ABO, criativos, ajustes), com diff visual: linhas iguais ficam normais, removidas em vermelho riscado, adicionadas em verde.
+  - **Criativos & Alertas (resumo)**: contagem de criativos, principais hooks repetidos, gargalo crítico.
+- Botão **Restaurar esta versão**: usa `updateProject` para gravar `meta.scale.plan = versão.plan` e `meta.scale.lastPlanInput = versão.input`, dispara toast e fecha o dialog — o `CampaignPlanResult` rehidrata pelo `meta` atualizado.
+- Botão **Exportar comparação em PDF**: reaproveita `src/lib/scale/pdf.ts` chamando `exportElementToPdf` no nó do dialog.
 
-7. **Botão “Modelar Estratégia”**
-   - Adicionar ação nos cards de Minerar Ofertas e Ofertas Escaladas.
-   - Ao clicar, criar um projeto já preenchido a partir do anúncio/VSL: headline, promessa, avatar, mecanismo, ângulos, CTA, funil e origem.
-   - Pré-popular `meta.scale.lastPlanInput` com os dados do anúncio e abrir direto em `/projetos/:id?tab=escala` para gerar/editar a estratégia.
+### Diff helper
+- Função pequena `diffLines(a: string[], b: string[])` em `src/lib/scale/diff.ts` usando set/multiset (sem dependência nova). Devolve `{ same, added, removed }` para alimentar a UI.
 
-### Prioridade 4 — UX e confiabilidade
-8. **Estados de carregamento e feedback**
-   - Skeletons nos projetos e na Escala enquanto carrega.
-   - Toasts claros para autosave, PDF, duplicação, exclusão e modelagem.
-   - Retry onde já existe IA/collector; manter mensagens amigáveis quando falhar.
+### Estado vazio
+- Se houver menos de 2 versões, o dialog mostra `"Gere mais uma versão para começar a comparar"` + botão fechar.
 
-## Arquivos principais afetados
-- `src/lib/scale.functions.ts`
-- `src/components/pipeline/ScaleAnalyzer.tsx`
-- `src/components/pipeline/scale/CampaignPlanForm.tsx`
-- `src/components/pipeline/scale/CampaignPlanResult.tsx`
-- `src/lib/scale/pdf.ts`
-- `src/lib/project.functions.ts`
-- `src/routes/_authenticated/projetos.tsx`
-- `src/routes/_authenticated/projetos.$id.tsx`
-- `src/routes/_authenticated/minerar.tsx`
-- `src/routes/_authenticated/ofertas-escaladas.tsx`
-- `src/lib/mining/keywords.ts`
-- `src/lib/collector/collector.normalizer.ts`
-- `src/routes/api/collector.run.ts`
+---
+
+## 2. Botão "Abrir estratégia" com retomada exata
+
+### Persistir o ponto de parada
+- Adicionar `meta.scale.lastView` salvo em autosave:
+  ```
+  lastView: { stage: "form" | "result" | "diagnosis", resultTab?: "plan" | "creatives" | "kpis" | "days" }
+  ```
+- `CampaignPlanForm` e `CampaignPlanResult` chamam `saveScaleDraft` (já existe) sempre que o usuário troca de aba/seção, atualizando `lastView`.
+
+### Reabrir
+- `EscalaTab` lê `meta.scale.lastView` na hidratação inicial e:
+  - Se `stage === "result"` e há `meta.scale.plan` → renderiza direto o `CampaignPlanResult` com a aba salva ativa.
+  - Se `stage === "diagnosis"` e há `meta.scale.fullDiagnosis` → renderiza `FullDiagnosisResult`.
+  - Caso contrário → form, com inputs/prints rehidratados (já funciona).
+- Pequeno banner discreto no topo: `"Retomando de onde você parou (atualizado em ...)"` com botão `Recomeçar` que reseta para o form sem apagar dados.
+
+### Botão "Abrir estratégia" mais visível
+- Já existe na lista `/projetos`. Adicionar também em:
+  - `ScaledOffersPage` (ações da tabela): se o anúncio já tem projeto associado (via `source_ad_key` → match em `projects`), botão **Abrir estratégia** que navega para `/projetos/$id?tab=escala`; caso contrário, mantém **Modelar Estratégia**.
+  - Header do projeto (`projetos.$id.tsx`): atalho rápido `Abrir estratégia` quando a aba ativa não é `escala` e existe `meta.scale.plan`.
+  - Sidebar / dashboard: card "Continuar última estratégia" usa o projeto mais recente com `meta.scale.plan` e leva direto para `/projetos/$id?tab=escala`.
+
+### Deep-link
+- A rota `/projetos/$id` já aceita `?tab=escala`. Estender o `validateSearch` para aceitar opcionalmente `?view=form|result|diagnosis&resultTab=...` e o `EscalaTab` usa esse search param como override do `lastView`, garantindo que um link compartilhado abra exatamente a mesma visão.
+
+---
+
+## Arquivos afetados
+
+- `src/lib/scale/diff.ts` (novo) — helper de diff de listas/strings.
+- `src/components/pipeline/scale/PlanVersionsDialog.tsx` (novo) — UI de comparação.
+- `src/components/pipeline/scale/CampaignPlanResult.tsx` — botão "Comparar versões", salvar `lastView.resultTab`.
+- `src/components/pipeline/scale/CampaignPlanForm.tsx` — salvar `lastView.stage = "form"` no autosave.
+- `src/components/pipeline/scale/FullDiagnosisResult.tsx` — salvar `lastView.stage = "diagnosis"`.
+- `src/components/pipeline/ScaleAnalyzer.tsx` / `src/components/pipeline/project/EscalaTab.tsx` — hidratar `lastView`, banner "Retomando…", `Recomeçar`.
+- `src/lib/scale.functions.ts` — aceitar `lastView` no schema do `saveScaleDraft` (sem migration; tudo em `meta` jsonb).
+- `src/routes/_authenticated/projetos.$id.tsx` — `validateSearch` aceita `view`/`resultTab`; atalho "Abrir estratégia" no header.
+- `src/routes/_authenticated/ofertas-escaladas.tsx` — botão condicional Abrir/Modelar estratégia (consulta `projects` por `source_ad_key` no carregamento).
+- `src/routes/_authenticated/dashboard.tsx` — card "Continuar última estratégia".
+
+## Banco
+Nenhuma migration. Tudo persiste em `projects.meta.scale.{plans, lastPlanInput, lastView, plan, fullDiagnosis}` (já em uso).
 
 ## Critérios de aceite
-- Um plano/diagnóstico gerado em Escala reaparece corretamente ao abrir o projeto depois.
-- Inputs e prints não somem ao trocar de rota ou recarregar.
-- Projetos têm ações de continuar, abrir estratégia, editar, duplicar e excluir.
-- Exportar PDF baixa um arquivo legível com scores, diagnósticos, D1/D2/D3 e alertas.
-- Minerar Ofertas mostra as novas categorias e badges de VSL/padrões.
-- “Modelar Estratégia” cria projeto e abre a Escala já contextualizada para continuar.
+- Gerar 2+ planos → abrir "Comparar versões" → KPIs com deltas coloridos e D1/D2/D3 com diff verde/vermelho.
+- "Restaurar versão" troca o plano ativo sem perder histórico.
+- Sair da aba Escala no meio de uma edição e voltar → abre exatamente na mesma seção/aba do resultado, com inputs e plano carregados.
+- Clicar "Abrir estratégia" em `/projetos`, `/ofertas-escaladas` ou no header do projeto leva ao mesmo estado.
+- Link `/projetos/:id?tab=escala&view=result&resultTab=days` abre direto na aba "Dias" do plano.

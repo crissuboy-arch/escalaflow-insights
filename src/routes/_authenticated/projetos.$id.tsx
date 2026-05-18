@@ -45,6 +45,14 @@ export const Route = createFileRoute("/_authenticated/projetos/$id")({
   },
   validateSearch: (s: Record<string, unknown>) => ({
     tab: typeof s.tab === "string" ? (s.tab as string) : undefined,
+    view:
+      s.view === "form" || s.view === "result" || s.view === "diagnosis"
+        ? (s.view as "form" | "result" | "diagnosis")
+        : undefined,
+    resultTab:
+      s.resultTab === "plan" || s.resultTab === "metrics" || s.resultTab === "next"
+        ? (s.resultTab as "plan" | "metrics" | "next")
+        : undefined,
   }),
   component: ProjectWorkspace,
 });
@@ -76,7 +84,11 @@ type Project = {
 
 function ProjectWorkspace() {
   const { id } = Route.useParams();
-  const search = Route.useSearch() as { tab?: string };
+  const search = Route.useSearch() as {
+    tab?: string;
+    view?: "form" | "result" | "diagnosis";
+    resultTab?: "plan" | "metrics" | "next";
+  };
   const navigate = useNavigate();
   const load = useServerFn(loadProject);
   const update = useServerFn(updateProject);
@@ -209,6 +221,11 @@ function ProjectWorkspace() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {project.meta?.scale && (project.meta.scale as Record<string, unknown>)?.plan && tab !== "escala" ? (
+            <Button onClick={() => setTab("escala")} variant="outline">
+              <Rocket className="mr-2 h-4 w-4" /> Abrir estratégia
+            </Button>
+          ) : null}
           <Button onClick={() => runEbook("kdp")} disabled={!!busy} variant="secondary">
             {busy === "ebook" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -487,6 +504,17 @@ function ProjectWorkspace() {
             initialContext={
               ((project.meta?.scale as Record<string, unknown> | undefined)?.lastExtractedContext as never) ?? null
             }
+            initialPlanVersions={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.plans as never) ?? null
+            }
+            initialView={{
+              stage:
+                search.view ??
+                ((project.meta?.scale as Record<string, unknown> | undefined)?.lastView as { stage?: "form" | "result" | "diagnosis" } | undefined)?.stage,
+              resultTab:
+                search.resultTab ??
+                ((project.meta?.scale as Record<string, unknown> | undefined)?.lastView as { resultTab?: "plan" | "metrics" | "next" } | undefined)?.resultTab,
+            }}
             hasEbook={!!project.ebook_id}
             hasPlaybook={!!project.playbook_id}
             hasCopy={!!project.meta?.copy}
