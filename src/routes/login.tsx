@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/providers/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,19 @@ export const Route = createFileRoute("/login")({ component: LoginPage });
 function LoginPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [authLoading, user, navigate]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -43,7 +49,7 @@ function LoginPage() {
         setMode("signin");
         return;
       }
-      navigate({ to: "/dashboard" });
+      navigate({ to: "/dashboard", replace: true });
     } finally {
       setLoading(false);
     }
