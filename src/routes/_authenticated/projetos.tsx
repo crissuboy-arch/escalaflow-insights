@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Loader2, Flame, BookOpen, Sparkles, Trash2 } from "lucide-react";
+import { Loader2, Flame, BookOpen, Sparkles, Trash2, Copy, ArrowRight, Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createProject,
   listProjects,
   deleteProject,
+  duplicateProject,
   type ProjectMode,
 } from "@/lib/project.functions";
 
@@ -62,6 +63,7 @@ type Row = {
   ebook_id: string | null;
   playbook_id: string | null;
   updated_at: string;
+  meta?: Record<string, unknown> | null;
 };
 
 function ProjectsHubPage() {
@@ -70,6 +72,7 @@ function ProjectsHubPage() {
   const list = useServerFn(listProjects);
   const create = useServerFn(createProject);
   const remove = useServerFn(deleteProject);
+  const dup = useServerFn(duplicateProject);
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
   const [category, setCategory] = useState<string>("Amazon/KDP");
@@ -142,7 +145,18 @@ function ProjectsHubPage() {
   async function onDelete(id: string) {
     if (!confirm("Excluir projeto?")) return;
     await remove({ data: { id } });
+    toast.success("Projeto excluído");
     refresh();
+  }
+
+  async function onDuplicate(id: string) {
+    try {
+      const r = await dup({ data: { id } });
+      toast.success("Projeto duplicado");
+      navigate({ to: "/projetos/$id", params: { id: r.id } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao duplicar");
+    }
   }
 
   // Auto-trigger creation when arriving with ?novo=1
@@ -297,40 +311,66 @@ function ProjectsHubPage() {
           <p className="text-sm text-muted-foreground">Nenhum projeto ainda.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {rows.map((r) => (
-              <Card key={r.id} className="overflow-hidden">
-                <CardContent className="space-y-2 p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to="/projetos/$id"
-                        params={{ id: r.id }}
-                        className="line-clamp-1 font-semibold hover:underline"
-                      >
-                        {r.title}
-                      </Link>
-                      <p className="line-clamp-1 text-xs text-muted-foreground">
-                        {r.niche ?? "—"}
-                      </p>
+            {rows.map((r) => {
+              const scale = (r.meta?.scale ?? {}) as Record<string, unknown>;
+              const hasStrategy = !!(scale.plan || scale.fullDiagnosis);
+              const lastInputCountries = (scale.lastPlanInput as Record<string, unknown> | undefined)?.countries as string[] | undefined;
+              const country = (r.meta?.country as string) || lastInputCountries?.[0];
+              const updated = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "—";
+              return (
+                <Card key={r.id} className="overflow-hidden">
+                  {r.cover_url ? (
+                    <div className="aspect-video w-full overflow-hidden bg-muted">
+                      <img src={r.cover_url} alt={r.title} className="h-full w-full object-cover" loading="lazy" />
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => onDelete(r.id)}
-                      className="h-7 w-7"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary">{MODE_LABEL[r.mode] ?? r.mode}</Badge>
-                    {r.ebook_id ? <Badge variant="outline">Ebook ✓</Badge> : null}
-                    {r.playbook_id ? <Badge variant="outline">Playbook ✓</Badge> : null}
-                    <Badge variant="outline">{r.status}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  ) : null}
+                  <CardContent className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to="/projetos/$id"
+                          params={{ id: r.id }}
+                          className="line-clamp-1 font-semibold hover:underline"
+                        >
+                          {r.title}
+                        </Link>
+                        <p className="line-clamp-1 text-xs text-muted-foreground">
+                          {r.niche ?? "—"} {country ? `· ${country}` : ""} · {updated}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="secondary">{MODE_LABEL[r.mode] ?? r.mode}</Badge>
+                      {r.ebook_id ? <Badge variant="outline">Ebook ✓</Badge> : null}
+                      {r.playbook_id ? <Badge variant="outline">Playbook ✓</Badge> : null}
+                      {hasStrategy ? <Badge variant="outline">Estratégia ✓</Badge> : null}
+                      <Badge variant="outline">{r.status}</Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        onClick={() => navigate({ to: "/projetos/$id", params: { id: r.id } })}
+                      >
+                        <ArrowRight className="mr-1 h-3.5 w-3.5" /> Continuar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate({ to: "/projetos/$id", params: { id: r.id }, search: { tab: "escala" } as never })}
+                      >
+                        <Rocket className="mr-1 h-3.5 w-3.5" /> Abrir estratégia
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onDuplicate(r.id)}>
+                        <Copy className="mr-1 h-3.5 w-3.5" /> Duplicar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onDelete(r.id)}>
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Excluir
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

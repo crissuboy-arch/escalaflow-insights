@@ -62,6 +62,12 @@ export const Route = createFileRoute("/api/collector/run")({
                   mechanism: a.mechanism ?? null,
                   emotion: a.emotion ?? null,
                   scaleLevel: a.scaleLevel ?? null,
+                  isVsl: a.isVsl ?? false,
+                  vslScaling: a.vslScaling ?? false,
+                  hookRepeated: a.hookRepeated ?? false,
+                  viralStructure: a.viralStructure ?? false,
+                  copyPattern: a.copyPattern ?? false,
+                  hookText: a.hookText ?? null,
                 },
               } as never,
             }));

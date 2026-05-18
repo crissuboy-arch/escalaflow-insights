@@ -35,6 +35,13 @@ export interface CollectorAd {
   mechanism?: string;
   emotion?: string;
   scaleLevel?: "cold" | "warming" | "hot" | "scaled";
+  // Pattern detection (filled by post-pass)
+  isVsl?: boolean;
+  vslScaling?: boolean;
+  hookRepeated?: boolean;
+  viralStructure?: boolean;
+  copyPattern?: boolean;
+  hookText?: string;
   raw?: unknown;
 }
 

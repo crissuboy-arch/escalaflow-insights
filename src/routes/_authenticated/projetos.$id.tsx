@@ -475,6 +475,18 @@ function ProjectWorkspace() {
             initialScalePlan={
               ((project.meta?.scale as Record<string, unknown> | undefined)?.scalePlan as never) ?? null
             }
+            initialDiagnosis={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.fullDiagnosis as never) ?? null
+            }
+            initialInput={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.lastPlanInput as never) ?? null
+            }
+            initialImages={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.lastImages as never) ?? null
+            }
+            initialContext={
+              ((project.meta?.scale as Record<string, unknown> | undefined)?.lastExtractedContext as never) ?? null
+            }
             hasEbook={!!project.ebook_id}
             hasPlaybook={!!project.playbook_id}
             hasCopy={!!project.meta?.copy}

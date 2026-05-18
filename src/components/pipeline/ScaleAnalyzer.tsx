@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, AlertTriangle, TrendingUp } from "lucide-react";
+import { Loader2, Sparkles, AlertTriangle, TrendingUp, FileDown } from "lucide-react";
 import { analyzeAdsPerformance } from "@/lib/scale.functions";
 import type { CampaignPlan, FullDiagnosis, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
 import { CampaignPlanForm } from "./scale/CampaignPlanForm";
@@ -17,6 +17,7 @@ import { FullDiagnosisResult } from "./scale/FullDiagnosisResult";
 import { NextStepsPanel } from "./scale/NextStepsPanel";
 import { ImageUploader } from "./scale/ImageUploader";
 import { SaveToProjectButton } from "./SaveToProjectButton";
+import { exportElementToPdf } from "@/lib/scale/pdf";
 
 export function ScaleAnalyzer({
   projectId,
@@ -24,6 +25,10 @@ export function ScaleAnalyzer({
   initialPlan,
   initialNextTests,
   initialScalePlan,
+  initialDiagnosis,
+  initialInput,
+  initialImages,
+  initialContext,
   onSaved,
 }: {
   projectId?: string;
@@ -31,11 +36,31 @@ export function ScaleAnalyzer({
   initialPlan?: CampaignPlan | null;
   initialNextTests?: NextTests | null;
   initialScalePlan?: ScalePlan | null;
+  initialDiagnosis?: FullDiagnosis | null;
+  initialInput?: Record<string, unknown> | null;
+  initialImages?: string[] | null;
+  initialContext?: unknown | null;
   onSaved?: (a: ScaleAnalysis) => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(initialPlan ?? null);
   const [analysis, setAnalysis] = useState<ScaleAnalysis | null>(initial ?? null);
-  const [diagnosis, setDiagnosis] = useState<FullDiagnosis | null>(null);
+  const [diagnosis, setDiagnosis] = useState<FullDiagnosis | null>(initialDiagnosis ?? null);
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
+
+  async function onExportPdf() {
+    if (!reportRef.current) return;
+    setExporting(true);
+    try {
+      const name = `escala-${(plan?.campaignName || "diagnostico").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
+      await exportElementToPdf(reportRef.current, name);
+      toast.success("PDF gerado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gerar PDF");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <Tabs defaultValue="plan" className="space-y-4">
@@ -46,18 +71,29 @@ export function ScaleAnalyzer({
       </TabsList>
 
       <TabsContent value="plan" className="space-y-4">
-        <CampaignPlanForm projectId={projectId} onPlan={setPlan} onDiagnosis={setDiagnosis} />
-        {diagnosis && <FullDiagnosisResult diagnosis={diagnosis} />}
-        {plan && (
-          <>
-            <CampaignPlanResult plan={plan} />
-            {!projectId && (
-              <div className="flex justify-end">
-                <SaveToProjectButton kind="escala" payload={{ plan }} defaultTitle={plan.campaignName || "Plano de tráfego"} />
-              </div>
+        <CampaignPlanForm
+          projectId={projectId}
+          onPlan={setPlan}
+          onDiagnosis={setDiagnosis}
+          initialInput={initialInput ?? null}
+          initialImages={initialImages ?? null}
+          initialContext={initialContext ?? null}
+        />
+        {(diagnosis || plan) && (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={onExportPdf} disabled={exporting}>
+              {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+              Exportar PDF
+            </Button>
+            {!projectId && plan && (
+              <SaveToProjectButton kind="escala" payload={{ plan }} defaultTitle={plan.campaignName || "Plano de tráfego"} />
             )}
-          </>
+          </div>
         )}
+        <div ref={reportRef} className="space-y-4">
+          {diagnosis && <FullDiagnosisResult diagnosis={diagnosis} />}
+          {plan && <CampaignPlanResult plan={plan} />}
+        </div>
       </TabsContent>
 
       <TabsContent value="metrics" className="space-y-4">

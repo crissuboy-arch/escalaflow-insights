@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Loader2, Sparkles, Stethoscope } from "lucide-react";
-import { createCampaignPlan, extractCreativeContext, fullDiagnosis } from "@/lib/scale.functions";
+import { createCampaignPlan, extractCreativeContext, fullDiagnosis, saveScaleDraft } from "@/lib/scale.functions";
 import type { CampaignPlan, FullDiagnosis } from "@/lib/scale.server";
 import { CountryMultiSelect } from "./CountryMultiSelect";
 import { CurrencySelect } from "./CurrencySelect";
@@ -19,44 +19,85 @@ export function CampaignPlanForm({
   projectId,
   onPlan,
   onDiagnosis,
+  initialInput,
+  initialImages,
+  initialContext,
 }: {
   projectId?: string;
   onPlan: (p: CampaignPlan) => void;
   onDiagnosis?: (d: FullDiagnosis) => void;
+  initialInput?: Record<string, unknown> | null;
+  initialImages?: string[] | null;
+  initialContext?: unknown | null;
 }) {
   const run = useServerFn(createCampaignPlan);
   const runExtract = useServerFn(extractCreativeContext);
   const runDiag = useServerFn(fullDiagnosis);
+  const runDraft = useServerFn(saveScaleDraft);
   const [busy, setBusy] = useState(false);
   const [busyDiag, setBusyDiag] = useState(false);
   const [stage, setStage] = useState<"idle" | "reading" | "planning" | "done">("idle");
-  const [images, setImages] = useState<string[]>([]);
-  const [cachedContext, setCachedContext] = useState<unknown | null>(null);
+  const [images, setImages] = useState<string[]>(initialImages ?? []);
+  const [cachedContext, setCachedContext] = useState<unknown | null>(initialContext ?? null);
   const [cachedKey, setCachedKey] = useState<string>("");
   const [form, setForm] = useState({
-    productName: "",
-    pageUrl: "",
-    price: "",
-    dailyBudget: "",
-    offerText: "",
+    productName: (initialInput?.productName as string) || "",
+    pageUrl: (initialInput?.pageUrl as string) || "",
+    price: (initialInput?.price as string) || "",
+    dailyBudget: (initialInput?.dailyBudget as string) || "",
+    offerText: (initialInput?.offerText as string) || "",
   });
 
   // Invalidate cached extraction when images change
   useEffect(() => {
     const key = images.join("|");
     if (key !== cachedKey) {
-      setCachedContext(null);
+      // Don't blow away the hydrated context on first render
+      if (cachedKey !== "") setCachedContext(null);
       setCachedKey(key);
     }
   }, [images, cachedKey]);
-  const [countryCodes, setCountryCodes] = useState<string[]>(["BR"]);
-  const [currency, setCurrency] = useState<string>("BRL");
+  const [countryCodes, setCountryCodes] = useState<string[]>(
+    (initialInput?.countryCodes as string[]) || ["BR"],
+  );
+  const [currency, setCurrency] = useState<string>(
+    (initialInput?.currency as string) || "BRL",
+  );
   const [currencyTouched, setCurrencyTouched] = useState(false);
-  const [platforms, setPlatforms] = useState<string[]>([
-    "Meta · Instagram Feed",
-    "Meta · Reels",
-    "Meta · Stories",
-  ]);
+  const [platforms, setPlatforms] = useState<string[]>(
+    (initialInput?.platforms as string[]) || [
+      "Meta · Instagram Feed",
+      "Meta · Reels",
+      "Meta · Stories",
+    ],
+  );
+
+  // Autosave draft (form + images + extracted context) so the user can
+  // reopen the project exactly where they stopped. Debounced 1.5s.
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstAutosave = useRef(true);
+  useEffect(() => {
+    if (!projectId) return;
+    if (firstAutosave.current) {
+      firstAutosave.current = false;
+      return;
+    }
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      runDraft({
+        data: {
+          projectId,
+          input: { ...form, countryCodes, currency, platforms },
+          imageDataUrls: images,
+          extractedContext: cachedContext ?? undefined,
+        },
+      }).catch(() => {});
+    }, 1500);
+    return () => {
+      if (draftTimer.current) clearTimeout(draftTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, form, countryCodes, currency, platforms, images, cachedContext]);
 
   function handleCountries(codes: string[]) {
     setCountryCodes(codes);
