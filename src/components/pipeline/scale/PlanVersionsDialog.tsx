@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, FileDown, History, Loader2, RotateCcw } from "lucide-react";
 import type { CampaignPlan } from "@/lib/scale.server";
-import { updateProject } from "@/lib/project.functions";
+import { restoreScaleVersion } from "@/lib/scale.functions";
 import { diffKpis, diffLines } from "@/lib/scale/diff";
 import { exportElementToPdf } from "@/lib/scale/pdf";
 
@@ -31,7 +31,7 @@ export function PlanVersionsDialog({
   versions: PlanVersion[];
   onRestored?: (plan: CampaignPlan) => void;
 }) {
-  const update = useServerFn(updateProject);
+  const restore = useServerFn(restoreScaleVersion);
   const reportRef = useRef<HTMLDivElement>(null);
   const [restoring, setRestoring] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -71,19 +71,7 @@ export function PlanVersionsDialog({
     if (!projectId || !b) return;
     setRestoring(true);
     try {
-      await update({
-        data: {
-          id: projectId,
-          patch: {
-            meta: {
-              scale: {
-                plan: b.plan,
-                lastPlanInput: b.input ?? {},
-              },
-            } as never,
-          },
-        } as never,
-      });
+      await restore({ data: { projectId, index: bIdx } });
       toast.success("Versão restaurada");
       onRestored?.(b.plan);
       onOpenChange(false);
