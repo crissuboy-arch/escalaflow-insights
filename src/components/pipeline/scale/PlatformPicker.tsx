@@ -1,6 +1,4 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PLATFORM_CATALOG } from "@/lib/scale/i18n";
-import { Info } from "lucide-react";
 
 export function PlatformPicker({
   value,
@@ -18,8 +16,7 @@ export function PlatformPicker({
   }
 
   return (
-    <TooltipProvider delayDuration={150}>
-      <div className="space-y-3 rounded-lg border border-border/60 p-3">
+    <div className="space-y-3 rounded-lg border border-border/60 p-3">
         {PLATFORM_CATALOG.map((group) => {
           const ids = group.placements.map((p) => p.id);
           const allOn = ids.every((id) => value.includes(id));
@@ -42,6 +39,7 @@ export function PlatformPicker({
                     <button
                       key={p.id}
                       type="button"
+                      title={p.hint}
                       onClick={() => toggle(p.id)}
                       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition ${
                         on
@@ -50,14 +48,6 @@ export function PlatformPicker({
                       }`}
                     >
                       {p.label}
-                      {p.hint && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 opacity-70" />
-                          </TooltipTrigger>
-                          <TooltipContent>{p.hint}</TooltipContent>
-                        </Tooltip>
-                      )}
                     </button>
                   );
                 })}
@@ -66,6 +56,5 @@ export function PlatformPicker({
           );
         })}
       </div>
-    </TooltipProvider>
   );
 }
