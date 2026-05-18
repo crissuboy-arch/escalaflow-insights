@@ -292,3 +292,29 @@ export const generatePlaybookStrategy = createServerFn({ method: "POST" })
     if (upErr) throw new Error(upErr.message);
     return { strategy };
   });
+
+export const loadPublicPlaybook = createServerFn({ method: "GET" })
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("playbooks")
+      .select("id, title, theme, cover_url, scenes, status")
+      .eq("id", data.id)
+      .eq("status", "published")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return null;
+    const scenes = normalizeScenes(row.scenes).map((s) => ({
+      id: s.id,
+      title: s.title,
+      text: s.text,
+      image_url: s.image_url,
+    }));
+    return {
+      id: row.id,
+      title: row.title,
+      theme: row.theme,
+      cover_url: row.cover_url,
+      scenes,
+    };
+  });
