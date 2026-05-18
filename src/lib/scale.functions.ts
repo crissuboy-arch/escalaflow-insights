@@ -130,6 +130,36 @@ const PlanInputSchema = z.object({
   extractedContext: z.unknown().optional(),
 });
 
+// Draft autosave — persists form inputs, images and extracted context
+// into projects.meta.scale so the user can reopen exactly where they stopped.
+const DraftInputSchema = z.object({
+  projectId: z.string().uuid(),
+  input: z.record(z.string(), z.unknown()).optional(),
+  imageDataUrls: z.array(z.string()).max(6).optional(),
+  extractedContext: z.unknown().optional(),
+});
+
+export const saveScaleDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof DraftInputSchema>) => DraftInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const patch: Record<string, unknown> = {
+      draftAt: new Date().toISOString(),
+    };
+    if (data.input) patch.lastPlanInput = data.input;
+    if (data.imageDataUrls) patch.lastImages = data.imageDataUrls;
+    if (data.extractedContext) patch.lastExtractedContext = data.extractedContext;
+    await saveScaleMeta(supabase, data.projectId, userId, patch);
+    // bump updated_at so the project list reflects activity
+    await supabase
+      .from("projects")
+      .update({ updated_at: new Date().toISOString() } as never)
+      .eq("id", data.projectId)
+      .eq("user_id", userId);
+    return { ok: true };
+  });
+
 const ExtractInputSchema = z.object({
   imageDataUrls: z.array(z.string()).max(6),
   pageUrl: z.string().optional(),
@@ -218,11 +248,18 @@ export const createCampaignPlan = createServerFn({ method: "POST" })
       await saveScaleMeta(supabase, data.projectId, userId, {
         plan,
         lastPlanInput: { ...data, imageDataUrls: undefined, extractedContext: undefined },
+        lastImages: data.imageDataUrls ?? [],
+        lastExtractedContext: extracted ?? null,
         plans: [
           { at: new Date().toISOString(), plan, input: { ...data, imageDataUrls: undefined, extractedContext: undefined } },
           ...prevPlans,
         ].slice(0, 10),
       });
+      await supabase
+        .from("projects")
+        .update({ updated_at: new Date().toISOString() } as never)
+        .eq("id", data.projectId)
+        .eq("user_id", userId);
       dlog("persist", "scale.plan.save", { projectId: data.projectId });
     }
     await recordAi(supabase, userId, {
@@ -352,7 +389,14 @@ export const fullDiagnosis = createServerFn({ method: "POST" })
       await saveScaleMeta(supabase, data.projectId, userId, {
         fullDiagnosis: diagnosis,
         fullDiagnosisAt: new Date().toISOString(),
+        lastImages: data.imageDataUrls ?? undefined,
+        lastExtractedContext: extracted ?? null,
       });
+      await supabase
+        .from("projects")
+        .update({ updated_at: new Date().toISOString() } as never)
+        .eq("id", data.projectId)
+        .eq("user_id", userId);
     }
     await recordAi(supabase, userId, {
       projectId: data.projectId ?? null,
