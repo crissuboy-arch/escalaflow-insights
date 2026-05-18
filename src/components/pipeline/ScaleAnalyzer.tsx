@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Sparkles, AlertTriangle, TrendingUp } from "lucide-react";
 import { analyzeAdsPerformance } from "@/lib/scale.functions";
-import type { CampaignPlan, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
+import type { CampaignPlan, FullDiagnosis, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
 import { CampaignPlanForm } from "./scale/CampaignPlanForm";
 import { CampaignPlanResult } from "./scale/CampaignPlanResult";
+import { FullDiagnosisResult } from "./scale/FullDiagnosisResult";
 import { NextStepsPanel } from "./scale/NextStepsPanel";
 import { ImageUploader } from "./scale/ImageUploader";
 import { SaveToProjectButton } from "./SaveToProjectButton";
@@ -34,6 +35,7 @@ export function ScaleAnalyzer({
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(initialPlan ?? null);
   const [analysis, setAnalysis] = useState<ScaleAnalysis | null>(initial ?? null);
+  const [diagnosis, setDiagnosis] = useState<FullDiagnosis | null>(null);
 
   return (
     <Tabs defaultValue="plan" className="space-y-4">
@@ -44,7 +46,8 @@ export function ScaleAnalyzer({
       </TabsList>
 
       <TabsContent value="plan" className="space-y-4">
-        <CampaignPlanForm projectId={projectId} onPlan={setPlan} />
+        <CampaignPlanForm projectId={projectId} onPlan={setPlan} onDiagnosis={setDiagnosis} />
+        {diagnosis && <FullDiagnosisResult diagnosis={diagnosis} />}
         {plan && (
           <>
             <CampaignPlanResult plan={plan} />
