@@ -598,7 +598,120 @@ Se a plataforma não foi escolhida pelo usuário, ainda preencha as 3 seções (
     { role: "system", content: PLAN_SYSTEM },
     { role: "user", content: userContent },
   ], { tag: "scale.plan", timeoutMs: 110_000, retries: 2 });
-  return CampaignPlanSchema.parse(safeJSON(content));
+  return CampaignPlanSchema.parse(normalizeCampaignPlan(safeJSON(content)));
+}
+
+// The AI occasionally returns numbers where we expect strings, or a single
+// string where we expect an array of strings. Normalize a few well-known
+// hotspots before Zod parsing so the whole plan isn't dropped over one cell.
+function normalizeCampaignPlan(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const data = raw as Record<string, unknown>;
+
+  const toStr = (v: unknown): string => {
+    if (v == null) return "";
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    try { return JSON.stringify(v); } catch { return ""; }
+  };
+  const toStrArr = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.map((x) => toStr(x)).filter(Boolean);
+    if (v == null || v === "") return [];
+    if (typeof v === "string") {
+      return v.split(/\r?\n|;|•|·/).map((s) => s.trim()).filter(Boolean);
+    }
+    return [toStr(v)];
+  };
+  const toNum = (v: unknown): number => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string") {
+      const n = Number(v.replace(",", ".").replace(/[^\d.\-]/g, ""));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  // creativesAdvanced[*]: string fields the AI sometimes returns as numbers
+  const adv = data.creativesAdvanced;
+  if (Array.isArray(adv)) {
+    data.creativesAdvanced = adv.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      const it = item as Record<string, unknown>;
+      for (const k of [
+        "format","placement","type","hook3s","patternBreak","script",
+        "onScreenText","caption","cta","dominantEmotion","editStyle",
+        "pace","cuts","soundtrack",
+      ]) it[k] = toStr(it[k]);
+      it.brollSuggestions = toStrArr(it.brollSuggestions);
+      it.viralScore = toNum(it.viralScore);
+      it.conversionScore = toNum(it.conversionScore);
+      return it;
+    });
+  }
+
+  // scaleByDay.day{1,2,3}: arrays the AI sometimes flattens to a string
+  const sbd = data.scaleByDay as Record<string, unknown> | undefined;
+  if (sbd && typeof sbd === "object") {
+    const d1 = sbd.day1 as Record<string, unknown> | undefined;
+    if (d1 && typeof d1 === "object") {
+      d1.positiveSignals = toStrArr(d1.positiveSignals);
+      d1.negativeSignals = toStrArr(d1.negativeSignals);
+      d1.objective = toStr(d1.objective);
+      d1.expectedMetrics = toStr(d1.expectedMetrics);
+    }
+    const d2 = sbd.day2 as Record<string, unknown> | undefined;
+    if (d2 && typeof d2 === "object") {
+      d2.whenPause = toStrArr(d2.whenPause);
+      d2.whenScale = toStrArr(d2.whenScale);
+      d2.whenSwapCreative = toStrArr(d2.whenSwapCreative);
+    }
+    const d3 = sbd.day3 as Record<string, unknown> | undefined;
+    if (d3 && typeof d3 === "object") {
+      d3.decisionRules = toStrArr(d3.decisionRules);
+      for (const k of ["budgetIncrease","duplication","horizontalScaling","verticalScaling"]) {
+        d3[k] = toStr(d3[k]);
+      }
+    }
+  }
+
+  // criticalAlerts.* arrays
+  const ca = data.criticalAlerts as Record<string, unknown> | undefined;
+  if (ca && typeof ca === "object") {
+    ca.alerts = toStrArr(ca.alerts);
+    ca.priorityImprovements = toStrArr(ca.priorityImprovements);
+    ca.nextSteps = toStrArr(ca.nextSteps);
+    ca.biggestBottleneck = toStr(ca.biggestBottleneck);
+  }
+
+  // Top-level arrays
+  data.copyAngles = toStrArr(data.copyAngles);
+  data.hooks = toStrArr(data.hooks);
+  data.warnings = toStrArr(data.warnings);
+
+  // visualDiagnosis / offerDiagnosis: score may come as string
+  for (const k of ["visualDiagnosis","offerDiagnosis"] as const) {
+    const d = data[k] as Record<string, unknown> | undefined;
+    if (d && typeof d === "object") {
+      if ("score" in d) d.score = toNum(d.score);
+      if (k === "visualDiagnosis") {
+        d.strengths = toStrArr(d.strengths);
+        d.weaknesses = toStrArr(d.weaknesses);
+        d.reducesConversion = toStrArr(d.reducesConversion);
+        d.increasesTrust = toStrArr(d.increasesTrust);
+      }
+    }
+  }
+
+  // scores.*.value may come as string
+  const sc = data.scores as Record<string, unknown> | undefined;
+  if (sc && typeof sc === "object") {
+    for (const k of Object.keys(sc)) {
+      const s = sc[k] as Record<string, unknown> | undefined;
+      if (s && typeof s === "object" && "value" in s) s.value = toNum(s.value);
+    }
+  }
+
+  return data;
 }
 
 export async function aiNextTests(args: {
