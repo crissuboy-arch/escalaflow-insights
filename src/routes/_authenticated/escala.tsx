@@ -1,14 +1,9 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Rocket } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { DualModeHub } from "@/components/pipeline/DualModeHub";
 import { StandaloneEscala } from "@/components/pipeline/StandaloneEscala";
 
 export const Route = createFileRoute("/_authenticated/escala")({
-  beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/login" });
-  },
   component: EscalaHubPage,
 });
 
