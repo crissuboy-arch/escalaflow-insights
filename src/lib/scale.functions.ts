@@ -5,10 +5,12 @@ import {
   aiAnalyzeScale,
   aiCreateCampaignPlan,
   aiExtractCreativeContext,
+  aiFullDiagnosis,
   aiNextTests,
   aiScalePlan,
   CampaignPlanSchema,
   CreativeContextSchema,
+  FullDiagnosisSchema,
   NextTestsSchema,
   ScaleAnalysisSchema,
   ScalePlanSchema,
@@ -287,4 +289,76 @@ export const generateScalePlan = createServerFn({ method: "POST" })
       response: result,
     });
     return { scalePlan: ScalePlanSchema.parse(result) };
+  });
+
+// ============= Full Diagnosis (Modo Consultor) =============
+
+const FullDiagInputSchema = z.object({
+  projectId: z.string().uuid().optional(),
+  productName: z.string().optional(),
+  niche: z.string().optional(),
+  pageUrl: z.string().optional(),
+  price: z.string().optional(),
+  currency: z.string().optional(),
+  countries: z.array(z.string()).optional(),
+  offerText: z.string().optional(),
+  briefing: z.string().optional(),
+  imageDataUrls: z.array(z.string()).max(6).optional(),
+  extractedContext: z.unknown().optional(),
+});
+
+export const fullDiagnosis = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof FullDiagInputSchema>) => FullDiagInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const t0 = Date.now();
+    dlog("hydrate", "scale.fullDiagnosis.start", {
+      images: data.imageDataUrls?.length ?? 0,
+      hasContext: !!data.extractedContext,
+    });
+    let extracted = data.extractedContext as CreativeContext | undefined;
+    if (!extracted && data.imageDataUrls?.length) {
+      extracted = await aiExtractCreativeContext({
+        imageDataUrls: data.imageDataUrls,
+        pageUrl: data.pageUrl,
+        price: data.price,
+        offerText: data.offerText,
+      });
+    }
+    let history: unknown = undefined;
+    if (data.projectId) {
+      const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
+      history = {
+        lastPlan: scale.plan ?? null,
+        lastAnalysis: scale.lastAnalysis ?? null,
+        recentPlans: Array.isArray(scale.plans) ? (scale.plans as unknown[]).slice(0, 3) : [],
+      };
+    }
+    const diagnosis = await aiFullDiagnosis({
+      context: extracted,
+      productName: data.productName,
+      niche: data.niche,
+      pageUrl: data.pageUrl,
+      price: data.price,
+      currency: data.currency,
+      countries: data.countries,
+      offerText: data.offerText,
+      briefing: data.briefing,
+      history,
+    });
+    dlog("hydrate", "scale.fullDiagnosis.done", { totalMs: Date.now() - t0 });
+    if (data.projectId) {
+      await saveScaleMeta(supabase, data.projectId, userId, {
+        fullDiagnosis: diagnosis,
+        fullDiagnosisAt: new Date().toISOString(),
+      });
+    }
+    await recordAi(supabase, userId, {
+      projectId: data.projectId ?? null,
+      module: "escala",
+      prompt: { kind: "fullDiagnosis", ...data, imageDataUrls: (data.imageDataUrls?.length ?? 0) > 0 ? `[${data.imageDataUrls?.length} images]` : undefined, extractedContext: extracted ? "[extracted]" : undefined },
+      response: diagnosis,
+    });
+    return { diagnosis: FullDiagnosisSchema.parse(diagnosis) };
   });
