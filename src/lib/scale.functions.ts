@@ -1,7 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { aiAnalyzeScale, ScaleAnalysisSchema, type ScaleContext } from "./scale.server";
+import {
+  aiAnalyzeScale,
+  aiCreateCampaignPlan,
+  aiNextTests,
+  aiScalePlan,
+  CampaignPlanSchema,
+  NextTestsSchema,
+  ScaleAnalysisSchema,
+  ScalePlanSchema,
+  type CampaignPlan,
+  type ScaleAnalysis,
+  type ScaleContext,
+} from "./scale.server";
 import { recordAi } from "./ai/history.server";
 import { dlog } from "./debug/log.server";
 
@@ -93,4 +105,138 @@ export const analyzeAdsPerformance = createServerFn({ method: "POST" })
     }
 
     return { analysis: ScaleAnalysisSchema.parse(analysis) };
+  });
+
+// ============= Campaign Plan =============
+
+const PlanInputSchema = z.object({
+  projectId: z.string().uuid().optional(),
+  productName: z.string().optional(),
+  pageUrl: z.string().optional(),
+  price: z.string().optional(),
+  currency: z.string().optional(),
+  countries: z.array(z.string()).optional(),
+  platforms: z.array(z.string()).optional(),
+  dailyBudget: z.string().optional(),
+  offerText: z.string().optional(),
+  imageDataUrls: z.array(z.string()).max(6).optional(),
+});
+
+async function loadScaleMeta(supabase: any, projectId: string, userId: string) {
+  const { data: row } = await supabase
+    .from("projects")
+    .select("meta")
+    .eq("id", projectId)
+    .eq("user_id", userId)
+    .single();
+  const meta = (row?.meta ?? {}) as Record<string, unknown>;
+  const scale = (meta.scale ?? {}) as Record<string, unknown>;
+  return { meta, scale };
+}
+
+async function saveScaleMeta(
+  supabase: any,
+  projectId: string,
+  userId: string,
+  patch: Record<string, unknown>,
+) {
+  const { meta, scale } = await loadScaleMeta(supabase, projectId, userId);
+  const nextMeta = { ...meta, scale: { ...scale, ...patch } };
+  await supabase.from("projects").update({ meta: nextMeta as never }).eq("id", projectId);
+}
+
+export const createCampaignPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof PlanInputSchema>) => PlanInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const plan = await aiCreateCampaignPlan({
+      productName: data.productName,
+      pageUrl: data.pageUrl,
+      price: data.price,
+      currency: data.currency,
+      countries: data.countries,
+      platforms: data.platforms,
+      dailyBudget: data.dailyBudget,
+      offerText: data.offerText,
+      imageDataUrls: data.imageDataUrls,
+    });
+
+    if (data.projectId) {
+      const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
+      const prevPlans = Array.isArray(scale.plans) ? (scale.plans as unknown[]) : [];
+      await saveScaleMeta(supabase, data.projectId, userId, {
+        plan,
+        lastPlanInput: { ...data, imageDataUrls: undefined },
+        plans: [
+          { at: new Date().toISOString(), plan, input: { ...data, imageDataUrls: undefined } },
+          ...prevPlans,
+        ].slice(0, 10),
+      });
+      dlog("persist", "scale.plan.save", { projectId: data.projectId });
+    }
+    await recordAi(supabase, userId, {
+      projectId: data.projectId ?? null,
+      module: "escala",
+      prompt: { kind: "plan", ...data, imageDataUrls: (data.imageDataUrls?.length ?? 0) > 0 ? `[${data.imageDataUrls?.length} images]` : undefined },
+      response: plan,
+    });
+    return { plan: CampaignPlanSchema.parse(plan) };
+  });
+
+const NextTestsInputSchema = z.object({
+  projectId: z.string().uuid().optional(),
+  plan: z.unknown().optional(),
+  analysis: z.unknown().optional(),
+  notes: z.string().optional(),
+});
+
+export const generateNextTests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof NextTestsInputSchema>) => NextTestsInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    let plan = data.plan as CampaignPlan | null | undefined;
+    let analysis = data.analysis as ScaleAnalysis | null | undefined;
+    if (data.projectId && (!plan || !analysis)) {
+      const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
+      plan = plan ?? (scale.plan as CampaignPlan | undefined);
+      analysis = analysis ?? (scale.lastAnalysis as ScaleAnalysis | undefined);
+    }
+    const result = await aiNextTests({ plan: plan ?? null, analysis: analysis ?? null, notes: data.notes });
+    if (data.projectId) {
+      await saveScaleMeta(supabase, data.projectId, userId, { nextTests: result });
+    }
+    await recordAi(supabase, userId, {
+      projectId: data.projectId ?? null,
+      module: "escala",
+      prompt: { kind: "nextTests", notes: data.notes },
+      response: result,
+    });
+    return { nextTests: NextTestsSchema.parse(result) };
+  });
+
+export const generateScalePlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof NextTestsInputSchema>) => NextTestsInputSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    let plan = data.plan as CampaignPlan | null | undefined;
+    let analysis = data.analysis as ScaleAnalysis | null | undefined;
+    if (data.projectId && (!plan || !analysis)) {
+      const { scale } = await loadScaleMeta(supabase, data.projectId, userId);
+      plan = plan ?? (scale.plan as CampaignPlan | undefined);
+      analysis = analysis ?? (scale.lastAnalysis as ScaleAnalysis | undefined);
+    }
+    const result = await aiScalePlan({ plan: plan ?? null, analysis: analysis ?? null, notes: data.notes });
+    if (data.projectId) {
+      await saveScaleMeta(supabase, data.projectId, userId, { scalePlan: result });
+    }
+    await recordAi(supabase, userId, {
+      projectId: data.projectId ?? null,
+      module: "escala",
+      prompt: { kind: "scalePlan", notes: data.notes },
+      response: result,
+    });
+    return { scalePlan: ScalePlanSchema.parse(result) };
   });

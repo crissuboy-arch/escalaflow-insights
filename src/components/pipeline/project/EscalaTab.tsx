@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Check, Circle, Rocket } from "lucide-react";
 import { ScaleAnalyzer } from "@/components/pipeline/ScaleAnalyzer";
-import type { ScaleAnalysis } from "@/lib/scale.server";
+import type { CampaignPlan, NextTests, ScaleAnalysis, ScalePlan } from "@/lib/scale.server";
 
 type Item = {
   key: string;
@@ -25,6 +25,9 @@ export function EscalaTab({
   onJump,
   projectId,
   initialAnalysis,
+  initialPlan,
+  initialNextTests,
+  initialScalePlan,
 }: {
   hasEbook: boolean;
   hasPlaybook: boolean;
@@ -36,6 +39,9 @@ export function EscalaTab({
   onJump: (tab: string) => void;
   projectId: string;
   initialAnalysis?: ScaleAnalysis | null;
+  initialPlan?: CampaignPlan | null;
+  initialNextTests?: NextTests | null;
+  initialScalePlan?: ScalePlan | null;
 }) {
   const items: Item[] = [
     {
@@ -94,7 +100,13 @@ export function EscalaTab({
 
   return (
     <div className="space-y-4">
-      <ScaleAnalyzer projectId={projectId} initial={initialAnalysis ?? null} />
+      <ScaleAnalyzer
+        projectId={projectId}
+        initial={initialAnalysis ?? null}
+        initialPlan={initialPlan ?? null}
+        initialNextTests={initialNextTests ?? null}
+        initialScalePlan={initialScalePlan ?? null}
+      />
 
       <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
         <CardContent className="p-5">
