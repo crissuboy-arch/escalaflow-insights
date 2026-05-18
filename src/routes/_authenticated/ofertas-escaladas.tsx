@@ -12,11 +12,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, TrendingUp, Info, Sparkles, ExternalLink } from "lucide-react";
+import { Search, TrendingUp, Info, Sparkles, ExternalLink, Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { createProjectFromOffer } from "@/lib/project.functions";
+import { toast } from "sonner";
 import {
   fetchScaledAds,
   rememberAdForAnalysis,
@@ -78,6 +81,8 @@ function ScaledPage() {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
+  const createFromOffer = useServerFn(createProjectFromOffer);
+  const [modeling, setModeling] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -222,6 +227,39 @@ function ScaledPage() {
     });
   };
 
+  const onModel = async (r: Scaled) => {
+    setModeling(r.key);
+    try {
+      const out = await createFromOffer({
+        data: {
+          title: `${r.advertiser} — ${r.niche}`,
+          niche: r.niche,
+          promise: r.headline,
+          avatar: `Pessoas interessadas em ${r.niche}`,
+          uniqueMechanism: "",
+          pains: [],
+          desires: [],
+          source_ad_key: r.key,
+          cover_url: r.image_url ?? null,
+          advertiser: r.advertiser,
+          platform: r.platform,
+          country: r.country,
+          headline: r.headline,
+          copy: r.copy ?? undefined,
+          cta: r.cta ?? undefined,
+          imageUrl: r.image_url ?? null,
+          videoUrl: r.video_url ?? null,
+        },
+      });
+      toast.success("Estratégia modelada");
+      navigate({ to: "/projetos/$id", params: { id: out.id }, search: { tab: "escala" } as never });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao modelar");
+    } finally {
+      setModeling(null);
+    }
+  };
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
@@ -318,6 +356,15 @@ function ScaledPage() {
                             title="Analisar com IA"
                           >
                             <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={modeling === r.key}
+                            onClick={() => onModel(r)}
+                            title="Modelar Estratégia"
+                          >
+                            <Rocket className="h-3.5 w-3.5 text-primary" />
                           </Button>
                         </div>
                       </TableCell>

@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
-import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search, FolderPlus } from "lucide-react";
+import { BookmarkCheck, Flame, Sparkles, ExternalLink, Image as ImageIcon, Megaphone, Globe, Search, Rocket } from "lucide-react";
 import { fetchSavedAds, saveCollectedAd, rememberAdForAnalysis, subscribeChange, type PersistedAd } from "@/lib/queries";
 import { toast } from "sonner";
 import { openAdLink } from "@/lib/external";
@@ -54,10 +54,15 @@ function SavedPage() {
           advertiser: a.advertiser,
           platform: a.platform,
           country: a.country,
+          headline: a.headline,
+          copy: a.copy ?? undefined,
+          cta: a.cta ?? undefined,
+          imageUrl: a.image_url ?? null,
+          videoUrl: a.video_url ?? null,
         },
       });
-      toast.success("Projeto criado a partir da oferta");
-      navigate({ to: "/projetos/$id", params: { id: r.id }, search: { tab: "briefing" } as never });
+      toast.success("Estratégia modelada");
+      navigate({ to: "/projetos/$id", params: { id: r.id }, search: { tab: "escala" } as never });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao criar projeto");
     } finally {
@@ -121,8 +126,8 @@ function SavedPage() {
                       disabled={creating === a.key}
                       onClick={() => onUseAsProject(a)}
                     >
-                      <FolderPlus className="mr-1 h-3.5 w-3.5" />
-                      {creating === a.key ? "Criando…" : "Usar como projeto"}
+                      <Rocket className="mr-1 h-3.5 w-3.5" />
+                      {creating === a.key ? "Modelando…" : "Modelar Estratégia"}
                     </Button>
                     <Button
                       size="sm"

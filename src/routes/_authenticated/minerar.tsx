@@ -758,6 +758,11 @@ function MinePage() {
                                   advertiser: a.advertiser,
                                   platform: a.platform,
                                   country: a.country,
+                                  headline: a.headline,
+                                  copy: a.copy ?? undefined,
+                                  cta: a.cta ?? undefined,
+                                  imageUrl: a.image_url ?? null,
+                                  videoUrl: a.video_url ?? null,
                                 },
                               });
                               toast.success("Estratégia modelada");

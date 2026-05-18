@@ -9,6 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Flame, BookOpen, Sparkles, Trash2, Copy, ArrowRight, Rocket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -16,6 +24,7 @@ import {
   listProjects,
   deleteProject,
   duplicateProject,
+  updateProject,
   type ProjectMode,
 } from "@/lib/project.functions";
 
@@ -52,6 +61,43 @@ const MODE_LABEL: Record<string, string> = {
   combo: "Combo",
 };
 
+const STATUS_OPTIONS = [
+  "draft",
+  "em_analise",
+  "pausado",
+  "escalando",
+  "vencedor",
+  "arquivado",
+] as const;
+
+const STATUS_LABEL: Record<string, string> = {
+  draft: "Rascunho",
+  ready: "Pronto",
+  published: "Publicado",
+  em_analise: "Em análise",
+  pausado: "Pausado",
+  escalando: "Escalando",
+  vencedor: "Vencedor",
+  arquivado: "Arquivado",
+};
+
+const STATUS_TONE: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  draft: "outline",
+  em_analise: "secondary",
+  pausado: "outline",
+  escalando: "default",
+  vencedor: "default",
+  arquivado: "outline",
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  escalando: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+  vencedor: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
+  arquivado: "bg-muted text-muted-foreground",
+  em_analise: "bg-blue-500/15 text-blue-600 border-blue-500/30",
+  pausado: "bg-zinc-500/15 text-zinc-500 border-zinc-500/30",
+};
+
 type Row = {
   id: string;
   title: string;
@@ -73,7 +119,9 @@ function ProjectsHubPage() {
   const create = useServerFn(createProject);
   const remove = useServerFn(deleteProject);
   const dup = useServerFn(duplicateProject);
+  const update = useServerFn(updateProject);
   const [rows, setRows] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [category, setCategory] = useState<string>("Amazon/KDP");
   const [mode, setMode] = useState<ProjectMode>("combo");
@@ -91,6 +139,8 @@ function ProjectsHubPage() {
       setRows((data ?? []) as unknown as Row[]);
     } catch (e) {
       console.error(e);
+    } finally {
+      setLoading(false);
     }
   };
   useEffect(() => {
@@ -156,6 +206,18 @@ function ProjectsHubPage() {
       navigate({ to: "/projetos/$id", params: { id: r.id } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao duplicar");
+    }
+  }
+
+  async function onChangeStatus(id: string, status: string) {
+    // Optimistic UI update so the badge reacts immediately.
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
+    try {
+      await update({ data: { id, patch: { status: status as never } } });
+      toast.success("Status atualizado");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao atualizar status");
+      refresh();
     }
   }
 
@@ -307,7 +369,24 @@ function ProjectsHubPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Continuar onde parou</h2>
-        {rows.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="aspect-video w-full" />
+                <CardContent className="space-y-2 p-4">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <div className="flex gap-2 pt-2">
+                    <Skeleton className="h-5 w-16" />
+                    <Skeleton className="h-5 w-20" />
+                  </div>
+                  <Skeleton className="h-9 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum projeto ainda.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -317,6 +396,7 @@ function ProjectsHubPage() {
               const lastInputCountries = (scale.lastPlanInput as Record<string, unknown> | undefined)?.countries as string[] | undefined;
               const country = (r.meta?.country as string) || lastInputCountries?.[0];
               const updated = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : "—";
+              const statusTone = STATUS_TONE[r.status] ?? "outline";
               return (
                 <Card key={r.id} className="overflow-hidden">
                   {r.cover_url ? (
@@ -344,8 +424,22 @@ function ProjectsHubPage() {
                       {r.ebook_id ? <Badge variant="outline">Ebook ✓</Badge> : null}
                       {r.playbook_id ? <Badge variant="outline">Playbook ✓</Badge> : null}
                       {hasStrategy ? <Badge variant="outline">Estratégia ✓</Badge> : null}
-                      <Badge variant="outline">{r.status}</Badge>
+                      <Badge className={STATUS_CLASS[r.status] ?? ""} variant={statusTone}>
+                        {STATUS_LABEL[r.status] ?? r.status}
+                      </Badge>
                     </div>
+                    <Select value={r.status} onValueChange={(v) => onChangeStatus(r.id, v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {STATUS_LABEL[s] ?? s}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <Button
                         size="sm"

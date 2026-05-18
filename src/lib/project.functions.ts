@@ -153,6 +153,11 @@ const FromOfferSchema = z.object({
   advertiser: z.string().optional(),
   platform: z.string().optional(),
   country: z.string().optional(),
+  copy: z.string().optional(),
+  cta: z.string().optional(),
+  headline: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
+  videoUrl: z.string().nullable().optional(),
 });
 
 export const createProjectFromOffer = createServerFn({ method: "POST" })
@@ -170,6 +175,25 @@ export const createProjectFromOffer = createServerFn({ method: "POST" })
       desires: data.desires,
       type: "infoproduto",
     };
+    // Pre-populate the Scale module input so the Escala tab opens already
+    // contextualised with the mined offer's headline/copy/CTA and media.
+    const scaleSeed = {
+      lastPlanInput: {
+        productName: data.title,
+        niche: data.niche,
+        promise: data.promise,
+        avatar: data.avatar,
+        mechanism: data.uniqueMechanism,
+        headline: data.headline ?? data.promise,
+        copy: data.copy ?? "",
+        cta: data.cta ?? "",
+        countries: data.country ? [data.country] : [],
+        platforms: data.platform ? [data.platform] : [],
+        advertiser: data.advertiser ?? null,
+        referenceImage: data.imageUrl ?? data.cover_url ?? null,
+        referenceVideo: data.videoUrl ?? null,
+      },
+    };
     const row = {
       user_id: context.userId,
       title: data.title,
@@ -184,6 +208,7 @@ export const createProjectFromOffer = createServerFn({ method: "POST" })
         advertiser: data.advertiser ?? null,
         platform: data.platform ?? null,
         country: data.country ?? null,
+        scale: scaleSeed,
       } as never,
       step: 2,
     };
@@ -231,7 +256,9 @@ const PatchSchema = z.object({
   outline: z.array(z.unknown()).optional(),
   mode: ModeSchema.optional(),
   cover_url: z.string().nullable().optional(),
-  status: z.enum(["draft", "ready", "published"]).optional(),
+  status: z
+    .enum(["draft", "ready", "published", "em_analise", "pausado", "escalando", "vencedor", "arquivado"])
+    .optional(),
   step: z.number().min(0).max(10).optional(),
   meta: z.record(z.string(), z.unknown()).optional(),
 });
