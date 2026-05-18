@@ -1,68 +1,148 @@
-## Problema
 
-O `createCampaignPlan` chama `google/gemini-2.5-pro` com até 6 imagens base64 numa única request síncrona. O Worker (Cloudflare) tem limite de ~100s por subrequest — Pro + imagens grandes estoura → `upstream request timeout`.
+## Objetivo
 
-Streaming SSE pelo TanStack server function não é viável (serverFn retorna JSON). Em vez de reescrever a infra, vamos atacar as causas reais.
+Reescrever a inteligência do módulo Escala para parar de gerar respostas genéricas. A IA passa a agir como uma agência de performance: lê prints reais, diagnostica oferta/funil/criativo, gera planos executáveis por placement, KPIs adaptados a país/nicho/ticket, plano de escala D1–D3 e um “Diagnóstico Completo” único.
 
-## O que mudar
+A maior parte do trabalho é em **prompt engineering + schemas + UI de resultado**. A infraestrutura de upload, compressão, timeout e retry já está pronta e será mantida.
 
-### 1. `src/lib/scale.server.ts` — modelo + timeout + retry + fallback
+---
 
-- Novo helper `callGateway(messages, { model, timeoutMs, retries })`:
-  - `AbortController` com timeout configurável (default **110s**, abaixo do limite do Worker).
-  - `retries: 2` com backoff (1s, 3s) em: `429`, `408`, `502/503/504`, network/abort.
-  - Logs `dlog("hydrate", "ai.call", { model, attempt, ms, status })`.
-- `aiCreateCampaignPlan`: trocar `gemini-2.5-pro` por **`google/gemini-2.5-flash`** (multimodal, muito mais rápido, mesmo gateway). Pro fica como fallback opcional só se Flash falhar com erro de qualidade — não por timeout.
-- `aiAnalyzeScale`, `aiNextTests`, `aiScalePlan`: também migrar para `gemini-2.5-flash` (já são tarefas curtas; Pro era exagero).
-- Cap defensivo no servidor: se alguma `imageDataUrl` > ~3MB base64, recortar a lista (logar warning) — o cliente já comprime, isso é cinto+suspensório.
+## 1. Novos schemas no servidor (`src/lib/scale.server.ts`)
 
-### 2. `src/lib/scale.functions.ts` — quebrar em 2 etapas + status
+Adicionar (sem quebrar os existentes — o `CampaignPlanSchema` ganha campos opcionais com default):
 
-Em vez de uma chamada gigante, dividir o "Criar Plano" em etapas independentes, cada uma curta:
+- `VisualDiagnosisSchema`
+  - `strengths[]`, `weaknesses[]`, `reducesConversion[]`, `increasesTrust[]`
+  - `headline`, `subheadline`, `cta`, `colors`, `contrast`, `informationOverload`, `socialProof`, `scarcity`, `bonuses`, `blockOrder`, `promiseClarity`, `designLevel` (`amador|intermediario|profissional`), `visualTrust`, `mobileLegibility`
+  - `score` 0–10 + `scoreColor` (`green|yellow|red`)
+- `OfferDiagnosisSchema`
+  - `promiseLevel`, `mechanismStrength`, `transformationClarity`, `perceivedValue`, `perceivedRisk`, `viralPotential`, `cpmPotential`, `ctrPotential`, `saturationLevel`
+  - `verdict` (`fraca|media|forte`), `urgencyLevel`, `conversionProbability`, `score` 0–10
+- `CreativeRecommendationSchema` (substitui o array atual `creatives`, mantendo campos antigos por compat)
+  - `format`, `placement` (`reels|feed|stories|youtube|tiktok|search|pmax`), `type` (`ugc|vsl|reels_viral|carrossel|imagem`)
+  - `hook3s`, `patternBreak`, `script` (roteiro completo), `onScreenText`, `caption`, `cta`
+  - `dominantEmotion`, `editStyle`, `pace`, `cuts`, `soundtrack`, `brollSuggestions[]`
+  - `viralScore` 0–100, `conversionScore` 0–100
+- `MetaPlanSchema` (estende o atual `meta`): `cbo` (boolean), `adsetsCount`, `creativesPerAdset`, `budgetDistribution`, `remarketing`, `lookalike`, `coldAudience`, `exclusions[]`, `idealFrequency`
+- `GooglePlanSchema` (estende `google`): `search`, `pmax`, `youtube`, `shopping`, `display`, `buyingIntent`, `keywords[]`, `customAudiences[]`
+- `InstagramPlanSchema` por placement: `feed`, `reels`, `stories` cada um com `{ creativeType, hook, duration, cta }`
+- `ExpectedKpisSchema` (estende): `ctr`, `cpc`, `cpm`, `cpa`, `roas`, `cpmByCountry[]`, `nicheBenchmark`
+- `ScalePlanByDaySchema`
+  - `day1`: `{ objective, expectedMetrics, positiveSignals[], negativeSignals[] }`
+  - `day2`: `{ whenPause[], whenScale[], whenSwapCreative[] }`
+  - `day3`: `{ decisionRules[], budgetIncrease, duplication, horizontalScaling, verticalScaling }`
+- `ScoreSetSchema`: `{ offer, creative, copy, funnel, page, scale }` cada um `{ value 0-100, color: green|yellow|red, reason }`
+- `CriticalAlertsSchema`: `alerts[]`, `priorityImprovements[]`, `biggestBottleneck`, `nextSteps[]`
+- `FullDiagnosisSchema` (saída do botão Diagnóstico Completo): combina `visual`, `offer`, `scores`, `criticalAlerts`, `strategicSummary`.
 
-- **Etapa A — `extractCreativeContext`** (nova serverFn): recebe `imageDataUrls` + url/preço/oferta, chama Flash só para OCR/leitura visual e devolve um JSON pequeno (`headline`, `cta`, `precoVisivel`, `bonus`, `prova`, `layout`, `criativos[]`, `metricas?`). Timeout 60s, sem schema pesado.
-- **Etapa B — `createCampaignPlan`** (existente, refatorada): passa a receber `extractedContext` em texto e **não recebe mais imagens** quando o cliente já chamou a etapa A. Prompt fica menor, resposta muito mais rápida.
-- Compatibilidade: se cliente mandar só `imageDataUrls` (sem `extractedContext`), o servidor faz as duas etapas em sequência (mesma URL, sem mudar contrato externo).
+Atualizar `CampaignPlanSchema` para incluir:
+```
+visualDiagnosis: VisualDiagnosisSchema.optional()
+offerDiagnosis: OfferDiagnosisSchema.optional()
+scores: ScoreSetSchema.optional()
+criticalAlerts: CriticalAlertsSchema.optional()
+scaleByDay: ScalePlanByDaySchema.optional()
+strategicSummary: z.string().optional()
+```
 
-### 3. `CampaignPlanForm.tsx` — progresso visual real
+Os campos antigos (`day1/day2/day3`, `creatives`, `expectedKpis`...) continuam preenchidos para retrocompat com `CampaignPlanResult` enquanto a UI evolui.
 
-- Estado `stage: "idle" | "reading" | "planning" | "done"`.
-- Fluxo do botão:
-  1. Se houver imagens → `await extractCreativeContext({ imageDataUrls, ... })`, mostra "Lendo imagens e página…".
-  2. `await createCampaignPlan({ extractedContext, ... })`, mostra "Gerando plano de campanha…".
-- Substituir spinner único por um bloco com 2 linhas que ficam ✓ ao completar. Toast de erro amigável por etapa, com retry no botão.
-- Sem trava de tela; estado `busy` continua bloqueando só o botão.
+## 2. Novos prompts
 
-### 4. Logs (`dlog`) em pontos-chave
+- `PLAN_SYSTEM` reescrito para persona “media buyer sênior + copywriter + estrategista de funil + CRO + growth hacker”, com instrução explícita de NÃO usar respostas genéricas, sempre adaptar a país/nicho/ticket, e citar benchmarks reais (CPM BR baixo, US/UK/DE alto, etc.).
+- Prompt do `aiCreateCampaignPlan` ampliado para cobrir todos os blocos novos (diagnóstico visual, oferta, scores, scaleByDay).
+- Novo `aiFullDiagnosis(ctx)` retornando `FullDiagnosisSchema` — usa o `extractedContext` (Stage A) + briefing como entrada, sem reler imagens.
+- `aiExtractCreativeContext` (Stage A) recebe instruções adicionais para mapear: cores dominantes, contraste, ordem dos blocos, prova social, bônus, escassez, legibilidade mobile (campos extras no `CreativeContextSchema`).
+- KPIs: prompt instrui a IA a usar tabela mental de benchmark por país + nicho + ticket (infoproduto baixo/médio/alto) e devolver faixas com mínimo/médio/máximo.
 
-- `scale.plan.start { images, hasContext }`
-- `scale.plan.extract.ok { ms, bytesIn }`
-- `scale.plan.ai.start { model, attempt }`
-- `scale.plan.ai.ok { ms }` / `scale.plan.ai.timeout { ms, attempt }` / `scale.plan.ai.retry`
-- `scale.plan.done { totalMs }`
+## 3. Novo server function: `fullDiagnosis`
 
-### 5. Cliente — compressão já existe, ajuste fino
+`src/lib/scale.functions.ts`:
+```
+export const fullDiagnosis = createServerFn(...)
+  .inputValidator(... { projectId?, extractedContext?, imageDataUrls?, briefing })
+  .handler(... → roda Stage A se necessário, depois aiFullDiagnosis, persiste em meta.scale.fullDiagnosis)
+```
+Salva no `projects.meta.scale.fullDiagnosis` e em `ai_history` (module=`escala`).
 
-`src/lib/scale/compressImage.ts` já comprime para ~2MB WebP. Manter; apenas:
-- Forçar `maxBytes = 1.5 * 1024 * 1024` quando `images.length > 2` (várias imagens = menos bytes cada).
-- Mensagem clara se uma imagem não comprimir abaixo do limite.
+## 4. Memória estratégica (sem nova tabela)
 
-## Fora de escopo
+Reusar `projects.meta.scale` que já existe. Estender com:
+- `history.creatives[]`, `history.campaigns[]`, `history.metrics[]` (slice 20).
+- A cada `createCampaignPlan`, `analyzeAdsPerformance` e `fullDiagnosis`, anexar entrada com `{ at, niche, country, audience, snapshot }`.
+- Prompt do plano recebe `history` resumido em texto para a IA comparar evolução (“CTR subiu de X→Y”, “mudou de público frio para LAL”).
 
-- Streaming SSE real (exigiria sair de `createServerFn` para `createFileRoute` API + EventSource no cliente — overkill agora; o split em 2 etapas + Flash resolve o sintoma).
-- Fila/jobs em background com polling (não há tabela `jobs` e o tempo final esperado com Flash + split fica ~15–40s, dentro do limite confortável).
-- Mudar `aiAnalyzeScale` (1 imagem só) para etapas — já é curto.
+Nada novo no schema do banco; o `meta jsonb` já existe.
 
-## Critérios de aceite
+## 5. UI — `src/components/pipeline/scale/CampaignPlanResult.tsx`
 
-- Gerar plano com 6 prints grandes não retorna mais `upstream request timeout`.
-- UI mostra "Lendo imagens… → Gerando plano…" com checkmarks.
-- Falha de rede num passo permite re-clicar sem reenviar tudo (etapa A em cache de estado local até nova edição de imagens).
-- Logs no `stack_modern--server-function-logs` mostram a sequência das etapas com duração.
+Reorganizar em cards conforme a estrutura pedida:
+
+```text
+[Resumo Estratégico]
+[Scores: oferta · criativo · copy · funil · página · escala]  ← chips verdes/amarelos/vermelhos
+[Diagnóstico Visual]      [Diagnóstico da Oferta]
+[Estratégia Meta Ads]     [Estratégia Google Ads]    [Estratégia Instagram (Feed/Reels/Stories)]
+[Criativos Recomendados]  [Hooks]   [Ângulos de Copy]
+[KPIs Esperados (por país/nicho)]
+[Plano de Escala — Dia 1 / Dia 2 / Dia 3]
+[Alertas Críticos]        [Melhorias Prioritárias]
+```
+
+Componentes novos pequenos:
+- `ScoreChip` (valor + cor)
+- `DiagnosisCard` (visual/oferta com bullets + score)
+- `PlacementCard` (Feed/Reels/Stories/PMax/Search/YouTube)
+- `CreativeCardAdvanced` (roteiro, hook 3s, score viral/conversão)
+- `ScaleDayCard` (D1/D2/D3 com sinais positivos/negativos e regras)
+- `AlertsCard` (críticos vs melhorias)
+
+Tudo só renderiza se o campo correspondente existir no `plan` (retrocompat).
+
+## 6. UI — Botão “Diagnóstico Completo”
+
+Em `CampaignPlanForm.tsx`, adicionar segundo botão `Diagnóstico Completo` ao lado de “Criar Plano”. Fluxo:
+1. Reusa Stage A (mesma cache de extração).
+2. Chama `fullDiagnosis`.
+3. Renderiza `<FullDiagnosisResult />` (novo) acima do `CampaignPlanResult`.
+
+## 7. UX / Loading / Export
+
+- Skeletons (`src/components/ui/skeleton.tsx` já existe) para cada card durante `busy`.
+- Histórico de análises: nova sub-aba “Histórico” em `ScaleAnalyzer.tsx` lendo `meta.scale.plans` e `meta.scale.analyses`.
+- Exportar PDF: usar `src/lib/playbook/pdf.ts` como referência → novo `src/lib/scale/pdf.ts` com `exportPlanToPdf(plan)`. Botão “Exportar PDF” no header do resultado.
+- Responsividade: trocar grids fixos por `grid-cols-1 md:grid-cols-2 lg:grid-cols-3` e revisar paddings dos cards.
+
+## 8. Técnico (já existe — manter / pequenos ajustes)
+
+- Upload, compressão, timeout 110s, retry 2x, fallback amigável já estão em `compressImage.ts` + `callGateway`. **Sem mudanças estruturais.**
+- Adicionar logs `scale.fullDiagnosis.start/ok/timeout` no novo serverFn.
+- Manter modelo `google/gemini-2.5-flash` para Stage A e diagnóstico; promover para `gemini-2.5-pro` apenas no `fullDiagnosis` quando ≤2 imagens (qualidade > velocidade aqui), com fallback automático para Flash em timeout.
+
+## 9. Fora de escopo (não fazer agora)
+
+- Nova tabela `scale_history` (a `meta jsonb` cobre o caso).
+- Streaming SSE.
+- Tradução automática de toda a UI.
+- Integração direta com APIs de Meta/Google (a IA continua gerando o plano para o usuário executar).
 
 ## Arquivos afetados
 
-- `src/lib/scale.server.ts` (helper de gateway, modelo, novo `aiExtractCreativeContext`).
-- `src/lib/scale.functions.ts` (nova serverFn `extractCreativeContext`, refator de `createCampaignPlan`).
-- `src/components/pipeline/scale/CampaignPlanForm.tsx` (fluxo em 2 etapas + UI de progresso).
-- `src/lib/scale/compressImage.ts` (cap dinâmico por nº de imagens).
+- `src/lib/scale.server.ts` — novos schemas, prompts reescritos, `aiFullDiagnosis`, KPIs por país/nicho, persona media buyer.
+- `src/lib/scale.functions.ts` — nova serverFn `fullDiagnosis`, persistência de histórico estendido.
+- `src/components/pipeline/scale/CampaignPlanResult.tsx` — reorganização em cards + novos componentes.
+- `src/components/pipeline/scale/CampaignPlanForm.tsx` — botão “Diagnóstico Completo”, skeletons.
+- `src/components/pipeline/scale/FullDiagnosisResult.tsx` — novo.
+- `src/components/pipeline/scale/ScoreChip.tsx`, `DiagnosisCard.tsx`, `PlacementCard.tsx`, `CreativeCardAdvanced.tsx`, `ScaleDayCard.tsx`, `AlertsCard.tsx` — novos componentes pequenos.
+- `src/components/pipeline/ScaleAnalyzer.tsx` — nova aba “Histórico”, botão Exportar PDF.
+- `src/lib/scale/pdf.ts` — novo, gera PDF do plano + diagnóstico.
+
+## Critérios de aceite
+
+- Gerar plano retorna estrutura nova com todos os cards (Visual, Oferta, Scores, Placements, Criativos avançados, KPIs por país, ScaleByDay, Alertas).
+- Botão “Diagnóstico Completo” devolve análise consolidada apontando maior gargalo.
+- Scores aparecem com cor (verde/amarelo/vermelho) coerente com o valor.
+- KPIs variam quando troco país (BR vs US) e ticket.
+- Histórico mostra planos/análises anteriores do projeto.
+- Exportar PDF gera arquivo legível com o plano completo.
+- Sem regressão: planos antigos salvos continuam renderizando.
