@@ -699,3 +699,121 @@ Se houver screenshot do Gerenciador anexado, use-o como fonte primária: faça O
   );
   return ScaleAnalysisSchema.parse(safeJSON(content));
 }
+
+// ============= Full Diagnosis (Modo Consultor) =============
+
+export const FullDiagnosisSchema = z.object({
+  strategicSummary: z.string().default(""),
+  visualDiagnosis: z.object({
+    strengths: z.array(z.string()).default([]),
+    weaknesses: z.array(z.string()).default([]),
+    reducesConversion: z.array(z.string()).default([]),
+    increasesTrust: z.array(z.string()).default([]),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+    notes: z.string().default(""),
+  }).default({}),
+  offerDiagnosis: z.object({
+    verdict: z.string().default(""),
+    promiseLevel: z.string().default(""),
+    mechanismStrength: z.string().default(""),
+    transformationClarity: z.string().default(""),
+    perceivedValue: z.string().default(""),
+    perceivedRisk: z.string().default(""),
+    viralPotential: z.string().default(""),
+    saturationLevel: z.string().default(""),
+    score: z.number().default(0),
+    scoreColor: z.string().default("yellow"),
+  }).default({}),
+  scores: z.object({
+    offer:    z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    creative: z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    copy:     z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    funnel:   z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    page:     z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+    scale:    z.object({ value: z.number().default(0), color: z.string().default("yellow"), reason: z.string().default("") }).default({}),
+  }).default({}),
+  criticalAlerts: z.object({
+    alerts: z.array(z.string()).default([]),
+    priorityImprovements: z.array(z.string()).default([]),
+    biggestBottleneck: z.string().default(""),
+    nextSteps: z.array(z.string()).default([]),
+  }).default({}),
+});
+export type FullDiagnosis = z.infer<typeof FullDiagnosisSchema>;
+
+const DIAG_SYSTEM = `Você é o head de performance de uma agência top-tier de infoprodutos. Faz diagnóstico cirúrgico de oferta, criativo, copy, página, funil e potencial de escala. Aponta o MAIOR gargalo e o que destravar para escalar. Sempre PT-BR, JSON válido, sem markdown.`;
+
+export async function aiFullDiagnosis(args: {
+  context?: CreativeContext;
+  productName?: string;
+  pageUrl?: string;
+  price?: string;
+  currency?: string;
+  countries?: string[];
+  niche?: string;
+  offerText?: string;
+  briefing?: string;
+  history?: unknown;
+}): Promise<FullDiagnosis> {
+  const ctxJson = args.context ? JSON.stringify(args.context).slice(0, 4000) : "—";
+  const histJson = args.history ? JSON.stringify(args.history).slice(0, 2000) : "—";
+  const prompt = `Faça um DIAGNÓSTICO COMPLETO desta operação para identificar o maior gargalo de escala e o que mudar primeiro.
+
+Retorne APENAS este JSON:
+{
+  "strategicSummary":"2-3 frases: situação atual + maior gargalo + maior oportunidade",
+  "visualDiagnosis":{
+    "strengths":["..."],"weaknesses":["..."],
+    "reducesConversion":["..."],"increasesTrust":["..."],
+    "score":0,"scoreColor":"green|yellow|red",
+    "notes":"observações da página/criativos"
+  },
+  "offerDiagnosis":{
+    "verdict":"fraca|media|forte",
+    "promiseLevel":"...","mechanismStrength":"...","transformationClarity":"...",
+    "perceivedValue":"...","perceivedRisk":"...","viralPotential":"...","saturationLevel":"...",
+    "score":0,"scoreColor":"green|yellow|red"
+  },
+  "scores":{
+    "offer":   {"value":0,"color":"green|yellow|red","reason":"..."},
+    "creative":{"value":0,"color":"green|yellow|red","reason":"..."},
+    "copy":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "funnel":  {"value":0,"color":"green|yellow|red","reason":"..."},
+    "page":    {"value":0,"color":"green|yellow|red","reason":"..."},
+    "scale":   {"value":0,"color":"green|yellow|red","reason":"..."}
+  },
+  "criticalAlerts":{
+    "alerts":["o que está impedindo escala AGORA"],
+    "priorityImprovements":["lista por ordem de impacto"],
+    "biggestBottleneck":"o maior gargalo em 1 frase",
+    "nextSteps":["3-5 próximas ações concretas"]
+  }
+}
+
+REGRAS: cor "green" para score 75+, "yellow" para 50-74, "red" para <50. Adapte CPM/CPC/CPA ao país real. NÃO use respostas genéricas.
+
+CONTEXTO TEXTUAL:
+- Produto: ${args.productName || "—"}
+- Nicho: ${args.niche || "—"}
+- Países: ${(args.countries ?? []).join(", ") || "—"}
+- Preço: ${args.price || "—"} ${args.currency || ""}
+- URL: ${args.pageUrl || "—"}
+- Oferta: ${args.offerText || "—"}
+- Briefing: ${args.briefing || "—"}
+
+CONTEXTO EXTRAÍDO DAS IMAGENS (OCR + leitura visual):
+${ctxJson}
+
+HISTÓRICO DE PLANOS/ANÁLISES ANTERIORES (compare evolução se houver):
+${histJson}`;
+
+  const content = await callGateway(
+    [
+      { role: "system", content: DIAG_SYSTEM },
+      { role: "user", content: prompt },
+    ],
+    { tag: "scale.fullDiagnosis", timeoutMs: 110_000, retries: 2 },
+  );
+  return FullDiagnosisSchema.parse(safeJSON(content));
+}
