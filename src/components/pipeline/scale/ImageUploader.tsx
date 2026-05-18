@@ -86,7 +86,9 @@ export function ImageUploader({
           if (f.size > 25 * 1024 * 1024) {
             toast("Sua imagem está muito pesada. Compactamos automaticamente para continuar.");
           }
-          const res = await compressImage(f);
+          // Tighter target when uploading many files (less bytes each => fits in one AI call)
+          const tighter = maxFiles > 1 && items.length + accepted.length > 2;
+          const res = await compressImage(f, tighter ? { maxBytes: 1.5 * 1024 * 1024 } : undefined);
           setItems((cur) =>
             cur.map((it) =>
               it.id === id
