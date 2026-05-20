@@ -18,11 +18,11 @@ export function AppHeader() {
   const collapsed = state === "collapsed";
   const initials = (user?.email ?? "U").slice(0, 2).toUpperCase();
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/40 bg-background/70 px-4 backdrop-blur-md">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-primary/15 bg-background/60 px-4 backdrop-blur-xl">
       <SidebarTrigger />
       {collapsed ? (
-        <Link to="/dashboard" className="flex items-center gap-2 animate-fade-in" aria-label="EscalaFlow">
-          <img src={logoMark} alt="" width={24} height={24} className="h-6 w-6" />
+        <Link to="/dashboard" className="flex items-center gap-2 animate-fade-in" aria-label="Flow">
+          <img src={logoMark} alt="" width={24} height={24} className="h-6 w-6 logo-drop-glow" />
         </Link>
       ) : null}
       <div className="ml-auto flex items-center gap-1">

@@ -42,20 +42,20 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("dashboard.title")}</h1>
-        <p className="text-muted-foreground">{t("dashboard.subtitle")}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-gradient-primary">{t("dashboard.title")}</h1>
+        <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">{t("dashboard.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {cards.map((c, i) => (
           <motion.div key={c.label} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-            <Card className="overflow-hidden border-border/60">
+            <Card className="card-premium overflow-hidden">
               <CardContent className="p-5">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">{c.label}</p>
-                  <c.icon className="h-4 w-4 text-primary" />
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">{c.label}</p>
+                  <c.icon className="h-4 w-4 text-primary drop-shadow-[0_0_8px_var(--primary)]" />
                 </div>
-                <p className="mt-2 text-3xl font-bold">{c.value}</p>
+                <p className="mt-2 text-3xl font-bold tabular-nums">{c.value}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -63,7 +63,7 @@ function Dashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-border/60">
+        <Card className="card-premium lg:col-span-2">
           <CardHeader>
             <CardTitle>{t("dashboard.scoreTrend")}</CardTitle>
           </CardHeader>
@@ -74,19 +74,19 @@ function Dashboard() {
                 <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={11} />
                 <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
-                <Line type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={2.5} dot={{ r: 4, fill: "var(--primary)" }} style={{ filter: "drop-shadow(0 0 6px var(--primary))" }} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card className="border-border/60">
+        <Card className="card-premium">
           <CardHeader>
             <CardTitle>{t("dashboard.recentScaled")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {recent.map((o) => (
-              <div key={o.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/40 p-3">
+              <div key={o.id} className="flex items-center justify-between gap-2 rounded-lg border border-primary/15 bg-background/40 p-3 transition-colors hover:border-primary/40">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{o.advertiser_name}</p>
                   <p className="text-xs text-muted-foreground">{o.niche}</p>

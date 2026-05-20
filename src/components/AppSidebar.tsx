@@ -40,14 +40,10 @@ import {
 } from "@/lib/queries";
 import logoHorizontal from "@/assets/brand/logo-horizontal.png";
 import logoMark from "@/assets/brand/logo-mark.png";
-import logoMono from "@/assets/brand/logo-mono.png";
-import { useTheme } from "@/providers/ThemeProvider";
 
 export function AppSidebar() {
   const { t } = useTranslation();
   const path = useRouterState({ select: (r) => r.location.pathname });
-  const { theme } = useTheme();
-  const horizontalSrc = theme === "dark" ? logoMono : logoHorizontal;
   const [favCount, setFavCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [scaledCount, setScaledCount] = useState(0);
@@ -102,12 +98,12 @@ export function AppSidebar() {
             alt=""
             width={36}
             height={36}
-            className="h-9 w-9 shrink-0 group-data-[collapsible=icon]:block hidden"
+            className="h-9 w-9 shrink-0 logo-drop-glow group-data-[collapsible=icon]:block hidden"
           />
           <img
-            src={horizontalSrc}
-            alt="EscalaFlow"
-            className="h-10 w-auto group-data-[collapsible=icon]:hidden"
+            src={logoHorizontal}
+            alt="Flow"
+            className="h-10 w-auto logo-drop-glow group-data-[collapsible=icon]:hidden"
           />
         </Link>
       </SidebarHeader>
@@ -122,13 +118,13 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={path === it.to}
-                      className="relative transition-colors duration-200 hover:bg-sidebar-accent/60 data-[active=true]:bg-sidebar-accent data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-0.5 data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary"
+                      className="relative transition-all duration-200 hover:bg-primary/5 hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-foreground data-[active=true]:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent),0_0_18px_-4px_color-mix(in_oklab,var(--primary)_50%,transparent)] data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary data-[active=true]:before:shadow-[0_0_8px_var(--primary)]"
                     >
                       <Link to={it.to} className="flex items-center gap-3">
-                        <it.icon className="h-4 w-4" />
+                        <it.icon className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`} />
                         <span className="flex-1">{it.label}</span>
                         {it.badge ? (
-                          <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden">
+                          <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary shadow-[0_0_12px_-2px_var(--primary)] group-data-[collapsible=icon]:hidden">
                             {it.badge}
                           </span>
                         ) : null}
