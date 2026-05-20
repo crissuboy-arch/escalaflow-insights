@@ -26,6 +26,7 @@ import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
+import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
 import { Route as AuthenticatedCopyRouteImport } from './routes/_authenticated/copy'
@@ -133,6 +134,11 @@ const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
 const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
   id: '/escala',
   path: '/escala',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
+  id: '/database',
+  path: '/database',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -246,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/copy': typeof AuthenticatedCopyRoute
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/database': typeof AuthenticatedDatabaseRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -282,6 +289,7 @@ export interface FileRoutesByTo {
   '/copy': typeof AuthenticatedCopyRoute
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/database': typeof AuthenticatedDatabaseRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/_authenticated/copy': typeof AuthenticatedCopyRoute
   '/_authenticated/criativos': typeof AuthenticatedCriativosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/database': typeof AuthenticatedDatabaseRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -358,6 +367,7 @@ export interface FileRouteTypes {
     | '/copy'
     | '/criativos'
     | '/dashboard'
+    | '/database'
     | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
@@ -394,6 +404,7 @@ export interface FileRouteTypes {
     | '/copy'
     | '/criativos'
     | '/dashboard'
+    | '/database'
     | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
@@ -431,6 +442,7 @@ export interface FileRouteTypes {
     | '/_authenticated/copy'
     | '/_authenticated/criativos'
     | '/_authenticated/dashboard'
+    | '/_authenticated/database'
     | '/_authenticated/escala'
     | '/_authenticated/favoritos'
     | '/_authenticated/importar-anuncio'
@@ -586,6 +598,13 @@ declare module '@tanstack/react-router' {
       path: '/escala'
       fullPath: '/escala'
       preLoaderRoute: typeof AuthenticatedEscalaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/database': {
+      id: '/_authenticated/database'
+      path: '/database'
+      fullPath: '/database'
+      preLoaderRoute: typeof AuthenticatedDatabaseRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -791,6 +810,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCopyRoute: typeof AuthenticatedCopyRoute
   AuthenticatedCriativosRoute: typeof AuthenticatedCriativosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
@@ -816,6 +836,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCopyRoute: AuthenticatedCopyRoute,
   AuthenticatedCriativosRoute: AuthenticatedCriativosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,

@@ -19,6 +19,7 @@ import {
   LayoutTemplate,
   ShoppingCart,
   Rocket,
+  Database,
 } from "lucide-react";
 import {
   Sidebar,
@@ -78,6 +79,7 @@ export function AppSidebar() {
     { to: "/escala", label: "Escala do Produto", icon: Rocket },
   ];
   const conta: Item[] = [
+    { to: "/database", label: "Database", icon: Database },
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ];
   const groups: { label: string; items: Item[] }[] = [
