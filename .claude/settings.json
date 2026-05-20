@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git pull *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Evand\\\\escalaflow-git\" -Recurse -Directory)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(dir /b /s src\\\\lib\\\\aiService*)",
+      "Bash(dir /b /s src\\\\*aiService*)",
+      "Read(//mnt/c/Users/Evand/**)",
+      "Bash(npm run *)"
+    ]
+  }
+}

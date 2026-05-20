@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { generateAIResponse, generateAIJson } from "./aiService";
+import { generateAIResponse, generateAIJson } from "../aiService";
 
 export const PlaybookBriefingSchema = z.object({
   title: z.string(),

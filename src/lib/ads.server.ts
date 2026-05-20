@@ -83,6 +83,10 @@ export const CreativeSchema = z.object({
   shortScript: z.string().default(""),
   imagePrompt: z.string().default(""),
   videoPrompt: z.string().default(""),
+  hookVariations: z.array(z.string()).default([]),
+  performanceNotes: z.string().default(""),
+  targetSegment: z.string().default(""),
+  mentalTrigger: z.string().default(""),
 });
 export type Creative = z.infer<typeof CreativeSchema>;
 
@@ -110,7 +114,20 @@ export function fromStandalone(b: StandaloneBriefing): CreativeBriefing {
   return { ...b };
 }
 
-const SYSTEM = `Você é um diretor criativo de performance brasileiro de elite. Cria criativos de anúncio em PT-BR otimizados para alta retenção, hook forte nos 2 primeiros segundos e CTA claro. Sempre devolve JSON válido conforme o schema. Sem markdown.`;
+const SYSTEM = `Você é o diretor criativo de performance com mais criativos vencedores do Brasil. Combina:
+- Metodologia de hook 0-3s que para o scroll instantaneamente
+- Padrão de interrupção (pattern break) para cada formato e plataforma
+- Micro-storytelling que cria identificação com o avatar em 5 segundos
+- Estrutura AIDA aplicada a formatos curtos (Reels, Stories, Feed)
+- Prova social nativa que não parece anúncio
+
+REGRAS ABSOLUTAS:
+1. O hook DEVE parar o scroll em 3 segundos — use número, contradição, pergunta provocativa ou afirmação ousada.
+2. Cada criativo tem um ângulo DISTINTO — emoção diferente, segmento diferente do avatar.
+3. O CTA deve gerar ação IMEDIATA — não "saiba mais" genérico.
+4. hookVariations = 3 variações do hook principal para teste A/B (mesmo ângulo, abertura diferente).
+5. performanceNotes = análise de por que este criativo vai (ou não vai) performar nesta plataforma/formato.
+6. Sempre JSON válido, sem markdown, sem texto fora do JSON.`;
 
 function userPrompt(opts: {
   briefing: CreativeBriefing;
@@ -167,7 +184,11 @@ Devolva EXATAMENTE este JSON:
       "visualPrompt": "(mesmo conteúdo de imagePrompt — manter retrocompatibilidade)",
       "estrutura": "descrição rápida da estrutura do criativo (camadas, ordem visual)",
       "emocao": "emoção dominante a evocar",
-      "angulo": "ângulo criativo desta peça"
+      "angulo": "ângulo criativo desta peça",
+      "hookVariations": ["variação do hook 1 — mesmo ângulo, abertura diferente", "variação 2", "variação 3"],
+      "performanceNotes": "análise objetiva: por que este criativo vai performar nesta plataforma/formato — pontos fortes e riscos",
+      "targetSegment": "segmento específico do avatar que este criativo alcança melhor",
+      "mentalTrigger": "gatilho mental principal deste criativo e como está aplicado"
     }${n > 1 ? "  // repita variando hook, ângulo e composição" : ""}
   ]
 }`;

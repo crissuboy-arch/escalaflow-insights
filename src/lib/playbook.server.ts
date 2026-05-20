@@ -33,14 +33,25 @@ export interface AdInput {
 
 export async function aiExtractPlaybookBriefing(ad: AdInput): Promise<PlaybookBriefing> {
   const systemPrompt =
-    "Você destila anúncios em briefings de playbook (passo-a-passo). Responda SOMENTE com JSON válido sem texto extra.";
-  const userPrompt = `Anunciante: ${ad.advertiser ?? "—"}
+    "Você é um analista de marketing direto especializado em extrair posicionamento estratégico de anúncios de tráfego pago. Lê o anúncio e extrai o briefing profundo do produto. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Analise este anúncio e extraia o briefing estratégico completo do produto.
+
+Anunciante: ${ad.advertiser ?? "—"}
 Headline: ${ad.headline ?? "—"}
 Copy: ${ad.copy ?? "—"}
 CTA: ${ad.cta ?? "—"}
 Nicho: ${ad.niche ?? "—"} | Plataforma: ${ad.platform ?? "—"}
 
-Retorne JSON com os campos: title, niche, promise, avatar, uniqueMechanism, pains (array), desires (array).`;
+Retorne JSON com EXATAMENTE estes campos:
+{
+  "title": "título do produto ou curso (infira do anúncio)",
+  "niche": "nicho específico (não genérico)",
+  "promise": "promessa principal como resultado tangível, específico e temporal",
+  "avatar": "descrição rica do avatar ideal: quem é, situação atual, dor principal, desejo profundo",
+  "uniqueMechanism": "mecanismo único que entrega a promessa — com nome proprietário se identificável",
+  "pains": ["5 dores específicas ao nicho identificadas no anúncio ou inferidas"],
+  "desires": ["5 desejos específicos como resultados concretos"]
+}`;
 
   const raw = await generateAIJson<PlaybookBriefing>(userPrompt, { systemPrompt });
   return PlaybookBriefingSchema.parse(raw);
@@ -48,12 +59,29 @@ Retorne JSON com os campos: title, niche, promise, avatar, uniqueMechanism, pain
 
 export async function aiGenerateSceneOutline(briefing: PlaybookBriefing, sceneCount: number): Promise<SceneOutline[]> {
   const systemPrompt =
-    "Você cria roteiros de playbook em cenas didáticas, divertidas e acionáveis. Responda SOMENTE com JSON válido sem texto extra.";
-  const userPrompt = `Briefing: ${JSON.stringify(briefing)}
+    "Você é um especialista em design instrucional e conteúdo educacional para infoprodutos. Cria sequências de aprendizado com progressão lógica e didática clara. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Crie o roteiro de ${sceneCount} cenas para o playbook abaixo. Cada cena deve ter progressão lógica — do problema à solução, do simples ao complexo.
 
-Crie EXATAMENTE ${sceneCount} cenas com progressão lógica do problema à solução.
-Cada cena deve ter: title (curto), summary (1-2 linhas), exercise (pergunta reflexiva), practicalAction (tarefa concreta).
-Retorne JSON com formato: { "scenes": [ { "title": "...", "summary": "...", "exercise": "...", "practicalAction": "..." } ] }`;
+Briefing do produto:
+- Título: ${briefing.title}
+- Nicho: ${briefing.niche}
+- Promessa: ${briefing.promise}
+- Avatar: ${briefing.avatar}
+- Mecanismo único: ${briefing.uniqueMechanism}
+
+Retorne JSON com formato:
+{
+  "scenes": [
+    {
+      "title": "título curto e específico da cena",
+      "summary": "o que o aluno vai aprender/fazer nesta cena (1-2 frases específicas ao tema)",
+      "exercise": "pergunta reflexiva que conecta o conteúdo à realidade do avatar",
+      "practicalAction": "tarefa concreta que pode ser executada em menos de 30 minutos"
+    }
+  ]
+}
+
+A cena 1 deve identificar o problema core. As cenas do meio ensinam o mecanismo. A última cena entrega a transformação.`;
 
   const raw = await generateAIJson<{ scenes: SceneOutline[] }>(userPrompt, { systemPrompt });
   return z.array(SceneOutlineSchema).parse(raw.scenes ?? []);
@@ -72,15 +100,24 @@ export async function aiGenerateSceneContent(
   total: number,
 ): Promise<SceneContent> {
   const systemPrompt =
-    "Você escreve conteúdo de playbook em PT-BR, tom premium e divertido. 180-280 palavras por cena. Responda SOMENTE com JSON válido sem texto extra.";
-  const userPrompt = `Briefing: ${JSON.stringify(briefing)}
+    "Você escreve conteúdo educacional em PT-BR com tom premium, direto e inspirador. Combina ensinamento prático com linguagem acessível. 180-280 palavras por cena. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Escreva o conteúdo desta cena do playbook. Tom: ${index === 0 ? "identificação com o problema" : index === total - 1 ? "celebração da transformação" : "ensinamento prático e motivador"}.
+
+Produto: ${briefing.title} | Nicho: ${briefing.niche}
+Avatar: ${briefing.avatar}
+Promessa do produto: ${briefing.promise}
+
 Cena ${index + 1}/${total}: ${scene.title}
-Resumo: ${scene.summary}
+O que ensinar: ${scene.summary}
 Exercício: ${scene.exercise}
 Ação prática: ${scene.practicalAction}
 
-Retorne JSON com formato: { "text": "conteúdo da cena...", "balloons": ["frase curta 1", "frase curta 2"] }
-O campo balloons deve ter no máximo 4 frases curtas de destaque.`;
+Retorne JSON:
+{
+  "text": "conteúdo da cena em 180-280 palavras — começa identificando o avatar na situação, ensina o conceito específico desta cena, termina preparando para a próxima",
+  "balloons": ["frase de destaque 1 (máx 80 chars)", "frase de destaque 2", "frase de destaque 3"]
+}
+Máximo 4 balloons. Cada balloon é uma frase-chave que resume o insight principal.`;
 
   const raw = await generateAIJson<SceneContent>(userPrompt, { systemPrompt });
   return SceneContentSchema.parse(raw);
@@ -105,7 +142,7 @@ export async function aiGenerateSceneImage(
 
 export async function aiGenerateVideoScript(briefing: PlaybookBriefing, scenes: { title: string; text: string }[]): Promise<string> {
   const systemPrompt =
-    "Você converte playbooks em roteiros de vídeo (YouTube/Reels). Saída em Markdown com cabeçalhos por cena, narração e sugestões de cortes.";
+    "Você é um roteirista de vídeo especializado em conteúdo educacional para YouTube e Reels. Converte playbooks em roteiros que ensinam E entretêm. Tom: próximo, específico, sem jargão. Saída em Markdown com cabeçalhos por cena, narração e sugestões de cortes visuais.";
   const userPrompt = `Título: ${briefing.title}
 Nicho: ${briefing.niche}
 Avatar: ${briefing.avatar}
@@ -147,31 +184,51 @@ export type PlaybookStrategy = z.infer<typeof PlaybookStrategySchema>;
 export async function aiGeneratePlaybookStrategy(
   briefing: PlaybookBriefing,
 ): Promise<PlaybookStrategy> {
-  const systemPrompt =
-    "Você é estrategista sênior de marketing direto. Gera estratégias completas de lançamento em PT-BR. Responda SOMENTE com JSON válido sem texto extra.";
-  const userPrompt = `Briefing do produto:
-${JSON.stringify(briefing, null, 2)}
+  const systemPrompt = `Você é o consultor de marketing direto mais caro do Brasil — combina Eugene Schwartz (big idea), Alex Hormozi (oferta irresistível), Russell Brunson (funis) e Rich Schefren (estratégia de posicionamento).
 
-Gere a estratégia completa com os seguintes campos JSON:
-- bigIdea: string
-- promise: string (refinada)
-- uniqueMechanism: string (refinado)
-- avatar: string (descrição rica)
-- pains: string[] (5 itens)
-- desires: string[] (5 itens)
-- objections: string[] (5 itens)
-- mentalTriggers: string[] (6 itens, ex: escassez, prova, autoridade…)
-- headlines: string[] (8 variações fortes)
-- vslStructure: string (markdown com blocos numerados Hook→Problema→Mecanismo→Prova→Oferta→CTA)
-- pageStructure: string (markdown com 10 dobras)
-- funnel: string (funil completo: tráfego, captura, VSL, oferta, OB, upsell, downsell)
-- offer: string (oferta principal completa)
-- bonuses: string[] (4 bônus)
-- stack: string (stack de valor empilhado)
-- cta: string (CTA principal)
-- scripts: string[] (3 scripts: Reels, WhatsApp, e-mail)
-- angles: string[] (5 ângulos criativos)
-- scale: string (plano de escala em 30/60/90 dias)`;
+REGRAS ABSOLUTAS:
+1. Seja ESPECÍFICO ao produto "${briefing.title}" no nicho "${briefing.niche}" — nada genérico.
+2. O mecanismo único PRECISA ter nome proprietário (não use o que está no briefing se for genérico — renomeie com criatividade).
+3. A big idea deve ser disruptiva: contradiz o senso comum mas é 100% plausível.
+4. Headlines com números, contradição ou promessa específica — nunca genéricas.
+5. O VSL deve soar como conversa gravada, não texto escrito.
+6. Responda SOMENTE com JSON válido sem texto extra.`;
+
+  const userPrompt = `Briefing do produto:
+- Título: ${briefing.title}
+- Nicho: ${briefing.niche}
+- Promessa: ${briefing.promise}
+- Avatar: ${briefing.avatar}
+- Mecanismo: ${briefing.uniqueMechanism}
+- Dores: ${briefing.pains.join(" | ")}
+- Desejos: ${briefing.desires.join(" | ")}
+
+Gere a estratégia completa com os seguintes campos JSON — seja ESPECÍFICO ao produto e nicho acima:
+{
+  "bigIdea": "a grande ideia central disruptiva que posiciona este produto de forma única (contradiz o senso comum do nicho mas é plausível)",
+  "promise": "promessa refinada como resultado tangível, específico e temporal (ex: 'X resultado em Y dias sem Z obstáculo')",
+  "uniqueMechanism": "nome proprietário do mecanismo + explicação em 1-2 frases de como entrega a promessa",
+  "avatar": "descrição rica do avatar: demografia, psicografia, dor principal e origem, desejo profundo, medo oculto, monólogo interno",
+  "pains": ["5 dores específicas ao nicho com profundidade emocional"],
+  "desires": ["5 desejos específicos como resultados concretos e mensuráveis"],
+  "objections": ["5 objeções reais do avatar + como quebrar cada uma (formato: 'Objeção: [X] → Quebra: [Y]')"],
+  "mentalTriggers": ["6 gatilhos mentais com como aplicar especificamente a este produto (formato: '[Gatilho]: [aplicação específica]')"],
+  "headlines": ["8 headlines distintas variando: dor, desejo, curiosidade, prova, contra-intuitivo, específico, transformação, mecanismo"],
+  "vslStructure": "roteiro de VSL em markdown com blocos: [HOOK 0-15s] → [IDENTIFICAÇÃO] → [AMPLIFICAÇÃO DE DOR] → [BIG IDEA] → [MECANISMO ÚNICO] → [PROVA] → [OFERTA] → [BÔNUS] → [GARANTIA] → [URGÊNCIA] → [CTA]",
+  "pageStructure": "wireframe da sales page em markdown com 10 seções numeradas: 1-Hero, 2-Lead, 3-Dor, 4-Big Idea, 5-Mecanismo, 6-Prova, 7-Benefícios, 8-Oferta+Stack, 9-Garantia+Urgência, 10-FAQ+CTA",
+  "funnel": "funil completo em texto: Tráfego → Landing de Captura → VSL Page → Checkout → Order Bump → Upsell → Downsell → E-mail de Entrega. Descreva copy e objetivo de cada etapa.",
+  "offer": "oferta principal completa com stack de valor: produto + bônus + garantia + âncora de preço + urgência",
+  "bonuses": ["4 bônus específicos com nome + valor percebido + por que resolve objeção"],
+  "stack": "stack de valor empilhado em formato lista: cada item com nome e valor percebido, total percebido vs preço pedido",
+  "cta": "CTA principal com urgência implícita (até 60 chars)",
+  "scripts": [
+    "Script Reels 30s: [HOOK 0-3s] → [DOR 3-10s] → [BIG IDEA 10-20s] → [CTA 20-30s]",
+    "Script WhatsApp: mensagem de 5-8 linhas com gancho, identificação, promessa e link",
+    "Script E-mail: assunto magnético + corpo de 150 palavras com história, mecanismo e CTA"
+  ],
+  "angles": ["5 ângulos criativos DISTINTOS: nome + emoção + formato + segmento do avatar + hook de abertura"],
+  "scale": "plano de escala em 3 fases: 30 dias (validar), 60 dias (otimizar e escalar), 90 dias (dominar nicho) — com orçamento e KPIs por fase"
+}`;
 
   const raw = await generateAIJson<PlaybookStrategy>(userPrompt, { systemPrompt, maxTokens: 8192 });
   return PlaybookStrategySchema.parse(raw);

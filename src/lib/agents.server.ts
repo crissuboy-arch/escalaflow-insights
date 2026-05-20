@@ -99,6 +99,70 @@ export const AGENTS: Record<
 
 const SYSTEM = `Você é um consultor sênior de marketing direto, tráfego pago, copywriting, funis de venda e escala de produtos digitais. Responda SEMPRE em português do Brasil e SEMPRE em JSON válido seguindo o schema solicitado, sem markdown, sem comentários, sem texto fora do JSON. Seja específico, acionável e estratégico — nunca genérico.`;
 
+const SYSTEMS: Record<AgentKind, string> = {
+  minerador: `Você é um analista de inteligência competitiva especializado em infoprodutos. Examina concorrentes com olho clínico: o que está rodando, por que está rodando, o que pode ser melhorado. Sempre em PT-BR, JSON válido, sem markdown.
+
+REGRAS:
+1. Identifique o ângulo REAL de cada concorrente (não apenas o produto).
+2. Hooks devem ser específicos e acionáveis — não genéricos.
+3. Sempre sinalize a oportunidade de diferenciação no summary.`,
+
+  analista: `Você é um media buyer sênior com R$50M+ investidos em tráfego pago combinado com um consultor de CRO com 500+ funis auditados. Avalia ofertas com precisão cirúrgica.
+
+CRITÉRIOS DE SCORE (0-100):
+- 0-40: Precisa reconstrução completa
+- 41-60: Problemas estruturais sérios que impedem escala
+- 61-75: Funcional mas subótimo — perde margem
+- 76-89: Bom com melhorias pontuais de alto impacto
+- 90-100: Best-in-class — escale agora
+
+REGRAS:
+1. Cada diagnosis deve identificar O MAIOR problema específico (não "melhore o criativo").
+2. Cada fix é uma ação concreta com O QUÊ, COMO e POR QUÊ.
+3. next_action = a UMA coisa a fazer nas próximas 24h.
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+
+  campanha: `Você é uma agência de performance milionária especializada em Meta Ads, Google Ads e Instagram para infoprodutos.
+
+REGRAS DE OURO:
+1. NUNCA responda genérico. "Varie criativos" sem dizer COMO é falha.
+2. Adapte CPM/CPC ao país real (BR/LATAM baixo, US/UK/DE alto, JP médio).
+3. Especifique públicos com detalhe: interesses, faixa etária, gênero, exclusões.
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+
+  conteudo: `Você é um estrategista de conteúdo viral para infoprodutos com 100M+ views orgânicos gerados. Entende de algoritmos, padrões de engajamento e storytelling que converte.
+
+REGRAS:
+1. Cada hook deve parar o scroll em 2 segundos — específico, não genérico.
+2. Formatos devem variar: reels, stories, carrosséis com propósito diferente.
+3. Conecte o conteúdo ao produto sem ser óbvio (valor primeiro, oferta depois).
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+
+  escala: `Você é um growth analyst que escalou 30+ produtos de R$0 a R$1M+/mês. Combina análise de dados com estratégia de escala real.
+
+REGRAS:
+1. Cada ação por dia é ESPECÍFICA: não "aumente orçamento" mas "suba CBO para R$300/dia no conjunto X".
+2. KPIs com metas numéricas concretas.
+3. Defina condições de PAUSA antes de condições de escala (proteja o caixa).
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+
+  operacional: `Você é um COO de marketing com experiência em estruturar times de tráfego e lançamentos. Cria checklists executáveis que times reais conseguem seguir.
+
+REGRAS:
+1. Tarefas devem ter owner claro (criativo, copy, tráfego, tech, etc).
+2. Prioridade baseada em impacto no resultado, não em urgência percebida.
+3. Cada tarefa deve ser acionável hoje — não "planejamento futuro".
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+
+  relatorio: `Você é um diretor de performance que consolida dados de múltiplas frentes e traduz em decisões claras para o dono do negócio.
+
+REGRAS:
+1. O relatório deve ser lido em 3 minutos e gerar decisão imediata.
+2. Diagnóstico é cirúrgico: o maior problema + a maior oportunidade.
+3. Próximos passos em ordem de impacto decrescente.
+4. Sempre em PT-BR, JSON válido, sem markdown.`,
+};
+
 function basePrompt(ctx: ProjectContext): string {
   return [
     `Projeto: ${ctx.title}`,
@@ -137,25 +201,110 @@ export type ProjectContext = {
 };
 
 const SCHEMAS: Record<AgentKind, string> = {
-  minerador: `{"competitors":[{"name":string,"angle":string,"why":string}],"hooks":[string],"creatives":[{"type":string,"idea":string}],"vsls":[{"hook":string,"structure":string}],"offers":[{"name":string,"price":string,"bonuses":[string]}],"summary":string}`,
-  analista: `{"promise":string,"audience":string,"mainPain":string,"mechanism":string,"cta":string,"funnel":string,"creativeNotes":string,"copyNotes":string,"page":string,"offerStrength":string,"overallScore":number,"scores":{"oferta":{"value":number,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string},"copy":{"value":number,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string},"criativo":{"value":number,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string},"funil":{"value":number,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string},"escala":{"value":number,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string}}}`,
-  campanha: `{"campaigns":[{"platform":"meta"|"google"|"instagram","name":string,"audiences":[string],"angles":[string],"headlines":[string],"adCopies":[string],"creatives":[{"format":string,"idea":string}]}]}`,
-  conteudo: `{"calendar":[{"day":number,"format":string,"hook":string,"caption":string,"cta":string}],"viralHooks":[string],"reels":[string],"stories":[string],"carousels":[{"title":string,"slides":[string]}]}`,
-  escala: `{"d3":{"goal":string,"budget":string,"kpis":[string],"actions":[string]},"d7":{"goal":string,"budget":string,"kpis":[string],"actions":[string]},"d14":{"goal":string,"budget":string,"kpis":[string],"actions":[string]},"pauseWhen":[string],"scaleWhen":[string],"testWhen":[string]}`,
-  operacional: `{"tasks":[{"title":string,"description":string,"priority":"alta"|"media"|"baixa"}]}`,
-  relatorio: `{"diagnosis":string,"strengths":[string],"weaknesses":[string],"campaignSummary":string,"contentSummary":string,"scalePlan":string,"nextSteps":[string]}`,
+  minerador: `{
+  "competitors": [{"name":string,"angle":string,"uniqueMechanism":string,"why":string,"weakness":string}],
+  "hooks": [string],
+  "creatives": [{"type":string,"idea":string,"whyItWorks":string}],
+  "vsls": [{"hook":string,"structure":string,"estimatedDuration":string}],
+  "offers": [{"name":string,"price":string,"bonuses":[string],"strength":string}],
+  "differentiationOpportunity": string,
+  "summary": string
+}`,
+  analista: `{
+  "promise": string,
+  "audience": string,
+  "mainPain": string,
+  "mechanism": string,
+  "cta": string,
+  "funnel": string,
+  "creativeNotes": string,
+  "copyNotes": string,
+  "page": string,
+  "offerStrength": string,
+  "overallScore": number,
+  "scores": {
+    "oferta": {"value":number,"label":string,"diagnosis":string,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string,"impact":"alto"|"médio"|"baixo"},
+    "copy": {"value":number,"label":string,"diagnosis":string,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string,"impact":"alto"|"médio"|"baixo"},
+    "criativo": {"value":number,"label":string,"diagnosis":string,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string,"impact":"alto"|"médio"|"baixo"},
+    "funil": {"value":number,"label":string,"diagnosis":string,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string,"impact":"alto"|"médio"|"baixo"},
+    "escala": {"value":number,"label":string,"diagnosis":string,"strengths":[string],"weaknesses":[string],"fixes":[string],"next_action":string,"impact":"alto"|"médio"|"baixo"}
+  },
+  "priorityAction": string,
+  "quickWins": [string],
+  "biggestRisk": string
+}`,
+  campanha: `{
+  "campaigns": [{
+    "platform": "meta"|"google"|"instagram",
+    "name": string,
+    "objective": string,
+    "dailyBudget": string,
+    "audiences": [{"name":string,"targeting":string,"exclusions":[string]}],
+    "angles": [string],
+    "headlines": [string],
+    "adCopies": [string],
+    "hooks": [string],
+    "creatives": [{"format":string,"idea":string,"hookText":string,"emotion":string}],
+    "kpis": [string],
+    "scaleCondition": string,
+    "pauseCondition": string
+  }]
+}`,
+  conteudo: `{
+  "calendar": [{"day":number,"format":string,"hook":string,"caption":string,"cta":string,"objective":string}],
+  "viralHooks": [string],
+  "reels": [{"concept":string,"hook":string,"script":string,"cta":string}],
+  "stories": [{"concept":string,"hook":string,"swipeUpText":string}],
+  "carousels": [{"title":string,"hook":string,"slides":[string],"finalCTA":string}],
+  "contentPillar": string,
+  "engagementTip": string
+}`,
+  escala: `{
+  "currentDiagnosis": string,
+  "biggestBottleneck": string,
+  "d3": {"goal":string,"budget":string,"kpis":[string],"actions":[string],"pauseWhen":[string],"scaleWhen":[string]},
+  "d7": {"goal":string,"budget":string,"kpis":[string],"actions":[string],"pauseWhen":[string],"scaleWhen":[string]},
+  "d14": {"goal":string,"budget":string,"kpis":[string],"actions":[string],"pauseWhen":[string],"scaleWhen":[string]},
+  "testMatrix": [{"element":string,"hypothesis":string,"budget":string,"successMetric":string}],
+  "budgetAllocation": string,
+  "warningSignals": [string],
+  "scaleSignals": [string]
+}`,
+  operacional: `{
+  "tasks": [{"title":string,"description":string,"priority":"alta"|"media"|"baixa","owner":string,"dueIn":string,"impactIfSkipped":string}],
+  "criticalPath": string,
+  "firstActionToday": string
+}`,
+  relatorio: `{
+  "diagnosis": string,
+  "biggestBottleneck": string,
+  "strengths": [string],
+  "weaknesses": [string],
+  "campaignSummary": string,
+  "contentSummary": string,
+  "scalePlan": string,
+  "nextSteps": [{"action":string,"priority":"alta"|"media"|"baixa","owner":string,"impact":string}],
+  "priorityAction": string,
+  "estimatedROI": string
+}`,
 };
 
 export async function runAgentAi(
   agent: AgentKind,
   ctx: ProjectContext,
 ): Promise<Record<string, unknown>> {
+  const agentSystem = SYSTEMS[agent] ?? SYSTEM;
+
   const userPrompt = [
     basePrompt(ctx),
     ctx.extra ? `Contexto adicional: ${ctx.extra}` : "",
     "",
-    `Tarefa do agente "${AGENTS[agent].title}": ${AGENTS[agent].description}`,
-    `Retorne ESTRITAMENTE JSON com este schema (sem texto fora do JSON): ${SCHEMAS[agent]}`,
+    `TAREFA: ${AGENTS[agent].title}`,
+    `OBJETIVO: ${AGENTS[agent].description}`,
+    "",
+    `REGRA CRÍTICA: Seja ESPECÍFICO ao produto "${ctx.title}" no contexto fornecido acima. Nada genérico.`,
+    `Retorne ESTRITAMENTE JSON com este schema (sem texto fora do JSON):`,
+    SCHEMAS[agent],
   ]
     .filter(Boolean)
     .join("\n");
@@ -163,7 +312,7 @@ export async function runAgentAi(
   const content = await aiChat({
     model: "google/gemini-2.5-flash",
     messages: [
-      { role: "system", content: SYSTEM },
+      { role: "system", content: agentSystem },
       { role: "user", content: userPrompt },
     ],
     response_format: { type: "json_object" },
@@ -174,10 +323,13 @@ export async function runAgentAi(
 
 export const ScoreDimSchema = z.object({
   value: z.coerce.number().min(0).max(100).default(0),
+  label: z.string().default(""),
+  diagnosis: z.string().default(""),
   strengths: z.array(z.string()).default([]),
   weaknesses: z.array(z.string()).default([]),
   fixes: z.array(z.string()).default([]),
   next_action: z.string().default(""),
+  impact: z.enum(["alto", "médio", "baixo"]).default("médio"),
 });
 
 export const ScoresSchema = z.object({

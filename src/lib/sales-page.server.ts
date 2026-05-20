@@ -67,18 +67,24 @@ export const SalesPageSchema = z.object({
   hero: z.string().default(""),
   headline: z.string().default(""),
   subheadline: z.string().default(""),
+  aboveTheFold: z.string().default(""),
   lead: z.string().default(""),
   dor: z.string().default(""),
   mecanismo: z.string().default(""),
+  bigIdea: z.string().default(""),
   beneficios: z.array(z.string()).default([]),
   objecoes: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
-  depoimentos: z.array(z.object({ nome: z.string(), texto: z.string() })).default([]),
+  depoimentos: z.array(z.object({ nome: z.string(), texto: z.string(), resultado: z.string().default("") })).default([]),
   oferta: z.string().default(""),
   bonus: z.array(z.string()).default([]),
   garantia: z.string().default(""),
+  urgencia: z.string().default(""),
   faq: z.array(z.object({ q: z.string(), a: z.string() })).default([]),
   cta: z.string().default(""),
+  ctaSecondary: z.string().default(""),
   estruturaVisual: z.string().default(""),
+  croNotes: z.string().default(""),
+  mobileOptimization: z.string().default(""),
 });
 
 export type SalesPage = z.infer<typeof SalesPageSchema>;
@@ -103,42 +109,58 @@ export function briefingToContext(b: StandaloneBriefing): PageContext {
   return { ...b };
 }
 
-const SYSTEM = `Você é um copywriter direto-resposta brasileiro de elite especializado em páginas de venda longas (sales letter style). Escreve em PT-BR, claro, específico, com gatilhos mentais fortes. Sempre devolve JSON válido conforme o schema. Sem markdown, sem comentários, apenas JSON.`;
+const SYSTEM = `Você é o copywriter de resposta direta + analista de CRO mais eficaz do Brasil. Especializado em sales pages de alta conversão.
+Combina: Gary Halbert (storytelling e lead), Dan Kennedy (urgência e oferta), Joanna Wiebe (copy orientada a dados e voz do cliente), Peep Laja (CRO, testes, above-the-fold).
+
+REGRAS ABSOLUTAS:
+1. Above-the-fold = os primeiros 600px que o visitante vê. Deve conter: headline magnética + subheadline + 1 elemento de prova social + CTA. Quem sai sem rolar não voltará.
+2. A headline PRECISA ser específica: números, prazo, mecanismo único ou contradição. Nunca genérica.
+3. A seção de DOR deve fazer o avatar pensar "é exatamente o que estou sentindo" — específica ao nicho, não clichê.
+4. Depoimentos devem ter resultado mensurável (ex: "perdi 8kg em 45 dias" — não "produto incrível").
+5. O CTA principal deve criar urgência implícita e aparecer pelo menos 3x na página.
+6. croNotes = as 3 mudanças de maior impacto para aumentar conversão nesta página específica.
+7. Sempre JSON válido, sem markdown, sem comentários, apenas JSON.`;
 
 function buildPrompt(ctx: PageContext) {
-  return `Crie a estrutura COMPLETA de uma página de vendas para o produto abaixo.
+  return `Crie a estrutura COMPLETA e PROFUNDA de uma página de vendas para o produto abaixo. Seja específico ao nicho e avatar — sem copy genérica.
 
 PRODUTO: ${ctx.productName}
 TIPO: ${ctx.productType}
 DESCRIÇÃO: ${ctx.description || "—"}
 NICHO: ${ctx.niche || "—"}
-PÚBLICO: ${ctx.audience || "—"}
+PÚBLICO-ALVO: ${ctx.audience || "—"}
 PROMESSA: ${ctx.promise || "—"}
 PREÇO: ${ctx.price || "—"}
 GARANTIA: ${ctx.guarantee || "—"}
 BÔNUS: ${ctx.bonus || "—"}
-TOM: ${ctx.tone || "persuasivo, próximo, confiante"}
-MECANISMO ÚNICO: ${ctx.uniqueMechanism || "—"}
-DORES: ${(ctx.pains ?? []).join(" · ") || "—"}
-DESEJOS: ${(ctx.desires ?? []).join(" · ") || "—"}
+TOM: ${ctx.tone || "persuasivo, próximo, confiante — como amigo especialista"}
+MECANISMO ÚNICO: ${ctx.uniqueMechanism || "criar nome proprietário"}
+DORES: ${(ctx.pains ?? []).join(" · ") || "mapear com base no nicho"}
+DESEJOS: ${(ctx.desires ?? []).join(" · ") || "mapear com base no nicho"}
 
 Devolva EXATAMENTE este JSON (sem nada antes ou depois):
 {
-  "hero": "frase forte do hero (até 110 chars)",
-  "headline": "headline principal (até 90 chars)",
-  "subheadline": "complemento (até 140 chars)",
-  "lead": "lead/abertura curta de 2-3 parágrafos",
-  "dor": "seção de dor expandida (3-5 parágrafos)",
-  "mecanismo": "explicação do mecanismo único (3-4 parágrafos)",
-  "beneficios": ["6 a 10 benefícios tangíveis"],
-  "objecoes": [{"q":"objeção comum","a":"quebra curta e convincente"}],
-  "depoimentos": [{"nome":"Nome fictício realista","texto":"depoimento curto"}],
-  "oferta": "descrição da oferta completa, stack de valor com âncora de preço",
-  "bonus": ["3 a 5 bônus específicos com nome + valor percebido"],
-  "garantia": "frase de garantia",
-  "faq": [{"q":"pergunta","a":"resposta"}],
-  "cta": "CTA principal (até 60 chars)",
-  "estruturaVisual": "descrição em texto da estrutura visual sugerida (Hero, cores, mockups, ícones, seções, ordem)"
+  "hero": "frase curta e poderosa do hero — emocional ou disruptiva (até 110 chars)",
+  "headline": "headline magnética com número, mecanismo ou promessa específica (até 90 chars)",
+  "subheadline": "complemento que reforça a promessa e o avatar (até 140 chars)",
+  "aboveTheFold": "bloco completo do above-the-fold (primeiros 600px): headline + subheadline + frase de prova social + CTA primário. Deve convencer o visitante a rolar em menos de 5 segundos.",
+  "lead": "lead de 2-3 parágrafos: identificação profunda com o avatar — 'se você é como a maioria das pessoas que [situação específica]...'",
+  "bigIdea": "a grande ideia central que posiciona este produto de forma única e disruptiva no nicho",
+  "dor": "seção de dor expandida: 4-6 parágrafos que fazem o avatar pensar 'é exatamente isso' — específico ao nicho, sem clichê",
+  "mecanismo": "explicação do mecanismo único com nome proprietário: como funciona, por que é diferente, prova interna (3-4 parágrafos)",
+  "beneficios": ["8 a 12 benefícios tangíveis e mensuráveis — evitar genéricos como 'mude sua vida'"],
+  "objecoes": [{"q": "objeção real e específica do avatar deste nicho", "a": "quebra direta, específica e convincente (não genérica)"}],
+  "depoimentos": [{"nome": "Nome realista", "texto": "depoimento específico com resultado mensurável", "resultado": "resultado em números (ex: 8kg em 45 dias)"}],
+  "oferta": "apresentação da oferta com stack de valor completo: produto principal + bônus + garantia + âncora de preço",
+  "bonus": ["3 a 5 bônus com nome específico + valor percebido + por que resolve uma objeção"],
+  "garantia": "frase de garantia que transfere risco total — tão forte que parece arriscada para você",
+  "urgencia": "urgência e escassez específica e genuína — com razão real (não 'oferta limitada' genérico)",
+  "faq": [{"q": "pergunta real que o avatar tem antes de comprar", "a": "resposta que quebra objeção e reforça a compra"}],
+  "cta": "CTA principal com urgência implícita — aparece pelo menos 3x na página (até 60 chars)",
+  "ctaSecondary": "CTA secundário para quem ainda não está convencido — mais suave, foco em garantia ou prova social",
+  "estruturaVisual": "wireframe textual completo: ordem das seções, elementos visuais (mockup, ícones, selos), sugestão de cores e tipografia, sticky CTA mobile",
+  "croNotes": "as 3 mudanças de CRO de maior impacto para aumentar a conversão desta página específica — com justificativa",
+  "mobileOptimization": "adaptações específicas para mobile: o que priorizar, o que simplificar, sticky CTA, velocidade de carregamento"
 }`;
 }
 
