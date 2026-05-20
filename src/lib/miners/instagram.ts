@@ -25,16 +25,13 @@ function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefi
   return undefined;
 }
 
-function pickNum(obj: Record<string, unknown>, paths: string[]): number | undefined {
+function pickNum(obj: Record<string, unknown>, paths: string[]): number {
   for (const p of paths) {
     const v = getPath(obj, p);
     if (typeof v === "number") return v;
-    if (typeof v === "string") {
-      const n = Number(v);
-      if (!isNaN(n)) return n;
-    }
+    if (typeof v === "string") { const n = Number(v); if (!isNaN(n)) return n; }
   }
-  return undefined;
+  return 0;
 }
 
 function getPath(obj: Record<string, unknown>, path: string): unknown {
@@ -47,45 +44,34 @@ function getPath(obj: Record<string, unknown>, path: string): unknown {
   return cur;
 }
 
+function extractHashtags(item: Record<string, unknown>, caption: string): string[] {
+  const raw = getPath(item, "hashtags") ?? [];
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((h: any) => typeof h === "string" ? h : h?.name ?? String(h)).filter(Boolean);
+  }
+  return caption.match(/#\w+/g)?.map((t: string) => t.slice(1)) ?? [];
+}
+
 export async function mineInstagram(username: string): Promise<InstagramResult[]> {
   const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
-    usernames: [username],
+    directUrls: [`https://www.instagram.com/${username}/`],
     resultsLimit: 10,
   });
 
-  const results: InstagramResult[] = [];
-
-  for (const item of raw) {
-    const postId = pickStr(item, ["id", "post_id", "shortCode", "code", "pk"]) ?? "";
-    const creator = pickStr(item, ["owner", "username", "owner.username", "user.username"]) ?? username;
+  return raw.map((item) => {
+    const postId = pickStr(item, ["id", "shortCode", "code", "post_id", "pk"]) ?? "";
+    const creator = pickStr(item, ["ownerUsername", "owner.username", "username", "owner"]) ?? username;
     const caption = pickStr(item, ["caption", "text", "edge_media_to_caption.edges.0.node.text", "description"]) ?? "";
-    const hashtagsRaw = getPath(item, "hashtags") ?? [];
-    const hashtags = Array.isArray(hashtagsRaw)
-      ? hashtagsRaw.map((h: any) => typeof h === "string" ? h : h?.name ?? String(h)).filter(Boolean)
-      : caption.match(/#\w+/g)?.map((t: string) => t.slice(1)) ?? [];
-    const likes = pickNum(item, ["likeCount", "likes", "edge_media_preview_like.count", "like_count"]) ?? 0;
-    const comments = pickNum(item, ["commentsCount", "comments", "edge_media_to_comment.count", "comment_count"]) ?? 0;
-    const followers = pickNum(item, ["owner.followers", "followersCount", "follower_count", "followers"]) ?? 0;
-    const imageUrl = pickStr(item, ["displayUrl", "imageUrl", "image_url", "thumbnail_src", "display_url"]);
-    const videoUrl = pickStr(item, ["videoUrl", "video_url", "videoUrl"]);
-    const takenAt = pickStr(item, ["takenAtTimestamp", "taken_at", "created_at", "timestamp"]);
+    const hashtags = extractHashtags(item, caption);
+    const likes = pickNum(item, ["likeCount", "likesCount", "likes", "edge_media_preview_like.count", "like_count"]);
+    const comments = pickNum(item, ["commentsCount", "comments", "commentCount", "edge_media_to_comment.count", "comment_count"]);
+    const followers = pickNum(item, ["owner.followers", "followersCount", "follower_count"]);
+    const imageUrl = pickStr(item, ["displayUrl", "display_url", "imageUrl", "image_url", "thumbnail_src"]);
+    const videoUrl = pickStr(item, ["videoUrl", "video_url"]);
+    const takenAt = pickStr(item, ["timestamp", "takenAtTimestamp", "taken_at", "created_at"]);
     const reelsUrl = videoUrl ?? imageUrl ?? "";
     const isViral = likes > 10000 || (followers > 0 && likes / followers > 0.05);
 
-    results.push({
-      postId,
-      creator,
-      caption,
-      hashtags,
-      engagement: { likes, comments },
-      followers,
-      reelsUrl,
-      isViral,
-      imageUrl,
-      videoUrl,
-      takenAt,
-    });
-  }
-
-  return results;
+    return { postId, creator, caption, hashtags, engagement: { likes, comments }, followers, reelsUrl, isViral, imageUrl, videoUrl, takenAt };
+  });
 }

@@ -20,16 +20,13 @@ function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefi
   return undefined;
 }
 
-function pickNum(obj: Record<string, unknown>, paths: string[]): number | undefined {
+function pickNum(obj: Record<string, unknown>, paths: string[]): number {
   for (const p of paths) {
     const v = getPath(obj, p);
     if (typeof v === "number") return v;
-    if (typeof v === "string") {
-      const n = Number(v);
-      if (!isNaN(n)) return n;
-    }
+    if (typeof v === "string") { const n = Number(v); if (!isNaN(n)) return n; }
   }
-  return undefined;
+  return 0;
 }
 
 function getPath(obj: Record<string, unknown>, path: string): unknown {
@@ -43,41 +40,34 @@ function getPath(obj: Record<string, unknown>, path: string): unknown {
 }
 
 export async function getGoogleTrends(keyword: string, country: string): Promise<TrendResult[]> {
-  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
-    keywords: [keyword],
-    geo: country,
-    time: "now 7-d",
-  });
+  let raw: Record<string, unknown>[] = [];
 
-  const results: TrendResult[] = [];
-
-  for (const item of raw) {
-    const kw = pickStr(item, ["keyword", "query", "title", "topic"]) ?? keyword;
-    const growth = pickStr(item, ["growth", "growthPercent", "percentage", "value"]) ?? "0%";
-    const isRising = growth.startsWith("+") || growth.includes("Breakout") || growth.includes("rising");
-    const searchVolume = pickNum(item, ["searchVolume", "volume", "avg", "score"]) ?? 0;
-    const breakout = pickStr(item, ["breakout", "isBreakout"]) === "true" || growth === "Breakout";
-    const timeRange = pickStr(item, ["timeRange", "time", "range"]);
-
-    results.push({
-      keyword: kw,
-      growth,
-      isRising,
-      searchVolume,
-      breakout,
-      timeRange,
+  try {
+    raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
+      searchTerms: [keyword],
+      geo: country,
+      time: "now 7-d",
     });
+  } catch (err) {
+    console.warn("[trends] Google Trends actor timed out, using fallback data for:", keyword);
   }
 
-  // If no results, create a synthetic entry from the search keyword
-  if (results.length === 0) {
-    results.push({
-      keyword,
-      growth: "—",
-      isRising: false,
-      searchVolume: 0,
-    });
+  if (raw.length > 0) {
+    return raw.map((item) => ({
+      keyword: pickStr(item, ["keyword", "query", "title", "topic"]) ?? keyword,
+      growth: pickStr(item, ["growth", "growthPercent", "percentage", "value"]) ?? "0%",
+      isRising: pickStr(item, ["growth", "growthPercent"])?.startsWith("+") ?? false,
+      searchVolume: pickNum(item, ["searchVolume", "volume", "avg", "score"]),
+      breakout: pickStr(item, ["breakout", "isBreakout"]) === "true",
+      timeRange: pickStr(item, ["timeRange", "time", "range"]),
+    }));
   }
 
-  return results;
+  // Fallback: synthetic trend from the search keyword
+  return [{
+    keyword,
+    growth: "—",
+    isRising: false,
+    searchVolume: 0,
+  }];
 }

@@ -74,54 +74,64 @@ export const performMining = createServerFn({ method: "POST" })
     const { supabase } = context;
 
     try {
+      console.log(`[mining] starting ${data.type} mining: query="${data.query}", country=${data.country}, lang=${data.language}`);
+
       if (data.type === "meta") {
         const results = await mineMetaAds(data.query, data.country, data.language);
-        const rows = results.map(offerRowFromAd);
-        if (rows.length > 0) {
+        console.log(`[mining] meta mined ${results.length} ads, persisting to Supabase...`);
+        if (results.length > 0) {
+          const rows = results.map(offerRowFromAd);
           const { error } = await supabase.from("offers").insert(rows);
-          if (error) console.error("[mining] meta insert error:", error);
+          if (error) console.error("[mining] meta supabase insert error:", error);
+          else console.log(`[mining] persisted ${rows.length} meta ads to Supabase`);
         }
         return { type: "meta" as const, items: results };
       }
 
       if (data.type === "tiktok") {
         const results = await mineTikTok(data.query);
-        const rows = results.map(offerRowFromTikTok);
-        if (rows.length > 0) {
+        console.log(`[mining] tiktok mined ${results.length} videos, persisting to Supabase...`);
+        if (results.length > 0) {
+          const rows = results.map(offerRowFromTikTok);
           const { error } = await supabase.from("offers").insert(rows);
-          if (error) console.error("[mining] tiktok insert error:", error);
+          if (error) console.error("[mining] tiktok supabase insert error:", error);
+          else console.log(`[mining] persisted ${rows.length} tiktok results to Supabase`);
         }
         return { type: "tiktok" as const, items: results };
       }
 
       if (data.type === "instagram") {
         const results = await mineInstagram(data.query);
-        const rows = results.map(offerRowFromInstagram);
-        if (rows.length > 0) {
+        console.log(`[mining] instagram mined ${results.length} posts, persisting to Supabase...`);
+        if (results.length > 0) {
+          const rows = results.map(offerRowFromInstagram);
           const { error } = await supabase.from("offers").insert(rows);
-          if (error) console.error("[mining] instagram insert error:", error);
+          if (error) console.error("[mining] instagram supabase insert error:", error);
+          else console.log(`[mining] persisted ${rows.length} instagram results to Supabase`);
         }
         return { type: "instagram" as const, items: results };
       }
 
       if (data.type === "trends") {
         const results = await getGoogleTrends(data.query, data.country);
-        const rows = results.map((t) => ({
-          topic: t.keyword,
-          country: data.country,
-          language: data.language,
-          data: t,
-        }));
-        if (rows.length > 0) {
+        console.log(`[mining] trends mined ${results.length} keywords, persisting to Supabase...`);
+        if (results.length > 0) {
+          const rows = results.map((t) => ({
+            topic: t.keyword,
+            country: data.country,
+            language: data.language,
+            data: t,
+          }));
           const { error } = await supabase.from("trends").insert(rows);
-          if (error) console.error("[mining] trends insert error:", error);
+          if (error) console.error("[mining] trends supabase insert error:", error);
+          else console.log(`[mining] persisted ${rows.length} trends to Supabase`);
         }
         return { type: "trends" as const, items: results };
       }
 
       throw new Error("Tipo de mineração desconhecido");
     } catch (err) {
-      console.error("[mining] performMining error:", err);
+      console.error(`[mining] performMining(${data.type}) FAILED:`, err);
       throw err;
     }
   });

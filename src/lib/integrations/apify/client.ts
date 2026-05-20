@@ -27,15 +27,21 @@ export async function runSyncGetDatasetItems<T = any>(
 ): Promise<T[]> {
   const token = getToken();
   const url = `${BASE}/acts/${actorId}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
+  console.log(`[apify] starting sync run: actor=${actorId}, timeout=${timeoutSec}s`);
+  const start = Date.now();
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`Apify sync run failed (${response.status}): ${text.slice(0, 300)}`);
+    console.error(`[apify] sync run FAILED after ${elapsed}s: ${response.status}`);
+    throw new Error(`Apify sync run failed (${response.status}) after ${elapsed}s: ${text.slice(0, 300)}`);
   }
   const data = (await response.json()) as unknown;
-  return Array.isArray(data) ? data : [];
+  const items = Array.isArray(data) ? data : [];
+  console.log(`[apify] sync run COMPLETE: ${items.length} items in ${elapsed}s`);
+  return items;
 }
