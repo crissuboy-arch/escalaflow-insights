@@ -174,7 +174,7 @@ export const runAgent = createServerFn({ method: "POST" })
         prompt: { agent: data.agent, ctx },
         response: payload,
       });
-      return { id: outputId, payload: payload as Record<string, unknown> };
+      return { id: outputId, payload: payload as Record<string, never> };
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Falha";
       await supabase
