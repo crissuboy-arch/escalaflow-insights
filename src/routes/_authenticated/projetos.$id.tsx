@@ -35,6 +35,9 @@ import { CreativesTab } from "@/components/pipeline/project/CreativesTab";
 import { CheckoutTab, type CheckoutDraft } from "@/components/pipeline/project/CheckoutTab";
 import { EscalaTab } from "@/components/pipeline/project/EscalaTab";
 import { AiHistoryTab } from "@/components/project/AiHistoryTab";
+import { AgentDeck } from "@/components/agents/AgentDeck";
+import { touchProject } from "@/lib/agents.functions";
+import { duplicateProject, deleteProject } from "@/lib/project.functions";
 import type { SalesCopy } from "@/lib/copy.server";
 import type { SalesPage } from "@/lib/sales-page.server";
 
@@ -108,6 +111,7 @@ function ProjectWorkspace() {
     "pagina",
     "checkout",
     "escala",
+    "agentes",
     "exportar",
     "historico",
   ] as const;
@@ -134,6 +138,34 @@ function ProjectWorkspace() {
   useEffect(() => {
     refresh();
   }, [id]);
+
+  const touch = useServerFn(touchProject);
+  const dup = useServerFn(duplicateProject);
+  const del = useServerFn(deleteProject);
+  useEffect(() => {
+    touch({ data: { id } }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  async function onDuplicate() {
+    try {
+      const r = await dup({ data: { id } });
+      toast.success("Projeto duplicado");
+      navigate({ to: "/projetos/$id", params: { id: r.id } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao duplicar");
+    }
+  }
+  async function onDelete() {
+    if (!confirm("Excluir este projeto? Essa ação não pode ser desfeita.")) return;
+    try {
+      await del({ data: { id } });
+      toast.success("Projeto excluído");
+      navigate({ to: "/projetos" });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao excluir");
+    }
+  }
 
   async function saveTitle(title: string) {
     if (!project) return;
@@ -226,6 +258,8 @@ function ProjectWorkspace() {
               <Rocket className="mr-2 h-4 w-4" /> Abrir estratégia
             </Button>
           ) : null}
+          <Button variant="outline" onClick={onDuplicate}>Duplicar</Button>
+          <Button variant="ghost" onClick={onDelete}>Excluir</Button>
           <Button onClick={() => runEbook("kdp")} disabled={!!busy} variant="secondary">
             {busy === "ebook" ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -264,6 +298,7 @@ function ProjectWorkspace() {
           <TabsTrigger value="pagina"><LayoutTemplate className="mr-1 h-3.5 w-3.5" />Página</TabsTrigger>
           <TabsTrigger value="checkout"><ShoppingCart className="mr-1 h-3.5 w-3.5" />Checkout</TabsTrigger>
           <TabsTrigger value="escala"><Rocket className="mr-1 h-3.5 w-3.5" />Escala</TabsTrigger>
+          <TabsTrigger value="agentes"><Sparkles className="mr-1 h-3.5 w-3.5" />Automação Agentiva</TabsTrigger>
           <TabsTrigger value="exportar">Exportar</TabsTrigger>
           <TabsTrigger value="historico">Histórico IA</TabsTrigger>
         </TabsList>
@@ -534,6 +569,9 @@ function ProjectWorkspace() {
         </TabsContent>
         <TabsContent value="historico">
           <AiHistoryTab projectId={id} />
+        </TabsContent>
+        <TabsContent value="agentes">
+          <AgentDeck projectId={id} />
         </TabsContent>
       </Tabs>
     </div>

@@ -390,18 +390,250 @@ export type Database = {
         }
         Relationships: []
       }
+      project_assets: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          meta: Json
+          project_id: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          project_id: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          meta?: Json
+          project_id?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_campaigns: {
+        Row: {
+          ad_copies: Json
+          angles: Json
+          audiences: Json
+          created_at: string
+          creatives: Json
+          headlines: Json
+          id: string
+          name: string
+          platform: string
+          project_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_copies?: Json
+          angles?: Json
+          audiences?: Json
+          created_at?: string
+          creatives?: Json
+          headlines?: Json
+          id?: string
+          name?: string
+          platform: string
+          project_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_copies?: Json
+          angles?: Json
+          audiences?: Json
+          created_at?: string
+          creatives?: Json
+          headlines?: Json
+          id?: string
+          name?: string
+          platform?: string
+          project_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_outputs: {
+        Row: {
+          agent: string
+          created_at: string
+          error: string | null
+          id: string
+          kind: string
+          payload: Json
+          project_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          payload?: Json
+          project_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          kind?: string
+          payload?: Json
+          project_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_scores: {
+        Row: {
+          created_at: string
+          dimension: string
+          fixes: Json
+          id: string
+          next_action: string | null
+          project_id: string
+          strengths: Json
+          user_id: string
+          value: number
+          weaknesses: Json
+        }
+        Insert: {
+          created_at?: string
+          dimension: string
+          fixes?: Json
+          id?: string
+          next_action?: string | null
+          project_id: string
+          strengths?: Json
+          user_id: string
+          value?: number
+          weaknesses?: Json
+        }
+        Update: {
+          created_at?: string
+          dimension?: string
+          fixes?: Json
+          id?: string
+          next_action?: string | null
+          project_id?: string
+          strengths?: Json
+          user_id?: string
+          value?: number
+          weaknesses?: Json
+        }
+        Relationships: []
+      }
+      project_tasks: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          order_index: number
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          order_index?: number
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          order_index?: number
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      project_timeline: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          project_id: string
+          ref_id: string | null
+          summary: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          project_id: string
+          ref_id?: string | null
+          summary?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          project_id?: string
+          ref_id?: string | null
+          summary?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           briefing: Json
+          country: string | null
           cover_url: string | null
           created_at: string
           ebook_id: string | null
           id: string
+          language: string
+          last_opened_at: string | null
           meta: Json
           mode: string
           niche: string | null
           outline: Json
           playbook_id: string | null
+          product_type: string | null
           source_ad_key: string | null
           status: string
           step: number
@@ -411,15 +643,19 @@ export type Database = {
         }
         Insert: {
           briefing?: Json
+          country?: string | null
           cover_url?: string | null
           created_at?: string
           ebook_id?: string | null
           id?: string
+          language?: string
+          last_opened_at?: string | null
           meta?: Json
           mode?: string
           niche?: string | null
           outline?: Json
           playbook_id?: string | null
+          product_type?: string | null
           source_ad_key?: string | null
           status?: string
           step?: number
@@ -429,15 +665,19 @@ export type Database = {
         }
         Update: {
           briefing?: Json
+          country?: string | null
           cover_url?: string | null
           created_at?: string
           ebook_id?: string | null
           id?: string
+          language?: string
+          last_opened_at?: string | null
           meta?: Json
           mode?: string
           niche?: string | null
           outline?: Json
           playbook_id?: string | null
+          product_type?: string | null
           source_ad_key?: string | null
           status?: string
           step?: number
