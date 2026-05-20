@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaybookIdRouteImport } from './routes/playbook.$id'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
@@ -68,6 +69,12 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedStrategicAiRoute =
+  AuthenticatedStrategicAiRouteImport.update({
+    id: '/strategic-ai',
+    path: '/strategic-ai',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
   id: '/storybook',
   path: '/storybook',
@@ -250,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
+  '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -285,6 +293,7 @@ export interface FileRoutesByTo {
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
+  '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -322,6 +331,7 @@ export interface FileRoutesById {
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
+  '/_authenticated/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -359,6 +369,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/radar'
     | '/storybook'
+    | '/strategic-ai'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -394,6 +405,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/radar'
     | '/storybook'
+    | '/strategic-ai'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -430,6 +442,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
     | '/_authenticated/storybook'
+    | '/_authenticated/strategic-ai'
     | '/api/ingest'
     | '/playbook/$id'
     | '/_authenticated/oferta/$id'
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ingest'
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/strategic-ai': {
+      id: '/_authenticated/strategic-ai'
+      path: '/strategic-ai'
+      fullPath: '/strategic-ai'
+      preLoaderRoute: typeof AuthenticatedStrategicAiRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/storybook': {
       id: '/_authenticated/storybook'
@@ -782,6 +802,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
+  AuthenticatedStrategicAiRoute: typeof AuthenticatedStrategicAiRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
   AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -806,6 +827,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,
+  AuthenticatedStrategicAiRoute: AuthenticatedStrategicAiRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
   AuthenticatedProdutosPlaybookRoute:
@@ -827,3 +849,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
