@@ -61,18 +61,19 @@ function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background p-4">
-      <div className="pointer-events-none absolute inset-0 opacity-60" style={{ background: "var(--gradient-glow)" }} />
-      <div className="absolute right-4 top-4 flex gap-1"><LanguageSwitcher /><ThemeToggle /></div>
+      <div className="pointer-events-none absolute inset-0 grid-bg opacity-30" />
+      <div className="pointer-events-none absolute inset-0" style={{ background: "var(--gradient-mission)" }} />
+      <div className="absolute right-4 top-4 z-10 flex gap-1"><LanguageSwitcher /><ThemeToggle /></div>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="relative w-full max-w-md">
         <div className="mb-8 text-center">
           <img
             src={logoHorizontal}
-            alt="EscalaFlow"
-            className="mx-auto mb-4 h-9 w-auto dark:invert dark:brightness-200"
+            alt="Flow"
+            className="mx-auto mb-4 h-12 w-auto logo-drop-glow"
           />
-          <p className="mt-1 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
+          <p className="mt-1 text-sm uppercase tracking-[0.24em] text-muted-foreground">{t("auth.subtitle")}</p>
         </div>
-        <Card className="border-border/60 backdrop-blur">
+        <Card className="card-premium">
           <CardContent className="p-6">
             <h2 className="mb-1 text-xl font-semibold">{mode === "signin" ? t("auth.welcomeBack") : t("auth.createAccount")}</h2>
             <p className="mb-5 text-sm text-muted-foreground">{t("app.tagline")}</p>
