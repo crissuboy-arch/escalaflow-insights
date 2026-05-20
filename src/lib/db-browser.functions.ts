@@ -40,15 +40,16 @@ export const fetchTableRows = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof FetchInput>) => FetchInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const table = data.table as AllowedTable;
     const { data: rows, error, count } = await supabase
-      .from(data.table)
+      .from(table as never)
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false, nullsFirst: false })
       .limit(data.limit);
     if (error) {
       // fallback without created_at ordering
       const { data: rows2, error: err2, count: c2 } = await supabase
-        .from(data.table)
+        .from(table as never)
         .select("*", { count: "exact" })
         .limit(data.limit);
       if (err2) throw new Error(err2.message);
