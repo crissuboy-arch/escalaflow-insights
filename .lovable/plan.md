@@ -1,67 +1,169 @@
-# Editor interativo de playbook + visualizador público (flipbook)
 
-## Objetivo
-Os botões "Criar primeiro playbook" e "+ Novo Playbook" em `/produtos/playbook` passam a abrir um **editor interativo** simples (sem wizard de IA). O playbook publicado fica acessível em uma URL pública `/playbook/:id` com animação de virar página em CSS nativo, responsivo.
+# Automação Agentiva — Flow / EscalaFlow
 
-O wizard atual (`/produtos/playbook/novo`) continua existindo como rota alternativa de geração por IA — não é o caminho default.
+Camada nova **dentro** da arquitetura atual. Nada existente é removido, renomeado ou simplificado. Sidebar, rotas, identidade visual, módulos (Ebook, Playbook, Copy, Página, Criativos, Checkout, Escala) permanecem **idênticos**.
 
-## Modelo de dados
-Reaproveitamos a tabela `playbooks` existente. Cada "página" do novo editor é uma `scene` simplificada com `title`, `text` e `image_url` (os demais campos — `summary`, `balloons`, `exercise`, `practical_action` — ficam vazios e seguem sendo opcionais no schema). Nenhuma migração necessária.
+## Fase 1 — Persistência real dos projetos (prioridade absoluta)
 
-Sem novos campos no banco. O visualizador público lê via uma nova server function que aceita playbooks com `status = 'published'` sem exigir auth.
+Hoje `projects` já tem `id, title, niche, mode, status, step, briefing, outline, meta, cover_url, created_at, updated_at`. Faltam campos estratégicos pedidos: país, idioma, tipo de produto, e tabelas-irmãs para histórico/timeline/scores.
 
-## Mudanças
+### Migração (aditiva, sem dropar nada)
 
-### 1. Novo componente `PlaybookEditor`
-`src/components/playbook/PlaybookEditor.tsx`
-- Campo "Título do playbook" (input grande).
-- Lista de páginas com drag-handle (↑/↓) — botões "Adicionar página", "Duplicar", "Excluir".
-- Cada item editável inline: título da página, textarea de conteúdo, upload de imagem (usa `uploadPlaybookImage` existente — converte arquivo para dataURL e sobe pro bucket `playbook-images`).
-- Painel lateral / aba "Preview" usando o componente `FlipBook` (ver abaixo).
-- Botões no header:
-  - "Salvar rascunho" → `savePlaybook` com `status: "draft"`.
-  - "Publicar" → `savePlaybook` com `status: "published"`, mostra toast com link público `/playbook/:id` e botão "Copiar link".
-  - "Despublicar" quando já estiver publicado.
+```sql
+ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS country text,
+  ADD COLUMN IF NOT EXISTS language text DEFAULT 'pt',
+  ADD COLUMN IF NOT EXISTS product_type text,
+  ADD COLUMN IF NOT EXISTS last_opened_at timestamptz;
 
-### 2. Componente `FlipBook` (CSS nativo, sem libs)
-`src/components/playbook/FlipBook.tsx`
-- Empilha as páginas em 3D usando `perspective` no container e `transform: rotateY` em cada página com `transform-origin: left center`.
-- Cada página vira ao clicar (próximo / anterior) ou ao arrastar (swipe touch para mobile).
-- Versão mobile (< 640px): cai para um carrossel horizontal com transição `transform: translateX` + sombra de lateral simulando dobra, em vez do flip 3D (mais legível em telas pequenas).
-- Indicador de página "3 / 12" + setas.
-- Estados controlados via `useState` apenas — sem GSAP / framer / page-flip.
-- Estilos isolados num arquivo `src/components/playbook/flipbook.css` com `@keyframes` simples.
+-- Tabelas-irmãs (cada uma com RLS user_id = auth.uid())
+CREATE TABLE project_outputs (
+  id uuid PK, project_id uuid, user_id uuid,
+  agent text,        -- 'minerador'|'analista'|'campanha'|'conteudo'|'escala'|'operacional'
+  kind text,         -- 'analysis'|'campaign'|'content'|'plan'|'report'
+  payload jsonb,     -- resposta da IA
+  status text,       -- 'pending'|'processing'|'done'|'error'
+  error text,
+  created_at, updated_at
+);
 
-### 3. Rotas
-- `src/routes/_authenticated/produtos.playbook.editor.$id.tsx` — editor autenticado, abre o `PlaybookEditor` carregando o playbook por id (ou cria um vazio se id for `novo`).
-- `src/routes/_authenticated/produtos.playbook.editor.novo.tsx` — atalho que cria um playbook em branco e redireciona para `/produtos/playbook/editor/<id>`.
-- `src/routes/playbook.$id.tsx` — **rota pública** (fora de `_authenticated`), só renderiza o `FlipBook` em fullscreen com o conteúdo do playbook. Mostra 404 amigável se o playbook não existir ou não estiver publicado.
+CREATE TABLE project_tasks (
+  id, project_id, user_id, title, description,
+  status text,       -- 'todo'|'doing'|'done'|'blocked'
+  due_at, order_index, created_at, updated_at
+);
 
-### 4. Server function pública
-Adicionar em `src/lib/playbook.functions.ts`:
-- `loadPublicPlaybook` — `createServerFn({ method: "GET" })` **sem** `requireSupabaseAuth`. Usa `supabaseAdmin` (`@/integrations/supabase/client.server`) para buscar o playbook, mas filtra estritamente por `id` + `status = 'published'`. Retorna apenas `{ title, theme, cover_url, scenes: [{ title, text, image_url }] }` — sem `user_id`, sem `briefing`, sem campos privados.
+CREATE TABLE project_timeline (
+  id, project_id, user_id,
+  event_type text,   -- 'created'|'agent_run'|'score'|'task_done'|'note'
+  ref_id uuid,       -- aponta para output/task/score
+  summary text, payload jsonb, created_at
+);
 
-### 5. Atualizar `produtos.playbook.tsx`
-- Botão "+ Novo Playbook" e "Criar primeiro playbook" passam a navegar para `/produtos/playbook/editor/novo` em vez de `/produtos/playbook/novo`.
-- No card de cada playbook, o botão de editar (Pencil) navega para `/produtos/playbook/editor/<id>`.
-- Ao publicar (botão Globe2), mostrar toast com botão "Copiar link público" apontando para `${window.location.origin}/playbook/<id>`.
+CREATE TABLE project_campaigns (
+  id, project_id, user_id, platform text, -- 'meta'|'google'|'instagram'
+  name, audiences jsonb, angles jsonb, headlines jsonb,
+  ad_copies jsonb, creatives jsonb, status, created_at, updated_at
+);
 
-## Verificação
-- Build / typecheck via harness.
-- Abrir `/produtos/playbook` → clicar "+ Novo Playbook" → editor abre com 1 página em branco.
-- Adicionar 3 páginas com imagem → salvar rascunho → reabrir → conteúdo persiste.
-- Publicar → abrir `${origin}/playbook/<id>` em janela anônima → flipbook responde a click/swipe no desktop e mobile.
-- Despublicar → URL pública retorna 404.
+CREATE TABLE project_assets (
+  id, project_id, user_id, kind text,    -- 'image'|'video'|'doc'|'link'
+  url text, meta jsonb, created_at
+);
 
-## Arquivos
-**Novos**
-- `src/components/playbook/PlaybookEditor.tsx`
-- `src/components/playbook/FlipBook.tsx`
-- `src/components/playbook/flipbook.css`
-- `src/routes/_authenticated/produtos.playbook.editor.$id.tsx`
-- `src/routes/_authenticated/produtos.playbook.editor.novo.tsx`
-- `src/routes/playbook.$id.tsx`
+CREATE TABLE project_scores (
+  id, project_id, user_id, dimension text, -- 'oferta'|'copy'|'criativo'|'funil'|'escala'
+  value int, strengths jsonb, weaknesses jsonb, fixes jsonb, next_action text,
+  created_at
+);
+```
+Todas com RLS `auth.uid() = user_id` (select/insert/update/delete) + admins via `has_role`. `ai_history` existente continua sendo o log bruto da IA.
 
-**Editados**
-- `src/lib/playbook.functions.ts` — adiciona `loadPublicPlaybook`.
-- `src/routes/_authenticated/produtos.playbook.tsx` — botões + link público no toast de publicar.
+### Server functions novas (`src/lib/projects/`)
+- `agents.functions.ts` — `runAgent({ projectId, agent, input })`, `regenerateOutput({ outputId })`, `listOutputs({ projectId })`.
+- `tasks.functions.ts` — CRUD de `project_tasks`.
+- `timeline.functions.ts` — `listTimeline({ projectId })`, `pushTimeline()` (interno).
+- `scores.functions.ts` — `computeScores({ projectId })` e `listScores`.
+- `projects.functions.ts` — estende `updateProject` para suportar `country|language|product_type|last_opened_at`; adiciona `touchProject({ id })` chamado no mount da rota para “continuar de onde parou”.
+
+Autosave já existe (hook `useAutosave`); reaproveitar nos novos campos.
+
+## Fase 2 — Agentes especializados
+
+Cada agente é um prompt-template no servidor que chama Lovable AI Gateway (`google/gemini-2.5-pro` para reasoning, `gemini-2.5-flash` para listas/checklists), valida com Zod, persiste em `project_outputs`, registra em `project_timeline` e `ai_history`.
+
+Arquivos: `src/lib/agents/<agent>.server.ts` + reexportados em `agents.functions.ts`.
+
+1. **Minerador** — entrada: links/prints/descrições/anúncios da oferta. Saída: `{ competitors[], hooks[], creatives[], offers[], vsls[], summary }`.
+2. **Analista** — usa briefing + outputs do Minerador. Saída: `{ promise, audience, mainPain, mechanism, cta, funnel, creativeNotes, copyNotes, page, offerStrength, overallScore }`.
+3. **Campanha** — gera campanhas Meta/Google/Instagram → grava em `project_campaigns`: `{ audiences, angles, headlines[], adCopies[], creatives[] }`.
+4. **Conteúdo** — calendário 14d + hooks virais + reels/stories/carrosséis adaptados por país/idioma.
+5. **Escala** — planos D3/D7/D14, KPIs, orçamento, gatilhos de pause/test/scale. Reaproveita `scale.server.ts` existente para parsing/normalização.
+6. **Operacional** — gera `project_tasks` (checklist), atualiza timeline, produz “Relatório Final” consolidando tudo.
+
+Cada execução escreve um evento em `project_timeline` para a aba histórico/timeline.
+
+### Sistema de Scores
+`computeScores` chama o Analista em modo `scores-only` e grava 5 linhas em `project_scores` (Oferta, Copy, Criativo, Funil, Escala). Cada uma com `value`, `strengths`, `weaknesses`, `fixes`, `next_action`.
+
+## Fase 3 — UX dentro do projeto
+
+Adicionar **uma nova aba** “Automação Agentiva” em `src/routes/_authenticated/projetos.$id.tsx` (entre “escala” e “exportar”) — abas existentes intactas.
+
+Componente novo `src/components/agents/AgentDeck.tsx` com 7 cards:
+- Minerar Mercado · Analisar Oferta · Criar Campanha · Criar Conteúdo · Plano de Escala · Criar Tarefas · Relatório Final
+
+Cada card (`AgentCard.tsx`):
+- ícone + título + descrição curta
+- badge de status (`pendente`/`processando`/`concluído`/`erro`) ligado ao último `project_outputs` do agente
+- botões: **Executar**, **Regenerar**, **Copiar**, **Editar**, **Ver detalhes** (abre Drawer com payload)
+- mostra resumo em 2 linhas do output mais recente
+
+Painéis auxiliares (mesma aba, abaixo do deck):
+- **Scores** — 5 medidores (componente `ScoreRing` reutilizando tokens do design-system) com expand para forte/fraco/corrigir/próxima ação.
+- **Timeline** — feed de `project_timeline`.
+- **Tarefas** — lista editável de `project_tasks` com drag reorder + status.
+
+Header do projeto ganha:
+- botão **Continuar Projeto** (vai para a última aba/etapa registrada em `meta.lastView` — infra já existe via `EscalaTab`, estender para todas as abas).
+- botões **Duplicar** e **Excluir** (server-fns `duplicateProject`/`deleteProject` já existem; expor no header).
+- botão **Abrir Projeto** já é o card na lista `/projetos`.
+
+Lista `/projetos`: cards ganham `Abrir`, `Continuar` (usa `last_opened_at`), `Editar`, `Duplicar`, `Excluir`.
+
+## Fase 4 — Conectores “coming soon”
+
+`src/lib/connectors/registry.ts` declara Apify, Canva, Notion, Stripe, Gmail com `status: "coming_soon"`. UI em `Configurações → Integrações` mostra cada um como card desabilitado com badge “Em breve”. Nenhuma chamada externa nova.
+
+## Identidade visual
+
+Tudo dentro do design system atual (tokens em `src/styles.css`, shadcn/ui, Tabs, Card, Badge). Nenhum hex hardcoded. Cards do AgentDeck usam o mesmo padrão visual das abas Escala/Copy.
+
+## Estrutura técnica (detalhes)
+
+```
+src/
+  lib/
+    agents/
+      minerador.server.ts
+      analista.server.ts
+      campanha.server.ts
+      conteudo.server.ts
+      escala.server.ts        (wrapper sobre scale.server.ts)
+      operacional.server.ts
+      shared.server.ts        (gateway, schemas, recordOutput, pushTimeline)
+    projects/
+      agents.functions.ts
+      tasks.functions.ts
+      timeline.functions.ts
+      scores.functions.ts
+    connectors/registry.ts
+  components/
+    agents/
+      AgentDeck.tsx
+      AgentCard.tsx
+      AgentResultDrawer.tsx
+      ScoreRing.tsx
+      ProjectTimeline.tsx
+      ProjectTasks.tsx
+    project/ProjectHeaderActions.tsx   (Continuar/Duplicar/Excluir)
+  routes/_authenticated/
+    projetos.$id.tsx           (apenas adiciona aba "agentes")
+    projetos.tsx               (apenas adiciona botões nos cards)
+    configuracoes.tsx          (adiciona seção "Integrações coming soon")
+```
+
+## Ordem de implementação
+
+1. Migração SQL aditiva + tipos.
+2. Server fns: tasks/timeline/scores/agents (com o `runAgent` chamando primeiro o Analista como prova de conceito).
+3. UI: aba “Automação Agentiva” + AgentDeck + Scores + Timeline + Tasks.
+4. Header actions (Continuar / Duplicar / Excluir) na rota do projeto e na lista.
+5. Restantes dos agentes (Minerador, Campanha, Conteúdo, Escala-wrapper, Operacional, Relatório Final).
+6. Conectores “coming soon”.
+7. Verificação via build + abrir um projeto real e rodar cada agente.
+
+## Não-objetivos (explícitos)
+- Não alterar Ebook/Playbook/Copy/Página/Checkout/Escala existentes além de **ler** seus dados para os agentes.
+- Não trocar Tabs/Sidebar/tema.
+- Não integrar Apify/Canva/Notion/Stripe/Gmail nesta entrega.
