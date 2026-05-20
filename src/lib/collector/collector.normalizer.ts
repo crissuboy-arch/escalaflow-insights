@@ -1,6 +1,10 @@
 import type { CollectorAd } from "./collector.types";
 import { inferTagsFromText, scaleLevelFromScore, KEYWORD_CATEGORIES } from "../mining/keywords";
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
+
 type Obj = Record<string, unknown>;
 
 function getPath(obj: unknown, path: string): unknown {
@@ -122,17 +126,29 @@ export function normalize(
         "pageName",
       ]) ?? "Anunciante";
 
-    const copy =
-      pickStr(ad, [
-        "snapshot.body.text",
-        "snapshot.body.markup.__html",
-        "snapshot.cards.0.body",
-        "snapshot.link_description",
-        "ad_creative_body",
-        "body",
-        "copy",
-        "text",
-      ]) ?? "";
+    const copyRaw = pickStr(ad, [
+      "snapshot.body.text",
+      "snapshot.body.markup.__html",
+      "snapshot.cards.0.body",
+      "snapshot.cards.0.text",
+      "snapshot.link_description",
+      "snapshot.caption",
+      "snapshot.message",
+      "ad_creative_body",
+      "primaryText",
+      "primary_text",
+      "adText",
+      "ad_text",
+      "body",
+      "copy",
+      "text",
+      "description",
+      "message",
+      "caption",
+      "body_text",
+      "ad_body",
+    ]) ?? "";
+    const copy = copyRaw.includes("<") ? stripHtml(copyRaw) : copyRaw;
 
     const headline =
       pickStr(ad, [
@@ -159,10 +175,25 @@ export function normalize(
     const directImg = pickStr(ad, [
       "snapshot.images.0.original_image_url",
       "snapshot.images.0.resized_image_url",
+      "snapshot.images.0.uri",
+      "snapshot.images.0.resized_image_uri",
       "image_url",
       "imageUrl",
+      "imageUri",
+      "image_uri",
       "snapshot_image",
       "thumbnail",
+      "thumbnailUrl",
+      "thumbnail_url",
+      "snapshotUrl",
+      "snapshot_url",
+      "creativeUrl",
+      "creative_url",
+      "resizedImageUri",
+      "resized_image_uri",
+      "poster",
+      "cover",
+      "background_image",
     ]);
     if (directImg) {
       imageUrl = directImg;
@@ -183,17 +214,27 @@ export function normalize(
     const videoUrl = pickStr(ad, [
       "snapshot.videos.0.video_hd_url",
       "snapshot.videos.0.video_sd_url",
+      "snapshot.videos.0.video_hd_uri",
+      "snapshot.videos.0.video_sd_uri",
       "snapshot.cards.0.video_hd_url",
       "snapshot.cards.0.video_sd_url",
+      "snapshot.cards.0.video_hd_uri",
+      "snapshot.cards.0.video_sd_uri",
       "video_hd_url",
       "video_sd_url",
       "video_url",
       "videoUrl",
+      "videoUri",
+      "video_uri",
+      "video_hd_uri",
+      "video_sd_uri",
     ]);
 
     const videoThumbnail = pickStr(ad, [
       "snapshot.videos.0.video_preview_image_url",
+      "snapshot.videos.0.video_preview_image_uri",
       "snapshot.cards.0.video_preview_image_url",
+      "snapshot.cards.0.video_preview_image_uri",
     ]);
 
     if (!imageUrl && videoThumbnail) {
@@ -329,6 +370,37 @@ export function normalize(
     if (a.copyPattern) tags.push("Padrão de copy");
     if (a.viralStructure) tags.push("Estrutura viral");
     a.tags = Array.from(new Set(tags));
+  }
+
+  // ── Diagnóstico pós-normalização ────────────────────────────────────────────
+  const withMedia = deduped.filter((a) => a.imageUrl || a.videoUrl).length;
+  const withCopy  = deduped.filter((a) => (a.copy?.length ?? 0) > 0).length;
+  const bySource  = {
+    image:     deduped.filter((a) => a.mediaSource === "image").length,
+    cardImage: deduped.filter((a) => a.mediaSource === "card-image").length,
+    videoThumb:deduped.filter((a) => a.mediaSource === "video-thumb").length,
+    deepFind:  deduped.filter((a) => a.mediaSource === "deep-find").length,
+    none:      deduped.filter((a) => a.mediaSource === "none").length,
+  };
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[normalizer] raw=${raw.length} | dedup=${deduped.length}` +
+    ` | mídia=${withMedia} (img:${bySource.image} card:${bySource.cardImage} thumb:${bySource.videoThumb} deepFind:${bySource.deepFind} ❌sem:${bySource.none})` +
+    ` | copy=${withCopy} ❌sem:${deduped.length - withCopy}`
+  );
+
+  if (bySource.none > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[normalizer] ⚠️ REAL: ${bySource.none} ad(s) sem mídia capturada — os campos tentados não existem neste item do Apify. Verifique snapshot no log de amostra acima.`
+    );
+  }
+  if (deduped.length - withCopy > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[normalizer] ⚠️ REAL: ${deduped.length - withCopy} ad(s) sem copy capturada — verifique snapshot.body.text ou outros campos no log de amostra.`
+    );
   }
 
   return deduped;

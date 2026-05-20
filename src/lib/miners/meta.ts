@@ -14,6 +14,8 @@ export interface AdResult {
   adLibraryId?: string;
   platforms?: string[];
   startDate?: string;
+  imageUrl?: string;
+  videoUrl?: string;
 }
 
 // curious_coder/facebook-ads-library-scraper - Apify actor
@@ -32,10 +34,22 @@ function getPath(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let cur: unknown = obj;
   for (const p of parts) {
-    if (cur == null || typeof cur !== "object") return undefined;
-    cur = (cur as Record<string, unknown>)[p];
+    if (cur == null) return undefined;
+    if (Array.isArray(cur)) {
+      const idx = Number(p);
+      if (Number.isNaN(idx)) return undefined;
+      cur = cur[idx];
+    } else if (typeof cur === "object") {
+      cur = (cur as Record<string, unknown>)[p];
+    } else {
+      return undefined;
+    }
   }
   return cur;
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function getPlatforms(obj: Record<string, unknown>): string[] {
@@ -58,37 +72,122 @@ export async function mineMetaAds(query: string, country: string, language: stri
     scrapeAdvertiserPage: false,
   });
 
-  return raw.map((item) => {
+  const results = raw.map((item) => {
+    const advertiser =
+      pickStr(item, ["page_name", "snapshot.page_name", "advertiser.page.page_name", "advertiser_name", "pageName"]) ??
+      "Anunciante";
+
+    const headline =
+      pickStr(item, ["snapshot.title", "snapshot.cards.0.title", "snapshot.link_description", "ad_creative_link_title", "headline", "title"]) ??
+      advertiser;
+
+    const copyRaw =
+      pickStr(item, [
+        "snapshot.body.text",
+        "snapshot.body.markup.__html",
+        "snapshot.cards.0.body",
+        "snapshot.cards.0.text",
+        "snapshot.link_description",
+        "snapshot.caption",
+        "snapshot.message",
+        "ad_creative_body",
+        "primaryText",
+        "primary_text",
+        "adText",
+        "body",
+        "copy",
+        "text",
+        "description",
+        "message",
+        "caption",
+      ]) ?? "";
+    const copy = copyRaw.includes("<") ? stripHtml(copyRaw) : copyRaw;
+
+    const cta =
+      pickStr(item, ["snapshot.cta_text", "snapshot.cards.0.cta_text", "cta_type", "cta", "call_to_action"]) ?? "";
+
+    const adLibraryId = pickStr(item, ["ad_archive_id", "adArchiveId", "snapshot.ad_archive_id", "id"]);
+    const landingPage = pickStr(item, ["snapshot.link_url", "snapshot.cards.0.link_url", "link_url", "landing_page_url"]) ?? "";
+
+    // Image — priority cascade
+    const imageUrl =
+      pickStr(item, [
+        "snapshot.images.0.original_image_url",
+        "snapshot.images.0.resized_image_url",
+        "snapshot.images.0.uri",
+        "snapshot.images.0.resized_image_uri",
+        "snapshot.cards.0.original_image_url",
+        "snapshot.cards.0.resized_image_url",
+        "snapshot.videos.0.video_preview_image_url",
+        "snapshot.cards.0.video_preview_image_url",
+        "image_url",
+        "imageUrl",
+        "imageUri",
+        "thumbnail",
+        "thumbnailUrl",
+        "thumbnail_url",
+        "snapshotUrl",
+        "snapshot_url",
+        "creativeUrl",
+        "creative_url",
+        "poster",
+        "cover",
+      ]) ?? "";
+
+    const videoUrl =
+      pickStr(item, [
+        "snapshot.videos.0.video_hd_url",
+        "snapshot.videos.0.video_sd_url",
+        "snapshot.videos.0.video_hd_uri",
+        "snapshot.videos.0.video_sd_uri",
+        "snapshot.cards.0.video_hd_url",
+        "snapshot.cards.0.video_sd_url",
+        "video_hd_url",
+        "video_sd_url",
+        "video_url",
+        "videoUrl",
+        "videoUri",
+      ]);
+
     const snapshot = (getPath(item, "snapshot") ?? {}) as Record<string, unknown>;
-    const advertiser = pickStr(item, ["page_name", "snapshot.page_name", "advertiser.page.page_name"]) ?? "Anunciante";
-    const headline = pickStr(snapshot, ["title", "link_description"]) ?? pickStr(item, ["page_name"]) ?? advertiser;
-    const copy = pickStr(snapshot, ["body.text", "body.markup.__html"]) ?? "";
-    const cta = pickStr(snapshot, ["cta_text", "cta_type"]) ?? "";
-    const adLibraryId = pickStr(item, ["ad_archive_id", "id"]);
-    const landingPage = pickStr(snapshot, ["link_url"]) ?? "";
-    const images: unknown = getPath(snapshot, "images") ?? [];
-    const videos: unknown = getPath(snapshot, "videos") ?? [];
-    const creativeUrl = pickStr(item, ["snapshot.videos.0.video_preview_image_url"]) ?? pickStr(item, ["snapshot.images.0.original_image_url"]) ?? "";
-    const creativeType = getPath(snapshot, "display_format") === "VIDEO" ? "video" as const : "image" as const;
-    const videoUrl = pickStr(item, ["snapshot.videos.0.video_hd_url", "snapshot.videos.0.video_sd_url"]);
+    const displayFormat = getPath(snapshot, "display_format");
+    const isVideo = displayFormat === "VIDEO" || !!videoUrl;
+
     const platforms = getPlatforms(item);
-    const startEpoch = getPath(item, "start_date");
+    const startEpoch = getPath(item, "start_date") ?? getPath(item, "snapshot.creation_time");
     const startDate = typeof startEpoch === "number" ? new Date(startEpoch * 1000).toISOString() : undefined;
+
+    const creativeUrl = videoUrl ?? imageUrl;
 
     return {
       advertiser: advertiser.slice(0, 120),
       headline: headline.slice(0, 240),
       copy,
-      cta: cta ?? "",
+      cta,
       landingPage,
-      creativeUrl: videoUrl ?? creativeUrl,
-      creativeType: creativeType === "video" || videoUrl ? "video" : "image",
+      creativeUrl,
+      creativeType: (isVideo ? "video" : "image") as "video" | "image",
       engagement: getEngagement(item),
       country,
       language,
       adLibraryId,
       platforms,
       startDate,
+      imageUrl: imageUrl || undefined,
+      videoUrl: videoUrl || undefined,
     };
   });
+
+  const withMedia = results.filter((r) => r.creativeUrl).length;
+  const withCopy  = results.filter((r) => r.copy.length > 0).length;
+  console.log(
+    `[meta] actor=${ACTOR_ID} | raw=${raw.length} ads` +
+    ` | com_mídia=${withMedia} ❌sem:${raw.length - withMedia}` +
+    ` | com_copy=${withCopy} ❌sem:${raw.length - withCopy}`
+  );
+  if (results.every((r) => r.engagement.likes === 0 && r.engagement.shares === 0)) {
+    console.warn("[meta] ⚠️ MOCK: engagement={likes:0,shares:0,comments:0} — Meta Ad Library não expõe métricas reais via scraper");
+  }
+
+  return results;
 }

@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { mineMetaAds } from "../miners/meta";
-import type { AdResult } from "../miners/meta";
-import { mineTikTok } from "../miners/tiktok";
-import type { TikTokResult } from "../miners/tiktok";
-import { mineInstagram } from "../miners/instagram";
-import type { InstagramResult } from "../miners/instagram";
-import { getGoogleTrends } from "../trends/google";
-import type { TrendResult } from "../trends/google";
+import { mineMetaAds } from "./miners/meta";
+import type { AdResult } from "./miners/meta";
+import { mineTikTok } from "./miners/tiktok";
+import type { TikTokResult } from "./miners/tiktok";
+import { mineInstagram } from "./miners/instagram";
+import type { InstagramResult } from "./miners/instagram";
+import { getGoogleTrends } from "./trends/google";
+import type { TrendResult } from "./trends/google";
 import { calculateCompositeScore } from "./scoring/engine";
 
 function offerRowFromAd(ad: AdResult) {
@@ -23,6 +23,11 @@ function offerRowFromAd(ad: AdResult) {
     engagement: ad.engagement,
     landing_page: ad.landingPage,
     language: ad.language,
+    // campos de mídia preservados no Supabase
+    image_url: ad.imageUrl ?? (ad.creativeType === "image" ? ad.creativeUrl : null) ?? null,
+    video_url: ad.videoUrl ?? (ad.creativeType === "video" ? ad.creativeUrl : null) ?? null,
+    ad_library_id: ad.adLibraryId ?? null,
+    source: "miner",
   };
 }
 
@@ -78,7 +83,14 @@ export const performMining = createServerFn({ method: "POST" })
 
       if (data.type === "meta") {
         const results = await mineMetaAds(data.query, data.country, data.language);
-        console.log(`[mining] meta mined ${results.length} ads, persisting to Supabase...`);
+        const metaWithMedia = results.filter((r) => r.creativeUrl).length;
+        const metaWithCopy  = results.filter((r) => r.copy.length > 0).length;
+        console.log(
+          `[mining] meta mined ${results.length} ads` +
+          ` | com_mídia=${metaWithMedia} ❌sem:${results.length - metaWithMedia}` +
+          ` | com_copy=${metaWithCopy} ❌sem:${results.length - metaWithCopy}` +
+          ` | engagement=ESTIMADO(mock)`
+        );
         if (results.length > 0) {
           const rows = results.map(offerRowFromAd);
           const { error } = await supabase.from("offers").insert(rows);
@@ -90,7 +102,14 @@ export const performMining = createServerFn({ method: "POST" })
 
       if (data.type === "tiktok") {
         const results = await mineTikTok(data.query);
-        console.log(`[mining] tiktok mined ${results.length} videos, persisting to Supabase...`);
+        const tikWithMedia = results.filter((r) => r.videoUrl).length;
+        const tikWithCopy  = results.filter((r) => (r.description ?? "").length > 0).length;
+        console.log(
+          `[mining] tiktok mined ${results.length} videos` +
+          ` | com_mídia=${tikWithMedia} ❌sem:${results.length - tikWithMedia}` +
+          ` | com_copy=${tikWithCopy} ❌sem:${results.length - tikWithCopy}` +
+          ` | engagement=REAL(views/likes/shares)`
+        );
         if (results.length > 0) {
           const rows = results.map(offerRowFromTikTok);
           const { error } = await supabase.from("offers").insert(rows);
@@ -102,7 +121,14 @@ export const performMining = createServerFn({ method: "POST" })
 
       if (data.type === "instagram") {
         const results = await mineInstagram(data.query);
-        console.log(`[mining] instagram mined ${results.length} posts, persisting to Supabase...`);
+        const igWithMedia = results.filter((r) => r.imageUrl || r.videoUrl).length;
+        const igWithCopy  = results.filter((r) => r.caption.length > 0).length;
+        console.log(
+          `[mining] instagram mined ${results.length} posts` +
+          ` | com_mídia=${igWithMedia} ❌sem:${results.length - igWithMedia}` +
+          ` | com_copy=${igWithCopy} ❌sem:${results.length - igWithCopy}` +
+          ` | engagement=REAL(likes/comments)`
+        );
         if (results.length > 0) {
           const rows = results.map(offerRowFromInstagram);
           const { error } = await supabase.from("offers").insert(rows);
