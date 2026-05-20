@@ -1,6 +1,5 @@
 import { z } from "zod";
-
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+import { generateAIResponse, generateAIJson } from "./aiService";
 
 export const PlaybookBriefingSchema = z.object({
   title: z.string(),
@@ -32,98 +31,32 @@ export interface AdInput {
   score?: number;
 }
 
-function getKey() {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY ausente — habilite Lovable Cloud.");
-  return k;
-}
-
-async function aiChat(body: Record<string, unknown>): Promise<unknown> {
-  const res = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${getKey()}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    if (res.status === 429) throw new Error("Limite de IA atingido. Tente novamente em alguns segundos.");
-    if (res.status === 402) throw new Error("Créditos da IA esgotados.");
-    throw new Error(`AI gateway ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  return res.json();
-}
-
 export async function aiExtractPlaybookBriefing(ad: AdInput): Promise<PlaybookBriefing> {
-  const data = (await aiChat({
-    model: "google/gemini-3-flash-preview",
-    messages: [
-      { role: "system", content: "Você destila anúncios em briefings de playbook (passo-a-passo). Responda via ferramenta `briefing` em PT-BR." },
-      { role: "user", content: `Anunciante: ${ad.advertiser ?? "—"}\nHeadline: ${ad.headline ?? "—"}\nCopy: ${ad.copy ?? "—"}\nCTA: ${ad.cta ?? "—"}\nNicho: ${ad.niche ?? "—"} | Plataforma: ${ad.platform ?? "—"}` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "briefing",
-        parameters: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            niche: { type: "string" },
-            promise: { type: "string" },
-            avatar: { type: "string" },
-            uniqueMechanism: { type: "string" },
-            pains: { type: "array", items: { type: "string" } },
-            desires: { type: "array", items: { type: "string" } },
-          },
-          required: ["title", "niche", "promise", "avatar", "uniqueMechanism", "pains", "desires"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "briefing" } },
-  })) as any;
-  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-  return PlaybookBriefingSchema.parse(JSON.parse(args));
+  const systemPrompt =
+    "Você destila anúncios em briefings de playbook (passo-a-passo). Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Anunciante: ${ad.advertiser ?? "—"}
+Headline: ${ad.headline ?? "—"}
+Copy: ${ad.copy ?? "—"}
+CTA: ${ad.cta ?? "—"}
+Nicho: ${ad.niche ?? "—"} | Plataforma: ${ad.platform ?? "—"}
+
+Retorne JSON com os campos: title, niche, promise, avatar, uniqueMechanism, pains (array), desires (array).`;
+
+  const raw = await generateAIJson<PlaybookBriefing>(userPrompt, { systemPrompt });
+  return PlaybookBriefingSchema.parse(raw);
 }
 
 export async function aiGenerateSceneOutline(briefing: PlaybookBriefing, sceneCount: number): Promise<SceneOutline[]> {
-  const data = (await aiChat({
-    model: "google/gemini-3-flash-preview",
-    messages: [
-      { role: "system", content: "Você cria roteiros de playbook em cenas didáticas, divertidas e acionáveis. Responda via ferramenta `outline`." },
-      { role: "user", content: `Briefing: ${JSON.stringify(briefing)}\n\nCrie EXATAMENTE ${sceneCount} cenas com progressão lógica do problema à solução. Cada cena: title curto + summary (1-2 linhas) + exercise (pergunta reflexiva) + practicalAction (tarefa concreta).` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "outline",
-        parameters: {
-          type: "object",
-          properties: {
-            scenes: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  summary: { type: "string" },
-                  exercise: { type: "string" },
-                  practicalAction: { type: "string" },
-                },
-                required: ["title", "summary", "exercise", "practicalAction"],
-                additionalProperties: false,
-              },
-            },
-          },
-          required: ["scenes"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "outline" } },
-  })) as any;
-  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-  return z.array(SceneOutlineSchema).parse(JSON.parse(args).scenes);
+  const systemPrompt =
+    "Você cria roteiros de playbook em cenas didáticas, divertidas e acionáveis. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Briefing: ${JSON.stringify(briefing)}
+
+Crie EXATAMENTE ${sceneCount} cenas com progressão lógica do problema à solução.
+Cada cena deve ter: title (curto), summary (1-2 linhas), exercise (pergunta reflexiva), practicalAction (tarefa concreta).
+Retorne JSON com formato: { "scenes": [ { "title": "...", "summary": "...", "exercise": "...", "practicalAction": "..." } ] }`;
+
+  const raw = await generateAIJson<{ scenes: SceneOutline[] }>(userPrompt, { systemPrompt });
+  return z.array(SceneOutlineSchema).parse(raw.scenes ?? []);
 }
 
 export const SceneContentSchema = z.object({
@@ -138,31 +71,19 @@ export async function aiGenerateSceneContent(
   index: number,
   total: number,
 ): Promise<SceneContent> {
-  const data = (await aiChat({
-    model: "google/gemini-3-flash-preview",
-    messages: [
-      { role: "system", content: "Você escreve conteúdo de playbook em PT-BR, tom premium e divertido. 180-280 palavras por cena. Sempre via ferramenta `scene`." },
-      { role: "user", content: `Briefing: ${JSON.stringify(briefing)}\nCena ${index + 1}/${total}: ${scene.title}\nResumo: ${scene.summary}\nExercício: ${scene.exercise}\nAção prática: ${scene.practicalAction}` },
-    ],
-    tools: [{
-      type: "function",
-      function: {
-        name: "scene",
-        parameters: {
-          type: "object",
-          properties: {
-            text: { type: "string" },
-            balloons: { type: "array", items: { type: "string" }, maxItems: 4 },
-          },
-          required: ["text", "balloons"],
-          additionalProperties: false,
-        },
-      },
-    }],
-    tool_choice: { type: "function", function: { name: "scene" } },
-  })) as any;
-  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-  return SceneContentSchema.parse(JSON.parse(args));
+  const systemPrompt =
+    "Você escreve conteúdo de playbook em PT-BR, tom premium e divertido. 180-280 palavras por cena. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Briefing: ${JSON.stringify(briefing)}
+Cena ${index + 1}/${total}: ${scene.title}
+Resumo: ${scene.summary}
+Exercício: ${scene.exercise}
+Ação prática: ${scene.practicalAction}
+
+Retorne JSON com formato: { "text": "conteúdo da cena...", "balloons": ["frase curta 1", "frase curta 2"] }
+O campo balloons deve ter no máximo 4 frases curtas de destaque.`;
+
+  const raw = await generateAIJson<SceneContent>(userPrompt, { systemPrompt });
+  return SceneContentSchema.parse(raw);
 }
 
 export async function aiGenerateSceneImage(
@@ -176,28 +97,25 @@ export async function aiGenerateSceneImage(
     "minimal-dark": "minimalista geométrico, fundo escuro, formas abstratas, paleta monocromática",
   };
   const prompt = `Banner horizontal 16:9 para playbook. Cena "${scene.title}". Tema: ${briefing.niche}. ${styleByTheme[theme] ?? styleByTheme["neon-roxo"]}. Conceito visual ilustrativo, sem texto na imagem.`;
-  const data = (await aiChat({
-    model: "google/gemini-3.1-flash-image-preview",
-    messages: [{ role: "user", content: prompt }],
-    modalities: ["image", "text"],
-  })) as any;
-  const url: string | undefined =
-    data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
-    data?.choices?.[0]?.message?.images?.[0]?.url;
-  if (!url) throw new Error("Modelo não retornou imagem.");
-  return url;
+  // Image generation is not supported by the current AI service; return empty string as placeholder.
+  console.warn("[playbook] aiGenerateSceneImage: image generation not supported, returning placeholder");
+  void prompt;
+  return "";
 }
 
 export async function aiGenerateVideoScript(briefing: PlaybookBriefing, scenes: { title: string; text: string }[]): Promise<string> {
-  const data = (await aiChat({
-    model: "google/gemini-3-flash-preview",
-    messages: [
-      { role: "system", content: "Você converte playbooks em roteiros de vídeo (YouTube/Reels). Saída em Markdown com cabeçalhos por cena, narração e sugestões de cortes." },
-      { role: "user", content: `Título: ${briefing.title}\nNicho: ${briefing.niche}\nAvatar: ${briefing.avatar}\nPromessa: ${briefing.promise}\n\nCenas:\n${scenes.map((s, i) => `### Cena ${i + 1}: ${s.title}\n${s.text}`).join("\n\n")}` },
-    ],
-  })) as any;
-  const text = data?.choices?.[0]?.message?.content ?? "";
-  if (typeof text !== "string" || !text.trim()) throw new Error("Roteiro vazio");
+  const systemPrompt =
+    "Você converte playbooks em roteiros de vídeo (YouTube/Reels). Saída em Markdown com cabeçalhos por cena, narração e sugestões de cortes.";
+  const userPrompt = `Título: ${briefing.title}
+Nicho: ${briefing.niche}
+Avatar: ${briefing.avatar}
+Promessa: ${briefing.promise}
+
+Cenas:
+${scenes.map((s, i) => `### Cena ${i + 1}: ${s.title}\n${s.text}`).join("\n\n")}`;
+
+  const text = await generateAIResponse(userPrompt, { systemPrompt });
+  if (!text.trim()) throw new Error("Roteiro vazio");
   return text;
 }
 
@@ -229,59 +147,32 @@ export type PlaybookStrategy = z.infer<typeof PlaybookStrategySchema>;
 export async function aiGeneratePlaybookStrategy(
   briefing: PlaybookBriefing,
 ): Promise<PlaybookStrategy> {
-  const data = (await aiChat({
-    model: "google/gemini-3-flash-preview",
-    messages: [
-      {
-        role: "system",
-        content:
-          "Você é estrategista sênior de marketing direto. Gera estratégias completas de lançamento em PT-BR. Devolva via ferramenta `strategy`.",
-      },
-      {
-        role: "user",
-        content: `Briefing do produto:\n${JSON.stringify(briefing, null, 2)}\n\nGere a estratégia completa: bigIdea, promise (refinada), uniqueMechanism (refinado), avatar (descrição rica), pains (5), desires (5), objections (5), mentalTriggers (6, ex: escassez, prova, autoridade…), headlines (8 variações fortes), vslStructure (markdown com blocos numerados Hook→Problema→Mecanismo→Prova→Oferta→CTA), pageStructure (markdown com 10 dobras), funnel (descreva funil completo: tráfego, captura, VSL, oferta, OB, upsell, downsell), offer (oferta principal completa), bonuses (4 bônus), stack (stack de valor empilhado), cta (CTA principal), scripts (3 scripts curtos: Reels, WhatsApp, e-mail), angles (5 ângulos criativos), scale (plano de escala em 30/60/90 dias).`,
-      },
-    ],
-    tools: [
-      {
-        type: "function",
-        function: {
-          name: "strategy",
-          parameters: {
-            type: "object",
-            properties: {
-              bigIdea: { type: "string" },
-              promise: { type: "string" },
-              uniqueMechanism: { type: "string" },
-              avatar: { type: "string" },
-              pains: { type: "array", items: { type: "string" } },
-              desires: { type: "array", items: { type: "string" } },
-              objections: { type: "array", items: { type: "string" } },
-              mentalTriggers: { type: "array", items: { type: "string" } },
-              headlines: { type: "array", items: { type: "string" } },
-              vslStructure: { type: "string" },
-              pageStructure: { type: "string" },
-              funnel: { type: "string" },
-              offer: { type: "string" },
-              bonuses: { type: "array", items: { type: "string" } },
-              stack: { type: "string" },
-              cta: { type: "string" },
-              scripts: { type: "array", items: { type: "string" } },
-              angles: { type: "array", items: { type: "string" } },
-              scale: { type: "string" },
-            },
-            required: [
-              "bigIdea","promise","uniqueMechanism","avatar","pains","desires","objections",
-              "mentalTriggers","headlines","vslStructure","pageStructure","funnel","offer",
-              "bonuses","stack","cta","scripts","angles","scale",
-            ],
-            additionalProperties: false,
-          },
-        },
-      },
-    ],
-    tool_choice: { type: "function", function: { name: "strategy" } },
-  })) as any;
-  const args = data?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments ?? "{}";
-  return PlaybookStrategySchema.parse(JSON.parse(args));
+  const systemPrompt =
+    "Você é estrategista sênior de marketing direto. Gera estratégias completas de lançamento em PT-BR. Responda SOMENTE com JSON válido sem texto extra.";
+  const userPrompt = `Briefing do produto:
+${JSON.stringify(briefing, null, 2)}
+
+Gere a estratégia completa com os seguintes campos JSON:
+- bigIdea: string
+- promise: string (refinada)
+- uniqueMechanism: string (refinado)
+- avatar: string (descrição rica)
+- pains: string[] (5 itens)
+- desires: string[] (5 itens)
+- objections: string[] (5 itens)
+- mentalTriggers: string[] (6 itens, ex: escassez, prova, autoridade…)
+- headlines: string[] (8 variações fortes)
+- vslStructure: string (markdown com blocos numerados Hook→Problema→Mecanismo→Prova→Oferta→CTA)
+- pageStructure: string (markdown com 10 dobras)
+- funnel: string (funil completo: tráfego, captura, VSL, oferta, OB, upsell, downsell)
+- offer: string (oferta principal completa)
+- bonuses: string[] (4 bônus)
+- stack: string (stack de valor empilhado)
+- cta: string (CTA principal)
+- scripts: string[] (3 scripts: Reels, WhatsApp, e-mail)
+- angles: string[] (5 ângulos criativos)
+- scale: string (plano de escala em 30/60/90 dias)`;
+
+  const raw = await generateAIJson<PlaybookStrategy>(userPrompt, { systemPrompt, maxTokens: 8192 });
+  return PlaybookStrategySchema.parse(raw);
 }
