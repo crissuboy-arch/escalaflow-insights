@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { z } from "zod";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
@@ -55,21 +56,73 @@ type CollectedAd = {
   copyPattern?: boolean;
 };
 
-export const Route = createFileRoute("/_authenticated/minerar")({ component: MinePage });
+const mineSearch = z.object({
+  keyword: z.string().optional().catch(undefined),
+  niche: z.string().optional().catch(undefined),
+  country: z.string().optional().catch(undefined),
+  platform: z.string().optional().catch(undefined),
+  scale: z.string().optional().catch(undefined),
+  page: z.coerce.number().optional().catch(undefined),
+});
+
+export const Route = createFileRoute("/_authenticated/minerar")({
+  validateSearch: mineSearch,
+  component: MinePage,
+});
+
+function AdMedia({ imageUrl, videoUrl, headline }: { imageUrl: string | null; videoUrl: string | null; headline: string }) {
+  const [imgError, setImgError] = useState(false);
+  if (videoUrl) {
+    return <video src={videoUrl} className="h-full w-full object-cover" muted loop playsInline controls />;
+  }
+  if (imageUrl && !imgError) {
+    return (
+      <img
+        src={imageUrl}
+        alt={headline}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+      <ImageIcon className="h-8 w-8 opacity-40" />
+      <span className="text-sm font-medium">sem mídia capturada</span>
+    </div>
+  );
+}
 
 function MinePage() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const createFromOffer = useServerFn(createProjectFromOffer);
   const [modeling, setModeling] = useState<string | null>(null);
-  const [keyword, setKeyword] = useState("");
-  const [niche, setNiche] = useState("all");
-  const [country, setCountry] = useState("all");
-  const [platform, setPlatform] = useState("all");
+
+  // Filter state persisted in URL so navigating back restores it
+  const keyword = search.keyword ?? "";
+  const niche = search.niche ?? "all";
+  const country = search.country ?? "all";
+  const platform = search.platform ?? "all";
+  const scaleFilter = (search.scale ?? "all") as "all" | "cold" | "warming" | "hot" | "scaled";
+  const page = search.page ?? 0;
+
+  const updateSearch = (updates: Partial<z.infer<typeof mineSearch>>) =>
+    navigate({ to: "/minerar", search: { ...search, ...updates }, replace: true });
+
+  const setKeyword = (k: string) => updateSearch({ keyword: k, page: 0 });
+  const setNiche = (n: string) => updateSearch({ niche: n, page: 0 });
+  const setCountry = (c: string) => updateSearch({ country: c, page: 0 });
+  const setPlatform = (p: string) => updateSearch({ platform: p, page: 0 });
+  const setScaleFilter = (s: string) => updateSearch({ scale: s, page: 0 });
+  const setPage = (fn: ((p: number) => number) | number) =>
+    updateSearch({ page: typeof fn === "function" ? fn(page) : fn });
+
   const [quantity, setQuantity] = useState(20);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
-  const [scaleFilter, setScaleFilter] = useState<"all" | "cold" | "warming" | "hot" | "scaled">("all");
   const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
@@ -85,7 +138,6 @@ function MinePage() {
   const [collected, setCollected] = useState<CollectedAd[]>([]);
   const [latestRunAds, setLatestRunAds] = useState<CollectedAd[]>([]);
   const [collectedLoading, setCollectedLoading] = useState(true);
-  const [page, setPage] = useState(0);
   const PAGE_SIZE = 12;
   const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
 
@@ -123,7 +175,7 @@ function MinePage() {
       if (n.has(t)) n.delete(t); else n.add(t);
       return n;
     });
-    setPage(0);
+    updateSearch({ page: 0 });
   };
 
   const fetchCollected = async () => {
@@ -240,25 +292,40 @@ function MinePage() {
 
   const onSaveCollected = async (ad: CollectedAd) => {
     const persisted = toPersisted(ad);
-    const isSaved = await saveCollectedAd(persisted);
-    setSavedIds((s) => {
-      const n = new Set(s);
-      isSaved ? n.add(persisted.key) : n.delete(persisted.key);
-      return n;
-    });
-    toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
+    try {
+      const isSaved = await saveCollectedAd(persisted);
+      setSavedIds((s) => {
+        const n = new Set(s);
+        isSaved ? n.add(persisted.key) : n.delete(persisted.key);
+        return n;
+      });
+      toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar anúncio");
+    }
   };
 
   const onFavoriteCollected = async (ad: CollectedAd) => {
     const persisted = toPersisted(ad);
     const next = !favIds.has(persisted.key);
-    await favoriteCollectedAd(persisted, next);
+    // Optimistic update
     setFavIds((s) => {
       const n = new Set(s);
       next ? n.add(persisted.key) : n.delete(persisted.key);
       return n;
     });
-    toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
+    try {
+      await favoriteCollectedAd(persisted, next);
+      toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
+    } catch (e) {
+      // Revert optimistic update
+      setFavIds((s) => {
+        const n = new Set(s);
+        next ? n.delete(persisted.key) : n.add(persisted.key);
+        return n;
+      });
+      toast.error(e instanceof Error ? e.message : "Erro ao favoritar anúncio");
+    }
   };
 
   const onCategoryClick = (id: CategoryId) => {
@@ -359,7 +426,7 @@ function MinePage() {
       setCollectorFound(optimistic.length || ingested.length);
       toast.success(`Mineração concluída: ${optimistic.length || ingested.length} anúncios`);
       await fetchCollected();
-      setPage(0);
+      updateSearch({ page: 0 });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha na mineração");
     } finally {
@@ -523,7 +590,7 @@ function MinePage() {
           </div>
           <div className="md:col-span-2">
             <Label>Nível de escala</Label>
-            <Select value={scaleFilter} onValueChange={(v) => { setScaleFilter(v as typeof scaleFilter); setPage(0); }}>
+            <Select value={scaleFilter} onValueChange={(v) => setScaleFilter(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
@@ -556,7 +623,7 @@ function MinePage() {
                 })}
                 {tagFilters.size > 0 && (
                   <button
-                    onClick={() => { setTagFilters(new Set()); setPage(0); }}
+                    onClick={() => { setTagFilters(new Set()); updateSearch({ page: 0 }); }}
                     className="rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
                   >
                     limpar
@@ -643,7 +710,7 @@ function MinePage() {
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <Radar className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Nenhum anúncio com os filtros atuais.</p>
-              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); }}>
+              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); updateSearch({ scale: "all", page: 0 }); }}>
                 Limpar filtros
               </Button>
             </div>
@@ -652,7 +719,6 @@ function MinePage() {
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
                   const key = a.ad_library_id || a.ad_url || a.id;
-                  const hasMedia = Boolean(a.video_url || a.image_url);
                   const scaleStyles: Record<NonNullable<CollectedAd["scale_level"]>, { label: string; cls: string; gradient?: boolean }> = {
                     cold:    { label: "Cold",    cls: "bg-muted text-muted-foreground" },
                     warming: { label: "Warming", cls: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
@@ -669,16 +735,7 @@ function MinePage() {
                     className="group flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
                   >
                     <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                      {a.video_url ? (
-                        <video src={a.video_url} className="h-full w-full object-cover" muted loop playsInline controls />
-                      ) : a.image_url ? (
-                        <img src={a.image_url} alt={a.headline} className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                          <ImageIcon className="h-8 w-8 opacity-40" />
-                          <span className="text-sm font-medium">sem mídia capturada</span>
-                        </div>
-                      )}
+                      <AdMedia imageUrl={a.image_url} videoUrl={a.video_url} headline={a.headline} />
                       <div className="absolute left-2 top-2 flex gap-1">
                         <UIBadge className="rounded-full bg-background/80 text-foreground backdrop-blur">
                           <FlameIcon className="mr-1 h-3 w-3 text-primary" />{a.score}
@@ -689,12 +746,7 @@ function MinePage() {
                           {a.platform}
                         </UIBadge>
                       </div>
-                      {!hasMedia && (
-                        <div className="absolute bottom-2 left-2 rounded-full bg-background/80 px-2 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-                          sem mídia capturada
-                        </div>
-                      )}
-                      {/* badge de mídia técnico removido */}
+                      {/* badge de mídia removido — AdMedia exibe fallback automaticamente */}
                     </div>
                     <div className="flex flex-1 flex-col gap-3 p-4">
                       <div>

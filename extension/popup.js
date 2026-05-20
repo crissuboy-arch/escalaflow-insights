@@ -2,15 +2,34 @@ const DEFAULT_ENDPOINT = "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3
 
 const $ = (id) => document.getElementById(id);
 
+function setStatus(msg, state = "idle") {
+  $("status-text").textContent = msg;
+  const dot = $("status-dot");
+  dot.className = "dot" + (state === "active" ? " active" : state === "error" ? " error" : "");
+}
+
+// Load saved endpoint
 chrome.storage.local.get(["endpoint"], ({ endpoint }) => {
   $("endpoint").value = endpoint || DEFAULT_ENDPOINT;
+  checkConnection(endpoint || DEFAULT_ENDPOINT);
 });
+
+// Check if EscalaFlow app is reachable
+function checkConnection(endpoint) {
+  setStatus("Verificando conexão…");
+  const url = endpoint.replace(/\/$/, "");
+  fetch(url, { method: "HEAD", mode: "no-cors" })
+    .then(() => setStatus("Conectado ao EscalaFlow", "active"))
+    .catch(() => setStatus("App offline ou URL incorreta", "error"));
+}
 
 $("save").addEventListener("click", () => {
   const endpoint = $("endpoint").value.trim().replace(/\/$/, "");
   chrome.storage.local.set({ endpoint }, () => {
+    const orig = $("save").textContent;
     $("save").textContent = "Salvo ✓";
-    setTimeout(() => ($("save").textContent = "Salvar URL"), 1200);
+    checkConnection(endpoint);
+    setTimeout(() => ($("save").textContent = orig), 1400);
   });
 });
 
@@ -20,74 +39,27 @@ $("capture").addEventListener("click", async () => {
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !/facebook\.com\/ads\/library/.test(tab.url || "")) {
-    alert("Abra a Facebook Ads Library em uma aba ativa.");
+    alert("Abra a Facebook Ads Library em uma aba ativa.\nhttps://www.facebook.com/ads/library/");
     return;
   }
 
-  const [{ result } = {}] = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: scrapeAd,
-  });
-
-  if (!result || !result.headline) {
-    alert("Não foi possível capturar o anúncio. Abra um card de anúncio específico.");
-    return;
+  // Inject content script if not already running, then trigger capture
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        // Trigger the floating IA PRO button click
+        const floatBtn = document.getElementById("escala-float");
+        if (floatBtn) {
+          floatBtn.click();
+        } else {
+          alert("EscalaFlow: recarregue a página da Ads Library e tente novamente.");
+        }
+      },
+    });
+  } catch (e) {
+    alert("Erro ao injetar script: " + e.message);
   }
 
-  const url = buildImportUrl(endpoint, { ...result, link: result.link || tab.url });
-  await chrome.tabs.create({ url });
   window.close();
 });
-
-function buildImportUrl(endpoint, data) {
-  const u = new URL(endpoint + "/importar-anuncio");
-  const set = (k, v) => v != null && v !== "" && u.searchParams.set(k, String(v));
-  set("headline", data.headline);
-  set("copy", data.copy);
-  set("link", data.link);
-  set("platform", data.platform || "Facebook");
-  set("country", data.country || "BR");
-  set("niche", data.niche || "Geral");
-  set("score", data.score ?? 75);
-  set("analysisType", data.analysisType || "manual");
-  set("creativeUrl", data.creativeUrl);
-  set("createdAt", data.createdAt || new Date().toISOString());
-  return u.toString();
-}
-
-// Executed inside the Facebook tab context.
-function scrapeAd() {
-  const text = (sel) => {
-    const el = document.querySelector(sel);
-    return el ? el.textContent.trim() : "";
-  };
-  const allText = (sel) =>
-    Array.from(document.querySelectorAll(sel))
-      .map((e) => e.textContent.trim())
-      .filter(Boolean);
-
-  const headline =
-    text('div[role="article"] strong') ||
-    text('div[role="main"] h2') ||
-    document.title.replace(/ \| Facebook.*/, "").slice(0, 140);
-
-  const copyCandidates = allText('div[role="article"] div[dir="auto"]');
-  const copy = copyCandidates.sort((a, b) => b.length - a.length)[0] || "";
-
-  const img = document.querySelector('div[role="article"] img');
-  const video = document.querySelector('div[role="article"] video');
-  const creativeUrl = (video && video.poster) || (img && img.src) || "";
-
-  return {
-    headline: headline.slice(0, 200),
-    copy: copy.slice(0, 1000),
-    link: location.href,
-    platform: "Facebook",
-    country: "BR",
-    niche: "Geral",
-    score: 80,
-    analysisType: "manual",
-    creativeUrl,
-    createdAt: new Date().toISOString(),
-  };
-}

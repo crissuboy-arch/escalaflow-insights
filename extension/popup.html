@@ -2,32 +2,141 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <title>EscalaFlow Miner</title>
+  <title>EscalaFlow IA PRO</title>
   <style>
-    :root { color-scheme: light dark; }
-    body { font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; width: 320px; margin: 0; padding: 16px; background: #0b0f1a; color: #e6edf7; }
-    h1 { font-size: 15px; margin: 0 0 4px; letter-spacing: -0.01em; }
-    p  { font-size: 12px; margin: 0 0 12px; color: #9aa6bd; }
-    label { display:block; font-size: 11px; color:#9aa6bd; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
-    input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #1f2a44; background: #0f1626; color: #e6edf7; font-size: 13px; box-sizing: border-box; }
-    button { width: 100%; margin-top: 12px; padding: 10px; border-radius: 8px; border: 0; background: linear-gradient(135deg,#3b82f6,#8b5cf6); color: white; font-weight: 600; font-size: 13px; cursor: pointer; }
-    button.secondary { background: #1f2a44; }
-    .row { display:flex; gap:8px; }
-    .row > * { flex:1; }
-    small { display:block; margin-top:10px; color:#6b7794; font-size: 11px; line-height: 1.4; }
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+      width: 340px; background: #0b0f1a; color: #e6edf7;
+      padding: 0; overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.1));
+      border-bottom: 1px solid rgba(168,85,247,.2);
+      padding: 14px 16px 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6, #a855f7);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .logo-text { flex: 1; }
+    .logo-text h1 { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+    .logo-text p { font-size: 11px; color: #7c8db8; margin-top: 1px; }
+    .badge {
+      font-size: 9px; font-weight: 800; letter-spacing: .06em;
+      text-transform: uppercase; padding: 3px 7px; border-radius: 999px;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      color: #fff;
+    }
+    .status-bar {
+      padding: 8px 16px;
+      font-size: 11px;
+      display: flex; align-items: center; gap: 6px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #6b7794; flex-shrink: 0; }
+    .dot.active { background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.5); }
+    .dot.error  { background: #ef4444; }
+    #status-text { color: #7c8db8; }
+    .body { padding: 14px 16px; }
+    label {
+      display: block; font-size: 10px; color: #7c8db8;
+      margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .05em;
+    }
+    label:first-child { margin-top: 0; }
+    input {
+      width: 100%; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid #1f2a44; background: #0f1626;
+      color: #e6edf7; font-size: 12px; outline: none;
+      transition: border-color .15s;
+    }
+    input:focus { border-color: rgba(124,58,237,.6); }
+    .btn-row { display: flex; gap: 8px; margin-top: 12px; }
+    button {
+      flex: 1; padding: 9px 12px; border-radius: 8px; border: 0;
+      font: 600 12px inherit; cursor: pointer; transition: opacity .15s, transform .1s;
+    }
+    button:hover { opacity: .9; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .btn-primary {
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      color: #fff;
+    }
+    .btn-secondary { background: #1a2340; color: #9aa6bd; }
+    .modules {
+      margin-top: 14px; border-top: 1px solid rgba(255,255,255,.06);
+      padding-top: 12px;
+    }
+    .modules-title {
+      font-size: 10px; color: #7c8db8; text-transform: uppercase;
+      letter-spacing: .05em; margin-bottom: 8px;
+    }
+    .module-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    }
+    .module-item {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 7px; border-radius: 6px;
+      background: rgba(255,255,255,.03);
+      font-size: 11px; color: #9aa6bd;
+    }
+    .module-item .m-icon { font-size: 13px; }
+    .footer {
+      padding: 8px 16px 12px;
+      font-size: 10px; color: #4a5568; text-align: center;
+      border-top: 1px solid rgba(255,255,255,.04);
+    }
   </style>
 </head>
 <body>
-  <h1>EscalaFlow Miner</h1>
-  <p>Captura anúncios do Facebook Ads Library e envia para a Central.</p>
+  <div class="header">
+    <div class="logo">⚡</div>
+    <div class="logo-text">
+      <h1>EscalaFlow</h1>
+      <p>Engenharia reversa de anúncios</p>
+    </div>
+    <span class="badge">IA PRO</span>
+  </div>
 
-  <label for="endpoint">URL do EscalaFlow</label>
-  <input id="endpoint" type="url" placeholder="https://seu-app.lovable.app" />
+  <div class="status-bar">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">Verificando conexão…</span>
+  </div>
 
-  <button id="capture">Minerar anúncio atual</button>
-  <button id="save" class="secondary">Salvar URL</button>
+  <div class="body">
+    <label for="endpoint">URL do EscalaFlow</label>
+    <input id="endpoint" type="url" placeholder="https://seu-app.lovable.app" />
 
-  <small>Abra um anúncio na Facebook Ads Library e clique em "Minerar".</small>
+    <div class="btn-row">
+      <button class="btn-primary" id="capture">⚡ Minerar anúncio</button>
+      <button class="btn-secondary" id="save">Salvar URL</button>
+    </div>
+
+    <div class="modules">
+      <div class="modules-title">Módulos disponíveis na página</div>
+      <div class="module-grid">
+        <div class="module-item"><span class="m-icon">🧠</span> Análise IA</div>
+        <div class="module-item"><span class="m-icon">📦</span> Oferta</div>
+        <div class="module-item"><span class="m-icon">⚙️</span> Mecanismo</div>
+        <div class="module-item"><span class="m-icon">🔥</span> Hooks</div>
+        <div class="module-item"><span class="m-icon">🎨</span> Criativos</div>
+        <div class="module-item"><span class="m-icon">🎯</span> Funil</div>
+        <div class="module-item"><span class="m-icon">🧬</span> Psicologia</div>
+        <div class="module-item"><span class="m-icon">🚀</span> Estratégia</div>
+        <div class="module-item"><span class="m-icon">⭐</span> Salvar Flow</div>
+        <div class="module-item"><span class="m-icon">💬</span> ChatGPT</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Abra a Facebook Ads Library e clique em ⚡ IA PRO em qualquer anúncio
+  </div>
+
+  <script src="popup.js"></script>
 </body>
-<script src="popup.js"></script>
 </html>
