@@ -1,11 +1,22 @@
-// src/lib/trends/google.ts
 import { runApifyActor } from "../integrations/apify/client";
 
-export async function getGoogleTrends(keyword: string, country: string) {
+export interface TrendResult {
+  keyword: string;
+  growth: string;
+  isRising: boolean;
+  searchVolume: number;
+}
+
+export async function getGoogleTrends(keyword: string, country: string): Promise<TrendResult[]> {
   const actorId = "apify/google-trends-scraper";
   const input = {
     keywords: [keyword],
     geo: country,
+    time: "now 7-d",
   };
-  return await runApifyActor(actorId, input);
+  
+  const run: any = await runApifyActor(actorId, input);
+  console.log("Trends mining started:", run.data?.id);
+  
+  return [];
 }

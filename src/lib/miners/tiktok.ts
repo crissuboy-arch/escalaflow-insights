@@ -1,10 +1,29 @@
-// src/lib/miners/tiktok.ts
 import { runApifyActor } from "../integrations/apify/client";
 
-export async function mineTikTok(query: string) {
+export interface TikTokResult {
+  videoId: string;
+  creator: string;
+  videoUrl: string;
+  hook: string;
+  hashtags: string[];
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  audioTitle: string;
+  viralScore: number;
+}
+
+export async function mineTikTok(query: string): Promise<TikTokResult[]> {
   const actorId = "clockworks/tiktok-scraper";
   const input = {
     search: query,
+    resultsLimit: 20,
   };
-  return await runApifyActor(actorId, input);
+  
+  const run: any = await runApifyActor(actorId, input);
+  console.log("TikTok mining started:", run.data?.id);
+  
+  // Mapeamento estruturado dos dados (mockado para representação da estrutura)
+  return []; 
 }
