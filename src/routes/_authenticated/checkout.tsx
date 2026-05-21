@@ -20,7 +20,7 @@ function CheckoutHubPage() {
       icon={ShoppingCart}
       tab="checkout"
       metaKey="checkout"
-      accent="linear-gradient(135deg, #10b981, #06b6d4)"
+      accent="linear-gradient(135deg, #0A6CFF, #3BA3FF)"
       standalone={<StandaloneCheckout />}
     />
   );

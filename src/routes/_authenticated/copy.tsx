@@ -27,7 +27,7 @@ function CopyHubPage() {
       icon={PenLine}
       tab="copy"
       metaKey="copy"
-      accent="linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary)/0.6))"
+      accent="linear-gradient(135deg, #0A6CFF, #3BA3FF)"
       standalone={<StandaloneCopy />}
     />
   );

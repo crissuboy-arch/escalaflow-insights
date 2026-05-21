@@ -20,7 +20,7 @@ function CriativosHubPage() {
       icon={Megaphone}
       tab="criativos"
       metaKey="creatives"
-      accent="linear-gradient(135deg, #ff5f8f, #ff8a3d)"
+      accent="linear-gradient(135deg, #0A6CFF, #3BA3FF)"
       standalone={<CreativeWizard />}
     />
   );

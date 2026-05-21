@@ -261,7 +261,7 @@ function PlaybookReaderPage() {
               </SheetContent>
             </Sheet>
             <Button asChild variant="outline" size="sm">
-              <Link to="/produtos/playbook/$id/editar" params={{ id }}>
+              <Link to="/produtos/playbook/editor/$id" params={{ id }}>
                 <Pencil className="mr-1 h-3.5 w-3.5" /> {t("playbook.edit")}
               </Link>
             </Button>

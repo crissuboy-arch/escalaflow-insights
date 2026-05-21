@@ -45,7 +45,6 @@ import { Route as AuthenticatedProdutosPlaybookNovoRouteImport } from './routes/
 import { Route as AuthenticatedProdutosPlaybookIdRouteImport } from './routes/_authenticated/produtos.playbook.$id'
 import { Route as AuthenticatedProdutosPlaybookEditorNovoRouteImport } from './routes/_authenticated/produtos.playbook.editor.novo'
 import { Route as AuthenticatedProdutosPlaybookEditorIdRouteImport } from './routes/_authenticated/produtos.playbook.editor.$id'
-import { Route as AuthenticatedProdutosPlaybookIdEditarRouteImport } from './routes/_authenticated/produtos.playbook.$id.editar'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -242,12 +241,6 @@ const AuthenticatedProdutosPlaybookEditorIdRoute =
     path: '/editor/$id',
     getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
   } as any)
-const AuthenticatedProdutosPlaybookIdEditarRoute =
-  AuthenticatedProdutosPlaybookIdEditarRouteImport.update({
-    id: '/editar',
-    path: '/editar',
-    getParentRoute: () => AuthenticatedProdutosPlaybookIdRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -281,9 +274,8 @@ export interface FileRoutesByFullPath {
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
   '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
   '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
@@ -319,9 +311,8 @@ export interface FileRoutesByTo {
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
+  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
   '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
   '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
   '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
@@ -359,9 +350,8 @@ export interface FileRoutesById {
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
+  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
   '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/_authenticated/produtos/playbook/$id/editar': typeof AuthenticatedProdutosPlaybookIdEditarRoute
   '/_authenticated/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
   '/_authenticated/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
@@ -401,7 +391,6 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
-    | '/produtos/playbook/$id/editar'
     | '/produtos/playbook/editor/$id'
     | '/produtos/playbook/editor/novo'
   fileRoutesByTo: FileRoutesByTo
@@ -439,7 +428,6 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/produtos/playbook/$id'
     | '/produtos/playbook/novo'
-    | '/produtos/playbook/$id/editar'
     | '/produtos/playbook/editor/$id'
     | '/produtos/playbook/editor/novo'
   id:
@@ -478,7 +466,6 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/_authenticated/produtos/playbook/$id'
     | '/_authenticated/produtos/playbook/novo'
-    | '/_authenticated/produtos/playbook/$id/editar'
     | '/_authenticated/produtos/playbook/editor/$id'
     | '/_authenticated/produtos/playbook/editor/novo'
   fileRoutesById: FileRoutesById
@@ -746,13 +733,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProdutosPlaybookEditorIdRouteImport
       parentRoute: typeof AuthenticatedProdutosPlaybookRoute
     }
-    '/_authenticated/produtos/playbook/$id/editar': {
-      id: '/_authenticated/produtos/playbook/$id/editar'
-      path: '/editar'
-      fullPath: '/produtos/playbook/$id/editar'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdEditarRouteImport
-      parentRoute: typeof AuthenticatedProdutosPlaybookIdRoute
-    }
   }
 }
 
@@ -783,23 +763,8 @@ const AuthenticatedStorybookRouteWithChildren =
     AuthenticatedStorybookRouteChildren,
   )
 
-interface AuthenticatedProdutosPlaybookIdRouteChildren {
-  AuthenticatedProdutosPlaybookIdEditarRoute: typeof AuthenticatedProdutosPlaybookIdEditarRoute
-}
-
-const AuthenticatedProdutosPlaybookIdRouteChildren: AuthenticatedProdutosPlaybookIdRouteChildren =
-  {
-    AuthenticatedProdutosPlaybookIdEditarRoute:
-      AuthenticatedProdutosPlaybookIdEditarRoute,
-  }
-
-const AuthenticatedProdutosPlaybookIdRouteWithChildren =
-  AuthenticatedProdutosPlaybookIdRoute._addFileChildren(
-    AuthenticatedProdutosPlaybookIdRouteChildren,
-  )
-
 interface AuthenticatedProdutosPlaybookRouteChildren {
-  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRouteWithChildren
+  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRoute
   AuthenticatedProdutosPlaybookNovoRoute: typeof AuthenticatedProdutosPlaybookNovoRoute
   AuthenticatedProdutosPlaybookEditorIdRoute: typeof AuthenticatedProdutosPlaybookEditorIdRoute
   AuthenticatedProdutosPlaybookEditorNovoRoute: typeof AuthenticatedProdutosPlaybookEditorNovoRoute
@@ -807,8 +772,7 @@ interface AuthenticatedProdutosPlaybookRouteChildren {
 
 const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookRouteChildren =
   {
-    AuthenticatedProdutosPlaybookIdRoute:
-      AuthenticatedProdutosPlaybookIdRouteWithChildren,
+    AuthenticatedProdutosPlaybookIdRoute: AuthenticatedProdutosPlaybookIdRoute,
     AuthenticatedProdutosPlaybookNovoRoute:
       AuthenticatedProdutosPlaybookNovoRoute,
     AuthenticatedProdutosPlaybookEditorIdRoute:

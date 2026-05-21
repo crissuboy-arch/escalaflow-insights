@@ -459,7 +459,7 @@ function ProjectWorkspace() {
                       <Button variant="secondary">Ver leitura</Button>
                     </Link>
                     <Link
-                      to="/produtos/playbook/$id/editar"
+                      to="/produtos/playbook/editor/$id"
                       params={{ id: project.playbook_id }}
                     >
                       <Button variant="outline">Editar cenas</Button>

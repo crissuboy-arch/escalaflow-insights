@@ -21,6 +21,8 @@ import {
   Rocket,
   Database,
   Play,
+  BookText,
+  BrainCircuit,
 } from "lucide-react";
 import {
   Sidebar,
@@ -74,11 +76,13 @@ export function AppSidebar() {
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
     { to: "/produtos/playbook", label: "Criar Playbook", icon: Sparkle },
+    { to: "/storybook", label: "StoryBook IA", icon: BookText },
     { to: "/copy", label: "Copy de Vendas", icon: PenLine },
     { to: "/criativos", label: "Criativos & Anúncios", icon: Megaphone },
     { to: "/pagina-venda", label: "Página de Venda", icon: LayoutTemplate },
     { to: "/checkout", label: "Checkout & Oferta", icon: ShoppingCart },
     { to: "/escala", label: "Escala do Produto", icon: Rocket },
+    { to: "/strategic-ai", label: "Strategic AI", icon: BrainCircuit },
   ];
   const conta: Item[] = [
     { to: "/database", label: "Database", icon: Database },

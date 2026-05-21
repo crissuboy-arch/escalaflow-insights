@@ -20,7 +20,7 @@ function PaginaVendaHubPage() {
       icon={LayoutTemplate}
       tab="pagina"
       metaKey="salesPage"
-      accent="linear-gradient(135deg, #4f46e5, #06b6d4)"
+      accent="linear-gradient(135deg, #0A6CFF, #3BA3FF)"
       standalone={<StandaloneSalesPage />}
     />
   );
