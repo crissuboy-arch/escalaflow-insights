@@ -5,7 +5,14 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
 import { generateAIJson } from "@/lib/aiService";
 
-const ACTOR_ID = "relogios/tiktok-scraper";
+// Read actor from env so the same code works with any configured actor.
+// .env: APIFY_TIKTOK_ACTOR=relogios~tiktok-scraper  (~ not /, which is a path separator)
+function getTikTokActorId(): string {
+  const id = process.env.APIFY_TIKTOK_ACTOR;
+  if (id) return id;
+  // Fallback uses ~ separator to avoid extra path segments in the URL.
+  return "relogios~tiktok-scraper";
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -131,8 +138,9 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
     const { hashtag, limit } = data;
     const userId = (context as any).userId as string;
 
-    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
-      hashtags: [hashtag.replace(/^#/, "")],
+    const cleanHashtag = hashtag.replace(/^#+/, "").trim();
+    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(getTikTokActorId(), {
+      hashtags: [cleanHashtag],
       resultsLimit: limit,
     });
 
