@@ -417,3 +417,24 @@
   font-family: "Space Grotesk", "Sora", system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
+
+/* ============================================================ */
+/* === Premium Templates horizontal scroll === */
+.premium-templates-scroll {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.62 0.22 258 / 0.28) transparent;
+}
+.premium-templates-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.premium-templates-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.premium-templates-scroll::-webkit-scrollbar-thumb {
+  background: oklch(0.62 0.22 258 / 0.30);
+  border-radius: 2px;
+}
+.premium-templates-scroll::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.62 0.22 258 / 0.55);
+}
