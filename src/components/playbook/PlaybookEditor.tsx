@@ -195,7 +195,7 @@ export function PlaybookEditor({ initial }: { initial: EditorPlaybook }) {
               disabled={!!busy}
               onClick={() => persist("published")}
               className="text-white"
-              style={{ background: "var(--gradient-playbook, linear-gradient(135deg,#7c3aed,#06b6d4))" }}
+              style={{ background: "var(--gradient-primary)" }}
             >
               {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Check className="mr-1 h-4 w-4" />}
               Publicar

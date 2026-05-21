@@ -38,14 +38,17 @@ export function CheckoutTab({
   projectId,
   initial,
   onSaved,
+  onNext,
 }: {
   projectId: string;
   initial: Partial<CheckoutDraft> | null;
   onSaved?: (data: CheckoutDraft) => void;
+  onNext?: () => void;
 }) {
   const update = useServerFn(updateProject);
   const [data, setData] = useState<CheckoutDraft>({ ...empty, ...(initial ?? {}) });
   const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(initial !== null);
   const set = <K extends keyof CheckoutDraft>(k: K, v: CheckoutDraft[K]) =>
     setData((p) => ({ ...p, [k]: v }));
 
@@ -57,6 +60,7 @@ export function CheckoutTab({
       const merged = { ...(initial ?? {}), ...data };
       await update({ data: { id: projectId, patch: { meta: { checkout: merged } } } });
       onSaved?.(data);
+      setSaved(true);
       toast.success("Checkout salvo no projeto.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao salvar");
@@ -151,14 +155,21 @@ export function CheckoutTab({
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3">
           <Badge variant="outline">Rascunho salvo automaticamente ao clicar Salvar</Badge>
-          <Button onClick={save} disabled={busy}>
-            {busy ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
+          <div className="flex gap-2">
+            <Button onClick={save} disabled={busy}>
+              {busy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Salvar
+            </Button>
+            {onNext && (
+              <Button onClick={onNext} variant="default">
+                Continuar → Escala
+              </Button>
             )}
-            Salvar
-          </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

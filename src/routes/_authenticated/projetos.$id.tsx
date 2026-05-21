@@ -115,9 +115,22 @@ function ProjectWorkspace() {
     "exportar",
     "historico",
   ] as const;
-  const initialTab =
-    search.tab && (TABS as readonly string[]).includes(search.tab) ? search.tab : "briefing";
+  const STORAGE_KEY = `escala_tab_${id}`;
+  const initialTab = (() => {
+    if (search.tab && (TABS as readonly string[]).includes(search.tab)) return search.tab;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored && (TABS as readonly string[]).includes(stored)) return stored;
+    } catch {}
+    return "briefing";
+  })();
   const [tab, setTab] = useState<string>(initialTab);
+
+  function handleTabChange(next: string) {
+    setTab(next);
+    try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+  }
+
   useEffect(() => {
     if (search.tab && (TABS as readonly string[]).includes(search.tab)) {
       setTab(search.tab);
@@ -254,7 +267,7 @@ function ProjectWorkspace() {
         </div>
         <div className="flex flex-wrap gap-2">
           {project.meta?.scale && (project.meta.scale as Record<string, unknown>)?.plan && tab !== "escala" ? (
-            <Button onClick={() => setTab("escala")} variant="outline">
+            <Button onClick={() => handleTabChange("escala")} variant="outline">
               <Rocket className="mr-2 h-4 w-4" /> Abrir estratégia
             </Button>
           ) : null}
@@ -287,7 +300,7 @@ function ProjectWorkspace() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="briefing">Briefing</TabsTrigger>
           <TabsTrigger value="estrutura">Estrutura</TabsTrigger>
@@ -351,6 +364,11 @@ function ProjectWorkspace() {
               </CardContent>
             </Card>
           )}
+          <div className="flex justify-end pt-1">
+            <Button onClick={() => handleTabChange("ebook")}>
+              Continuar → Ebook
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="estrutura" className="space-y-2">
@@ -372,6 +390,11 @@ function ProjectWorkspace() {
               </Card>
             ))
           )}
+          <div className="flex justify-end pt-1">
+            <Button onClick={() => handleTabChange("ebook")}>
+              Continuar → Ebook
+            </Button>
+          </div>
         </TabsContent>
 
         <TabsContent value="ebook">
@@ -380,14 +403,19 @@ function ProjectWorkspace() {
               {project.ebook_id ? (
                 <>
                   <p className="text-sm">Ebook pronto. Abra no editor para revisar e exportar.</p>
-                  <Link
-                    to="/produtos/ebook"
-                    search={{ id: project.ebook_id } as never}
-                  >
-                    <Button>
-                      <BookOpen className="mr-2 h-4 w-4" /> Abrir editor
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      to="/produtos/ebook"
+                      search={{ id: project.ebook_id } as never}
+                    >
+                      <Button variant="secondary">
+                        <BookOpen className="mr-2 h-4 w-4" /> Abrir editor
+                      </Button>
+                    </Link>
+                    <Button onClick={() => handleTabChange("playbook")}>
+                      Continuar → Playbook
                     </Button>
-                  </Link>
+                  </div>
                 </>
               ) : (
                 <>
@@ -396,12 +424,19 @@ function ProjectWorkspace() {
                   </p>
                   <div className="flex gap-2">
                     <Button onClick={() => runEbook("kdp")} disabled={!!busy} variant="secondary">
+                      {busy === "ebook" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Gerar KDP
                     </Button>
                     <Button onClick={() => runEbook("premium")} disabled={!!busy}>
+                      {busy === "ebook" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                       Gerar Premium
                     </Button>
                   </div>
+                  {busy === "ebook" && (
+                    <p className="text-xs text-muted-foreground">
+                      Gerando capítulos com IA… isso pode levar alguns minutos.
+                    </p>
+                  )}
                 </>
               )}
             </CardContent>
@@ -416,7 +451,7 @@ function ProjectWorkspace() {
                   <p className="text-sm">
                     Playbook interativo pronto — extensão visual do mesmo briefing do ebook.
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Link
                       to="/produtos/playbook/$id"
                       params={{ id: project.playbook_id }}
@@ -427,8 +462,11 @@ function ProjectWorkspace() {
                       to="/produtos/playbook/$id/editar"
                       params={{ id: project.playbook_id }}
                     >
-                      <Button>Editar cenas</Button>
+                      <Button variant="outline">Editar cenas</Button>
                     </Link>
+                    <Button onClick={() => handleTabChange("copy")}>
+                      Continuar → Copy de Vendas
+                    </Button>
                   </div>
                 </>
               ) : (
@@ -437,8 +475,18 @@ function ProjectWorkspace() {
                     Gere o playbook para ter uma versão interativa em cards do mesmo conteúdo.
                   </p>
                   <Button onClick={runPlaybook} disabled={!!busy}>
-                    Gerar Playbook
+                    {busy === "playbook" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    {busy === "playbook" ? "Gerando playbook…" : "Gerar Playbook"}
                   </Button>
+                  {busy === "playbook" && (
+                    <p className="text-xs text-muted-foreground">
+                      A IA está criando as cenas — isso pode levar alguns minutos. Não feche a página.
+                    </p>
+                  )}
                 </>
               )}
             </CardContent>
@@ -478,6 +526,7 @@ function ProjectWorkspace() {
             projectId={id}
             initial={(project.meta?.copy as SalesCopy | undefined) ?? null}
             onSaved={(c) => setProject({ ...project, meta: { ...project.meta, copy: c } })}
+            onNext={() => handleTabChange("criativos")}
           />
         </TabsContent>
         <TabsContent value="criativos">
@@ -491,6 +540,7 @@ function ProjectWorkspace() {
             onSaved={(list) =>
               setProject({ ...project, meta: { ...project.meta, creatives: list } })
             }
+            onNext={() => handleTabChange("pagina")}
           />
         </TabsContent>
         <TabsContent value="pagina">
@@ -500,6 +550,7 @@ function ProjectWorkspace() {
             onSaved={(d) =>
               setProject({ ...project, meta: { ...project.meta, salesPage: d } })
             }
+            onNext={() => handleTabChange("checkout")}
           />
         </TabsContent>
         <TabsContent value="checkout">
@@ -509,6 +560,7 @@ function ProjectWorkspace() {
             onSaved={(d) =>
               setProject({ ...project, meta: { ...project.meta, checkout: d } })
             }
+            onNext={() => handleTabChange("escala")}
           />
         </TabsContent>
         <TabsContent value="escala">
@@ -564,7 +616,7 @@ function ProjectWorkspace() {
                 ? (project.meta!.creatives as unknown[]).length
                 : 0
             }
-            onJump={(t) => setTab(t)}
+            onJump={(t) => handleTabChange(t)}
           />
         </TabsContent>
         <TabsContent value="historico">
