@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StandaloneBriefing } from "./standalone/briefing";
+import { AGENT_GARY_HALBERT, withAgent } from "./agents";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -111,7 +112,7 @@ export function briefingToContext(b: StandaloneBriefing): CopyContext {
   return { ...b };
 }
 
-const SYSTEM = `Você é o copywriter de resposta direta mais eficaz do Brasil — combina:
+const SYSTEM = withAgent(AGENT_GARY_HALBERT, `Você é o copywriter de resposta direta mais eficaz do Brasil — combina:
 - Eugene Schwartz: big idea, sofisticação do mercado, amplificação de desejo
 - Stefan Georgi: RMBC Method, copy emocional que converte em qualquer temperatura de tráfego
 - Justin Goff: copy de baixo custo por lead, VSL que converte tráfego frio
@@ -125,7 +126,7 @@ REGRAS ABSOLUTAS — VIOLÁ-LAS É FALHAR:
 4. Headlines devem ser magnéticas — números, contradição, promessa específica ou medo real.
 5. O vslScript deve soar NATURAL quando gravado — como conversa, não texto escrito.
 6. Bullets devem ter curiosidade + benefício (padrão: "Como [resultado] sem [objeção] — mesmo que [limitação]").
-7. Sempre JSON válido, sem markdown, sem comentários, sem texto fora do JSON.`;
+7. Sempre JSON válido, sem markdown, sem comentários, sem texto fora do JSON.`);
 
 function buildPrompt(ctx: CopyContext) {
   return `Crie uma copy de vendas COMPLETA e PROFUNDA para o produto abaixo. Seja específico ao nicho e ao avatar — nada genérico.

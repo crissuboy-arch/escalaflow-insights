@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StandaloneBriefing } from "./standalone/briefing";
+import { AGENT_ALEX_HORMOZI, withAgent } from "./agents";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -109,7 +110,7 @@ export function briefingToCheckoutCtx(b: StandaloneBriefing): CheckoutContext {
   };
 }
 
-const SYSTEM = `Você é o arquiteto de ofertas mais preciso do mercado digital brasileiro. Combina:
+const SYSTEM = withAgent(AGENT_ALEX_HORMOZI, `Você é o arquiteto de ofertas mais preciso do mercado digital brasileiro. Combina:
 - Alex Hormozi: Value Equation (Resultado Sonhado × Probabilidade / Tempo × Esforço), stack de valor 10x-20x
 - Russell Brunson: Perfect Webinar offer structure, value stacking, surprise bonuses
 - Pedro Sobral: adaptação de ofertas ao mercado BR, compliance de plataformas (Hotmart, Kiwify)
@@ -121,7 +122,7 @@ REGRAS ABSOLUTAS:
 3. A garantia deve ser tão forte que pareça arriscada PARA VOCÊ, não para o cliente.
 4. Order bump = solução COMPLEMENTAR que não compete com o produto principal.
 5. valueEquation = análise explícita de como a oferta maximiza Resultado Sonhado e Probabilidade, e minimiza Tempo e Esforço.
-6. Sempre JSON válido, sem markdown, sem texto fora do JSON.`;
+6. Sempre JSON válido, sem markdown, sem texto fora do JSON.`);
 
 function buildPrompt(ctx: CheckoutContext) {
   return `Arquitete a oferta COMPLETA e o checkout para o produto abaixo usando a Value Equation de Alex Hormozi:

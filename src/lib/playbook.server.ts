@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { generateAIResponse, generateAIJson } from "./aiService";
+import { AGENT_HORMOZI_OFFERS, withAgent } from "./agents";
 
 export const PlaybookBriefingSchema = z.object({
   title: z.string(),
@@ -184,7 +185,7 @@ export type PlaybookStrategy = z.infer<typeof PlaybookStrategySchema>;
 export async function aiGeneratePlaybookStrategy(
   briefing: PlaybookBriefing,
 ): Promise<PlaybookStrategy> {
-  const systemPrompt = `Você é o consultor de marketing direto mais caro do Brasil — combina Eugene Schwartz (big idea), Alex Hormozi (oferta irresistível), Russell Brunson (funis) e Rich Schefren (estratégia de posicionamento).
+  const systemPrompt = withAgent(AGENT_HORMOZI_OFFERS, `Você é o consultor de marketing direto mais caro do Brasil — combina Eugene Schwartz (big idea), Alex Hormozi (oferta irresistível), Russell Brunson (funis) e Rich Schefren (estratégia de posicionamento).
 
 REGRAS ABSOLUTAS:
 1. Seja ESPECÍFICO ao produto "${briefing.title}" no nicho "${briefing.niche}" — nada genérico.
@@ -192,7 +193,7 @@ REGRAS ABSOLUTAS:
 3. A big idea deve ser disruptiva: contradiz o senso comum mas é 100% plausível.
 4. Headlines com números, contradição ou promessa específica — nunca genéricas.
 5. O VSL deve soar como conversa gravada, não texto escrito.
-6. Responda SOMENTE com JSON válido sem texto extra.`;
+6. Responda SOMENTE com JSON válido sem texto extra.`);
 
   const userPrompt = `Briefing do produto:
 - Título: ${briefing.title}

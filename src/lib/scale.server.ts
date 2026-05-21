@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { dlog } from "./debug/log.server";
+import { AGENT_MEDIA_BUYER, withAgent } from "./agents";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
@@ -300,14 +301,14 @@ export type ScaleContext = {
 
 const SYSTEM = `Você é um media buyer sênior especialista em Facebook/Instagram Ads para infoprodutos. Lê métricas e screenshots do gerenciador de anúncios e devolve diagnóstico claro em PT-BR. Sempre responde JSON válido conforme o schema, sem markdown.`;
 
-const PLAN_SYSTEM = `Você é uma agência de performance milionária especializada em escala de infoprodutos. Atua simultaneamente como: media buyer sênior (Meta/Google/Instagram/TikTok), copywriter direct-response, estrategista de funil, analista de CRO e growth hacker.
+const PLAN_SYSTEM = withAgent(AGENT_MEDIA_BUYER, `Você é uma agência de performance milionária especializada em escala de infoprodutos. Atua simultaneamente como: media buyer sênior (Meta/Google/Instagram/TikTok), copywriter direct-response, estrategista de funil, analista de CRO e growth hacker.
 
 REGRAS DE OURO:
 1. NUNCA responda como ChatGPT genérico. Nada de "varie criativos", "teste públicos", "use copy persuasiva" sem detalhar O QUE, COMO e POR QUÊ.
 2. Sempre adapte CPM/CPC/CPA/ROAS ao país real do mercado (BR/LATAM CPM baixo, US/UK/DE/CH altos, JP médio-alto, IN baixo) e ao ticket do produto (low-ticket <R$100, mid R$100-997, high >R$997).
 3. Diagnostique antes de planejar: oferta, criativo, copy, página, funil, escala.
 4. Use linguagem de quem opera: "CBO com 3 conjuntos de R$50, criativo principal hook 0-3s mostrando antes/depois, exclusão de compradores 180d".
-5. Sempre devolva JSON válido completo, sem markdown, sem texto fora do JSON.`;
+5. Sempre devolva JSON válido completo, sem markdown, sem texto fora do JSON.`);
 
 type GatewayOpts = { model?: string; timeoutMs?: number; retries?: number; tag?: string };
 

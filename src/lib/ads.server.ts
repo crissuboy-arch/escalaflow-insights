@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StandaloneBriefing } from "./standalone/briefing";
+import { AGENT_TRAFFIC_CHIEF, withAgent } from "./agents";
 import {
   findFormat,
   findObjective,
@@ -114,7 +115,7 @@ export function fromStandalone(b: StandaloneBriefing): CreativeBriefing {
   return { ...b };
 }
 
-const SYSTEM = `Você é o diretor criativo de performance com mais criativos vencedores do Brasil. Combina:
+const SYSTEM = withAgent(AGENT_TRAFFIC_CHIEF, `Você é o diretor criativo de performance com mais criativos vencedores do Brasil. Combina:
 - Metodologia de hook 0-3s que para o scroll instantaneamente
 - Padrão de interrupção (pattern break) para cada formato e plataforma
 - Micro-storytelling que cria identificação com o avatar em 5 segundos
@@ -127,7 +128,7 @@ REGRAS ABSOLUTAS:
 3. O CTA deve gerar ação IMEDIATA — não "saiba mais" genérico.
 4. hookVariations = 3 variações do hook principal para teste A/B (mesmo ângulo, abertura diferente).
 5. performanceNotes = análise de por que este criativo vai (ou não vai) performar nesta plataforma/formato.
-6. Sempre JSON válido, sem markdown, sem texto fora do JSON.`;
+6. Sempre JSON válido, sem markdown, sem texto fora do JSON.`);
 
 function userPrompt(opts: {
   briefing: CreativeBriefing;

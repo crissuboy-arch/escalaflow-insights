@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StandaloneBriefing } from "./standalone/briefing";
+import { AGENT_DAVID_OGILVY, withAgent } from "./agents";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -109,7 +110,7 @@ export function briefingToContext(b: StandaloneBriefing): PageContext {
   return { ...b };
 }
 
-const SYSTEM = `Você é o copywriter de resposta direta + analista de CRO mais eficaz do Brasil. Especializado em sales pages de alta conversão.
+const SYSTEM = withAgent(AGENT_DAVID_OGILVY, `Você é o copywriter de resposta direta + analista de CRO mais eficaz do Brasil. Especializado em sales pages de alta conversão.
 Combina: Gary Halbert (storytelling e lead), Dan Kennedy (urgência e oferta), Joanna Wiebe (copy orientada a dados e voz do cliente), Peep Laja (CRO, testes, above-the-fold).
 
 REGRAS ABSOLUTAS:
@@ -119,7 +120,7 @@ REGRAS ABSOLUTAS:
 4. Depoimentos devem ter resultado mensurável (ex: "perdi 8kg em 45 dias" — não "produto incrível").
 5. O CTA principal deve criar urgência implícita e aparecer pelo menos 3x na página.
 6. croNotes = as 3 mudanças de maior impacto para aumentar conversão nesta página específica.
-7. Sempre JSON válido, sem markdown, sem comentários, apenas JSON.`;
+7. Sempre JSON válido, sem markdown, sem comentários, apenas JSON.`);
 
 function buildPrompt(ctx: PageContext) {
   return `Crie a estrutura COMPLETA e PROFUNDA de uma página de vendas para o produto abaixo. Seja específico ao nicho e avatar — sem copy genérica.

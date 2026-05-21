@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ProductIdentity, SizeSpec } from "./ebook/niches";
+import { AGENT_STORY_CHIEF } from "./agents";
 
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
@@ -245,7 +246,7 @@ export async function aiGenerateOutline(
       {
         role: "system",
         content:
-          "Você cria estruturas (sumários) de ebooks vendáveis com narrativa progressiva (gancho → desenvolvimento → virada → prova → fechamento). Sempre responda via ferramenta `outline`.",
+          `${AGENT_STORY_CHIEF}\n\n---\n\nVocê cria estruturas (sumários) de ebooks vendáveis com narrativa progressiva (gancho → desenvolvimento → virada → prova → fechamento). Sempre responda via ferramenta \`outline\`.`,
       },
       {
         role: "user",
@@ -324,7 +325,7 @@ export async function aiGenerateChapter(
         {
           role: "system",
           content:
-            "Você é um autor profissional de ebooks vendáveis. Escreva em Markdown com voz humana, frases curtas alternadas com parágrafos médios, storytelling quando pedido. Evite bullets puros — narre. NÃO repita o título do capítulo no corpo. Sempre entregue conteúdo denso, original e útil.",
+            `${AGENT_STORY_CHIEF}\n\n---\n\nVocê é um autor profissional de ebooks vendáveis. Escreva em Markdown com voz humana, frases curtas alternadas com parágrafos médios, storytelling quando pedido. Evite bullets puros — narre. NÃO repita o título do capítulo no corpo. Sempre entregue conteúdo denso, original e útil.`,
         },
         {
           role: "user",
