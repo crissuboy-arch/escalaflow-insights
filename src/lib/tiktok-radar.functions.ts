@@ -101,14 +101,35 @@ function normalizeItem(item: Record<string, unknown>, hashtag: string) {
   };
 }
 
+// Supabase types don't include tiktok_minerados yet (migration pending on remote).
+// Using typed helper to avoid casting throughout.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const tiktokTable = () => (supabaseAdmin as any).from("tiktok_minerados");
+
+// ── input schemas ─────────────────────────────────────────────────────────────
+
+const MineInput = z.object({
+  hashtag: z.string().min(1),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+const ListInput = z.object({
+  hashtag: z.string().optional(),
+  limit: z.number().int().min(1).max(200).default(50),
+});
+
+const IdInput = z.object({ id: z.string().uuid() });
+
+const HashtagInput = z.object({ hashtag: z.string() });
+
 // ── server functions ──────────────────────────────────────────────────────────
 
-export const mineTikTokHashtagFn = createServerFn()
-  .validator(z.object({ hashtag: z.string().min(1), limit: z.number().int().min(1).max(50).default(20) }))
+export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
   .handler(async ({ data, context }) => {
     const { hashtag, limit } = data;
-    const userId = context.user.id;
+    const userId = (context as any).userId as string;
 
     const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
       hashtags: [hashtag.replace(/^#/, "")],
@@ -122,8 +143,7 @@ export const mineTikTokHashtagFn = createServerFn()
       .filter((r) => r.video_id)
       .map((r) => ({ ...r, user_id: userId }));
 
-    const { data: inserted, error } = await supabaseAdmin
-      .from("tiktok_minerados")
+    const { data: inserted, error } = await tiktokTable()
       .upsert(rows, { onConflict: "user_id,video_id", ignoreDuplicates: true })
       .select("id");
 
@@ -131,18 +151,12 @@ export const mineTikTokHashtagFn = createServerFn()
     return { inserted: inserted?.length ?? 0, skipped: rows.length - (inserted?.length ?? 0) };
   });
 
-export const listTikTokMinedFn = createServerFn()
-  .validator(
-    z.object({
-      hashtag: z.string().optional(),
-      limit: z.number().int().min(1).max(200).default(50),
-    }),
-  )
+export const listTikTokMinedFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof ListInput>) => ListInput.parse(d))
   .handler(async ({ data, context }) => {
-    const userId = context.user.id;
-    let query = supabaseAdmin
-      .from("tiktok_minerados")
+    const userId = (context as any).userId as string;
+    let query = tiktokTable()
       .select("*")
       .eq("user_id", userId)
       .order("viral_score", { ascending: false })
@@ -166,14 +180,13 @@ export type TikTokAiAnalysis = {
   virality_reason: string;
 };
 
-export const analyzeTikTokVideoFn = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+export const analyzeTikTokVideoFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
   .handler(async ({ data, context }) => {
-    const userId = context.user.id;
+    const userId = (context as any).userId as string;
 
-    const { data: row, error } = await supabaseAdmin
-      .from("tiktok_minerados")
+    const { data: row, error } = await tiktokTable()
       .select("*")
       .eq("id", data.id)
       .eq("user_id", userId)
@@ -196,17 +209,16 @@ Responda APENAS com o JSON, sem texto extra.`;
     const userPrompt = `Vídeo TikTok:
 Criador: ${row.creator}
 Hook/Descrição: ${row.description}
-Hashtags: ${row.hashtags?.join(", ") ?? ""}
-Views: ${row.views.toLocaleString("pt-BR")}
-Likes: ${row.likes.toLocaleString("pt-BR")}
-Compartilhamentos: ${row.shares.toLocaleString("pt-BR")}
+Hashtags: ${(row.hashtags as string[])?.join(", ") ?? ""}
+Views: ${Number(row.views).toLocaleString("pt-BR")}
+Likes: ${Number(row.likes).toLocaleString("pt-BR")}
+Compartilhamentos: ${Number(row.shares).toLocaleString("pt-BR")}
 Áudio: ${row.audio_title}
 Viral Score: ${row.viral_score}/100`;
 
     const analysis = await generateAIJson<TikTokAiAnalysis>(userPrompt, { systemPrompt });
 
-    await supabaseAdmin
-      .from("tiktok_minerados")
+    await tiktokTable()
       .update({ ai_analysis: analysis })
       .eq("id", data.id)
       .eq("user_id", userId);
@@ -214,27 +226,27 @@ Viral Score: ${row.viral_score}/100`;
     return analysis;
   });
 
-export const deleteTikTokVideoFn = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+export const deleteTikTokVideoFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await supabaseAdmin
-      .from("tiktok_minerados")
+    const userId = (context as any).userId as string;
+    const { error } = await tiktokTable()
       .delete()
       .eq("id", data.id)
-      .eq("user_id", context.user.id);
+      .eq("user_id", userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
-export const clearTikTokHashtagFn = createServerFn()
-  .validator(z.object({ hashtag: z.string() }))
+export const clearTikTokHashtagFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof HashtagInput>) => HashtagInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await supabaseAdmin
-      .from("tiktok_minerados")
+    const userId = (context as any).userId as string;
+    const { error } = await tiktokTable()
       .delete()
-      .eq("user_id", context.user.id)
+      .eq("user_id", userId)
       .eq("hashtag", data.hashtag);
     if (error) throw new Error(error.message);
     return { ok: true };
