@@ -112,6 +112,20 @@ type Row = {
   meta?: Record<string, unknown> | null;
 };
 
+// Determines the next incomplete pipeline tab for a project.
+// Flow: Ebook → Playbook → Copy → Criativos → Página → Checkout → Escala
+function getNextTab(r: Row): string {
+  const meta = (r.meta ?? {}) as Record<string, unknown>;
+  if (!r.ebook_id) return "ebook";
+  if (!r.playbook_id) return "playbook";
+  if (!meta.copy) return "copy";
+  if (!Array.isArray(meta.creatives) || (meta.creatives as unknown[]).length === 0)
+    return "criativos";
+  if (!meta.salesPage) return "pagina";
+  if (!meta.checkout) return "checkout";
+  return "escala";
+}
+
 function ProjectsHubPage() {
   const navigate = useNavigate();
   const search = Route.useSearch() as { novo?: 1; tab?: string };
@@ -443,7 +457,13 @@ function ProjectsHubPage() {
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <Button
                         size="sm"
-                        onClick={() => navigate({ to: "/projetos/$id", params: { id: r.id } })}
+                        onClick={() =>
+                          navigate({
+                            to: "/projetos/$id",
+                            params: { id: r.id },
+                            search: { tab: getNextTab(r) } as never,
+                          })
+                        }
                       >
                         <ArrowRight className="mr-1 h-3.5 w-3.5" /> Continuar
                       </Button>

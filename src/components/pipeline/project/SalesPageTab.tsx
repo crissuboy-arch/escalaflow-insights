@@ -20,10 +20,12 @@ export function SalesPageTab({
   projectId,
   initial,
   onSaved,
+  onNext,
 }: {
   projectId: string;
   initial: { page: SalesPage; prompts: Prompts } | null;
   onSaved?: (data: { page: SalesPage; prompts: Prompts }) => void;
+  onNext?: () => void;
 }) {
   const generate = useServerFn(generateSalesPage);
   const [state, setState] = useState<{ page: SalesPage; prompts: Prompts } | null>(initial);
@@ -86,6 +88,13 @@ export function SalesPageTab({
         </Button>
       </div>
       <SalesPageResult page={state.page} prompts={state.prompts} />
+      {onNext && (
+        <div className="flex justify-end pt-2 border-t border-border/40">
+          <Button onClick={onNext}>
+            Continuar → Checkout & Oferta
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 ALTER TABLE public.ebooks ADD COLUMN IF NOT EXISTS step int NOT NULL DEFAULT 0;
 ALTER TABLE public.ebooks ADD COLUMN IF NOT EXISTS chapter_count int NOT NULL DEFAULT 6;
 
+DROP TRIGGER IF EXISTS ebooks_set_updated_at ON public.ebooks;
 DROP TRIGGER IF EXISTS trg_ebooks_updated_at ON public.ebooks;
 CREATE TRIGGER trg_ebooks_updated_at
 BEFORE UPDATE ON public.ebooks

@@ -12,10 +12,12 @@ export function CopyTab({
   projectId,
   initial,
   onSaved,
+  onNext,
 }: {
   projectId: string;
   initial: SalesCopy | null;
   onSaved?: (copy: SalesCopy) => void;
+  onNext?: () => void;
 }) {
   const generate = useServerFn(generateSalesCopy);
   const [copy, setCopy] = useState<SalesCopy | null>(initial);
@@ -77,6 +79,13 @@ export function CopyTab({
         </Button>
       </div>
       <CopyResult copy={copy} />
+      {onNext && (
+        <div className="flex justify-end pt-2 border-t border-border/40">
+          <Button onClick={onNext}>
+            Continuar → Criativos & Anúncios
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

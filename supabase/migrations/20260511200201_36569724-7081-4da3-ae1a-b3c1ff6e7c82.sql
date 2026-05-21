@@ -29,7 +29,9 @@ CREATE POLICY "user_ad_actions delete own"
   ON public.user_ad_actions FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_ad_actions;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.user_ad_actions;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 ALTER TABLE public.user_ad_actions REPLICA IDENTITY FULL;
 
 ALTER TABLE public.ebooks

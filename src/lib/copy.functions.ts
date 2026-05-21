@@ -49,12 +49,20 @@ export const generateSalesCopy = createServerFn({ method: "POST" })
     const copy = await aiGenerateCopy(ctx);
 
     if (projectRow) {
-      const meta = { ...(projectRow.meta ?? {}), copy };
+      // Re-read meta after AI call to avoid stale overwrite from concurrent saves
+      const { data: fresh } = await supabase
+        .from("projects")
+        .select("meta")
+        .eq("id", projectRow.id)
+        .single();
+      const freshMeta = ((fresh?.meta ?? projectRow.meta) ?? {}) as Record<string, unknown>;
+      const meta = { ...freshMeta, copy };
       dlog("persist", "copy.save", { projectId: projectRow.id, metaKey: "copy" });
-      await supabase
+      const { error: saveErr } = await supabase
         .from("projects")
         .update({ meta: meta as never })
         .eq("id", projectRow.id);
+      if (saveErr) throw new Error(`Falha ao salvar copy: ${saveErr.message}`);
       await seedFromModule(supabase, userId, projectRow.id, "copy", { copy });
       await recordAi(supabase, userId, {
         projectId: projectRow.id,

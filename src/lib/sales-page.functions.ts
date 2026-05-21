@@ -56,12 +56,20 @@ export const generateSalesPage = createServerFn({ method: "POST" })
     const prompts = buildExternalPrompts(page, ctx);
 
     if (projectRow) {
-      const meta = { ...projectRow.meta, salesPage: { page, prompts } };
+      // Re-read meta after AI call to avoid stale overwrite from concurrent saves
+      const { data: fresh } = await supabase
+        .from("projects")
+        .select("meta")
+        .eq("id", projectRow.id)
+        .single();
+      const freshMeta = ((fresh?.meta ?? projectRow.meta) ?? {}) as Record<string, unknown>;
+      const meta = { ...freshMeta, salesPage: { page, prompts } };
       dlog("persist", "salesPage.save", { projectId: projectRow.id, metaKey: "salesPage" });
-      await supabase
+      const { error: saveErr } = await supabase
         .from("projects")
         .update({ meta: meta as never })
         .eq("id", projectRow.id);
+      if (saveErr) throw new Error(`Falha ao salvar página: ${saveErr.message}`);
       await seedFromModule(supabase, userId, projectRow.id, "salesPage", { page });
       await recordAi(supabase, userId, {
         projectId: projectRow.id,

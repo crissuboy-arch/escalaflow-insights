@@ -288,6 +288,112 @@
   }
 }
 
+/* ============================================================ */
+/* LOGIN PAGE — premium cinematic effects                      */
+/* ============================================================ */
+@keyframes aurora-drift-1 {
+  0%,100% { transform: translate(0,0) scale(1); opacity:.55; }
+  40%      { transform: translate(60px,-40px) scale(1.12); opacity:.70; }
+  70%      { transform: translate(-30px, 30px) scale(0.95); opacity:.50; }
+}
+@keyframes aurora-drift-2 {
+  0%,100% { transform: translate(0,0) scale(1); opacity:.40; }
+  35%      { transform: translate(-80px, 50px) scale(1.15); opacity:.60; }
+  65%      { transform: translate(50px,-30px) scale(0.90); opacity:.35; }
+}
+@keyframes aurora-drift-3 {
+  0%,100% { transform: translate(0,0) scale(1); opacity:.30; }
+  50%      { transform: translate(40px, 60px) scale(1.08); opacity:.48; }
+}
+.login-aurora-1 {
+  position:absolute; width:900px; height:900px; border-radius:50%;
+  background: radial-gradient(circle, oklch(0.62 0.22 258 / 0.22) 0%, transparent 70%);
+  top:-25%; left:-20%;
+  animation: aurora-drift-1 14s ease-in-out infinite;
+  filter: blur(80px);
+}
+.login-aurora-2 {
+  position:absolute; width:700px; height:700px; border-radius:50%;
+  background: radial-gradient(circle, oklch(0.60 0.22 295 / 0.18) 0%, transparent 70%);
+  bottom:-20%; right:-15%;
+  animation: aurora-drift-2 18s ease-in-out infinite;
+  filter: blur(70px);
+}
+.login-aurora-3 {
+  position:absolute; width:500px; height:500px; border-radius:50%;
+  background: radial-gradient(circle, oklch(0.74 0.18 248 / 0.14) 0%, transparent 70%);
+  top:40%; left:55%;
+  animation: aurora-drift-3 22s ease-in-out infinite;
+  filter: blur(60px);
+}
+
+@keyframes particle-float {
+  0%,100% { transform: translateY(0) scale(1); opacity:.5; }
+  50%      { transform: translateY(-18px) scale(1.15); opacity:1; }
+}
+.login-particle {
+  position:absolute; border-radius:50%;
+  background: oklch(0.74 0.18 248 / 0.6);
+  pointer-events:none;
+  animation: particle-float linear infinite;
+}
+
+@keyframes logo-ring-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes logo-ring-spin-rev {
+  to { transform: rotate(-360deg); }
+}
+@keyframes logo-orb-pulse {
+  0%,100% { box-shadow: 0 0 40px oklch(0.62 0.22 258 / 0.35), 0 0 80px oklch(0.62 0.22 258 / 0.15), inset 0 0 30px oklch(0.62 0.22 258 / 0.08); }
+  50%      { box-shadow: 0 0 60px oklch(0.62 0.22 258 / 0.55), 0 0 120px oklch(0.62 0.22 258 / 0.25), inset 0 0 40px oklch(0.62 0.22 258 / 0.14); }
+}
+.login-logo-orb {
+  background: linear-gradient(145deg,
+    oklch(0.20 0.06 265 / 0.85) 0%,
+    oklch(0.15 0.05 268 / 0.70) 100%);
+  border: 1px solid oklch(0.62 0.22 258 / 0.35);
+  backdrop-filter: blur(24px);
+  animation: logo-orb-pulse 3s ease-in-out infinite;
+}
+.login-ring-1 {
+  position:absolute; border-radius:50%;
+  border: 1px solid oklch(0.62 0.22 258 / 0.25);
+  border-top-color: oklch(0.74 0.18 248 / 0.80);
+  animation: logo-ring-spin 6s linear infinite;
+}
+.login-ring-2 {
+  position:absolute; border-radius:50%;
+  border: 1px solid oklch(0.60 0.22 295 / 0.18);
+  border-right-color: oklch(0.72 0.22 295 / 0.70);
+  animation: logo-ring-spin-rev 9s linear infinite;
+}
+.login-ring-3 {
+  position:absolute; border-radius:50%;
+  border: 1px dashed oklch(0.62 0.22 258 / 0.12);
+  border-bottom-color: oklch(0.62 0.22 258 / 0.45);
+  animation: logo-ring-spin 15s linear infinite;
+}
+
+@keyframes title-glow-pulse {
+  0%,100% { text-shadow: 0 0 18px oklch(0.74 0.18 248 / 0.30); }
+  50%      { text-shadow: 0 0 32px oklch(0.74 0.18 248 / 0.55), 0 0 64px oklch(0.62 0.22 258 / 0.20); }
+}
+.login-title-glow { animation: title-glow-pulse 4s ease-in-out infinite; }
+
+.login-card {
+  background: linear-gradient(160deg,
+    oklch(0.18 0.055 265 / 0.92) 0%,
+    oklch(0.14 0.045 268 / 0.88) 100%);
+  border: 1px solid oklch(0.62 0.22 258 / 0.28);
+  box-shadow:
+    0 0 0 1px oklch(0.62 0.22 258 / 0.10),
+    0 24px 64px -16px oklch(0 0 0 / 0.65),
+    0 0 40px oklch(0.62 0.22 258 / 0.10);
+  backdrop-filter: blur(20px);
+}
+
+/* ============================================================ */
 /* === Playbook design tokens === */
 :root {
   --playbook-bg: radial-gradient(ellipse at top, oklch(0.22 0.12 290) 0%, oklch(0.12 0.08 270) 60%, oklch(0.08 0.04 260) 100%);

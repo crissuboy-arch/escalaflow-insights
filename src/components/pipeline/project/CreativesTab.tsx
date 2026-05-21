@@ -36,10 +36,12 @@ export function CreativesTab({
   projectId,
   initial,
   onSaved,
+  onNext,
 }: {
   projectId: string;
   initial: Saved[];
   onSaved?: (creatives: Saved[]) => void;
+  onNext?: () => void;
 }) {
   const gen = useServerFn(generateCreative);
   const genVar = useServerFn(generateCreativeVariations);
@@ -251,6 +253,13 @@ export function CreativesTab({
               }}
             />
           ))}
+        </div>
+      )}
+      {onNext && (
+        <div className="flex justify-end pt-2 border-t border-border/40">
+          <Button onClick={onNext}>
+            Continuar → Página de Venda
+          </Button>
         </div>
       )}
     </div>

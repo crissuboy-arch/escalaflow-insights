@@ -205,13 +205,13 @@ CREATE INDEX IF NOT EXISTS idx_saved_offers_mining ON public.saved_offers(mining
 -- ============================================================================
 -- 10. Realtime subscriptions
 -- ============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.offers;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.analyses;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.trends;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.mining_runs;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.saved_ads;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.favorites;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.extension_logs;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.offers;       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.analyses;     EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.trends;       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.mining_runs;  EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.saved_ads;    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.favorites;    EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.extension_logs; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE public.offers REPLICA IDENTITY FULL;
 ALTER TABLE public.analyses REPLICA IDENTITY FULL;
