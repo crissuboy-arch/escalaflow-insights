@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaybookIdRouteImport } from './routes/playbook.$id'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
 import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
@@ -70,6 +71,12 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedTiktokRadarRoute =
+  AuthenticatedTiktokRadarRouteImport.update({
+    id: '/tiktok-radar',
+    path: '/tiktok-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedStrategicAiRoute =
   AuthenticatedStrategicAiRouteImport.update({
     id: '/strategic-ai',
@@ -265,6 +272,7 @@ export interface FileRoutesByFullPath {
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
+  '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -302,6 +310,7 @@ export interface FileRoutesByTo {
   '/radar': typeof AuthenticatedRadarRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
+  '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -341,6 +350,7 @@ export interface FileRoutesById {
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/_authenticated/strategic-ai': typeof AuthenticatedStrategicAiRoute
+  '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/storybook'
     | '/strategic-ai'
+    | '/tiktok-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -417,6 +428,7 @@ export interface FileRouteTypes {
     | '/radar'
     | '/storybook'
     | '/strategic-ai'
+    | '/tiktok-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -455,6 +467,7 @@ export interface FileRouteTypes {
     | '/_authenticated/radar'
     | '/_authenticated/storybook'
     | '/_authenticated/strategic-ai'
+    | '/_authenticated/tiktok-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/_authenticated/oferta/$id'
@@ -515,6 +528,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ingest'
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/tiktok-radar': {
+      id: '/_authenticated/tiktok-radar'
+      path: '/tiktok-radar'
+      fullPath: '/tiktok-radar'
+      preLoaderRoute: typeof AuthenticatedTiktokRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/strategic-ai': {
       id: '/_authenticated/strategic-ai'
@@ -823,6 +843,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
   AuthenticatedStrategicAiRoute: typeof AuthenticatedStrategicAiRoute
+  AuthenticatedTiktokRadarRoute: typeof AuthenticatedTiktokRadarRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
   AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -849,6 +870,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,
   AuthenticatedStrategicAiRoute: AuthenticatedStrategicAiRoute,
+  AuthenticatedTiktokRadarRoute: AuthenticatedTiktokRadarRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
   AuthenticatedProdutosPlaybookRoute:
