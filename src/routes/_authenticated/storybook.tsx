@@ -96,9 +96,14 @@ function StorybookHub() {
       <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-background via-background to-primary/10 p-6 md:p-8">
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/20 blur-3xl" />
         <div className="relative">
-          <Badge variant="outline" className="mb-2 border-primary/40 text-primary">
-            PREMIUM
-          </Badge>
+          <div className="mb-2 flex items-center gap-2">
+            <Badge variant="outline" className="border-primary/40 text-primary">
+              PREMIUM
+            </Badge>
+            <Badge variant="secondary" className="bg-amber-500/20 text-amber-400 border border-amber-500/30">
+              BETA
+            </Badge>
+          </div>
           <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight md:text-4xl">
             <BookHeart className="h-7 w-7 text-primary" />
             StoryBook Engine AI
@@ -271,6 +276,9 @@ function StorybookHub() {
                   <Sparkles className="mr-2 h-4 w-4" />
                 )}
                 Criar história
+                <Badge className="ml-2 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px]">
+                  BETA
+                </Badge>
               </Button>
             </div>
           </CardContent>

@@ -110,6 +110,20 @@ function normalize(item: Record<string, unknown>, platform: EcommercePlatform): 
   };
 }
 
+// ── URL builder (search pages per platform) ───────────────────────────────────
+
+function buildSearchUrl(platform: EcommercePlatform, query: string): string {
+  const q = encodeURIComponent(query);
+  switch (platform) {
+    case "amazon":
+      return `https://www.amazon.com.br/s?k=${q}`;
+    case "shopee":
+      return `https://shopee.com.br/search?keyword=${q}`;
+    case "mercadolivre":
+      return `https://lista.mercadolivre.com.br/${q}`;
+  }
+}
+
 // ── skill entry point ─────────────────────────────────────────────────────────
 
 export async function runEcommerceRadarSkill(
@@ -128,10 +142,8 @@ export async function runEcommerceRadarSkill(
   }
 
   const payload: Record<string, unknown> = {
-    query: input.query,
-    country: input.country ?? "BR",
-    maxResults: input.maxResults ?? 50,
-    ...(input.sortBy && { sortBy: input.sortBy }),
+    startUrls: [{ url: buildSearchUrl(input.platform, input.query) }],
+    maxItems: input.maxResults ?? 50,
   };
 
   console.log("[ecommerce-radar] actor=", actor);

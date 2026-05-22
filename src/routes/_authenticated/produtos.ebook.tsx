@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Loader2, BookOpen, Wand2, ImageIcon, FileDown, Check, ArrowLeft, ArrowRight, Sparkles, FileText, BookMarked } from "lucide-react";
+import { Loader2, BookOpen, Wand2, ImageIcon, FileDown, Check, ArrowLeft, ArrowRight, Sparkles, FileText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchFavoriteAds, fetchSavedAds, fetchScaledAds, type PersistedAd } from "@/lib/queries";
 import {
@@ -30,6 +30,7 @@ import {
   PALETTES,
   styleToMode,
   styleToLayout,
+  type EbookMode,
   type EbookStyle,
   type EbookPalette,
   type EbookCategory,
@@ -73,14 +74,11 @@ type Identity = {
 };
 type Outline = { title: string; bullets: string[] }[];
 type Chapter = { title: string; markdown: string; imageUrl?: string | null };
-type EbookMode = "kdp" | "premium" | "playbook";
-
 const STEPS = ["Anúncio", "Briefing", "Modo & Estrutura", "Layout & Capa", "Capítulos & Exportar"];
 
 const MODES: { id: EbookMode; label: string; icon: typeof BookOpen; description: string }[] = [
   { id: "kdp", label: "Amazon/KDP", icon: FileText, description: "PDF, DOCX e EPUB com sumário, capítulos limpos e layout profissional para publicar." },
   { id: "premium", label: "Premium Visual", icon: Sparkles, description: "Imagem por capítulo gerada por IA, layouts modernos estilo Canva/Gamma." },
-  { id: "playbook", label: "Playbook Interativo", icon: BookMarked, description: "Cenas, storytelling, narrativa visual. Abre o construtor de Playbooks." },
 ];
 
 async function errMsg(e: unknown, fallback: string): Promise<string> {
@@ -401,16 +399,6 @@ function EbookPage() {
     }
   };
 
-  const onCreatePlaybookFromEbook = async () => {
-    if (!briefing) return;
-    await saveDraft();
-    if (!ebookId) {
-      toast.error("Salve o rascunho primeiro");
-      return;
-    }
-    navigate({ to: "/produtos/playbook/novo", search: { fromEbook: ebookId } as never });
-  };
-
   const onCover = async () => {
     if (!briefing) return;
     setBusy("Gerando capa com IA…");
@@ -610,15 +598,6 @@ function EbookPage() {
     toast.success("Imagens prontas");
   };
 
-  const onPlaybookMode = () => {
-    // Hand off to existing Playbook builder, prefilled with the same ad.
-    if (selectedAd) {
-      navigate({ to: "/produtos/playbook/novo", search: { adKey: selectedAd.key } as never });
-    } else {
-      navigate({ to: "/produtos/playbook/novo" });
-    }
-  };
-
   const canNext = useMemo(() => {
     if (step === 0) return !!selectedAd;
     if (step === 1) return !!briefing;
@@ -646,10 +625,7 @@ function EbookPage() {
 
   const onHubScratch = (category: EbookCategory) => {
     setEntryStarted(true);
-    if (category === "Playbook") {
-      setStyle("playbook");
-      setMode("playbook");
-    } else if (category === "Amazon/KDP") {
+    if (category === "Amazon/KDP") {
       setStyle("amazon-kdp");
       setLayout("classico");
       setMode("kdp");
@@ -927,7 +903,6 @@ function EbookPage() {
                         setStyle(s.id);
                         setMode(styleToMode(s.id));
                         setLayout(styleToLayout(s.id));
-                        if (s.id === "playbook") onPlaybookMode();
                       }}
                       className={`rounded-lg border p-3 text-left transition ${
                         active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
@@ -1128,13 +1103,6 @@ function EbookPage() {
               )}
               <Button onClick={onExportDocx} disabled={!!busy || chapters.length === 0} variant="outline">
                 <FileDown className="mr-2 h-4 w-4" /> DOCX
-              </Button>
-              <Button
-                onClick={onCreatePlaybookFromEbook}
-                disabled={!!busy || !briefing}
-                variant="outline"
-              >
-                <Sparkles className="mr-2 h-4 w-4" /> Criar Playbook a partir deste Ebook
               </Button>
             </div>
             <div className="space-y-3 rounded-lg border border-border/60 p-4">

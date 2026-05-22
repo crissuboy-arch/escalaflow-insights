@@ -11,7 +11,6 @@ import {
   Settings,
   Radio,
   BookOpen,
-  Sparkle,
   Radar,
   FolderKanban,
   Megaphone,
@@ -83,7 +82,6 @@ export function AppSidebar() {
   const esteira: Item[] = [
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
-    { to: "/produtos/playbook", label: "Criar Playbook", icon: Sparkle },
     { to: "/storybook", label: "StoryBook IA", icon: BookText },
     { to: "/copy", label: "Copy de Vendas", icon: PenLine },
     { to: "/criativos", label: "Criativos & Anúncios", icon: Megaphone },

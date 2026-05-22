@@ -10,7 +10,6 @@ export type EbookStyle =
   | "luxo"
   | "feminino"
   | "infantil"
-  | "playbook"
   | "low-ticket"
   | "apostila"
   | "planner"
@@ -30,7 +29,7 @@ export type EbookPalette =
   | "minimalista"
   | "neon";
 
-export type EbookMode = "kdp" | "premium" | "playbook";
+export type EbookMode = "kdp" | "premium";
 
 export interface StyleSpec {
   id: EbookStyle;
@@ -51,7 +50,6 @@ export const STYLES: StyleSpec[] = [
   { id: "luxo", label: "Luxo", description: "Dourado, serifa, alto padrão.", mode: "premium", layout: "classico", promptHint: "estilo luxo, dourado, serifa elegante, alto padrão" },
   { id: "feminino", label: "Feminino", description: "Tons suaves, elegante.", mode: "premium", layout: "moderno", promptHint: "estilo feminino delicado, tons suaves, elegante" },
   { id: "infantil", label: "Infantil", description: "Cores alegres, ilustrado.", mode: "premium", layout: "moderno", promptHint: "estilo infantil, ilustrações alegres, cores primárias" },
-  { id: "playbook", label: "Playbook", description: "Cenas e narrativa visual.", mode: "playbook", layout: "moderno", promptHint: "narrativa visual, cenas sequenciais" },
   { id: "low-ticket", label: "Low Ticket", description: "Direto ao ponto, foco em conversão.", mode: "kdp", layout: "moderno", promptHint: "design direto e persuasivo, foco em valor percebido alto a baixo custo" },
   { id: "apostila", label: "Apostila", description: "Material didático estruturado.", mode: "kdp", layout: "classico", promptHint: "estilo apostila escolar profissional, didático, capa institucional" },
   { id: "planner", label: "Planner", description: "Organização e produtividade.", mode: "premium", layout: "moderno", promptHint: "estilo planner premium, layout funcional com elementos de organização" },
@@ -100,6 +98,5 @@ export const EBOOK_CATEGORIES = [
   "Infantil",
   "Negócios",
   "PLR",
-  "Playbook",
 ] as const;
 export type EbookCategory = (typeof EBOOK_CATEGORIES)[number];

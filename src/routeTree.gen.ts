@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PlaybookIdRouteImport } from './routes/playbook.$id'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
 import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
@@ -42,13 +41,8 @@ import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authentica
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
 import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
-import { Route as AuthenticatedProdutosPlaybookRouteImport } from './routes/_authenticated/produtos.playbook'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
-import { Route as AuthenticatedProdutosPlaybookNovoRouteImport } from './routes/_authenticated/produtos.playbook.novo'
-import { Route as AuthenticatedProdutosPlaybookIdRouteImport } from './routes/_authenticated/produtos.playbook.$id'
-import { Route as AuthenticatedProdutosPlaybookEditorNovoRouteImport } from './routes/_authenticated/produtos.playbook.editor.novo'
-import { Route as AuthenticatedProdutosPlaybookEditorIdRouteImport } from './routes/_authenticated/produtos.playbook.editor.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -62,11 +56,6 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlaybookIdRoute = PlaybookIdRouteImport.update({
-  id: '/playbook/$id',
-  path: '/playbook/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
@@ -228,12 +217,6 @@ const AuthenticatedProjetosIdRoute = AuthenticatedProjetosIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedProjetosRoute,
 } as any)
-const AuthenticatedProdutosPlaybookRoute =
-  AuthenticatedProdutosPlaybookRouteImport.update({
-    id: '/produtos/playbook',
-    path: '/produtos/playbook',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedProdutosEbookRoute =
   AuthenticatedProdutosEbookRouteImport.update({
     id: '/produtos/ebook',
@@ -245,30 +228,6 @@ const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
   path: '/oferta/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedProdutosPlaybookNovoRoute =
-  AuthenticatedProdutosPlaybookNovoRouteImport.update({
-    id: '/novo',
-    path: '/novo',
-    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
-  } as any)
-const AuthenticatedProdutosPlaybookIdRoute =
-  AuthenticatedProdutosPlaybookIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
-  } as any)
-const AuthenticatedProdutosPlaybookEditorNovoRoute =
-  AuthenticatedProdutosPlaybookEditorNovoRouteImport.update({
-    id: '/editor/novo',
-    path: '/editor/novo',
-    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
-  } as any)
-const AuthenticatedProdutosPlaybookEditorIdRoute =
-  AuthenticatedProdutosPlaybookEditorIdRouteImport.update({
-    id: '/editor/$id',
-    path: '/editor/$id',
-    getParentRoute: () => AuthenticatedProdutosPlaybookRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -299,17 +258,11 @@ export interface FileRoutesByFullPath {
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
-  '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
-  '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
-  '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -340,17 +293,11 @@ export interface FileRoutesByTo {
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
-  '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
-  '/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
-  '/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -383,17 +330,11 @@ export interface FileRoutesById {
   '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/_authenticated/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
-  '/playbook/$id': typeof PlaybookIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
-  '/_authenticated/produtos/playbook': typeof AuthenticatedProdutosPlaybookRouteWithChildren
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
-  '/_authenticated/produtos/playbook/$id': typeof AuthenticatedProdutosPlaybookIdRoute
-  '/_authenticated/produtos/playbook/novo': typeof AuthenticatedProdutosPlaybookNovoRoute
-  '/_authenticated/produtos/playbook/editor/$id': typeof AuthenticatedProdutosPlaybookEditorIdRoute
-  '/_authenticated/produtos/playbook/editor/novo': typeof AuthenticatedProdutosPlaybookEditorNovoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -426,17 +367,11 @@ export interface FileRouteTypes {
     | '/tiktok-radar'
     | '/youtube-radar'
     | '/api/ingest'
-    | '/playbook/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
-    | '/produtos/playbook'
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
-    | '/produtos/playbook/$id'
-    | '/produtos/playbook/novo'
-    | '/produtos/playbook/editor/$id'
-    | '/produtos/playbook/editor/novo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -467,17 +402,11 @@ export interface FileRouteTypes {
     | '/tiktok-radar'
     | '/youtube-radar'
     | '/api/ingest'
-    | '/playbook/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
-    | '/produtos/playbook'
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
-    | '/produtos/playbook/$id'
-    | '/produtos/playbook/novo'
-    | '/produtos/playbook/editor/$id'
-    | '/produtos/playbook/editor/novo'
   id:
     | '__root__'
     | '/'
@@ -509,17 +438,11 @@ export interface FileRouteTypes {
     | '/_authenticated/tiktok-radar'
     | '/_authenticated/youtube-radar'
     | '/api/ingest'
-    | '/playbook/$id'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
-    | '/_authenticated/produtos/playbook'
     | '/_authenticated/projetos/$id'
     | '/_authenticated/storybook/$id'
     | '/api/collector/run'
-    | '/_authenticated/produtos/playbook/$id'
-    | '/_authenticated/produtos/playbook/novo'
-    | '/_authenticated/produtos/playbook/editor/$id'
-    | '/_authenticated/produtos/playbook/editor/novo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -527,7 +450,6 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiIngestRoute: typeof ApiIngestRoute
-  PlaybookIdRoute: typeof PlaybookIdRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
 }
 
@@ -552,13 +474,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/playbook/$id': {
-      id: '/playbook/$id'
-      path: '/playbook/$id'
-      fullPath: '/playbook/$id'
-      preLoaderRoute: typeof PlaybookIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ingest': {
@@ -764,13 +679,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjetosIdRouteImport
       parentRoute: typeof AuthenticatedProjetosRoute
     }
-    '/_authenticated/produtos/playbook': {
-      id: '/_authenticated/produtos/playbook'
-      path: '/produtos/playbook'
-      fullPath: '/produtos/playbook'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/produtos/ebook': {
       id: '/_authenticated/produtos/ebook'
       path: '/produtos/ebook'
@@ -784,34 +692,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/oferta/$id'
       preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
       parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/produtos/playbook/novo': {
-      id: '/_authenticated/produtos/playbook/novo'
-      path: '/novo'
-      fullPath: '/produtos/playbook/novo'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookNovoRouteImport
-      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
-    }
-    '/_authenticated/produtos/playbook/$id': {
-      id: '/_authenticated/produtos/playbook/$id'
-      path: '/$id'
-      fullPath: '/produtos/playbook/$id'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookIdRouteImport
-      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
-    }
-    '/_authenticated/produtos/playbook/editor/novo': {
-      id: '/_authenticated/produtos/playbook/editor/novo'
-      path: '/editor/novo'
-      fullPath: '/produtos/playbook/editor/novo'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookEditorNovoRouteImport
-      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
-    }
-    '/_authenticated/produtos/playbook/editor/$id': {
-      id: '/_authenticated/produtos/playbook/editor/$id'
-      path: '/editor/$id'
-      fullPath: '/produtos/playbook/editor/$id'
-      preLoaderRoute: typeof AuthenticatedProdutosPlaybookEditorIdRouteImport
-      parentRoute: typeof AuthenticatedProdutosPlaybookRoute
     }
   }
 }
@@ -843,29 +723,6 @@ const AuthenticatedStorybookRouteWithChildren =
     AuthenticatedStorybookRouteChildren,
   )
 
-interface AuthenticatedProdutosPlaybookRouteChildren {
-  AuthenticatedProdutosPlaybookIdRoute: typeof AuthenticatedProdutosPlaybookIdRoute
-  AuthenticatedProdutosPlaybookNovoRoute: typeof AuthenticatedProdutosPlaybookNovoRoute
-  AuthenticatedProdutosPlaybookEditorIdRoute: typeof AuthenticatedProdutosPlaybookEditorIdRoute
-  AuthenticatedProdutosPlaybookEditorNovoRoute: typeof AuthenticatedProdutosPlaybookEditorNovoRoute
-}
-
-const AuthenticatedProdutosPlaybookRouteChildren: AuthenticatedProdutosPlaybookRouteChildren =
-  {
-    AuthenticatedProdutosPlaybookIdRoute: AuthenticatedProdutosPlaybookIdRoute,
-    AuthenticatedProdutosPlaybookNovoRoute:
-      AuthenticatedProdutosPlaybookNovoRoute,
-    AuthenticatedProdutosPlaybookEditorIdRoute:
-      AuthenticatedProdutosPlaybookEditorIdRoute,
-    AuthenticatedProdutosPlaybookEditorNovoRoute:
-      AuthenticatedProdutosPlaybookEditorNovoRoute,
-  }
-
-const AuthenticatedProdutosPlaybookRouteWithChildren =
-  AuthenticatedProdutosPlaybookRoute._addFileChildren(
-    AuthenticatedProdutosPlaybookRouteChildren,
-  )
-
 interface AuthenticatedRouteChildren {
   AuthenticatedAnaliseIaRoute: typeof AuthenticatedAnaliseIaRoute
   AuthenticatedCentralMineracaoRoute: typeof AuthenticatedCentralMineracaoRoute
@@ -894,7 +751,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedYoutubeRadarRoute: typeof AuthenticatedYoutubeRadarRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
-  AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -925,8 +781,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedYoutubeRadarRoute: AuthenticatedYoutubeRadarRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
-  AuthenticatedProdutosPlaybookRoute:
-    AuthenticatedProdutosPlaybookRouteWithChildren,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -938,7 +792,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiIngestRoute: ApiIngestRoute,
-  PlaybookIdRoute: PlaybookIdRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
 }
 export const routeTree = rootRouteImport
