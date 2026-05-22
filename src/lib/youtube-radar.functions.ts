@@ -1,0 +1,186 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { runYouTubeRadarSkill } from "@/skills/youtube-radar.skill";
+import { generateAIJson } from "@/lib/aiService";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ytTable = () => (supabaseAdmin as any).from("youtube_minerados");
+
+function detectShort(duration: string, videoUrl: string): boolean {
+  if (videoUrl.toLowerCase().includes("/shorts/")) return true;
+  const m = duration.match(/^(\d+):(\d+)$/);
+  if (m) return parseInt(m[1]) === 0 && parseInt(m[2]) <= 60;
+  return false;
+}
+
+// ── input schemas ─────────────────────────────────────────────────────────────
+
+const MineInput = z.object({
+  query: z.string().min(1),
+  maxResults: z.number().int().min(1).max(100).default(30),
+  dateFilter: z
+    .enum(["today", "week", "month", "year"])
+    .optional(),
+});
+
+const ListInput = z.object({
+  query: z.string().optional(),
+  limit: z.number().int().min(1).max(200).default(100),
+});
+
+const IdInput = z.object({ id: z.string().uuid() });
+const QueryInput = z.object({ query: z.string() });
+
+// ── server functions ──────────────────────────────────────────────────────────
+
+export const mineYouTubeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+
+    const result = await runYouTubeRadarSkill({
+      query: data.query,
+      maxResults: data.maxResults,
+      dateFilter: data.dateFilter as any,
+    });
+
+    if (!result.ok) throw new Error(result.error ?? "YouTube skill failed");
+    if (!result.data.length) return { inserted: 0, skipped: 0 };
+
+    const rows = result.data
+      .filter((v) => v.videoId)
+      .map((v) => ({
+        user_id: userId,
+        query: data.query.trim(),
+        video_id: v.videoId,
+        title: v.title,
+        channel_name: v.channelName,
+        channel_id: v.channelId,
+        video_url: v.videoUrl,
+        description: v.description.slice(0, 500),
+        hashtags: v.hashtags,
+        views: v.views,
+        likes: v.likes,
+        comments: v.comments,
+        duration: v.duration,
+        is_short: detectShort(v.duration, v.videoUrl),
+        published_at: v.publishedAt,
+        thumbnail_url: v.thumbnailUrl,
+        viral_score: v.viralScore,
+      }));
+
+    const { data: inserted, error } = await ytTable()
+      .upsert(rows, { onConflict: "user_id,video_id", ignoreDuplicates: true })
+      .select("id");
+
+    if (error) throw new Error(`Supabase error: ${error.message}`);
+    return {
+      inserted: inserted?.length ?? 0,
+      skipped: rows.length - (inserted?.length ?? 0),
+    };
+  });
+
+export const listYouTubeMinedFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof ListInput>) => ListInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    let query = ytTable()
+      .select("*")
+      .eq("user_id", userId)
+      .order("viral_score", { ascending: false })
+      .limit(data.limit);
+
+    if (data.query) query = query.eq("query", data.query);
+
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return rows ?? [];
+  });
+
+export type YouTubeAiAnalysis = {
+  niche: string;
+  hook_formula: string;
+  content_formula: string;
+  promise: string;
+  offer_angle: string;
+  ebook_title: string;
+  vsl_hook: string;
+  virality_reason: string;
+};
+
+export const analyzeYouTubeVideoFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+
+    const { data: row, error } = await ytTable()
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !row) throw new Error("Vídeo não encontrado");
+
+    const systemPrompt = `Você é um estrategista de marketing digital especializado em YouTube e produtos digitais.
+Analise o vídeo e retorne um JSON com:
+- niche: nicho de mercado
+- hook_formula: fórmula do hook do título
+- content_formula: estrutura do conteúdo (ex: Problema + Agitação + Solução)
+- promise: promessa principal do vídeo
+- offer_angle: ângulo de oferta recomendado
+- ebook_title: título de ebook sugerido para esse nicho
+- vsl_hook: primeiros 15 segundos de VSL baseado nesse hook
+- virality_reason: por que esse vídeo viralizou em uma frase
+Responda APENAS com o JSON.`;
+
+    const userPrompt = `Vídeo YouTube:
+Título: ${row.title}
+Canal: ${row.channel_name}
+Descrição: ${row.description}
+Hashtags: ${(row.hashtags as string[])?.join(", ")}
+Views: ${Number(row.views).toLocaleString("pt-BR")}
+Likes: ${Number(row.likes).toLocaleString("pt-BR")}
+Duração: ${row.duration}
+Short: ${row.is_short ? "Sim" : "Não"}
+Viral Score: ${row.viral_score}/100`;
+
+    const analysis = await generateAIJson<YouTubeAiAnalysis>(userPrompt, { systemPrompt });
+
+    await ytTable()
+      .update({ ai_analysis: analysis })
+      .eq("id", data.id)
+      .eq("user_id", userId);
+
+    return analysis;
+  });
+
+export const deleteYouTubeVideoFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    const { error } = await ytTable()
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const clearYouTubeQueryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof QueryInput>) => QueryInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    const { error } = await ytTable()
+      .delete()
+      .eq("user_id", userId)
+      .eq("query", data.query);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

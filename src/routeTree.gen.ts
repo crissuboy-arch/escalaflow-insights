@@ -14,9 +14,11 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlaybookIdRouteImport } from './routes/playbook.$id'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
 import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
 import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
+import { Route as AuthenticatedRadarProdutosRouteImport } from './routes/_authenticated/radar-produtos'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenticated/pagina-venda'
@@ -26,6 +28,7 @@ import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
 import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
+import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
@@ -71,6 +74,12 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedYoutubeRadarRoute =
+  AuthenticatedYoutubeRadarRouteImport.update({
+    id: '/youtube-radar',
+    path: '/youtube-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedTiktokRadarRoute =
   AuthenticatedTiktokRadarRouteImport.update({
     id: '/tiktok-radar',
@@ -88,6 +97,12 @@ const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
   path: '/storybook',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedRadarProdutosRoute =
+  AuthenticatedRadarProdutosRouteImport.update({
+    id: '/radar-produtos',
+    path: '/radar-produtos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
   id: '/radar',
   path: '/radar',
@@ -137,6 +152,12 @@ const AuthenticatedImportarAnuncioRoute =
   AuthenticatedImportarAnuncioRouteImport.update({
     id: '/importar-anuncio',
     path: '/importar-anuncio',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedGoogleRadarRoute =
+  AuthenticatedGoogleRadarRouteImport.update({
+    id: '/google-radar',
+    path: '/google-radar',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
@@ -262,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/database': typeof AuthenticatedDatabaseRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
@@ -271,9 +293,11 @@ export interface FileRoutesByFullPath {
   '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/radar-produtos': typeof AuthenticatedRadarProdutosRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
+  '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -300,6 +324,7 @@ export interface FileRoutesByTo {
   '/database': typeof AuthenticatedDatabaseRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
@@ -309,9 +334,11 @@ export interface FileRoutesByTo {
   '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
+  '/radar-produtos': typeof AuthenticatedRadarProdutosRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
+  '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -340,6 +367,7 @@ export interface FileRoutesById {
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
+  '/_authenticated/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/_authenticated/link-externo': typeof AuthenticatedLinkExternoRoute
@@ -349,9 +377,11 @@ export interface FileRoutesById {
   '/_authenticated/pagina-venda': typeof AuthenticatedPaginaVendaRoute
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
+  '/_authenticated/radar-produtos': typeof AuthenticatedRadarProdutosRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/_authenticated/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
+  '/_authenticated/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
   '/playbook/$id': typeof PlaybookIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -380,6 +410,7 @@ export interface FileRouteTypes {
     | '/database'
     | '/escala'
     | '/favoritos'
+    | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
     | '/link-externo'
@@ -389,9 +420,11 @@ export interface FileRouteTypes {
     | '/pagina-venda'
     | '/projetos'
     | '/radar'
+    | '/radar-produtos'
     | '/storybook'
     | '/strategic-ai'
     | '/tiktok-radar'
+    | '/youtube-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -418,6 +451,7 @@ export interface FileRouteTypes {
     | '/database'
     | '/escala'
     | '/favoritos'
+    | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
     | '/link-externo'
@@ -427,9 +461,11 @@ export interface FileRouteTypes {
     | '/pagina-venda'
     | '/projetos'
     | '/radar'
+    | '/radar-produtos'
     | '/storybook'
     | '/strategic-ai'
     | '/tiktok-radar'
+    | '/youtube-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/oferta/$id'
@@ -457,6 +493,7 @@ export interface FileRouteTypes {
     | '/_authenticated/database'
     | '/_authenticated/escala'
     | '/_authenticated/favoritos'
+    | '/_authenticated/google-radar'
     | '/_authenticated/importar-anuncio'
     | '/_authenticated/instagram-radar'
     | '/_authenticated/link-externo'
@@ -466,9 +503,11 @@ export interface FileRouteTypes {
     | '/_authenticated/pagina-venda'
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
+    | '/_authenticated/radar-produtos'
     | '/_authenticated/storybook'
     | '/_authenticated/strategic-ai'
     | '/_authenticated/tiktok-radar'
+    | '/_authenticated/youtube-radar'
     | '/api/ingest'
     | '/playbook/$id'
     | '/_authenticated/oferta/$id'
@@ -529,6 +568,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/youtube-radar': {
+      id: '/_authenticated/youtube-radar'
+      path: '/youtube-radar'
+      fullPath: '/youtube-radar'
+      preLoaderRoute: typeof AuthenticatedYoutubeRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/tiktok-radar': {
       id: '/_authenticated/tiktok-radar'
       path: '/tiktok-radar'
@@ -548,6 +594,13 @@ declare module '@tanstack/react-router' {
       path: '/storybook'
       fullPath: '/storybook'
       preLoaderRoute: typeof AuthenticatedStorybookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/radar-produtos': {
+      id: '/_authenticated/radar-produtos'
+      path: '/radar-produtos'
+      fullPath: '/radar-produtos'
+      preLoaderRoute: typeof AuthenticatedRadarProdutosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/radar': {
@@ -611,6 +664,13 @@ declare module '@tanstack/react-router' {
       path: '/importar-anuncio'
       fullPath: '/importar-anuncio'
       preLoaderRoute: typeof AuthenticatedImportarAnuncioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/google-radar': {
+      id: '/_authenticated/google-radar'
+      path: '/google-radar'
+      fullPath: '/google-radar'
+      preLoaderRoute: typeof AuthenticatedGoogleRadarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/favoritos': {
@@ -817,6 +877,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
+  AuthenticatedGoogleRadarRoute: typeof AuthenticatedGoogleRadarRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedInstagramRadarRoute: typeof AuthenticatedInstagramRadarRoute
   AuthenticatedLinkExternoRoute: typeof AuthenticatedLinkExternoRoute
@@ -826,9 +887,11 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPaginaVendaRoute: typeof AuthenticatedPaginaVendaRoute
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
+  AuthenticatedRadarProdutosRoute: typeof AuthenticatedRadarProdutosRoute
   AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
   AuthenticatedStrategicAiRoute: typeof AuthenticatedStrategicAiRoute
   AuthenticatedTiktokRadarRoute: typeof AuthenticatedTiktokRadarRoute
+  AuthenticatedYoutubeRadarRoute: typeof AuthenticatedYoutubeRadarRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
   AuthenticatedProdutosPlaybookRoute: typeof AuthenticatedProdutosPlaybookRouteWithChildren
@@ -845,6 +908,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
+  AuthenticatedGoogleRadarRoute: AuthenticatedGoogleRadarRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedInstagramRadarRoute: AuthenticatedInstagramRadarRoute,
   AuthenticatedLinkExternoRoute: AuthenticatedLinkExternoRoute,
@@ -854,9 +918,11 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPaginaVendaRoute: AuthenticatedPaginaVendaRoute,
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
+  AuthenticatedRadarProdutosRoute: AuthenticatedRadarProdutosRoute,
   AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,
   AuthenticatedStrategicAiRoute: AuthenticatedStrategicAiRoute,
   AuthenticatedTiktokRadarRoute: AuthenticatedTiktokRadarRoute,
+  AuthenticatedYoutubeRadarRoute: AuthenticatedYoutubeRadarRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
   AuthenticatedProdutosPlaybookRoute:

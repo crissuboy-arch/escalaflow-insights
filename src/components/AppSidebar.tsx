@@ -24,6 +24,9 @@ import {
   BookText,
   BrainCircuit,
   Camera,
+  BarChart2,
+  Youtube,
+  ShoppingBag,
 } from "lucide-react";
 import {
   Sidebar,
@@ -68,6 +71,9 @@ export function AppSidebar() {
     { to: "/radar", label: "Radar", icon: Radar },
     { to: "/tiktok-radar", label: "Radar TikTok", icon: Play },
     { to: "/instagram-radar", label: "Radar Instagram", icon: Camera },
+    { to: "/google-radar", label: "Radar Google", icon: BarChart2 },
+    { to: "/youtube-radar", label: "Radar YouTube", icon: Youtube },
+    { to: "/radar-produtos", label: "Radar Produtos", icon: ShoppingBag },
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
