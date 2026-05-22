@@ -139,10 +139,20 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
     const userId = (context as any).userId as string;
 
     const cleanHashtag = hashtag.replace(/^#+/, "").trim();
-    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(getTikTokActorId(), {
+    const actorId = getTikTokActorId();
+
+    console.log(`[tiktok-radar] actor=${actorId} hashtag="${cleanHashtag}" limit=${limit}`);
+
+    // Payload tries fields accepted by relogios~tiktok-scraper.
+    // The actor may use hashtags[], searchQueries[], or startUrls[].
+    const payload = {
       hashtags: [cleanHashtag],
+      searchQueries: [`#${cleanHashtag}`],
+      maxItems: limit,
       resultsLimit: limit,
-    });
+    };
+
+    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, payload);
 
     if (!raw.length) return { inserted: 0, skipped: 0 };
 

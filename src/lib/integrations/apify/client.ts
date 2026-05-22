@@ -9,6 +9,11 @@ function getToken(): string {
   return token;
 }
 
+/** Mask token for safe logging: show first 8 chars only. */
+function maskToken(token: string): string {
+  return token.slice(0, 8) + "…(masked)";
+}
+
 export async function runApifyActor(actorId: string, input: any) {
   const token = getToken();
   const response = await fetch(`${BASE}/acts/${actorId}/runs?token=${token}`, {
@@ -26,22 +31,41 @@ export async function runSyncGetDatasetItems<T = any>(
   timeoutSec = MAX_TIMEOUT_SEC,
 ): Promise<T[]> {
   const token = getToken();
-  const url = `${BASE}/acts/${actorId}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
-  console.log(`[apify] starting sync run: actor=${actorId}, timeout=${timeoutSec}s`);
+
+  const url =
+    `${BASE}/acts/${actorId}/run-sync-get-dataset-items` +
+    `?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
+
+  // Log for debugging — token masked, full URL visible
+  const safeUrl =
+    `${BASE}/acts/${actorId}/run-sync-get-dataset-items` +
+    `?token=${maskToken(token)}&timeout=${timeoutSec}`;
+
+  console.log(`[apify] ▶ actor=${actorId}`);
+  console.log(`[apify] ▶ url=${safeUrl}`);
+  console.log(`[apify] ▶ payload=${JSON.stringify(input)}`);
+
   const start = Date.now();
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    console.error(`[apify] sync run FAILED after ${elapsed}s: ${response.status}`);
-    throw new Error(`Apify sync run failed (${response.status}) after ${elapsed}s: ${text.slice(0, 300)}`);
+    const body = await response.text().catch(() => "");
+    console.error(`[apify] ✗ status=${response.status} after ${elapsed}s`);
+    console.error(`[apify] ✗ response body: ${body.slice(0, 500)}`);
+    throw new Error(
+      `Apify sync run failed (${response.status}) after ${elapsed}s: ${body.slice(0, 300)}`,
+    );
   }
+
   const data = (await response.json()) as unknown;
   const items = Array.isArray(data) ? data : [];
-  console.log(`[apify] sync run COMPLETE: ${items.length} items in ${elapsed}s`);
+  console.log(`[apify] ✓ ${items.length} items in ${elapsed}s`);
   return items;
 }
