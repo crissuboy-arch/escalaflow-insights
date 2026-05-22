@@ -24,6 +24,7 @@ import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authen
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
 import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
+import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
@@ -124,6 +125,12 @@ const AuthenticatedLinkExternoRoute =
   AuthenticatedLinkExternoRouteImport.update({
     id: '/link-externo',
     path: '/link-externo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstagramRadarRoute =
+  AuthenticatedInstagramRadarRouteImport.update({
+    id: '/instagram-radar',
+    path: '/instagram-radar',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedImportarAnuncioRoute =
@@ -256,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
+  '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
@@ -293,6 +301,7 @@ export interface FileRoutesByTo {
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
+  '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
@@ -332,6 +341,7 @@ export interface FileRoutesById {
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
+  '/_authenticated/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/_authenticated/link-externo': typeof AuthenticatedLinkExternoRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
+    | '/instagram-radar'
     | '/link-externo'
     | '/minerar'
     | '/ofertas-escaladas'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/escala'
     | '/favoritos'
     | '/importar-anuncio'
+    | '/instagram-radar'
     | '/link-externo'
     | '/minerar'
     | '/ofertas-escaladas'
@@ -446,6 +458,7 @@ export interface FileRouteTypes {
     | '/_authenticated/escala'
     | '/_authenticated/favoritos'
     | '/_authenticated/importar-anuncio'
+    | '/_authenticated/instagram-radar'
     | '/_authenticated/link-externo'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
@@ -584,6 +597,13 @@ declare module '@tanstack/react-router' {
       path: '/link-externo'
       fullPath: '/link-externo'
       preLoaderRoute: typeof AuthenticatedLinkExternoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instagram-radar': {
+      id: '/_authenticated/instagram-radar'
+      path: '/instagram-radar'
+      fullPath: '/instagram-radar'
+      preLoaderRoute: typeof AuthenticatedInstagramRadarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/importar-anuncio': {
@@ -798,6 +818,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
+  AuthenticatedInstagramRadarRoute: typeof AuthenticatedInstagramRadarRoute
   AuthenticatedLinkExternoRoute: typeof AuthenticatedLinkExternoRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
@@ -825,6 +846,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
+  AuthenticatedInstagramRadarRoute: AuthenticatedInstagramRadarRoute,
   AuthenticatedLinkExternoRoute: AuthenticatedLinkExternoRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
