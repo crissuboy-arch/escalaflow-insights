@@ -204,14 +204,28 @@ export const listTikTokMinedFn = createServerFn({ method: "POST" })
   });
 
 export type TikTokAiAnalysis = {
+  // Conteúdo e estratégia
   niche: string;
   promise: string;
   emotion: string;
+  mechanism: string;
+  // Hook
+  hook_analysis: string;
   hook_formula: string;
+  // CTA e narrativa
+  cta: string;
+  narrative: string;
+  // Retenção e edição
+  retention: string;
+  visual_pattern: string;
+  editing_speed: string;
+  editing_style: string;
+  // Ofertas e conversão
   offer_angle: string;
+  virality_reason: string;
+  // Produtos digitais
   ebook_title: string;
   vsl_hook: string;
-  virality_reason: string;
 };
 
 export const analyzeTikTokVideoFn = createServerFn({ method: "POST" })
@@ -228,26 +242,35 @@ export const analyzeTikTokVideoFn = createServerFn({ method: "POST" })
 
     if (error || !row) throw new Error("Vídeo não encontrado");
 
-    const systemPrompt = `Você é um estrategista de marketing digital especializado em TikTok Shop e produtos digitais.
-Analise o vídeo do TikTok e retorne um JSON com:
-- niche: nicho de mercado do vídeo
-- promise: promessa principal que o vídeo entrega
-- emotion: emoção dominante ativada (medo, desejo, urgência, inveja, esperança)
-- hook_formula: fórmula do hook (ex: "Problema + Agitação + Solução")
-- offer_angle: ângulo de oferta recomendado para vender para essa audiência
-- ebook_title: sugestão de título de ebook para esse nicho
-- vsl_hook: primeiros 15 segundos de VSL baseado nesse hook
-- virality_reason: por que esse vídeo viralizou em uma frase
-Responda APENAS com o JSON, sem texto extra.`;
+    const systemPrompt = `Você é um estrategista sênior de marketing digital especializado em TikTok, VSL e produtos digitais.
+Analise o vídeo do TikTok com profundidade e retorne um JSON com EXATAMENTE estes campos:
+- niche: nicho de mercado específico (ex: "emagrecimento feminino 30+", "dropshipping de gadgets")
+- promise: promessa principal entregue ao espectador em 1 frase direta
+- emotion: emoção dominante ativada — escolha entre: medo, desejo, urgência, inveja, esperança, curiosidade, raiva, alívio
+- mechanism: mecanismo único ou solução apresentada no vídeo (o "como" da promessa)
+- hook_analysis: análise detalhada dos primeiros 3 segundos — o que prende a atenção e por quê
+- hook_formula: fórmula estrutural do hook (ex: "Choque + Identificação + Promessa", "Pergunta + Problema + Solução")
+- cta: call-to-action usado ou implícito no vídeo (ex: "Clica no link da bio", "Compra agora", "Salva esse vídeo")
+- narrative: estrutura narrativa completa (ex: "Problema → Agitação → Solução → Prova → CTA")
+- retention: técnicas de retenção identificadas (ex: "loop aberto, cortes rápidos, text on screen, suspense, humor")
+- visual_pattern: padrão visual predominante (ex: "UGC estilo selfie", "B-roll com legenda", "Talking head + produto", "Antes e depois")
+- editing_speed: velocidade de edição — exatamente uma de: "rápida", "média", "lenta"
+- editing_style: estilo de edição (ex: "jump cuts estilo vlog", "transições suaves", "texto animado + música trending", "POV estático")
+- offer_angle: ângulo de oferta ideal para vender produto/serviço para essa audiência
+- virality_reason: por que esse vídeo viralizou — em 1 frase objetiva
+- ebook_title: título de ebook premium para esse nicho (use números e promessa forte)
+- vsl_hook: abertura de VSL de 15 segundos inspirada nesse hook (comece com impacto)
+Responda APENAS com o JSON válido, sem texto extra, sem markdown.`;
 
-    const userPrompt = `Vídeo TikTok:
-Criador: ${row.creator}
-Hook/Descrição: ${row.description}
+    const userPrompt = `Vídeo TikTok para análise:
+Criador: @${row.creator}
+Descrição/Hook: ${row.description}
 Hashtags: ${(row.hashtags as string[])?.join(", ") ?? ""}
 Views: ${Number(row.views).toLocaleString("pt-BR")}
 Likes: ${Number(row.likes).toLocaleString("pt-BR")}
 Compartilhamentos: ${Number(row.shares).toLocaleString("pt-BR")}
-Áudio: ${row.audio_title}
+Comentários: ${Number(row.comments).toLocaleString("pt-BR")}
+Áudio/Música: ${row.audio_title || "não identificado"}
 Viral Score: ${row.viral_score}/100`;
 
     const analysis = await generateAIJson<TikTokAiAnalysis>(userPrompt, { systemPrompt });

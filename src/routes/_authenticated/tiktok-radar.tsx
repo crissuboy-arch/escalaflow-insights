@@ -173,6 +173,142 @@ function ViralBadge({ score }: { score: number }) {
   );
 }
 
+// ── AiAnalysisDisplay ─────────────────────────────────────────────────────────
+
+function AiSection({
+  label,
+  value,
+  accent,
+  italic,
+}: {
+  label: string;
+  value?: string;
+  accent?: boolean;
+  italic?: boolean;
+}) {
+  if (!value) return null;
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div
+        className={`text-xs leading-snug ${italic ? "italic" : ""}`}
+        style={accent ? { color: "#3BA3FF", fontWeight: 600 } : { color: "hsl(var(--foreground))" }}
+      >
+        {italic ? `"${value}"` : value}
+      </div>
+    </div>
+  );
+}
+
+function EditingSpeedBadge({ speed }: { speed?: string }) {
+  if (!speed) return null;
+  const map: Record<string, { color: string; label: string }> = {
+    rápida: { color: "#ff4d4d", label: "⚡ Rápida" },
+    media: { color: "#ff9500", label: "➡ Média" },
+    média: { color: "#ff9500", label: "➡ Média" },
+    lenta: { color: "#00c896", label: "🐢 Lenta" },
+  };
+  const entry = map[speed.toLowerCase()] ?? { color: "#3BA3FF", label: speed };
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+      style={{ background: `${entry.color}20`, color: entry.color, border: `1px solid ${entry.color}40` }}
+    >
+      {entry.label}
+    </span>
+  );
+}
+
+function AiAnalysisDisplay({ analysis }: { analysis: TikTokAiAnalysis }) {
+  const [tab, setTab] = useState<"hook" | "narrativa" | "edicao" | "oferta">("hook");
+
+  const tabs = [
+    { id: "hook" as const, label: "Hook" },
+    { id: "narrativa" as const, label: "Narrativa" },
+    { id: "edicao" as const, label: "Edição" },
+    { id: "oferta" as const, label: "Oferta" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-[#0A6CFF]/25 bg-[#0A6CFF]/6 p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[#3BA3FF] font-semibold text-sm">
+          <Sparkles className="h-4 w-4" />
+          Análise IA Completa
+        </div>
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span className="font-semibold text-foreground">{analysis.niche}</span>
+          {" · "}
+          <span
+            className="px-1.5 py-0.5 rounded-full"
+            style={{ background: "rgba(255,149,0,0.15)", color: "#ff9500" }}
+          >
+            {analysis.emotion}
+          </span>
+        </div>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
+            style={
+              tab === t.id
+                ? { background: "rgba(10,108,255,0.25)", color: "#3BA3FF" }
+                : { color: "hsl(var(--muted-foreground))", background: "transparent" }
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="space-y-3">
+        {tab === "hook" && (
+          <>
+            <AiSection label="Análise do Hook" value={analysis.hook_analysis} />
+            <AiSection label="Fórmula do Hook" value={analysis.hook_formula} />
+            <AiSection label="Por que viralizou" value={analysis.virality_reason} />
+          </>
+        )}
+        {tab === "narrativa" && (
+          <>
+            <AiSection label="Promessa principal" value={analysis.promise} />
+            <AiSection label="Mecanismo único" value={analysis.mechanism} />
+            <AiSection label="Estrutura narrativa" value={analysis.narrative} />
+            <AiSection label="CTA identificado" value={analysis.cta} />
+            <AiSection label="Técnicas de retenção" value={analysis.retention} />
+          </>
+        )}
+        {tab === "edicao" && (
+          <>
+            <AiSection label="Padrão visual" value={analysis.visual_pattern} />
+            <AiSection label="Estilo de edição" value={analysis.editing_style} />
+            <div className="space-y-0.5">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Velocidade de edição
+              </div>
+              <EditingSpeedBadge speed={analysis.editing_speed} />
+            </div>
+          </>
+        )}
+        {tab === "oferta" && (
+          <>
+            <AiSection label="Ângulo de oferta" value={analysis.offer_angle} />
+            <AiSection label="Título Ebook sugerido" value={analysis.ebook_title} accent />
+            <AiSection label="Hook VSL (15s)" value={analysis.vsl_hook} italic />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── VideoModal ────────────────────────────────────────────────────────────────
 
 function VideoModal({
@@ -323,55 +459,7 @@ function VideoModal({
 
             {/* AI Analysis */}
             {row.ai_analysis ? (
-              <div className="rounded-xl border border-[#0A6CFF]/25 bg-[#0A6CFF]/6 p-4 space-y-3">
-                <div className="flex items-center gap-2 text-[#3BA3FF] font-semibold text-sm">
-                  <Sparkles className="h-4 w-4" />
-                  Análise IA
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    ["Nicho", row.ai_analysis.niche],
-                    ["Promessa", row.ai_analysis.promise],
-                    ["Emoção dominante", row.ai_analysis.emotion],
-                    ["Fórmula do Hook", row.ai_analysis.hook_formula],
-                    ["Ângulo de Oferta", row.ai_analysis.offer_angle],
-                    ["Por que viralizou", row.ai_analysis.virality_reason],
-                  ]
-                    .filter(([, v]) => v)
-                    .map(([label, value]) => (
-                      <div key={label} className="space-y-0.5">
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          {label}
-                        </div>
-                        <div className="text-foreground text-xs leading-snug">{value}</div>
-                      </div>
-                    ))}
-                </div>
-                {(row.ai_analysis.ebook_title || row.ai_analysis.vsl_hook) && (
-                  <div className="border-t border-[#0A6CFF]/20 pt-3 space-y-2">
-                    {row.ai_analysis.ebook_title && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
-                          Título Ebook sugerido
-                        </div>
-                        <div className="text-xs text-[#3BA3FF] font-medium">
-                          {row.ai_analysis.ebook_title}
-                        </div>
-                      </div>
-                    )}
-                    {row.ai_analysis.vsl_hook && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">
-                          Hook VSL (15s)
-                        </div>
-                        <div className="text-xs text-foreground italic">
-                          "{row.ai_analysis.vsl_hook}"
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <AiAnalysisDisplay analysis={row.ai_analysis} />
             ) : (
               <Button
                 onClick={() => onAnalyze(row.id)}
