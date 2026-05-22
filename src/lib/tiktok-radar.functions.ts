@@ -5,15 +5,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
 import { generateAIJson } from "@/lib/aiService";
 
-// Actor ID used for TikTok scraping.
-// Apify supports both username~actorName and username/actorName formats.
-// clockworks/tiktok-scraper is the confirmed working actor (also used in src/lib/miners/tiktok.ts).
-// Override via APIFY_TIKTOK_ACTOR in .env if needed.
+// .env: APIFY_TIKTOK_ACTOR=clockworks~tiktok-scraper
 function getTikTokActorId(): string {
-  // .trim() handles Windows \r\n line endings in .env values
   const id = process.env.APIFY_TIKTOK_ACTOR?.trim();
   if (id) return id;
-  return "clockworks/tiktok-scraper";
+  return "clockworks~tiktok-scraper";
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -143,14 +139,16 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
     const cleanHashtag = hashtag.replace(/^#+/, "").trim();
     const actorId = getTikTokActorId();
 
-    console.log(`[tiktok-radar] actor=${actorId} hashtag="${cleanHashtag}" limit=${limit}`);
-
-    // clockworks/tiktok-scraper accepts searchQueries (with # prefix) and resultsLimit.
-    // Confirmed by src/lib/miners/tiktok.ts which uses the same actor.
     const payload = {
-      searchQueries: [`#${cleanHashtag}`],
-      resultsLimit: limit,
+      hashtags: [cleanHashtag],
+      resultsPerPage: limit,
+      proxyCountryCode: "None",
+      excludePinnedPosts: false,
+      scrapeRelatedVideos: false,
     };
+
+    console.log("[apify] url=", `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=***&timeout=120`);
+    console.log("[apify] payload=", payload);
 
     const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, payload);
 
