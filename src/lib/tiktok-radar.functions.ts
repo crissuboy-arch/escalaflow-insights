@@ -79,6 +79,23 @@ function normalizeItem(item: Record<string, unknown>, hashtag: string) {
     pickStr(item, ["musicMeta.musicName", "music", "audioTitle", "sound_name"]) ?? "";
   const createTime = pickStr(item, ["createTimeISO", "createTime", "created_at", "timestamp"]);
 
+  // Extract thumbnail/cover from various Apify field shapes
+  let thumbnailUrl = "";
+  const covers = getPath(item, "covers");
+  if (Array.isArray(covers) && covers.length > 0 && typeof covers[0] === "string") {
+    thumbnailUrl = covers[0];
+  } else {
+    thumbnailUrl =
+      pickStr(item, [
+        "videoMeta.coverUrl",
+        "cover",
+        "coverImageUrl",
+        "thumbnail",
+        "dynamicCover",
+        "originCover",
+      ]) ?? "";
+  }
+
   const viralScore = Math.min(
     100,
     Math.round(
@@ -93,6 +110,7 @@ function normalizeItem(item: Record<string, unknown>, hashtag: string) {
     video_id: videoId,
     creator,
     video_url: videoUrl,
+    thumbnail_url: thumbnailUrl,
     hook,
     hashtags,
     views,
