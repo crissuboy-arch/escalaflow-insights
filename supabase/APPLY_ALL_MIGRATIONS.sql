@@ -434,8 +434,7 @@ CREATE POLICY "user_ad_actions insert own" ON public.user_ad_actions FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "user_ad_actions delete own" ON public.user_ad_actions FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
-
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.user_ad_actions;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.user_ad_actions;
 ALTER TABLE public.user_ad_actions REPLICA IDENTITY FULL;
 
 -- ============================================================================
@@ -910,13 +909,13 @@ ALTER TABLE public.collected_ads ADD COLUMN IF NOT EXISTS mining_run_id UUID REF
 -- ============================================================================
 -- REALTIME
 -- ============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.offers;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.analyses;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.trends;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.mining_runs;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.saved_ads;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.favorites;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.extension_logs;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.offers;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.analyses;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.trends;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.mining_runs;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.saved_ads;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.favorites;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.extension_logs;
 
 ALTER TABLE public.offers REPLICA IDENTITY FULL;
 ALTER TABLE public.analyses REPLICA IDENTITY FULL;
