@@ -8,9 +8,9 @@ import { generateAIJson } from "@/lib/aiService";
 // Read actor from env so the same code works with any configured actor.
 // .env: APIFY_TIKTOK_ACTOR=relogios~tiktok-scraper  (~ not /, which is a path separator)
 function getTikTokActorId(): string {
-  const id = process.env.APIFY_TIKTOK_ACTOR;
+  // .trim() handles Windows \r\n line endings in .env values
+  const id = process.env.APIFY_TIKTOK_ACTOR?.trim();
   if (id) return id;
-  // Fallback uses ~ separator to avoid extra path segments in the URL.
   return "relogios~tiktok-scraper";
 }
 
@@ -157,7 +157,7 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
     if (!raw.length) return { inserted: 0, skipped: 0 };
 
     const rows = raw
-      .map((item) => normalizeItem(item, hashtag))
+      .map((item) => normalizeItem(item, cleanHashtag))
       .filter((r) => r.video_id)
       .map((r) => ({ ...r, user_id: userId }));
 

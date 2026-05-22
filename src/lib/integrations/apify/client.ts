@@ -16,7 +16,7 @@ function maskToken(token: string): string {
 
 export async function runApifyActor(actorId: string, input: any) {
   const token = getToken();
-  const response = await fetch(`${BASE}/acts/${actorId}/runs?token=${token}`, {
+  const response = await fetch(`${BASE}/acts/${actorId}/runs?token=${encodeURIComponent(token)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
