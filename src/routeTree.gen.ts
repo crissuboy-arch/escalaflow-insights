@@ -31,6 +31,7 @@ import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_auth
 import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
+import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authenticated/ebook-forge'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
@@ -166,6 +167,11 @@ const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
   path: '/escala',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEbookForgeRoute = AuthenticatedEbookForgeRouteImport.update({
+  id: '/ebook-forge',
+  path: '/ebook-forge',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
   id: '/database',
   path: '/database',
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
@@ -283,6 +290,7 @@ export interface FileRoutesByTo {
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
@@ -321,6 +329,7 @@ export interface FileRoutesById {
   '/_authenticated/criativos': typeof AuthenticatedCriativosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
+  '/_authenticated/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/google-radar': typeof AuthenticatedGoogleRadarRoute
@@ -359,6 +368,7 @@ export interface FileRouteTypes {
     | '/criativos'
     | '/dashboard'
     | '/database'
+    | '/ebook-forge'
     | '/escala'
     | '/favoritos'
     | '/google-radar'
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/criativos'
     | '/dashboard'
     | '/database'
+    | '/ebook-forge'
     | '/escala'
     | '/favoritos'
     | '/google-radar'
@@ -432,6 +443,7 @@ export interface FileRouteTypes {
     | '/_authenticated/criativos'
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
+    | '/_authenticated/ebook-forge'
     | '/_authenticated/escala'
     | '/_authenticated/favoritos'
     | '/_authenticated/google-radar'
@@ -622,6 +634,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEscalaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/ebook-forge': {
+      id: '/_authenticated/ebook-forge'
+      path: '/ebook-forge'
+      fullPath: '/ebook-forge'
+      preLoaderRoute: typeof AuthenticatedEbookForgeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/database': {
       id: '/_authenticated/database'
       path: '/database'
@@ -752,6 +771,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCriativosRoute: typeof AuthenticatedCriativosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
+  AuthenticatedEbookForgeRoute: typeof AuthenticatedEbookForgeRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedGoogleRadarRoute: typeof AuthenticatedGoogleRadarRoute
@@ -783,6 +803,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCriativosRoute: AuthenticatedCriativosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
+  AuthenticatedEbookForgeRoute: AuthenticatedEbookForgeRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedGoogleRadarRoute: AuthenticatedGoogleRadarRoute,

@@ -1180,6 +1180,100 @@ create policy "users own page_builder_projects"
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================================
+-- TABELA: anuncios_salvos
+-- ============================================================================
+create table if not exists public.anuncios_salvos (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  source         text not null default 'tiktok',
+  video_id       text not null default '',
+  creator        text not null default '',
+  hook           text not null default '',
+  description    text not null default '',
+  thumbnail_url  text not null default '',
+  video_url      text not null default '',
+  views          bigint not null default 0,
+  likes          bigint not null default 0,
+  comments       bigint not null default 0,
+  shares         bigint not null default 0,
+  viral_score    int not null default 0,
+  enhanced_score int not null default 0,
+  hashtags       text[] not null default '{}',
+  ai_analysis    jsonb,
+  tags           text[] default '{}',
+  notes          text,
+  created_at     timestamptz not null default now()
+);
+create index if not exists anuncios_salvos_user_idx on public.anuncios_salvos(user_id, created_at desc);
+create unique index if not exists anuncios_salvos_user_video_idx
+  on public.anuncios_salvos(user_id, video_id)
+  where video_id != '';
+alter table public.anuncios_salvos enable row level security;
+drop policy if exists "users own anuncios_salvos" on public.anuncios_salvos;
+create policy "users own anuncios_salvos" on public.anuncios_salvos
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: anuncios_escalados
+-- ============================================================================
+create table if not exists public.anuncios_escalados (
+  id             uuid primary key default gen_random_uuid(),
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  source         text not null default 'tiktok',
+  video_id       text not null default '',
+  creator        text not null default '',
+  hook           text not null default '',
+  description    text not null default '',
+  thumbnail_url  text not null default '',
+  video_url      text not null default '',
+  views          bigint not null default 0,
+  likes          bigint not null default 0,
+  comments       bigint not null default 0,
+  shares         bigint not null default 0,
+  viral_score    int not null default 0,
+  enhanced_score int not null default 0,
+  hashtags       text[] not null default '{}',
+  ai_analysis    jsonb,
+  playbook       jsonb,
+  tags           text[] default '{}',
+  notes          text,
+  scaled_at      timestamptz not null default now(),
+  created_at     timestamptz not null default now()
+);
+create index if not exists anuncios_escalados_user_idx on public.anuncios_escalados(user_id, scaled_at desc);
+create unique index if not exists anuncios_escalados_user_video_idx
+  on public.anuncios_escalados(user_id, video_id)
+  where video_id != '';
+alter table public.anuncios_escalados enable row level security;
+drop policy if exists "users own anuncios_escalados" on public.anuncios_escalados;
+create policy "users own anuncios_escalados" on public.anuncios_escalados
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: creators_salvos
+-- ============================================================================
+create table if not exists public.creators_salvos (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  creator         text not null,
+  source          text not null default 'tiktok',
+  profile_url     text not null default '',
+  total_videos    int not null default 0,
+  avg_views       bigint not null default 0,
+  avg_viral_score int not null default 0,
+  top_hashtags    text[] not null default '{}',
+  notes           text,
+  saved_at        timestamptz not null default now()
+);
+create index if not exists creators_salvos_user_idx on public.creators_salvos(user_id, saved_at desc);
+create unique index if not exists creators_salvos_user_creator_idx
+  on public.creators_salvos(user_id, creator, source);
+alter table public.creators_salvos enable row level security;
+drop policy if exists "users own creators_salvos" on public.creators_salvos;
+create policy "users own creators_salvos" on public.creators_salvos
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ============================================================================
 -- VERIFICAÇÃO FINAL: lista todas as tabelas criadas
 -- ============================================================================
 SELECT tablename

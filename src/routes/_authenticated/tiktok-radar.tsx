@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,6 @@ import {
   X,
   Hash,
   ChevronRight,
-  Flame,
   Play,
   ShoppingBag,
   Zap,
@@ -31,7 +30,13 @@ import {
   Bookmark,
   Copy,
   FileText,
-  Star,
+  CheckCircle2,
+  Flame,
+  Library,
+  ShoppingCart,
+  ChevronDown,
+  ChevronUp,
+  Rocket,
 } from "lucide-react";
 import {
   mineTikTokHashtagFn,
@@ -39,14 +44,18 @@ import {
   analyzeTikTokVideoFn,
   deleteTikTokVideoFn,
   clearTikTokHashtagFn,
+  saveAnuncioFn,
+  escalateAnuncioFn,
+  saveCreatorFn,
+  generatePlaybookFn,
 } from "@/lib/tiktok-radar.functions";
-import type { TikTokAiAnalysis } from "@/lib/tiktok-radar.functions";
+import type { TikTokAiAnalysis, TikTokPlaybook } from "@/lib/tiktok-radar.functions";
 
 export const Route = createFileRoute("/_authenticated/tiktok-radar")({
   component: TikTokRadarPage,
 });
 
-// ── Tab definitions ──────────────────────────────────────────────────────────
+// ── Tab definitions ───────────────────────────────────────────────────────────
 
 type RadarTab =
   | "trending"
@@ -55,7 +64,9 @@ type RadarTab =
   | "ads-spy"
   | "creators"
   | "winning-products"
-  | "vsls";
+  | "vsls"
+  | "hooks-library"
+  | "shop-radar";
 
 const TABS: {
   id: RadarTab;
@@ -64,55 +75,24 @@ const TABS: {
   defaultHashtag: string;
   description: string;
 }[] = [
-  {
-    id: "trending",
-    label: "Trending",
-    icon: TrendingUp,
-    defaultHashtag: "viral",
-    description: "Vídeos em alta agora — ordenados pelo viral score",
-  },
-  {
-    id: "viral-hooks",
-    label: "Viral Hooks",
-    icon: Zap,
-    defaultHashtag: "hook",
-    description: "Os melhores hooks virais (score 60+)",
-  },
-  {
-    id: "tiktok-shop",
-    label: "TikTok Shop",
-    icon: ShoppingBag,
-    defaultHashtag: "tiktokshop",
-    description: "Produtos virais na TikTok Shop",
-  },
-  {
-    id: "ads-spy",
-    label: "Ads Spy",
-    icon: Megaphone,
-    defaultHashtag: "adsnotsponsored",
-    description: "Criativos e anúncios em evidência",
-  },
-  {
-    id: "creators",
-    label: "Creators",
-    icon: Users,
-    defaultHashtag: "contentcreator",
-    description: "Top criadores por nicho",
-  },
-  {
-    id: "winning-products",
-    label: "Winning Products",
-    icon: Trophy,
-    defaultHashtag: "dropshipping",
-    description: "Produtos ganhadores validados pelo mercado",
-  },
-  {
-    id: "vsls",
-    label: "VSLs",
-    icon: Clapperboard,
-    defaultHashtag: "vsl",
-    description: "Video Sales Letters de alta conversão",
-  },
+  { id: "trending",         label: "Trending",         icon: TrendingUp,  defaultHashtag: "viral",           description: "Vídeos em alta agora — ordenados pelo viral score" },
+  { id: "viral-hooks",      label: "Viral Hooks",       icon: Zap,         defaultHashtag: "hook",            description: "Os melhores hooks virais (score 60+)" },
+  { id: "tiktok-shop",      label: "TikTok Shop",       icon: ShoppingBag, defaultHashtag: "tiktokshop",      description: "Produtos virais na TikTok Shop" },
+  { id: "ads-spy",          label: "Ads Spy",           icon: Megaphone,   defaultHashtag: "adsnotsponsored", description: "Criativos e anúncios em evidência" },
+  { id: "creators",         label: "Creators",          icon: Users,       defaultHashtag: "contentcreator",  description: "Top criadores por nicho" },
+  { id: "winning-products", label: "Winning Products",  icon: Trophy,      defaultHashtag: "dropshipping",    description: "Produtos ganhadores validados pelo mercado" },
+  { id: "vsls",             label: "VSLs",              icon: Clapperboard,defaultHashtag: "vsl",             description: "Video Sales Letters de alta conversão" },
+  { id: "hooks-library",    label: "Hooks Library",     icon: Library,     defaultHashtag: "hook",            description: "Biblioteca de hooks virais catalogados por fórmula" },
+  { id: "shop-radar",       label: "Shop Radar",        icon: ShoppingCart,defaultHashtag: "tiktokshop",      description: "Radar TikTok Shop — produtos, creators, UGC, anúncios e VSLs" },
+];
+
+type ShopSubTab = "produtos" | "creators" | "ugc" | "anuncios" | "vsls";
+const SHOP_SUBTABS: { id: ShopSubTab; label: string; hashtags: string[]; keywords: string[] }[] = [
+  { id: "produtos",  label: "Produtos Virais", hashtags: ["tiktokshop","shopnow","produto","compre","tiktokmademebuyit"], keywords: [] },
+  { id: "creators",  label: "Creators",        hashtags: ["ugccreator","contentcreator","creatortiktok"],                keywords: [] },
+  { id: "ugc",       label: "UGC",             hashtags: ["unboxing","review","testei","comprei","ugc"],                keywords: ["unboxing","review","testei","comprei"] },
+  { id: "anuncios",  label: "Anúncios",        hashtags: ["ugcads","ads","sponsored","ad","publi"],                     keywords: [] },
+  { id: "vsls",      label: "VSLs",            hashtags: ["vsl","videovendas","salesletter"],                           keywords: ["vsl","video de vendas"] },
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -138,11 +118,19 @@ type TikTokRow = {
   created_at: string;
 };
 
+type EnhancedScore = {
+  score: number;
+  tier: "Escalando" | "Quente" | "Médio" | "Fraco";
+  icon: string;
+  color: string;
+  breakdown: { label: string; pts: number }[];
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtNum(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1_000)     return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
 }
 
@@ -150,50 +138,139 @@ function creatorInitial(name: string): string {
   return (name?.[0] ?? "?").toUpperCase();
 }
 
+function calcEnhancedScore(row: TikTokRow): EnhancedScore {
+  const breakdown: { label: string; pts: number }[] = [];
+
+  // Base from engagement (max 55)
+  const baseViews  = row.views   > 0 ? Math.round(Math.log10(Math.max(1, row.views))  * 7) : 0;
+  const baseLikes  = row.likes   > 0 ? Math.round(Math.log10(Math.max(1, row.likes))  * 3) : 0;
+  const baseShares = row.shares  > 0 ? Math.round(Math.log10(Math.max(1, row.shares)) * 3) : 0;
+  const base = Math.min(55, baseViews + baseLikes + baseShares);
+  if (base > 0) breakdown.push({ label: "Engajamento base", pts: base });
+
+  let bonus = 0;
+
+  // Comment ratio — qualidade do engajamento
+  if (row.views > 0 && row.comments > 0) {
+    const r = row.comments / row.views;
+    const pts = r > 0.02 ? 8 : r > 0.01 ? 4 : 0;
+    if (pts) { bonus += pts; breakdown.push({ label: "Taxa de comentários", pts }); }
+  }
+
+  // Share ratio — viralidade
+  if (row.views > 0 && row.shares > 0) {
+    const r = row.shares / row.views;
+    const pts = r > 0.01 ? 10 : r > 0.005 ? 5 : 0;
+    if (pts) { bonus += pts; breakdown.push({ label: "Taxa de compartilhamento", pts }); }
+  }
+
+  // AI bonuses
+  if (row.ai_analysis) {
+    const ai = row.ai_analysis;
+    const speed = ai.editing_speed?.toLowerCase() ?? "";
+    const speedPts = speed === "rápida" ? 8 : (speed === "média" || speed === "media") ? 4 : 0;
+    if (speedPts) { bonus += speedPts; breakdown.push({ label: `Edição ${ai.editing_speed}`, pts: speedPts }); }
+
+    const retention = ai.retention?.toLowerCase() ?? "";
+    const retPts = retention.includes("loop") || retention.includes("suspense") ? 8 : retention.length > 10 ? 4 : 0;
+    if (retPts) { bonus += retPts; breakdown.push({ label: "Técnicas de retenção", pts: retPts }); }
+
+    if (ai.hook_formula && ai.hook_formula.length > 5) { bonus += 6; breakdown.push({ label: "Fórmula do hook", pts: 6 }); }
+    if (ai.hook_analysis && ai.hook_analysis.length > 20) { bonus += 4; breakdown.push({ label: "Análise do hook", pts: 4 }); }
+  }
+
+  const score = Math.min(100, base + bonus);
+  const [tier, icon, color] =
+    score >= 85 ? ["Escalando", "🔥", "#ff4d4d"] as const :
+    score >= 65 ? ["Quente",    "⚡", "#ff9500"] as const :
+    score >= 40 ? ["Médio",     "🟡", "#f5c400"] as const :
+                  ["Fraco",     "⚪", "#6b7280"] as const;
+
+  return { score, tier, icon, color, breakdown };
+}
+
+function rowToAdPayload(row: TikTokRow, enhanced: EnhancedScore) {
+  return {
+    video_id:      row.video_id,
+    creator:       row.creator,
+    hook:          row.hook,
+    description:   row.description,
+    thumbnail_url: row.thumbnail_url,
+    video_url:     row.video_url,
+    views:         row.views,
+    likes:         row.likes,
+    comments:      row.comments,
+    shares:        row.shares,
+    viral_score:   row.viral_score,
+    enhanced_score: enhanced.score,
+    hashtags:      row.hashtags,
+    ai_analysis:   row.ai_analysis as Record<string, unknown> | null,
+    source:        "tiktok",
+  };
+}
+
 // ── ViralBadge ────────────────────────────────────────────────────────────────
 
 function ViralBadge({ score }: { score: number }) {
-  const [color, label, icon] =
-    score >= 70
-      ? ["#ff4d4d", "Viral", "🔥"]
-      : score >= 45
-        ? ["#ff9500", "Quente", "⚡"]
-        : ["#3BA3FF", "Normal", ""];
+  const [color, label] =
+    score >= 70 ? ["#ff4d4d", "🔥 Viral"] :
+    score >= 45 ? ["#ff9500", "⚡ Quente"] :
+                  ["#3BA3FF", "Normal"];
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
-      style={{
-        background: `${color}20`,
-        color,
-        border: `1px solid ${color}40`,
-      }}
-    >
-      {icon} {score} · {label}
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap"
+      style={{ background: `${color}20`, color, border: `1px solid ${color}40` }}>
+      {label}
     </span>
   );
 }
 
-// ── AiAnalysisDisplay ─────────────────────────────────────────────────────────
+// ── EnhancedScoreDisplay ──────────────────────────────────────────────────────
 
-function AiSection({
-  label,
-  value,
-  accent,
-  italic,
-}: {
-  label: string;
-  value?: string;
-  accent?: boolean;
-  italic?: boolean;
-}) {
+function EnhancedScoreDisplay({ es }: { es: EnhancedScore }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground uppercase tracking-wider">Score Profissional</span>
+        </div>
+        <button onClick={() => setOpen(v => !v)} className="text-muted-foreground hover:text-foreground transition-colors">
+          {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="text-2xl font-black" style={{ color: es.color }}>{es.icon} {es.score}</div>
+        <div>
+          <div className="text-sm font-bold" style={{ color: es.color }}>{es.tier}</div>
+          <div className="w-28 h-1.5 rounded-full bg-white/10 mt-1 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${es.score}%`, background: es.color }} />
+          </div>
+        </div>
+      </div>
+      {open && (
+        <div className="space-y-1 pt-1 border-t border-white/8">
+          {es.breakdown.map(({ label, pts }) => (
+            <div key={label} className="flex justify-between text-[10px] text-muted-foreground">
+              <span>{label}</span>
+              <span className="font-mono text-foreground/70">+{pts}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── AiSection helper ──────────────────────────────────────────────────────────
+
+function AiSection({ label, value, accent, italic }: { label: string; value?: string; accent?: boolean; italic?: boolean }) {
   if (!value) return null;
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div
-        className={`text-xs leading-snug ${italic ? "italic" : ""}`}
-        style={accent ? { color: "#3BA3FF", fontWeight: 600 } : { color: "hsl(var(--foreground))" }}
-      >
+      <div className={`text-xs leading-snug ${italic ? "italic" : ""}`}
+        style={accent ? { color: "#3BA3FF", fontWeight: 600 } : { color: "hsl(var(--foreground))" }}>
         {italic ? `"${value}"` : value}
       </div>
     </div>
@@ -204,108 +281,291 @@ function EditingSpeedBadge({ speed }: { speed?: string }) {
   if (!speed) return null;
   const map: Record<string, { color: string; label: string }> = {
     rápida: { color: "#ff4d4d", label: "⚡ Rápida" },
-    media: { color: "#ff9500", label: "➡ Média" },
-    média: { color: "#ff9500", label: "➡ Média" },
-    lenta: { color: "#00c896", label: "🐢 Lenta" },
+    media:  { color: "#ff9500", label: "➡ Média"  },
+    média:  { color: "#ff9500", label: "➡ Média"  },
+    lenta:  { color: "#00c896", label: "🐢 Lenta"  },
   };
-  const entry = map[speed.toLowerCase()] ?? { color: "#3BA3FF", label: speed };
+  const e = map[speed.toLowerCase()] ?? { color: "#3BA3FF", label: speed };
   return (
-    <span
-      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
-      style={{ background: `${entry.color}20`, color: entry.color, border: `1px solid ${entry.color}40` }}
-    >
-      {entry.label}
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+      style={{ background: `${e.color}20`, color: e.color, border: `1px solid ${e.color}40` }}>
+      {e.label}
     </span>
   );
 }
 
+// ── AiAnalysisDisplay ─────────────────────────────────────────────────────────
+
 function AiAnalysisDisplay({ analysis }: { analysis: TikTokAiAnalysis }) {
   const [tab, setTab] = useState<"hook" | "narrativa" | "edicao" | "oferta">("hook");
-
   const tabs = [
-    { id: "hook" as const, label: "Hook" },
+    { id: "hook" as const,     label: "Hook"     },
     { id: "narrativa" as const, label: "Narrativa" },
-    { id: "edicao" as const, label: "Edição" },
-    { id: "oferta" as const, label: "Oferta" },
+    { id: "edicao" as const,   label: "Edição"   },
+    { id: "oferta" as const,   label: "Oferta"   },
   ];
-
   return (
     <div className="rounded-xl border border-[#0A6CFF]/25 bg-[#0A6CFF]/6 p-4 space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#3BA3FF] font-semibold text-sm">
-          <Sparkles className="h-4 w-4" />
-          Análise IA Completa
+          <Sparkles className="h-4 w-4" /> Análise IA
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
           <span className="font-semibold text-foreground">{analysis.niche}</span>
           {" · "}
-          <span
-            className="px-1.5 py-0.5 rounded-full"
-            style={{ background: "rgba(255,149,0,0.15)", color: "#ff9500" }}
-          >
+          <span className="px-1.5 py-0.5 rounded-full" style={{ background: "rgba(255,149,0,0.15)", color: "#ff9500" }}>
             {analysis.emotion}
           </span>
         </div>
       </div>
-
-      {/* Sub-tabs */}
       <div className="flex gap-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
             className="px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all"
-            style={
-              tab === t.id
-                ? { background: "rgba(10,108,255,0.25)", color: "#3BA3FF" }
-                : { color: "hsl(var(--muted-foreground))", background: "transparent" }
-            }
-          >
+            style={tab === t.id ? { background: "rgba(10,108,255,0.25)", color: "#3BA3FF" } : { color: "hsl(var(--muted-foreground))" }}>
             {t.label}
           </button>
         ))}
       </div>
-
-      {/* Tab content */}
       <div className="space-y-3">
-        {tab === "hook" && (
-          <>
-            <AiSection label="Análise do Hook" value={analysis.hook_analysis} />
-            <AiSection label="Fórmula do Hook" value={analysis.hook_formula} />
-            <AiSection label="Por que viralizou" value={analysis.virality_reason} />
-          </>
-        )}
-        {tab === "narrativa" && (
-          <>
-            <AiSection label="Promessa principal" value={analysis.promise} />
-            <AiSection label="Mecanismo único" value={analysis.mechanism} />
-            <AiSection label="Estrutura narrativa" value={analysis.narrative} />
-            <AiSection label="CTA identificado" value={analysis.cta} />
-            <AiSection label="Técnicas de retenção" value={analysis.retention} />
-          </>
-        )}
-        {tab === "edicao" && (
-          <>
-            <AiSection label="Padrão visual" value={analysis.visual_pattern} />
-            <AiSection label="Estilo de edição" value={analysis.editing_style} />
-            <div className="space-y-0.5">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Velocidade de edição
-              </div>
-              <EditingSpeedBadge speed={analysis.editing_speed} />
-            </div>
-          </>
-        )}
-        {tab === "oferta" && (
-          <>
-            <AiSection label="Ângulo de oferta" value={analysis.offer_angle} />
-            <AiSection label="Título Ebook sugerido" value={analysis.ebook_title} accent />
-            <AiSection label="Hook VSL (15s)" value={analysis.vsl_hook} italic />
-          </>
-        )}
+        {tab === "hook" && <>
+          <AiSection label="Análise do Hook"  value={analysis.hook_analysis} />
+          <AiSection label="Fórmula do Hook"  value={analysis.hook_formula} />
+          <AiSection label="Por que viralizou" value={analysis.virality_reason} />
+        </>}
+        {tab === "narrativa" && <>
+          <AiSection label="Promessa principal"   value={analysis.promise} />
+          <AiSection label="Mecanismo único"      value={analysis.mechanism} />
+          <AiSection label="Estrutura narrativa"  value={analysis.narrative} />
+          <AiSection label="CTA identificado"     value={analysis.cta} />
+          <AiSection label="Técnicas de retenção" value={analysis.retention} />
+        </>}
+        {tab === "edicao" && <>
+          <AiSection label="Padrão visual"   value={analysis.visual_pattern} />
+          <AiSection label="Estilo de edição" value={analysis.editing_style} />
+          <div className="space-y-0.5">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Velocidade</div>
+            <EditingSpeedBadge speed={analysis.editing_speed} />
+          </div>
+        </>}
+        {tab === "oferta" && <>
+          <AiSection label="Ângulo de oferta"       value={analysis.offer_angle} />
+          <AiSection label="Título Ebook sugerido"  value={analysis.ebook_title} accent />
+          <AiSection label="Hook VSL (15s)"         value={analysis.vsl_hook} italic />
+        </>}
       </div>
     </div>
+  );
+}
+
+// ── PlaybookModal ─────────────────────────────────────────────────────────────
+
+function PlaybookModal({
+  playbook,
+  row,
+  loading,
+  onClose,
+  onEscalate,
+  escalating,
+  escalated,
+}: {
+  playbook: TikTokPlaybook | null;
+  row: TikTokRow;
+  loading: boolean;
+  onClose: () => void;
+  onEscalate: () => void;
+  escalating: boolean;
+  escalated: boolean;
+}) {
+  const [vslOpen, setVslOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyAll = () => {
+    if (!playbook) return;
+    const text = [
+      `HEADLINE: ${playbook.headline}`,
+      `PROMESSA: ${playbook.promise}`,
+      `MECANISMO: ${playbook.mechanism}`,
+      `PÚBLICO: ${playbook.target_audience}`,
+      `OFERTA: ${playbook.offer_structure}`,
+      `ÂNGULO: ${playbook.angle}`,
+      `CTA: ${playbook.cta}`,
+      `\nCRIATIVOS:\n${playbook.creatives?.map((c, i) => `${i + 1}. ${c}`).join("\n")}`,
+      `\nFUNIL: ${playbook.funnel}`,
+      `\nESTRATÉGIA:\n${playbook.strategy}`,
+      `\nROTEIRO VSL:\n${playbook.vsl_script}`,
+    ].join("\n\n");
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative w-full max-w-3xl rounded-2xl border border-white/10 overflow-hidden"
+        style={{ background: "#080812", boxShadow: "0 30px 90px rgba(0,0,0,0.8)", maxHeight: "90vh" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8"
+          style={{ background: "linear-gradient(135deg, rgba(10,108,255,0.12), rgba(255,0,80,0.06))" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #0A6CFF, #ff0050)" }}>
+              <Rocket className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-foreground">Playbook Automático</div>
+              <div className="text-[10px] text-muted-foreground">@{row.creator}</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-full p-2 bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(90vh - 130px)" }}>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 rounded-full border-2 border-[#0A6CFF]/30" />
+                <div className="absolute inset-0 rounded-full border-2 border-[#0A6CFF] border-t-transparent animate-spin" />
+                <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-[#3BA3FF]" />
+              </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-foreground">Gerando Playbook...</div>
+                <div className="text-xs text-muted-foreground mt-1">A IA está analisando o vídeo e montando a estratégia</div>
+              </div>
+            </div>
+          ) : playbook ? (
+            <div className="p-5 space-y-5">
+              {/* Headline */}
+              <div className="rounded-xl border border-[#0A6CFF]/30 p-4"
+                style={{ background: "linear-gradient(135deg, rgba(10,108,255,0.08), rgba(0,0,0,0))" }}>
+                <div className="text-[10px] uppercase tracking-wider text-[#3BA3FF] mb-2">Headline Principal</div>
+                <div className="text-lg font-bold text-foreground leading-tight">{playbook.headline}</div>
+              </div>
+
+              {/* Promise + Mechanism */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Promessa</div>
+                  <div className="text-xs text-foreground leading-snug">{playbook.promise}</div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Mecanismo Único</div>
+                  <div className="text-xs text-foreground leading-snug">{playbook.mechanism}</div>
+                </div>
+              </div>
+
+              {/* Audience + Angle */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Público-Alvo</div>
+                  <div className="text-xs text-foreground leading-snug">{playbook.target_audience}</div>
+                </div>
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Ângulo de Marketing</div>
+                  <div className="text-xs text-foreground leading-snug">{playbook.angle}</div>
+                </div>
+              </div>
+
+              {/* Offer + CTA */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Estrutura da Oferta</div>
+                  <div className="text-xs text-foreground leading-snug">{playbook.offer_structure}</div>
+                </div>
+                <div className="rounded-xl border border-[#00c896]/30 bg-[#00c896]/5 p-3 space-y-1">
+                  <div className="text-[10px] uppercase tracking-wider text-[#00c896]">CTA</div>
+                  <div className="text-sm font-bold text-foreground">"{playbook.cta}"</div>
+                </div>
+              </div>
+
+              {/* Creatives */}
+              {playbook.creatives?.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">3 Ideias de Criativos</div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {playbook.creatives.map((c, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/3 p-3">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold"
+                          style={{ background: i === 0 ? "#ff0050" : i === 1 ? "#0A6CFF" : "#ff9500", color: "#fff" }}>
+                          {i + 1}
+                        </div>
+                        <div className="text-xs text-foreground leading-snug">{c}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Funnel */}
+              <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-1">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Funil de Vendas</div>
+                <div className="text-xs text-foreground leading-snug font-mono">{playbook.funnel}</div>
+              </div>
+
+              {/* Strategy */}
+              {playbook.strategy && (
+                <div className="rounded-xl border border-white/8 bg-white/3 p-3 space-y-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Estratégia 30 Dias</div>
+                  <div className="space-y-1">
+                    {playbook.strategy.split("\n").filter(Boolean).map((step, i) => (
+                      <div key={i} className="text-xs text-foreground leading-snug">{step}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* VSL Script (collapsible) */}
+              <div className="rounded-xl border border-[#ff9500]/20 bg-[#ff9500]/5 overflow-hidden">
+                <button
+                  onClick={() => setVslOpen(v => !v)}
+                  className="w-full flex items-center justify-between p-3 text-left hover:bg-white/3 transition-colors">
+                  <div className="text-[10px] uppercase tracking-wider text-[#ff9500] flex items-center gap-2">
+                    <Video className="h-3.5 w-3.5" /> Roteiro VSL (90s)
+                  </div>
+                  {vslOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </button>
+                {vslOpen && (
+                  <div className="px-3 pb-3 text-xs text-foreground leading-relaxed whitespace-pre-line border-t border-[#ff9500]/15">
+                    {playbook.vsl_script}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {/* Footer */}
+        {playbook && !loading && (
+          <div className="flex gap-2 p-4 border-t border-white/8">
+            <Button onClick={onEscalate} disabled={escalating || escalated}
+              className="flex-1 gap-2"
+              style={{ background: escalated ? "#00c896" : "linear-gradient(135deg, #0A6CFF, #ff0050)", color: "#fff" }}>
+              {escalating ? <Loader2 className="h-4 w-4 animate-spin" /> :
+               escalated   ? <CheckCircle2 className="h-4 w-4" /> :
+                             <Rocket className="h-4 w-4" />}
+              {escalated ? "Salvo em Escalados!" : "Salvar em Ofertas Escaladas"}
+            </Button>
+            <Button variant="outline" onClick={copyAll} className="gap-2 border-white/10 hover:bg-white/5">
+              {copied ? <CheckCircle2 className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+              {copied ? "Copiado!" : "Copiar"}
+            </Button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -317,75 +577,54 @@ function VideoModal({
   onAnalyze,
   analyzing,
   onAction,
+  savedIds,
+  escalatedIds,
 }: {
   row: TikTokRow;
   onClose: () => void;
   onAnalyze: (id: string) => void;
   analyzing: boolean;
   onAction: (action: string, row: TikTokRow) => void;
+  savedIds: Set<string>;
+  escalatedIds: Set<string>;
 }) {
-  const embedUrl = row.video_id
-    ? `https://www.tiktok.com/embed/v2/${row.video_id}`
-    : null;
+  const embedUrl = row.video_id ? `https://www.tiktok.com/embed/v2/${row.video_id}` : null;
+  const es = useMemo(() => calcEnhancedScore(row), [row]);
+  const isSaved     = savedIds.has(row.id);
+  const isEscalated = escalatedIds.has(row.id);
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onClick={e => e.target === e.currentTarget && onClose()}
     >
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        exit={{ opacity: 0, scale: 0.95 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         className="relative w-full max-w-5xl rounded-2xl border border-white/10 overflow-hidden"
-        style={{
-          background: "#0a0a12",
-          boxShadow: "0 25px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05)",
-          maxHeight: "92vh",
-        }}
+        style={{ background: "#0a0a12", boxShadow: "0 25px 80px rgba(0,0,0,0.8)", maxHeight: "92vh" }}
       >
-        {/* Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-20 rounded-full p-2 bg-white/8 hover:bg-white/15 text-muted-foreground hover:text-foreground transition-colors"
-        >
+        <button onClick={onClose}
+          className="absolute top-4 right-4 z-20 rounded-full p-2 bg-white/8 hover:bg-white/15 text-muted-foreground hover:text-foreground transition-colors">
           <X className="h-4 w-4" />
         </button>
 
         <div className="flex flex-col lg:flex-row overflow-auto" style={{ maxHeight: "92vh" }}>
-          {/* ── Video panel ── */}
-          <div
-            className="lg:w-[300px] xl:w-[320px] shrink-0 flex-col bg-black overflow-hidden"
-            style={{ minHeight: 400 }}
-          >
+          {/* Video panel */}
+          <div className="lg:w-[300px] xl:w-[320px] shrink-0 bg-black overflow-hidden" style={{ minHeight: 400 }}>
             {embedUrl ? (
-              <iframe
-                src={embedUrl}
-                className="w-full"
-                style={{ height: 560, border: 0 }}
-                allowFullScreen
-                allow="encrypted-media"
-                title="TikTok Video"
-              />
+              <iframe src={embedUrl} className="w-full" style={{ height: 560, border: 0 }}
+                allowFullScreen allow="encrypted-media" title="TikTok Video" />
             ) : (
-              <div
-                className="flex flex-col items-center justify-center text-muted-foreground"
-                style={{ height: 560 }}
-              >
+              <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: 560 }}>
                 <Play className="h-12 w-12 mb-3 opacity-20" />
                 <p className="text-sm">Vídeo indisponível</p>
                 {row.video_url && (
-                  <a
-                    href={row.video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 text-xs text-[#3BA3FF] hover:underline"
-                  >
+                  <a href={row.video_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-[#3BA3FF] hover:underline">
                     Abrir no TikTok
                   </a>
                 )}
@@ -393,16 +632,12 @@ function VideoModal({
             )}
           </div>
 
-          {/* ── Details panel ── */}
-          <div className="flex-1 p-5 space-y-5 overflow-y-auto" style={{ maxHeight: 560 }}>
-            {/* Creator & badge */}
+          {/* Details panel */}
+          <div className="flex-1 p-5 space-y-4 overflow-y-auto" style={{ maxHeight: 560 }}>
+            {/* Creator */}
             <div className="flex items-start gap-3 pr-8">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                style={{
-                  background: "linear-gradient(135deg, #ff0050, #00f2ea)",
-                }}
-              >
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}>
                 {creatorInitial(row.creator)}
               </div>
               <div className="flex-1 min-w-0">
@@ -416,18 +651,18 @@ function VideoModal({
               </div>
             </div>
 
-            {/* Stats grid */}
+            {/* Enhanced Score */}
+            <EnhancedScoreDisplay es={es} />
+
+            {/* Stats */}
             <div className="grid grid-cols-4 gap-2">
               {[
-                { icon: Eye, label: "Views", val: row.views, color: "#3BA3FF" },
-                { icon: Heart, label: "Likes", val: row.likes, color: "#ff4d4d" },
-                { icon: MessageCircle, label: "Coment.", val: row.comments, color: "#ff9500" },
-                { icon: Share2, label: "Shares", val: row.shares, color: "#00c896" },
+                { icon: Eye,           label: "Views",    val: row.views,    color: "#3BA3FF" },
+                { icon: Heart,         label: "Likes",    val: row.likes,    color: "#ff4d4d" },
+                { icon: MessageCircle, label: "Coment.",  val: row.comments, color: "#ff9500" },
+                { icon: Share2,        label: "Shares",   val: row.shares,   color: "#00c896" },
               ].map(({ icon: Icon, label, val, color }) => (
-                <div
-                  key={label}
-                  className="text-center rounded-xl border border-white/8 bg-white/3 py-2 px-1"
-                >
+                <div key={label} className="text-center rounded-xl border border-white/8 bg-white/3 py-2 px-1">
                   <Icon className="h-3.5 w-3.5 mx-auto mb-1" style={{ color }} />
                   <div className="text-sm font-bold text-foreground">{fmtNum(val)}</div>
                   <div className="text-[10px] text-muted-foreground">{label}</div>
@@ -438,13 +673,8 @@ function VideoModal({
             {/* Hashtags */}
             {row.hashtags?.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {row.hashtags.map((h) => (
-                  <span
-                    key={h}
-                    className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]"
-                  >
-                    #{h}
-                  </span>
+                {row.hashtags.map(h => (
+                  <span key={h} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]">#{h}</span>
                 ))}
               </div>
             )}
@@ -461,56 +691,40 @@ function VideoModal({
             {row.ai_analysis ? (
               <AiAnalysisDisplay analysis={row.ai_analysis} />
             ) : (
-              <Button
-                onClick={() => onAnalyze(row.id)}
-                disabled={analyzing}
+              <Button onClick={() => onAnalyze(row.id)} disabled={analyzing}
                 className="w-full bg-[#0A6CFF] hover:bg-[#0A6CFF]/80 text-white"
-                style={
-                  analyzing ? {} : { boxShadow: "0 0 20px rgba(10,108,255,0.35)" }
-                }
-              >
-                {analyzing ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
+                style={analyzing ? {} : { boxShadow: "0 0 20px rgba(10,108,255,0.35)" }}>
+                {analyzing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
                 {analyzing ? "Analisando com IA..." : "Analisar com IA"}
               </Button>
             )}
 
             {/* Action grid */}
             <div className="grid grid-cols-3 gap-2">
-              {(
-                [
-                  { icon: Bookmark, label: "Salvar Anúncio", action: "save" },
-                  { icon: Megaphone, label: "Gerar Criativo", action: "creative" },
-                  { icon: BookOpen, label: "Gerar Ebook", action: "ebook" },
-                  { icon: FileText, label: "Gerar Playbook", action: "playbook" },
-                  { icon: Video, label: "Gerar VSL", action: "vsl" },
-                  { icon: Copy, label: "Clonar Estrutura", action: "clone" },
-                ] as const
-              ).map(({ icon: Icon, label, action }) => (
-                <Button
-                  key={action}
-                  size="sm"
-                  variant="outline"
-                  className="h-auto flex-col gap-1.5 py-3 border-white/10 hover:bg-white/5 hover:border-[#0A6CFF]/40 text-[11px] leading-tight"
-                  onClick={() => onAction(action, row)}
-                >
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-center">{label}</span>
+              {([
+                { icon: Bookmark,    label: "Salvar Anúncio",       action: "save",     active: isSaved },
+                { icon: Rocket,      label: "Gerar Playbook",        action: "playbook", active: false },
+                { icon: Flame,       label: "Escalar Anúncio",       action: "escalate", active: isEscalated },
+                { icon: BookOpen,    label: "Gerar Ebook",           action: "ebook",    active: false },
+                { icon: Video,       label: "Gerar VSL",             action: "vsl",      active: false },
+                { icon: Copy,        label: "Clonar Estrutura",      action: "clone",    active: false },
+              ] as const).map(({ icon: Icon, label, action, active }) => (
+                <Button key={action} size="sm" variant="outline"
+                  className="h-auto flex-col gap-1.5 py-3 text-[11px] leading-tight transition-all"
+                  style={active
+                    ? { borderColor: "#00c896", background: "rgba(0,200,150,0.1)", color: "#00c896" }
+                    : { borderColor: "rgba(255,255,255,0.1)" }}
+                  onClick={() => onAction(action, row)}>
+                  {active ? <CheckCircle2 className="h-4 w-4" style={{ color: "#00c896" }} /> : <Icon className="h-4 w-4 text-muted-foreground" />}
+                  <span className="text-center">{active && (action === "save" || action === "escalate") ? "Salvo!" : label}</span>
                 </Button>
               ))}
             </div>
 
-            {/* External link */}
+            {/* External */}
             {row.video_url && (
-              <a
-                href={row.video_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <a href={row.video_url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 Ver original no TikTok <ChevronRight className="h-3 w-3" />
               </a>
             )}
@@ -527,10 +741,14 @@ function VideoCard({
   row,
   onClick,
   onDelete,
+  isSaved,
+  isEscalated,
 }: {
   row: TikTokRow;
   onClick: () => void;
   onDelete: (id: string) => void;
+  isSaved?: boolean;
+  isEscalated?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -540,13 +758,12 @@ function VideoCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      className="group relative rounded-2xl border border-white/8 bg-[#0d0d16] overflow-hidden cursor-pointer"
+      className="group relative rounded-2xl border overflow-hidden cursor-pointer"
       style={{
-        boxShadow: hovered
-          ? "0 8px 40px rgba(10,108,255,0.18), 0 0 0 1px rgba(10,108,255,0.3)"
-          : "0 2px 12px rgba(0,0,0,0.4)",
-        transition: "box-shadow 0.25s ease, border-color 0.25s ease",
-        borderColor: hovered ? "rgba(10,108,255,0.35)" : "rgba(255,255,255,0.06)",
+        background: "#0d0d16",
+        boxShadow: hovered ? "0 8px 40px rgba(10,108,255,0.18), 0 0 0 1px rgba(10,108,255,0.3)" : "0 2px 12px rgba(0,0,0,0.4)",
+        borderColor: isEscalated ? "rgba(255,77,77,0.4)" : isSaved ? "rgba(0,200,150,0.3)" : hovered ? "rgba(10,108,255,0.35)" : "rgba(255,255,255,0.06)",
+        transition: "all 0.25s ease",
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -555,56 +772,52 @@ function VideoCard({
       {/* Thumbnail */}
       <div className="relative w-full overflow-hidden" style={{ height: 200 }}>
         {row.thumbnail_url ? (
-          <img
-            src={row.thumbnail_url}
-            alt={row.hook}
+          <img src={row.thumbnail_url} alt={row.hook}
             className="w-full h-full object-cover transition-transform duration-500"
             style={{ transform: hovered ? "scale(1.05)" : "scale(1)" }}
-            loading="lazy"
-          />
+            loading="lazy" />
         ) : (
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(255,0,80,0.12) 0%, rgba(0,242,234,0.08) 100%)",
-            }}
-          >
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, rgba(255,0,80,0.12) 0%, rgba(0,242,234,0.08) 100%)" }}>
             <Play className="h-10 w-10 text-white/15" />
           </div>
         )}
 
         {/* Play overlay */}
-        <div
-          className="absolute inset-0 flex items-center justify-center transition-opacity duration-250"
-          style={{
-            background: "rgba(0,0,0,0.3)",
-            opacity: hovered ? 1 : 0,
-          }}
-        >
+        <div className="absolute inset-0 flex items-center justify-center transition-opacity duration-250"
+          style={{ background: "rgba(0,0,0,0.3)", opacity: hovered ? 1 : 0 }}>
           <div className="w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm border border-white/20 bg-white/15">
             <Play className="h-5 w-5 text-white ml-0.5" />
           </div>
         </div>
 
-        {/* Top badges */}
-        <div className="absolute top-2 left-2">
+        {/* Badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
           <ViralBadge score={row.viral_score} />
+          {isEscalated && (
+            <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold"
+              style={{ background: "rgba(255,77,77,0.2)", color: "#ff4d4d", border: "1px solid rgba(255,77,77,0.4)" }}>
+              🔥 Escalando
+            </span>
+          )}
         </div>
 
-        {/* Delete button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(row.id);
-          }}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white/40 hover:text-red-400 hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100"
-        >
+        {/* Delete */}
+        <button onClick={e => { e.stopPropagation(); onDelete(row.id); }}
+          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white/40 hover:text-red-400 hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100">
           <Trash2 className="h-3 w-3" />
         </button>
 
-        {/* AI analysis indicator */}
-        {row.ai_analysis && (
+        {/* Saved indicator */}
+        {isSaved && !isEscalated && (
+          <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 bg-[#00c896]/80 backdrop-blur-sm">
+            <Bookmark className="h-2.5 w-2.5 text-white" />
+            <span className="text-[9px] text-white font-medium">Salvo</span>
+          </div>
+        )}
+
+        {/* AI indicator */}
+        {row.ai_analysis && !isSaved && (
           <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-1.5 py-0.5 bg-[#0A6CFF]/80 backdrop-blur-sm">
             <Sparkles className="h-2.5 w-2.5 text-white" />
             <span className="text-[9px] text-white font-medium">IA</span>
@@ -614,51 +827,181 @@ function VideoCard({
 
       {/* Card body */}
       <div className="p-3 space-y-2">
-        {/* Creator */}
         <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
-            style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}
-          >
+          <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+            style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}>
             {creatorInitial(row.creator)}
           </div>
           <span className="text-xs text-muted-foreground truncate">@{row.creator}</span>
         </div>
-
-        {/* Hook */}
         <p className="text-xs text-foreground/90 line-clamp-2 leading-snug">{row.hook}</p>
-
-        {/* Stats */}
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-0.5">
-            <Eye className="h-3 w-3" />
-            {fmtNum(row.views)}
-          </span>
-          <span className="flex items-center gap-0.5">
-            <Heart className="h-3 w-3" />
-            {fmtNum(row.likes)}
-          </span>
-          <span className="flex items-center gap-0.5">
-            <Share2 className="h-3 w-3" />
-            {fmtNum(row.shares)}
-          </span>
+          <span className="flex items-center gap-0.5"><Eye className="h-3 w-3" />{fmtNum(row.views)}</span>
+          <span className="flex items-center gap-0.5"><Heart className="h-3 w-3" />{fmtNum(row.likes)}</span>
+          <span className="flex items-center gap-0.5"><Share2 className="h-3 w-3" />{fmtNum(row.shares)}</span>
         </div>
-
-        {/* Top hashtags */}
         {row.hashtags?.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {row.hashtags.slice(0, 3).map((h) => (
-              <span
-                key={h}
-                className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]"
-              >
-                #{h}
-              </span>
+            {row.hashtags.slice(0, 3).map(h => (
+              <span key={h} className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]">#{h}</span>
             ))}
           </div>
         )}
       </div>
     </motion.div>
+  );
+}
+
+// ── HooksLibraryView ──────────────────────────────────────────────────────────
+
+function HooksLibraryView({ videos }: { videos: TikTokRow[] }) {
+  const [filter, setFilter] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const analyzed = videos.filter(v => v.ai_analysis?.hook_formula);
+
+  const byFormula = analyzed.reduce<Record<string, TikTokRow[]>>((acc, v) => {
+    const f = v.ai_analysis!.hook_formula ?? "Outros";
+    (acc[f] = acc[f] ?? []).push(v);
+    return acc;
+  }, {});
+
+  const formulas = Object.entries(byFormula).sort(([, a], [, b]) => b.length - a.length);
+  const displayed = filter ? [[filter, byFormula[filter] ?? []]] as [string, TikTokRow[]][] : formulas;
+
+  const copy = (text: string, id: string) => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(id); setTimeout(() => setCopied(null), 1500); });
+  };
+
+  if (analyzed.length === 0) {
+    return (
+      <div className="text-center py-20 text-muted-foreground">
+        <Library className="h-10 w-10 mx-auto mb-3 opacity-20" />
+        <p className="text-sm">Nenhum hook catalogado ainda.</p>
+        <p className="text-xs mt-1 opacity-55">Analise vídeos com IA para popular a biblioteca.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Formula filter pills */}
+      <div className="flex gap-2 flex-wrap">
+        <button onClick={() => setFilter(null)}
+          className="rounded-full px-3 py-1 text-[11px] font-medium border transition-colors"
+          style={filter === null ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
+                                 : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}>
+          Todas ({analyzed.length})
+        </button>
+        {formulas.slice(0, 6).map(([formula, vids]) => (
+          <button key={formula} onClick={() => setFilter(formula === filter ? null : formula)}
+            className="rounded-full px-3 py-1 text-[11px] font-medium border transition-colors"
+            style={filter === formula ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
+                                      : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}>
+            {formula.slice(0, 30)}{formula.length > 30 ? "…" : ""} ({vids.length})
+          </button>
+        ))}
+      </div>
+
+      {/* Formula cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {displayed.map(([formula, vids]) => (
+          <div key={formula} className="rounded-2xl border border-white/8 bg-white/2 overflow-hidden">
+            <div className="px-4 py-3 border-b border-white/6 flex items-center justify-between"
+              style={{ background: "rgba(10,108,255,0.06)" }}>
+              <div>
+                <div className="text-xs font-semibold text-[#3BA3FF]">🎣 {formula}</div>
+                <div className="text-[10px] text-muted-foreground mt-0.5">{vids.length} exemplo{vids.length !== 1 ? "s" : ""}</div>
+              </div>
+            </div>
+            <div className="divide-y divide-white/5">
+              {vids.slice(0, 3).map(v => (
+                <div key={v.id} className="px-4 py-2.5 flex items-start justify-between gap-3 hover:bg-white/3 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] text-muted-foreground mb-0.5">@{v.creator}</div>
+                    <div className="text-xs text-foreground/85 line-clamp-2 leading-snug">{v.hook}</div>
+                  </div>
+                  <button onClick={() => copy(v.hook, v.id)}
+                    className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 transition-colors text-muted-foreground hover:text-foreground">
+                    {copied === v.id ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ShopRadarView ─────────────────────────────────────────────────────────────
+
+function ShopRadarView({
+  videos,
+  onSelect,
+  onDelete,
+  savedIds,
+  escalatedIds,
+}: {
+  videos: TikTokRow[];
+  onSelect: (row: TikTokRow) => void;
+  onDelete: (id: string) => void;
+  savedIds: Set<string>;
+  escalatedIds: Set<string>;
+}) {
+  const [sub, setSub] = useState<ShopSubTab>("produtos");
+  const def = SHOP_SUBTABS.find(s => s.id === sub)!;
+
+  const filtered = useMemo(() => {
+    if (sub === "creators") {
+      // Group by creator — show top video per creator
+      const byCreator = videos.reduce<Record<string, TikTokRow>>((acc, v) => {
+        if (!acc[v.creator] || v.viral_score > acc[v.creator].viral_score) acc[v.creator] = v;
+        return acc;
+      }, {});
+      return Object.values(byCreator).sort((a, b) => b.viral_score - a.viral_score);
+    }
+    return videos.filter(v => {
+      const hashMatch = def.hashtags.some(h => v.hashtags?.some(vh => vh.toLowerCase().includes(h)));
+      const kwMatch = def.keywords.some(k => (v.description + v.hook).toLowerCase().includes(k));
+      return hashMatch || kwMatch;
+    });
+  }, [videos, sub, def]);
+
+  return (
+    <div className="space-y-4">
+      {/* Sub-navigation */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+        {SHOP_SUBTABS.map(s => (
+          <button key={s.id} onClick={() => setSub(s.id)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all shrink-0"
+            style={sub === s.id
+              ? { background: "rgba(255,0,80,0.15)", color: "#ff6680", border: "1px solid rgba(255,0,80,0.3)" }
+              : { color: "hsl(var(--muted-foreground))", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {s.label}
+            <span className="text-[10px] opacity-60">
+              ({sub === s.id ? filtered.length : "?"})
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          Nenhum resultado para {def.label}. Mine mais vídeos de #{def.hashtags[0]}.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <AnimatePresence mode="popLayout">
+            {filtered.map(row => (
+              <VideoCard key={row.id} row={row} onClick={() => onSelect(row)} onDelete={onDelete}
+                isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -668,10 +1011,16 @@ function CreatorsView({
   videos,
   onSelect,
   onDelete,
+  savedIds,
+  escalatedIds,
+  onSaveCreator,
 }: {
   videos: TikTokRow[];
   onSelect: (row: TikTokRow) => void;
   onDelete: (id: string) => void;
+  savedIds: Set<string>;
+  escalatedIds: Set<string>;
+  onSaveCreator: (creator: string, vids: TikTokRow[]) => void;
 }) {
   const byCreator = videos.reduce<Record<string, TikTokRow[]>>((acc, v) => {
     (acc[v.creator] = acc[v.creator] ?? []).push(v);
@@ -679,8 +1028,7 @@ function CreatorsView({
   }, {});
 
   const sorted = Object.entries(byCreator).sort(
-    ([, a], [, b]) =>
-      b.reduce((s, v) => s + v.views, 0) - a.reduce((s, v) => s + v.views, 0),
+    ([, a], [, b]) => b.reduce((s, v) => s + v.views, 0) - a.reduce((s, v) => s + v.views, 0),
   );
 
   return (
@@ -691,10 +1039,8 @@ function CreatorsView({
         return (
           <div key={creator}>
             <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
-                style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}
-              >
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}>
                 {creatorInitial(creator)}
               </div>
               <div className="flex-1 min-w-0">
@@ -705,15 +1051,15 @@ function CreatorsView({
                   <span>Score médio: {avgScore}</span>
                 </div>
               </div>
+              <Button size="sm" variant="outline" className="h-7 text-xs border-white/10 hover:bg-white/5 shrink-0"
+                onClick={() => onSaveCreator(creator, vids)}>
+                <Bookmark className="h-3 w-3 mr-1" /> Salvar Creator
+              </Button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {vids.slice(0, 5).map((row) => (
-                <VideoCard
-                  key={row.id}
-                  row={row}
-                  onClick={() => onSelect(row)}
-                  onDelete={onDelete}
-                />
+              {vids.slice(0, 5).map(row => (
+                <VideoCard key={row.id} row={row} onClick={() => onSelect(row)} onDelete={onDelete}
+                  isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
               ))}
             </div>
           </div>
@@ -728,250 +1074,219 @@ function CreatorsView({
 function TikTokRadarPage() {
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<RadarTab>("trending");
-  const [hashtag, setHashtag] = useState("");
-  const [limit, setLimit] = useState(20);
-  const [mining, setMining] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [videos, setVideos] = useState<TikTokRow[]>([]);
-  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
-  const [selectedVideo, setSelectedVideo] = useState<TikTokRow | null>(null);
-  const [filterHashtag, setFilterHashtag] = useState<string | null>(null);
-  const [mineResult, setMineResult] = useState<{ inserted: number; skipped: number } | null>(
-    null,
-  );
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab]             = useState<RadarTab>("trending");
+  const [hashtag, setHashtag]                 = useState("");
+  const [limit, setLimit]                     = useState(20);
+  const [mining, setMining]                   = useState(false);
+  const [loading, setLoading]                 = useState(false);
+  const [videos, setVideos]                   = useState<TikTokRow[]>([]);
+  const [analyzingIds, setAnalyzingIds]       = useState<Set<string>>(new Set());
+  const [selectedVideo, setSelectedVideo]     = useState<TikTokRow | null>(null);
+  const [filterHashtag, setFilterHashtag]     = useState<string | null>(null);
+  const [mineResult, setMineResult]           = useState<{ inserted: number; skipped: number } | null>(null);
+  const [error, setError]                     = useState<string | null>(null);
+  // Save/escalate state
+  const [savedIds, setSavedIds]               = useState<Set<string>>(new Set());
+  const [escalatedIds, setEscaledIds]         = useState<Set<string>>(new Set());
+  const [savingId, setSavingId]               = useState<string | null>(null);
+  // Playbook state
+  const [playbookFor, setPlaybookFor]         = useState<TikTokRow | null>(null);
+  const [playbook, setPlaybook]               = useState<TikTokPlaybook | null>(null);
+  const [playbookLoading, setPlaybookLoading] = useState(false);
+  const [escalatingPb, setEscalatingPb]       = useState(false);
+  const [escalatedPb, setEscalatedPb]         = useState(false);
 
-  const mineHashtag = useServerFn(mineTikTokHashtagFn);
-  const listMined = useServerFn(listTikTokMinedFn);
-  const analyzeVideo = useServerFn(analyzeTikTokVideoFn);
-  const deleteVideo = useServerFn(deleteTikTokVideoFn);
-  const clearHashtag = useServerFn(clearTikTokHashtagFn);
+  const mineHashtag    = useServerFn(mineTikTokHashtagFn);
+  const listMined      = useServerFn(listTikTokMinedFn);
+  const analyzeVideo   = useServerFn(analyzeTikTokVideoFn);
+  const deleteVideo    = useServerFn(deleteTikTokVideoFn);
+  const clearHashtag   = useServerFn(clearTikTokHashtagFn);
+  const saveAnuncio    = useServerFn(saveAnuncioFn);
+  const escalateAnuncio = useServerFn(escalateAnuncioFn);
+  const saveCreator    = useServerFn(saveCreatorFn);
+  const genPlaybook    = useServerFn(generatePlaybookFn);
 
-  const activeTabDef = TABS.find((t) => t.id === activeTab) ?? TABS[0];
+  const activeTabDef = TABS.find(t => t.id === activeTab) ?? TABS[0];
 
-  const loadVideos = useCallback(
-    async (htag?: string) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const rows = await listMined({ data: { hashtag: htag, limit: 200 } });
-        setVideos(rows as TikTokRow[]);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Erro ao carregar vídeos");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [listMined],
-  );
+  const loadVideos = useCallback(async (htag?: string) => {
+    setLoading(true); setError(null);
+    try {
+      const rows = await listMined({ data: { hashtag: htag, limit: 200 } });
+      setVideos(rows as TikTokRow[]);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erro ao carregar vídeos");
+    } finally { setLoading(false); }
+  }, [listMined]);
 
-  useEffect(() => {
-    loadVideos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { loadVideos(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMine = async () => {
     const query = (hashtag.trim() || activeTabDef.defaultHashtag).replace(/^#/, "");
-    setMining(true);
-    setError(null);
-    setMineResult(null);
+    setMining(true); setError(null); setMineResult(null);
     try {
       const result = await mineHashtag({ data: { hashtag: query, limit } });
       setMineResult(result);
       await loadVideos(filterHashtag ?? undefined);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erro ao minerar");
-    } finally {
-      setMining(false);
-    }
+    } finally { setMining(false); }
   };
 
   const handleAnalyze = async (id: string) => {
-    setAnalyzingIds((prev) => new Set(prev).add(id));
+    setAnalyzingIds(prev => new Set(prev).add(id));
     try {
       const analysis = await analyzeVideo({ data: { id } });
-      setVideos((prev) =>
-        prev.map((v) => (v.id === id ? { ...v, ai_analysis: analysis as TikTokAiAnalysis } : v)),
-      );
-      setSelectedVideo((prev) =>
-        prev?.id === id ? { ...prev, ai_analysis: analysis as TikTokAiAnalysis } : prev,
-      );
+      const update = (v: TikTokRow) => v.id === id ? { ...v, ai_analysis: analysis as TikTokAiAnalysis } : v;
+      setVideos(prev => prev.map(update));
+      setSelectedVideo(prev => prev?.id === id ? update(prev) : prev);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erro ao analisar");
     } finally {
-      setAnalyzingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      setAnalyzingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
     }
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteVideo({ data: { id } });
-      setVideos((prev) => prev.filter((v) => v.id !== id));
+      setVideos(prev => prev.filter(v => v.id !== id));
       if (selectedVideo?.id === id) setSelectedVideo(null);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erro ao deletar");
-    }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Erro ao deletar"); }
   };
 
   const handleClearHashtag = async (htag: string) => {
     try {
       await clearHashtag({ data: { hashtag: htag } });
-      setVideos((prev) => prev.filter((v) => v.hashtag !== htag));
+      setVideos(prev => prev.filter(v => v.hashtag !== htag));
       if (filterHashtag === htag) setFilterHashtag(null);
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Erro ao limpar"); }
+  };
+
+  const handleSave = async (row: TikTokRow) => {
+    if (savedIds.has(row.id)) return;
+    setSavingId(row.id);
+    try {
+      const es = calcEnhancedScore(row);
+      await saveAnuncio({ data: rowToAdPayload(row, es) });
+      setSavedIds(prev => new Set(prev).add(row.id));
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Erro ao salvar"); }
+    finally { setSavingId(null); }
+  };
+
+  const handleEscalate = async (row: TikTokRow, pb?: TikTokPlaybook | null) => {
+    const es = calcEnhancedScore(row);
+    try {
+      await escalateAnuncio({
+        data: { ...rowToAdPayload(row, es), playbook: (pb ?? null) as Record<string, unknown> | null },
+      });
+      setEscaledIds(prev => new Set(prev).add(row.id));
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Erro ao escalar"); }
+  };
+
+  const handleSaveCreator = async (creator: string, vids: TikTokRow[]) => {
+    const totalViews = vids.reduce((s, v) => s + v.views, 0);
+    const avgViews = Math.round(totalViews / vids.length);
+    const avgScore = Math.round(vids.reduce((s, v) => s + v.viral_score, 0) / vids.length);
+    const topHashtags = [...new Set(vids.flatMap(v => v.hashtags ?? []))].slice(0, 10);
+    try {
+      await saveCreator({ data: { creator, source: "tiktok", profile_url: "", total_videos: vids.length, avg_views: avgViews, avg_viral_score: avgScore, top_hashtags: topHashtags } });
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Erro ao salvar creator"); }
+  };
+
+  const handleGeneratePlaybook = async (row: TikTokRow) => {
+    setSelectedVideo(null);
+    setPlaybookFor(row);
+    setPlaybook(null);
+    setPlaybookLoading(true);
+    setEscalatedPb(false);
+    try {
+      const pb = await genPlaybook({ data: { id: row.id } });
+      setPlaybook(pb as TikTokPlaybook);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erro ao limpar");
-    }
+      setError(e instanceof Error ? e.message : "Erro ao gerar playbook");
+      setPlaybookFor(null);
+    } finally { setPlaybookLoading(false); }
+  };
+
+  const handlePlaybookEscalate = async () => {
+    if (!playbookFor) return;
+    setEscalatingPb(true);
+    await handleEscalate(playbookFor, playbook);
+    setEscalatingPb(false);
+    setEscalatedPb(true);
   };
 
   const handleAction = (action: string, row: TikTokRow) => {
     const ctx = [
       `Hook TikTok: ${row.hook}`,
-      row.ai_analysis?.niche ? `Nicho: ${row.ai_analysis.niche}` : "",
+      row.ai_analysis?.niche   ? `Nicho: ${row.ai_analysis.niche}` : "",
       row.ai_analysis?.promise ? `Promessa: ${row.ai_analysis.promise}` : "",
-      row.ai_analysis?.offer_angle ? `Ângulo de oferta: ${row.ai_analysis.offer_angle}` : "",
-      row.ai_analysis?.vsl_hook ? `Hook VSL sugerido: ${row.ai_analysis.vsl_hook}` : "",
+      row.ai_analysis?.offer_angle ? `Ângulo: ${row.ai_analysis.offer_angle}` : "",
+      row.ai_analysis?.vsl_hook ? `Hook VSL: ${row.ai_analysis.vsl_hook}` : "",
       `Criador: @${row.creator}`,
       `Views: ${fmtNum(row.views)} · Likes: ${fmtNum(row.likes)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    try {
-      sessionStorage.setItem("tiktok_radar_context", ctx);
-    } catch {
-      // ignore
-    }
+    ].filter(Boolean).join("\n");
+    try { sessionStorage.setItem("tiktok_radar_context", ctx); } catch { /* ignore */ }
 
     switch (action) {
-      case "ebook":
-        navigate({ to: "/produtos/ebook" });
-        break;
-      case "playbook":
-        navigate({ to: "/copy" });
-        break;
-      case "vsl":
-        navigate({ to: "/pagina-venda" });
-        break;
-      case "creative":
-        navigate({ to: "/criativos" });
-        break;
+      case "save":     handleSave(row); return;
+      case "escalate": handleEscalate(row); return;
+      case "playbook": handleGeneratePlaybook(row); return;
+      case "ebook":    navigate({ to: "/produtos/ebook" }); return;
+      case "vsl":      navigate({ to: "/pagina-venda" }); return;
       case "clone":
-        navigate({ to: "/copy" });
-        break;
-      case "save":
-        navigate({ to: "/ofertas-salvas" });
-        break;
+      case "creative": navigate({ to: "/criativos" }); return;
     }
   };
 
-  // ── Tab-specific filtering ──────────────────────────────────────────────────
+  // ── Tab filtering ───────────────────────────────────────────────────────────
 
-  const base = filterHashtag ? videos.filter((v) => v.hashtag === filterHashtag) : videos;
+  const base = filterHashtag ? videos.filter(v => v.hashtag === filterHashtag) : videos;
 
   const tabFiltered: TikTokRow[] =
-    activeTab === "viral-hooks"
-      ? base.filter((v) => v.viral_score >= 60)
-      : activeTab === "tiktok-shop"
-        ? base.filter((v) =>
-            v.hashtags?.some((h) =>
-              ["tiktokshop", "shop", "tiktokmademebuyit", "produto", "shopnow"].includes(
-                h.toLowerCase(),
-              ),
-            ),
-          )
-        : activeTab === "ads-spy"
-          ? base.filter((v) =>
-              v.hashtags?.some((h) =>
-                ["ads", "adsnotsponsored", "ugcads", "ugc", "sponsored", "ad"].includes(
-                  h.toLowerCase(),
-                ),
-              ),
-            )
-          : activeTab === "winning-products"
-            ? base.filter((v) =>
-                v.hashtags?.some((h) =>
-                  [
-                    "dropshipping",
-                    "produto",
-                    "winningproduct",
-                    "product",
-                    "ecommerce",
-                    "shopify",
-                  ].includes(h.toLowerCase()),
-                ),
-              )
-            : activeTab === "vsls"
-              ? base.filter(
-                  (v) =>
-                    v.hashtags?.some((h) =>
-                      ["vsl", "videovendas", "salesletter"].includes(h.toLowerCase()),
-                    ) || v.viral_score >= 55,
-                )
-              : base; // trending and creators use base
+    activeTab === "viral-hooks"      ? base.filter(v => v.viral_score >= 60) :
+    activeTab === "tiktok-shop"      ? base.filter(v => v.hashtags?.some(h => ["tiktokshop","shop","tiktokmademebuyit","produto","shopnow"].includes(h.toLowerCase()))) :
+    activeTab === "ads-spy"          ? base.filter(v => v.hashtags?.some(h => ["ads","adsnotsponsored","ugcads","ugc","sponsored","ad"].includes(h.toLowerCase()))) :
+    activeTab === "winning-products" ? base.filter(v => v.hashtags?.some(h => ["dropshipping","produto","winningproduct","product","ecommerce","shopify"].includes(h.toLowerCase()))) :
+    activeTab === "vsls"             ? base.filter(v => v.hashtags?.some(h => ["vsl","videovendas","salesletter"].includes(h.toLowerCase())) || v.viral_score >= 55) :
+    base;
 
-  const uniqueHashtags = [...new Set(videos.map((v) => v.hashtag))];
-
-  const viralCount = videos.filter((v) => v.viral_score >= 70).length;
-  const hotCount = videos.filter((v) => v.viral_score >= 45 && v.viral_score < 70).length;
-  const aiCount = videos.filter((v) => v.ai_analysis).length;
+  const uniqueHashtags = [...new Set(videos.map(v => v.hashtag))];
+  const viralCount = videos.filter(v => v.viral_score >= 70).length;
+  const hotCount   = videos.filter(v => v.viral_score >= 45 && v.viral_score < 70).length;
+  const aiCount    = videos.filter(v => v.ai_analysis).length;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-5 pb-16">
       {/* ── Hero Header ── */}
-      <div
-        className="relative overflow-hidden rounded-2xl"
-        style={{
-          background: "linear-gradient(135deg, #060610 0%, #0a0820 40%, #120010 100%)",
-        }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 15% 60%, rgba(255,0,80,0.18) 0%, transparent 55%), radial-gradient(ellipse at 85% 40%, rgba(0,242,234,0.12) 0%, transparent 55%)",
-          }}
-        />
+      <div className="relative overflow-hidden rounded-2xl"
+        style={{ background: "linear-gradient(135deg, #060610 0%, #0a0820 40%, #120010 100%)" }}>
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 15% 60%, rgba(255,0,80,0.18) 0%, transparent 55%), radial-gradient(ellipse at 85% 40%, rgba(0,242,234,0.12) 0%, transparent 55%)" }} />
         <div className="relative px-6 py-7 flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}
-              >
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #ff0050, #00f2ea)" }}>
                 <Play className="h-4 w-4 text-white" />
               </div>
               <h1 className="text-2xl font-bold text-white tracking-tight">TikTok Radar</h1>
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                style={{
-                  background: "rgba(255,0,80,0.15)",
-                  color: "#ff6680",
-                  border: "1px solid rgba(255,0,80,0.25)",
-                }}
-              >
-                BETA
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(255,0,80,0.15)", color: "#ff6680", border: "1px solid rgba(255,0,80,0.25)" }}>
+                PRO
               </span>
             </div>
             <p className="text-sm text-white/55 max-w-md">
-              Espione vídeos virais, analise hooks com IA e crie produtos digitais em segundos.
+              Mineração profissional de vídeos virais com IA, playbooks automáticos e gestão de escala.
             </p>
             <div className="flex gap-5 mt-4 text-xs text-white/45">
-              <span>
-                <span className="font-bold text-white/70 mr-1">{viralCount}</span>virais
-              </span>
-              <span>
-                <span className="font-bold text-white/70 mr-1">{hotCount}</span>quentes
-              </span>
-              <span>
-                <span className="font-bold text-white/70 mr-1">{aiCount}</span>com análise IA
-              </span>
+              <span><span className="font-bold text-white/70 mr-1">{viralCount}</span>virais</span>
+              <span><span className="font-bold text-white/70 mr-1">{hotCount}</span>quentes</span>
+              <span><span className="font-bold text-white/70 mr-1">{aiCount}</span>com IA</span>
+              <span><span className="font-bold text-white/70 mr-1">{savedIds.size}</span>salvos</span>
+              <span><span className="font-bold text-white/70 mr-1">{escalatedIds.size}</span>escalados</span>
             </div>
           </div>
           <div className="text-right hidden sm:block">
@@ -982,88 +1297,43 @@ function TikTokRadarPage() {
       </div>
 
       {/* ── Tab Bar ── */}
-      <div
-        className="flex gap-1 overflow-x-auto pb-1"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {TABS.map((tab) => {
+      <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+        {TABS.map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 shrink-0"
-              style={
-                isActive
-                  ? {
-                      background: "#0A6CFF",
-                      color: "#fff",
-                      boxShadow: "0 0 20px rgba(10,108,255,0.4)",
-                    }
-                  : {
-                      color: "hsl(var(--muted-foreground))",
-                      border: "1px solid transparent",
-                    }
-              }
-              onMouseEnter={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "rgba(255,255,255,0.05)";
-              }}
-              onMouseLeave={(e) => {
-                if (!isActive)
-                  (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-              }}
-            >
+              style={isActive
+                ? { background: "#0A6CFF", color: "#fff", boxShadow: "0 0 20px rgba(10,108,255,0.4)" }
+                : { color: "hsl(var(--muted-foreground))" }}>
               <Icon className="h-4 w-4" />
               {tab.label}
             </button>
           );
         })}
       </div>
-
-      {/* Tab description */}
       <p className="text-xs text-muted-foreground -mt-2">{activeTabDef.description}</p>
 
-      {/* ── Search & Controls ── */}
-      <div
-        className="rounded-2xl border border-white/8 bg-white/2 p-4 space-y-3"
-        style={{ boxShadow: "0 0 40px -10px rgba(10,108,255,0.07)" }}
-      >
+      {/* ── Search bar ── */}
+      <div className="rounded-2xl border border-white/8 bg-white/2 p-4 space-y-3"
+        style={{ boxShadow: "0 0 40px -10px rgba(10,108,255,0.07)" }}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={hashtag}
-              onChange={(e) => setHashtag(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleMine()}
+            <Input value={hashtag} onChange={e => setHashtag(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleMine()}
               placeholder={`hashtag (padrão: ${activeTabDef.defaultHashtag})`}
-              className="pl-9 bg-transparent border-white/10 focus:border-[#0A6CFF]/50"
-            />
+              className="pl-9 bg-transparent border-white/10 focus:border-[#0A6CFF]/50" />
           </div>
-          <select
-            value={limit}
-            onChange={(e) => setLimit(Number(e.target.value))}
-            className="rounded-lg border border-white/10 bg-background px-3 text-sm text-muted-foreground"
-          >
-            {[10, 20, 30, 50].map((n) => (
-              <option key={n} value={n}>
-                {n} vídeos
-              </option>
-            ))}
+          <select value={limit} onChange={e => setLimit(Number(e.target.value))}
+            className="rounded-lg border border-white/10 bg-background px-3 text-sm text-muted-foreground">
+            {[10, 20, 30, 50].map(n => <option key={n} value={n}>{n} vídeos</option>)}
           </select>
-          <Button
-            onClick={handleMine}
-            disabled={mining}
+          <Button onClick={handleMine} disabled={mining}
             className="gap-2 bg-[#0A6CFF] hover:bg-[#0A6CFF]/80 text-white shrink-0"
-            style={mining ? {} : { boxShadow: "0 0 20px rgba(10,108,255,0.35)" }}
-          >
-            {mining ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
+            style={mining ? {} : { boxShadow: "0 0 20px rgba(10,108,255,0.35)" }}>
+            {mining ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             {mining ? "Minerando..." : "Minerar"}
           </Button>
         </div>
@@ -1076,59 +1346,31 @@ function TikTokRadarPage() {
         )}
 
         <div className="flex gap-2 items-center flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs border-white/10"
-            disabled={loading}
-            onClick={() => loadVideos(filterHashtag ?? undefined)}
-          >
+          <Button size="sm" variant="outline" className="h-7 text-xs border-white/10" disabled={loading}
+            onClick={() => loadVideos(filterHashtag ?? undefined)}>
             {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
             Carregar salvos
           </Button>
-
           {uniqueHashtags.length > 0 && (
             <div className="flex gap-1 flex-wrap">
-              <button
-                className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
-                style={
-                  filterHashtag === null
-                    ? {
-                        background: "rgba(10,108,255,0.15)",
-                        borderColor: "rgba(10,108,255,0.5)",
-                        color: "#3BA3FF",
-                      }
-                    : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }
-                }
-                onClick={() => setFilterHashtag(null)}
-              >
+              <button className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
+                style={filterHashtag === null
+                  ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
+                  : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}
+                onClick={() => setFilterHashtag(null)}>
                 Todos ({videos.length})
               </button>
-              {uniqueHashtags.map((h) => (
+              {uniqueHashtags.map(h => (
                 <div key={h} className="flex items-center gap-0.5">
-                  <button
-                    className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
-                    style={
-                      filterHashtag === h
-                        ? {
-                            background: "rgba(10,108,255,0.15)",
-                            borderColor: "rgba(10,108,255,0.5)",
-                            color: "#3BA3FF",
-                          }
-                        : {
-                            borderColor: "rgba(255,255,255,0.1)",
-                            color: "hsl(var(--muted-foreground))",
-                          }
-                    }
-                    onClick={() => setFilterHashtag(filterHashtag === h ? null : h)}
-                  >
-                    #{h} ({videos.filter((v) => v.hashtag === h).length})
+                  <button className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
+                    style={filterHashtag === h
+                      ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
+                      : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}
+                    onClick={() => setFilterHashtag(filterHashtag === h ? null : h)}>
+                    #{h} ({videos.filter(v => v.hashtag === h).length})
                   </button>
-                  <button
-                    className="text-muted-foreground/40 hover:text-red-400 transition-colors"
-                    title={`Limpar #${h}`}
-                    onClick={() => handleClearHashtag(h)}
-                  >
+                  <button className="text-muted-foreground/40 hover:text-red-400 transition-colors"
+                    onClick={() => handleClearHashtag(h)}>
                     <X className="h-3 w-3" />
                   </button>
                 </div>
@@ -1142,41 +1384,7 @@ function TikTokRadarPage() {
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)}>
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* ── Empty state ── */}
-      {!loading && tabFiltered.length === 0 && !error && (
-        <div className="text-center py-20 text-muted-foreground">
-          <div
-            className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(255,0,80,0.08), rgba(0,242,234,0.08))",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}
-          >
-            <Play className="h-8 w-8 opacity-20" />
-          </div>
-          <p className="text-sm">Nenhum vídeo para esta aba.</p>
-          <p className="text-xs mt-1 opacity-55">
-            Minere #{activeTabDef.defaultHashtag} para começar
-          </p>
-          <Button
-            className="mt-4 bg-[#0A6CFF] hover:bg-[#0A6CFF]/80 text-white text-xs h-8"
-            onClick={handleMine}
-            disabled={mining}
-          >
-            {mining ? (
-              <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-            ) : (
-              <Search className="h-3 w-3 mr-1.5" />
-            )}
-            Minerar #{activeTabDef.defaultHashtag}
-          </Button>
+          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -1188,25 +1396,46 @@ function TikTokRadarPage() {
         </div>
       )}
 
-      {/* ── Content ── */}
-      {!loading && tabFiltered.length > 0 && (
+      {/* ── Hooks Library ── */}
+      {!loading && activeTab === "hooks-library" && (
+        <HooksLibraryView videos={videos} />
+      )}
+
+      {/* ── Shop Radar ── */}
+      {!loading && activeTab === "shop-radar" && (
+        <ShopRadarView videos={base} onSelect={setSelectedVideo} onDelete={handleDelete}
+          savedIds={savedIds} escalatedIds={escalatedIds} />
+      )}
+
+      {/* ── Creators ── */}
+      {!loading && activeTab === "creators" && tabFiltered.length > 0 && (
+        <CreatorsView videos={tabFiltered} onSelect={setSelectedVideo} onDelete={handleDelete}
+          savedIds={savedIds} escalatedIds={escalatedIds} onSaveCreator={handleSaveCreator} />
+      )}
+
+      {/* ── Grid view (all other tabs) ── */}
+      {!loading && !["hooks-library", "shop-radar", "creators"].includes(activeTab) && (
         <>
-          {activeTab === "creators" ? (
-            <CreatorsView
-              videos={tabFiltered}
-              onSelect={setSelectedVideo}
-              onDelete={handleDelete}
-            />
+          {tabFiltered.length === 0 && !error ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, rgba(255,0,80,0.08), rgba(0,242,234,0.08))", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <Play className="h-8 w-8 opacity-20" />
+              </div>
+              <p className="text-sm">Nenhum vídeo para esta aba.</p>
+              <p className="text-xs mt-1 opacity-55">Minere #{activeTabDef.defaultHashtag} para começar</p>
+              <Button className="mt-4 bg-[#0A6CFF] hover:bg-[#0A6CFF]/80 text-white text-xs h-8"
+                onClick={handleMine} disabled={mining}>
+                {mining ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Search className="h-3 w-3 mr-1.5" />}
+                Minerar #{activeTabDef.defaultHashtag}
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               <AnimatePresence mode="popLayout">
-                {tabFiltered.map((row) => (
-                  <VideoCard
-                    key={row.id}
-                    row={row}
-                    onClick={() => setSelectedVideo(row)}
-                    onDelete={handleDelete}
-                  />
+                {tabFiltered.map(row => (
+                  <VideoCard key={row.id} row={row} onClick={() => setSelectedVideo(row)} onDelete={handleDelete}
+                    isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
                 ))}
               </AnimatePresence>
             </div>
@@ -1217,13 +1446,19 @@ function TikTokRadarPage() {
       {/* ── Video Modal ── */}
       <AnimatePresence>
         {selectedVideo && (
-          <VideoModal
-            row={selectedVideo}
-            onClose={() => setSelectedVideo(null)}
-            onAnalyze={handleAnalyze}
-            analyzing={analyzingIds.has(selectedVideo.id)}
-            onAction={handleAction}
-          />
+          <VideoModal row={selectedVideo} onClose={() => setSelectedVideo(null)}
+            onAnalyze={handleAnalyze} analyzing={analyzingIds.has(selectedVideo.id)}
+            onAction={handleAction} savedIds={savedIds} escalatedIds={escalatedIds} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Playbook Modal ── */}
+      <AnimatePresence>
+        {playbookFor && (
+          <PlaybookModal row={playbookFor} playbook={playbook} loading={playbookLoading}
+            onClose={() => { setPlaybookFor(null); setPlaybook(null); }}
+            onEscalate={handlePlaybookEscalate}
+            escalating={escalatingPb} escalated={escalatedPb} />
         )}
       </AnimatePresence>
     </div>

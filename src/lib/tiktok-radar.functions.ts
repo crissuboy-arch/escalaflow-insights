@@ -308,3 +308,151 @@ export const clearTikTokHashtagFn = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ── Playbook type ─────────────────────────────────────────────────────────────
+
+export type TikTokPlaybook = {
+  headline: string;
+  promise: string;
+  mechanism: string;
+  target_audience: string;
+  offer_structure: string;
+  angle: string;
+  cta: string;
+  creatives: string[];
+  funnel: string;
+  strategy: string;
+  vsl_script: string;
+};
+
+// ── Save / Escalate schemas ───────────────────────────────────────────────────
+
+const AdPayloadInput = z.object({
+  video_id:      z.string().default(""),
+  creator:       z.string().default(""),
+  hook:          z.string().default(""),
+  description:   z.string().default(""),
+  thumbnail_url: z.string().default(""),
+  video_url:     z.string().default(""),
+  views:         z.number().default(0),
+  likes:         z.number().default(0),
+  comments:      z.number().default(0),
+  shares:        z.number().default(0),
+  viral_score:   z.number().default(0),
+  enhanced_score: z.number().default(0),
+  hashtags:      z.array(z.string()).default([]),
+  ai_analysis:   z.record(z.unknown()).nullable().default(null),
+  source:        z.string().default("tiktok"),
+});
+
+const EscalateInput = AdPayloadInput.extend({
+  playbook: z.record(z.unknown()).nullable().default(null),
+});
+
+const SaveCreatorInput = z.object({
+  creator:         z.string(),
+  source:          z.string().default("tiktok"),
+  profile_url:     z.string().default(""),
+  total_videos:    z.number().default(0),
+  avg_views:       z.number().default(0),
+  avg_viral_score: z.number().default(0),
+  top_hashtags:    z.array(z.string()).default([]),
+  notes:           z.string().optional(),
+});
+
+// ── save to anuncios_salvos ───────────────────────────────────────────────────
+
+export const saveAnuncioFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof AdPayloadInput>) => AdPayloadInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    const row = { ...data, user_id: userId };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabaseAdmin as any)
+      .from("anuncios_salvos")
+      .insert(row);
+    // Ignore unique-constraint duplicates silently
+    if (error && !error.message.toLowerCase().includes("duplicate") && !error.code?.includes("23505"))
+      throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── save to anuncios_escalados ────────────────────────────────────────────────
+
+export const escalateAnuncioFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof EscalateInput>) => EscalateInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    const row = { ...data, user_id: userId };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabaseAdmin as any)
+      .from("anuncios_escalados")
+      .upsert(row, { onConflict: "user_id,video_id", ignoreDuplicates: false });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── save creator ──────────────────────────────────────────────────────────────
+
+export const saveCreatorFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof SaveCreatorInput>) => SaveCreatorInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabaseAdmin as any)
+      .from("creators_salvos")
+      .upsert({ ...data, user_id: userId }, { onConflict: "user_id,creator,source", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ── generate full playbook via AI ─────────────────────────────────────────────
+
+export const generatePlaybookFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+
+    const { data: row, error } = await tiktokTable()
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !row) throw new Error("Vídeo não encontrado");
+
+    const ai = row.ai_analysis as TikTokAiAnalysis | null;
+    const aiCtx = ai
+      ? `\nAnálise IA disponível:\n- Nicho: ${ai.niche}\n- Promessa: ${ai.promise}\n- Mecanismo: ${ai.mechanism ?? ""}\n- Emoção: ${ai.emotion}\n- Narrativa: ${ai.narrative ?? ""}\n- Ângulo: ${ai.offer_angle}\n- CTA: ${ai.cta ?? ""}\n- Retenção: ${ai.retention ?? ""}`
+      : "";
+
+    const systemPrompt = `Você é um estrategista de marketing digital de elite. Com base nos dados do vídeo TikTok viral, crie um playbook completo e acionável para escalar esse produto/oferta.
+Retorne APENAS um JSON válido (sem markdown) com:
+- headline: headline irresistível com promessa específica e número (máx 12 palavras)
+- promise: promessa central em 1 frase impactante e crível
+- mechanism: mecanismo único que torna a promessa possível (o "segredo" ou método proprietário)
+- target_audience: avatar detalhado — demográfico, dores principais e desejos específicos
+- offer_structure: estrutura da oferta (produto principal + 2 bônus + garantia + elemento de urgência)
+- angle: ângulo de marketing mais potente para essa audiência (ex: "Mãe que quer renda extra sem sair de casa")
+- cta: call-to-action irresistível para o criativo (máx 10 palavras, verbo de ação no início)
+- creatives: array com EXATAMENTE 3 ideias de criativos virais distintos para TikTok/Reels (cada ideia em 1-2 frases concretas)
+- funnel: funil de vendas completo (ex: "TikTok Orgânico → Bio Link → VSL 3min → Checkout → Upsell OTO 1 → Downsell")
+- strategy: estratégia de escala para 30 dias — escreva 6 passos concretos separados por \\n (numerados)
+- vsl_script: roteiro VSL de 90 segundos com marcações [GANCHO 0-5s] [PROBLEMA 5-20s] [AGITAÇÃO 20-35s] [SOLUÇÃO 35-55s] [PROVA 55-70s] [CTA 70-90s]`;
+
+    const userPrompt = `Vídeo TikTok Viral:
+Criador: @${row.creator}
+Hook/Descrição: ${row.description}
+Hashtags: ${(row.hashtags as string[])?.join(", ") ?? ""}
+Views: ${Number(row.views).toLocaleString("pt-BR")} | Likes: ${Number(row.likes).toLocaleString("pt-BR")} | Shares: ${Number(row.shares).toLocaleString("pt-BR")} | Comentários: ${Number(row.comments).toLocaleString("pt-BR")}
+Viral Score: ${row.viral_score}/100
+Áudio: ${row.audio_title || "não identificado"}${aiCtx}
+
+Gere um playbook completo para escalar esse produto/oferta.`;
+
+    return await generateAIJson<TikTokPlaybook>(userPrompt, { systemPrompt });
+  });
