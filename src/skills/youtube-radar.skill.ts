@@ -104,13 +104,21 @@ export async function runYouTubeRadarSkill(
     return { ok: false, skill: "youtube", data: [], error, duration_ms: 0 };
   }
 
-  const payload: Record<string, unknown> = {
-    searchQuery: input.query,
-    maxResults: input.maxResults ?? 30,
-    ...(input.dateFilter && { dateFilter: input.dateFilter }),
+  const dateFilterMap: Record<string, string> = {
+    today: "today",
+    week: "thisWeek",
+    month: "thisMonth",
+    year: "thisYear",
   };
 
-  console.log("[skill:youtube] starting", { actor, query: input.query });
+  const payload: Record<string, unknown> = {
+    searchKeywords: input.query,
+    maxResults: input.maxResults ?? 30,
+    ...(input.dateFilter && { dateFilter: dateFilterMap[input.dateFilter] ?? input.dateFilter }),
+  };
+
+  console.log("[youtube-radar] actor=", actor);
+  console.log("[youtube-radar] payload=", JSON.stringify(payload));
 
   try {
     const raw = await withTimeout(
@@ -121,11 +129,11 @@ export async function runYouTubeRadarSkill(
     const data = raw.map(normalize).filter((v) => v.videoId);
     const duration_ms = Date.now() - start;
 
-    console.log(`[skill:youtube] done items=${data.length} duration=${duration_ms}ms`);
+    console.log(`[youtube-radar] response items=${data.length} duration=${duration_ms}ms`);
     return { ok: true, skill: "youtube", data, duration_ms };
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[skill:youtube] error", error);
+    console.error("[youtube-radar] error=", error);
     return { ok: false, skill: "youtube", data: [], error, duration_ms: Date.now() - start };
   }
 }

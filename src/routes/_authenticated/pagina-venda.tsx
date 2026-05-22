@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -164,6 +164,22 @@ export default function PaginaVendaPage() {
   const [copied, setCopied] = useState(false);
   const [previewScale, setPreviewScale] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    try {
+      const ctx = sessionStorage.getItem("tiktok_vsl_context");
+      if (ctx) {
+        sessionStorage.removeItem("tiktok_vsl_context");
+        setForm((f) => ({
+          ...f,
+          skillId: "vsl-page",
+          toneOfVoice: "urgente e persuasivo",
+          trafficSource: "tiktok",
+          mineracaoContext: ctx,
+        }));
+      }
+    } catch {}
+  }, []);
 
   const generatePage = useServerFn(generatePageHtmlFn);
   const savePage = useServerFn(savePageProjectFn);

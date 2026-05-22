@@ -434,7 +434,7 @@ CREATE POLICY "user_ad_actions insert own" ON public.user_ad_actions FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "user_ad_actions delete own" ON public.user_ad_actions FOR DELETE TO authenticated
   USING (auth.uid() = user_id);
-ALTER PUBLICATION supabase_realtime ADD TABLE public.user_ad_actions;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.user_ad_actions; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 ALTER TABLE public.user_ad_actions REPLICA IDENTITY FULL;
 
 -- ============================================================================
@@ -909,13 +909,13 @@ ALTER TABLE public.collected_ads ADD COLUMN IF NOT EXISTS mining_run_id UUID REF
 -- ============================================================================
 -- REALTIME
 -- ============================================================================
-ALTER PUBLICATION supabase_realtime ADD TABLE public.offers;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.analyses;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.trends;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.mining_runs;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.saved_ads;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.favorites;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.extension_logs;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.offers; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.analyses; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.trends; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.mining_runs; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.saved_ads; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.favorites; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.extension_logs; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE public.offers REPLICA IDENTITY FULL;
 ALTER TABLE public.analyses REPLICA IDENTITY FULL;
@@ -1056,6 +1056,125 @@ create policy "users own instagram_minerados"
   for all
   using  (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: google_trends_minerados
+-- ============================================================================
+create table if not exists public.google_trends_minerados (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  keyword         text not null,
+  geo             text not null default 'BR',
+  timeframe       text not null default 'today 3-m',
+  avg_interest    int not null default 0,
+  peak_interest   int not null default 0,
+  trend           text not null default 'stable',
+  related_queries text[] not null default '{}',
+  related_topics  text[] not null default '{}',
+  points          jsonb,
+  ai_analysis     jsonb,
+  updated_at      timestamptz not null default now(),
+  created_at      timestamptz not null default now()
+);
+create index if not exists google_trends_user_id_idx on public.google_trends_minerados(user_id);
+create unique index if not exists google_trends_keyword_user_idx on public.google_trends_minerados(user_id, keyword, geo);
+alter table public.google_trends_minerados enable row level security;
+drop policy if exists "users own google_trends_minerados" on public.google_trends_minerados;
+create policy "users own google_trends_minerados"
+  on public.google_trends_minerados for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: youtube_minerados
+-- ============================================================================
+create table if not exists public.youtube_minerados (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  query         text not null,
+  video_id      text not null,
+  title         text not null default '',
+  channel_name  text not null default '',
+  channel_id    text not null default '',
+  video_url     text not null default '',
+  description   text not null default '',
+  hashtags      text[] not null default '{}',
+  views         bigint not null default 0,
+  likes         bigint not null default 0,
+  comments      bigint not null default 0,
+  duration      text not null default '',
+  is_short      boolean not null default false,
+  published_at  text,
+  thumbnail_url text not null default '',
+  viral_score   int not null default 0,
+  ai_analysis   jsonb,
+  created_at    timestamptz not null default now()
+);
+create index if not exists youtube_minerados_user_id_idx on public.youtube_minerados(user_id);
+create index if not exists youtube_minerados_query_idx   on public.youtube_minerados(user_id, query);
+create unique index if not exists youtube_minerados_video_user_idx on public.youtube_minerados(user_id, video_id);
+alter table public.youtube_minerados enable row level security;
+drop policy if exists "users own youtube_minerados" on public.youtube_minerados;
+create policy "users own youtube_minerados"
+  on public.youtube_minerados for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: produtos_minerados
+-- ============================================================================
+create table if not exists public.produtos_minerados (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references auth.users(id) on delete cascade,
+  query             text not null,
+  platform          text not null,
+  product_id        text not null,
+  title             text not null default '',
+  price             numeric not null default 0,
+  currency          text not null default 'BRL',
+  original_price    numeric not null default 0,
+  discount          int not null default 0,
+  rating            numeric not null default 0,
+  review_count      bigint not null default 0,
+  sold_count        bigint not null default 0,
+  seller            text not null default '',
+  product_url       text not null default '',
+  image_url         text not null default '',
+  category          text not null default '',
+  opportunity_score int not null default 0,
+  ai_analysis       jsonb,
+  created_at        timestamptz not null default now()
+);
+create index if not exists produtos_minerados_user_id_idx on public.produtos_minerados(user_id);
+create index if not exists produtos_minerados_query_idx   on public.produtos_minerados(user_id, query);
+create unique index if not exists produtos_minerados_product_user_idx on public.produtos_minerados(user_id, platform, product_id);
+alter table public.produtos_minerados enable row level security;
+drop policy if exists "users own produtos_minerados" on public.produtos_minerados;
+create policy "users own produtos_minerados"
+  on public.produtos_minerados for all
+  using  (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ============================================================================
+-- TABELA: page_builder_projects
+-- ============================================================================
+create table if not exists public.page_builder_projects (
+  id               uuid primary key default gen_random_uuid(),
+  user_id          uuid not null references auth.users(id) on delete cascade,
+  title            text not null,
+  html             text not null default '',
+  skill_id         text not null default '',
+  design_system_id text not null default '',
+  form_data        jsonb,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+create index if not exists page_builder_user_id_idx on public.page_builder_projects(user_id);
+alter table public.page_builder_projects enable row level security;
+drop policy if exists "users own page_builder_projects" on public.page_builder_projects;
+create policy "users own page_builder_projects"
+  on public.page_builder_projects for all
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ============================================================================
 -- VERIFICAÇÃO FINAL: lista todas as tabelas criadas

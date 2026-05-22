@@ -7,13 +7,15 @@ import { SkillResult, SkillOptions, withTimeout } from "./types";
 //   APIFY_ECOMMERCE_SHOPEE_ACTOR  — e.g. apify~shopee-scraper
 //   APIFY_ECOMMERCE_ML_ACTOR      — e.g. apify~mercado-livre-scraper
 function getActor(platform: EcommercePlatform): string {
-  const map: Record<EcommercePlatform, string | undefined> = {
+  const platformActors: Record<EcommercePlatform, string | undefined> = {
     amazon: process.env.APIFY_ECOMMERCE_AMAZON_ACTOR?.trim(),
     shopee: process.env.APIFY_ECOMMERCE_SHOPEE_ACTOR?.trim(),
     mercadolivre: process.env.APIFY_ECOMMERCE_ML_ACTOR?.trim(),
   };
-  const id = map[platform];
-  if (!id) throw new Error(`APIFY_ECOMMERCE_${platform.toUpperCase()}_ACTOR não configurado no .env`);
+  const id = platformActors[platform] ?? process.env.APIFY_ECOMMERCE_ACTOR?.trim();
+  if (!id) throw new Error(
+    `Nenhum actor configurado para ${platform}. Configure APIFY_ECOMMERCE_ACTOR no .env`
+  );
   return id;
 }
 
@@ -132,7 +134,9 @@ export async function runEcommerceRadarSkill(
     ...(input.sortBy && { sortBy: input.sortBy }),
   };
 
-  console.log("[skill:ecommerce] starting", { actor, platform: input.platform, query: input.query });
+  console.log("[ecommerce-radar] actor=", actor);
+  console.log("[ecommerce-radar] platform=", input.platform);
+  console.log("[ecommerce-radar] payload=", JSON.stringify(payload));
 
   try {
     const raw = await withTimeout(
@@ -143,11 +147,11 @@ export async function runEcommerceRadarSkill(
     const data = raw.map((item) => normalize(item, input.platform)).filter((p) => p.productId);
     const duration_ms = Date.now() - start;
 
-    console.log(`[skill:ecommerce] done items=${data.length} duration=${duration_ms}ms`);
+    console.log(`[ecommerce-radar] response items=${data.length} duration=${duration_ms}ms`);
     return { ok: true, skill: "ecommerce", data, duration_ms };
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("[skill:ecommerce] error", error);
+    console.error("[ecommerce-radar] error=", error);
     return { ok: false, skill: "ecommerce", data: [], error, duration_ms: Date.now() - start };
   }
 }

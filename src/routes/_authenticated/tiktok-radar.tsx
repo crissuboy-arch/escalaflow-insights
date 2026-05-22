@@ -249,15 +249,7 @@ function VideoCard({
           size="sm"
           variant="outline"
           className="h-7 px-3 text-xs border-white/10 hover:bg-white/5"
-          onClick={() =>
-            navigate({
-              to: "/produtos/ebook",
-              search: {
-                niche: row.ai_analysis?.niche ?? row.hashtags[0] ?? "",
-                prompt: row.ai_analysis?.ebook_title ?? row.hook,
-              } as any,
-            })
-          }
+          onClick={() => navigate({ to: "/produtos/ebook" })}
         >
           <BookOpen className="h-3 w-3 mr-1" />
           Criar Ebook
@@ -267,14 +259,7 @@ function VideoCard({
           size="sm"
           variant="outline"
           className="h-7 px-3 text-xs border-white/10 hover:bg-white/5"
-          onClick={() =>
-            navigate({
-              to: "/copy",
-              search: {
-                prompt: row.ai_analysis?.offer_angle ?? row.hook,
-              } as any,
-            })
-          }
+          onClick={() => navigate({ to: "/copy" })}
         >
           <TrendingUp className="h-3 w-3 mr-1" />
           Criar Oferta
@@ -284,14 +269,19 @@ function VideoCard({
           size="sm"
           variant="outline"
           className="h-7 px-3 text-xs border-white/10 hover:bg-white/5"
-          onClick={() =>
-            navigate({
-              to: "/criativos",
-              search: {
-                hook: row.ai_analysis?.vsl_hook ?? row.hook,
-              } as any,
-            })
-          }
+          onClick={() => {
+            const ctx = [
+              `Hook TikTok: ${row.hook}`,
+              row.ai_analysis?.niche ? `Nicho: ${row.ai_analysis.niche}` : "",
+              row.ai_analysis?.promise ? `Promessa: ${row.ai_analysis.promise}` : "",
+              row.ai_analysis?.offer_angle ? `Ângulo de oferta: ${row.ai_analysis.offer_angle}` : "",
+              row.ai_analysis?.vsl_hook ? `Hook VSL sugerido: ${row.ai_analysis.vsl_hook}` : "",
+              `Criador: @${row.creator}`,
+              `Views: ${fmtNum(row.views)} · Likes: ${fmtNum(row.likes)}`,
+            ].filter(Boolean).join("\n");
+            try { sessionStorage.setItem("tiktok_vsl_context", ctx); } catch {}
+            navigate({ to: "/pagina-venda" });
+          }}
         >
           <Video className="h-3 w-3 mr-1" />
           Criar VSL

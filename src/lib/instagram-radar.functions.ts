@@ -160,10 +160,31 @@ export const mineInstagramFn = createServerFn({ method: "POST" })
     const actor = getInstagramActorId();
     const cleanSearch = search.replace(/^[#@]+/, "").trim();
 
+    function sanitizeInstagramUrl(raw: string): string {
+      try {
+        const u = new URL(raw.trim());
+        return u.origin + u.pathname.replace(/\/$/, "") + "/";
+      } catch {
+        return raw.split("?")[0].trim();
+      }
+    }
+
     let payload: Record<string, unknown>;
     if (searchType === "url") {
       payload = {
-        directUrls: [search.trim()],
+        directUrls: [sanitizeInstagramUrl(search.trim())],
+        resultsType,
+        resultsLimit: limit,
+      };
+    } else if (searchType === "hashtag") {
+      payload = {
+        directUrls: [`https://www.instagram.com/explore/tags/${cleanSearch}/`],
+        resultsType,
+        resultsLimit: limit,
+      };
+    } else if (searchType === "user") {
+      payload = {
+        directUrls: [`https://www.instagram.com/${cleanSearch}/`],
         resultsType,
         resultsLimit: limit,
       };
@@ -171,21 +192,19 @@ export const mineInstagramFn = createServerFn({ method: "POST" })
       payload = {
         search: cleanSearch,
         searchType,
-        searchLimit: 10,
         resultsType,
         resultsLimit: limit,
       };
     }
 
+    console.log("[instagram-radar] mode=", searchType);
+    console.log("[instagram-radar] input=", cleanSearch || search.trim());
     console.log("[instagram-radar] actor=", actor);
-    console.log(
-      "[instagram-radar] url=",
-      `https://api.apify.com/v2/acts/${actor}/run-sync-get-dataset-items?token=***&timeout=120`,
-    );
-    console.log("[instagram-radar] payload=", payload);
+    console.log("[instagram-radar] payload=", JSON.stringify(payload));
 
     const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actor, payload);
 
+    console.log("[instagram-radar] response items=", raw.length);
     if (!raw.length) return { inserted: 0, skipped: 0 };
 
     const rows = raw
