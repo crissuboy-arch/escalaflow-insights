@@ -24,6 +24,7 @@ import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedLivroTemplateMestreRouteImport } from './routes/_authenticated/livro-template-mestre'
 import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
 import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
@@ -125,6 +126,12 @@ const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   path: '/minerar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedLivroTemplateMestreRoute =
+  AuthenticatedLivroTemplateMestreRouteImport.update({
+    id: '/livro-template-mestre',
+    path: '/livro-template-mestre',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedLinkExternoRoute =
   AuthenticatedLinkExternoRouteImport.update({
     id: '/link-externo',
@@ -246,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
+  '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -281,6 +289,7 @@ export interface FileRoutesByTo {
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/link-externo': typeof AuthenticatedLinkExternoRoute
+  '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/minerar': typeof AuthenticatedMinerarRoute
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -318,6 +327,7 @@ export interface FileRoutesById {
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/instagram-radar': typeof AuthenticatedInstagramRadarRoute
   '/_authenticated/link-externo': typeof AuthenticatedLinkExternoRoute
+  '/_authenticated/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/importar-anuncio'
     | '/instagram-radar'
     | '/link-externo'
+    | '/livro-template-mestre'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -390,6 +401,7 @@ export interface FileRouteTypes {
     | '/importar-anuncio'
     | '/instagram-radar'
     | '/link-externo'
+    | '/livro-template-mestre'
     | '/minerar'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -426,6 +438,7 @@ export interface FileRouteTypes {
     | '/_authenticated/importar-anuncio'
     | '/_authenticated/instagram-radar'
     | '/_authenticated/link-externo'
+    | '/_authenticated/livro-template-mestre'
     | '/_authenticated/minerar'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
@@ -558,6 +571,13 @@ declare module '@tanstack/react-router' {
       path: '/minerar'
       fullPath: '/minerar'
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/livro-template-mestre': {
+      id: '/_authenticated/livro-template-mestre'
+      path: '/livro-template-mestre'
+      fullPath: '/livro-template-mestre'
+      preLoaderRoute: typeof AuthenticatedLivroTemplateMestreRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/link-externo': {
@@ -738,6 +758,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedInstagramRadarRoute: typeof AuthenticatedInstagramRadarRoute
   AuthenticatedLinkExternoRoute: typeof AuthenticatedLinkExternoRoute
+  AuthenticatedLivroTemplateMestreRoute: typeof AuthenticatedLivroTemplateMestreRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
@@ -768,6 +789,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedInstagramRadarRoute: AuthenticatedInstagramRadarRoute,
   AuthenticatedLinkExternoRoute: AuthenticatedLinkExternoRoute,
+  AuthenticatedLivroTemplateMestreRoute: AuthenticatedLivroTemplateMestreRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
