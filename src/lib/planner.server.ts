@@ -1,29 +1,8 @@
 import { z } from "zod";
 import type { PlannerTemplate } from "./ebook/niches";
+import { callGateway } from "@/lib/aiService";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
-function getKey() {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY ausente — habilite Lovable Cloud.");
-  return k;
-}
-
-async function aiChat(body: Record<string, unknown>): Promise<unknown> {
-  const res = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`AI gateway ${res.status}: ${txt.slice(0, 160)}`);
-  }
-  return res.json();
-}
+const aiChat = callGateway;
 
 export const PlannerContentSchema = z.object({
   template: z.string(),

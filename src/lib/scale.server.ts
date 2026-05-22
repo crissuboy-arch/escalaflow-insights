@@ -1,16 +1,10 @@
 import { z } from "zod";
 import { dlog } from "./debug/log.server";
 import { AGENT_MEDIA_BUYER, withAgent } from "./agents";
+import { resolveAIProvider } from "@/lib/aiService";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // server-side defensive cap
-
-function getKey() {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY ausente — habilite Lovable Cloud.");
-  return k;
-}
 
 function safeJSON(raw: unknown): unknown {
   if (typeof raw !== "string") return raw ?? {};
@@ -313,11 +307,15 @@ REGRAS DE OURO:
 type GatewayOpts = { model?: string; timeoutMs?: number; retries?: number; tag?: string };
 
 async function callGateway(messages: unknown[], opts: GatewayOpts = {}): Promise<string> {
-  const key = getKey();
+  const provider = resolveAIProvider();
   const model = opts.model ?? DEFAULT_MODEL;
   const timeoutMs = opts.timeoutMs ?? 110_000;
   const retries = opts.retries ?? 2;
   const tag = opts.tag ?? "ai";
+  const isAnthropic = provider.url.includes("anthropic.com");
+  const authHeaders: Record<string, string> = isAnthropic
+    ? { "x-api-key": provider.key, "anthropic-version": "2023-06-01" }
+    : { Authorization: `Bearer ${provider.key}` };
 
   let lastErr: Error | null = null;
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
@@ -326,9 +324,9 @@ async function callGateway(messages: unknown[], opts: GatewayOpts = {}): Promise
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       dlog("hydrate", `${tag}.start`, { model, attempt, timeoutMs });
-      const res = await fetch(GATEWAY_URL, {
+      const res = await fetch(provider.url, {
         method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        headers: { ...authHeaders, "Content-Type": "application/json" },
         body: JSON.stringify({
           model,
           messages,

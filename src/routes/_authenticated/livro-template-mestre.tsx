@@ -19,9 +19,9 @@ export const Route = createFileRoute("/_authenticated/livro-template-mestre")({
   component: LivroTemplateMestrePage,
 });
 
-const ACCENT = "#F97316";
-const ACCENT_BG = "rgba(249,115,22,0.08)";
-const ACCENT_BORDER = "rgba(249,115,22,0.25)";
+const ACCENT = "#3B82F6";
+const ACCENT_BG = "rgba(59,130,246,0.08)";
+const ACCENT_BORDER = "rgba(59,130,246,0.25)";
 
 const TIPOS = Object.entries(LIVRO_TIPO_LABELS) as [LivroTipo, string][];
 
@@ -126,7 +126,7 @@ function ChapterCard({ cap, index }: { cap: LivroTemplateOutput["capitulos"][0];
                   <ul className="space-y-1">
                     {cap.pontos_principais.map((p, i) => (
                       <li key={i} className="flex items-start gap-2 text-xs text-foreground/80">
-                        <span className="mt-0.5 text-[#F97316]">•</span>{p}
+                        <span className="mt-0.5 text-[#3B82F6]">•</span>{p}
                       </li>
                     ))}
                   </ul>
@@ -251,10 +251,10 @@ export default function LivroTemplateMestrePage() {
       {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: ACCENT, textShadow: "0 0 24px rgba(249,115,22,0.5)" }}>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: ACCENT, textShadow: "0 0 24px rgba(59,130,246,0.5)" }}>
             Livro Template Mestre
           </h1>
-          <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px]">
+          <Badge className="bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px]">
             PREMIUM
           </Badge>
         </div>
@@ -266,7 +266,7 @@ export default function LivroTemplateMestrePage() {
       {/* Form */}
       <div
         className="rounded-2xl border p-5 space-y-5"
-        style={{ borderColor: ACCENT_BORDER, boxShadow: "0 0 40px -10px rgba(249,115,22,0.15)" }}
+        style={{ borderColor: ACCENT_BORDER, boxShadow: "0 0 40px -10px rgba(59,130,246,0.15)" }}
       >
         {/* Tipo */}
         <div className="space-y-2">
@@ -278,7 +278,7 @@ export default function LivroTemplateMestrePage() {
                 onClick={() => f("tipoProduto", value)}
                 className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
                   form.tipoProduto === value
-                    ? "border-[#F97316] bg-[rgba(249,115,22,0.12)] text-[#F97316] font-semibold"
+                    ? "border-[#3B82F6] bg-[rgba(59,130,246,0.12)] text-[#3B82F6] font-semibold"
                     : "border-white/10 text-muted-foreground hover:border-white/20"
                 }`}
               >
@@ -296,7 +296,7 @@ export default function LivroTemplateMestrePage() {
               value={form.tema}
               onChange={(e) => f("tema", e.target.value)}
               placeholder="ex: emagrecimento com alimentação real"
-              className="bg-transparent border-white/10 focus:border-[#F97316]/50"
+              className="bg-transparent border-white/10 focus:border-[#3B82F6]/50"
             />
           </div>
           <div className="space-y-1.5">
@@ -305,7 +305,7 @@ export default function LivroTemplateMestrePage() {
               value={form.nicho}
               onChange={(e) => f("nicho", e.target.value)}
               placeholder="ex: saúde e bem-estar"
-              className="bg-transparent border-white/10 focus:border-[#F97316]/50"
+              className="bg-transparent border-white/10 focus:border-[#3B82F6]/50"
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -314,7 +314,7 @@ export default function LivroTemplateMestrePage() {
               value={form.publicoAlvo}
               onChange={(e) => f("publicoAlvo", e.target.value)}
               placeholder="ex: mulheres 30-50 anos que querem emagrecer sem dietas restritivas"
-              className="bg-transparent border-white/10 focus:border-[#F97316]/50"
+              className="bg-transparent border-white/10 focus:border-[#3B82F6]/50"
             />
           </div>
           <div className="space-y-1.5">
@@ -323,7 +323,7 @@ export default function LivroTemplateMestrePage() {
               value={form.objetivo}
               onChange={(e) => f("objetivo", e.target.value)}
               placeholder="ex: vender no Amazon KDP e Hotmart"
-              className="bg-transparent border-white/10 focus:border-[#F97316]/50"
+              className="bg-transparent border-white/10 focus:border-[#3B82F6]/50"
             />
           </div>
           <div className="space-y-1.5">
@@ -332,7 +332,7 @@ export default function LivroTemplateMestrePage() {
               value={form.estiloDesejado}
               onChange={(e) => f("estiloDesejado", e.target.value)}
               placeholder="ex: inspirador, prático e sem jargão técnico"
-              className="bg-transparent border-white/10 focus:border-[#F97316]/50"
+              className="bg-transparent border-white/10 focus:border-[#3B82F6]/50"
             />
           </div>
         </div>
@@ -374,7 +374,7 @@ export default function LivroTemplateMestrePage() {
             onClick={handleGenerate}
             disabled={generating || !form.tema.trim() || !form.nicho.trim() || !form.publicoAlvo.trim()}
             className="gap-2 text-white ml-auto"
-            style={{ background: ACCENT, boxShadow: generating ? "none" : "0 0 20px rgba(249,115,22,0.4)" }}
+            style={{ background: ACCENT, boxShadow: generating ? "none" : "0 0 20px rgba(59,130,246,0.4)" }}
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
             {generating ? "Gerando..." : "Gerar Template"}

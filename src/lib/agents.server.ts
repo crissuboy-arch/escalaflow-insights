@@ -1,48 +1,9 @@
 import { z } from "zod";
-
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
-function getKey() {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY ausente — habilite Lovable Cloud.");
-  return k;
-}
-
-function safeJSON(raw: unknown): unknown {
-  if (typeof raw !== "string") return raw ?? {};
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const m = raw.match(/\{[\s\S]*\}/);
-    if (m) {
-      try {
-        return JSON.parse(m[0]);
-      } catch {
-        return {};
-      }
-    }
-    return {};
-  }
-}
+import { callGateway, safeJSON } from "@/lib/aiService";
 
 async function aiChat(body: Record<string, unknown>): Promise<string> {
-  const key = getKey();
-  const res = await fetch(GATEWAY_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (res.status === 429) throw new Error("Limite de IA atingido. Aguarde alguns segundos.");
-  if (res.status === 402)
-    throw new Error("Créditos da IA esgotados. Adicione créditos no workspace.");
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`AI gateway ${res.status}: ${txt.slice(0, 200)}`);
-  }
-  const j = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  return j.choices?.[0]?.message?.content ?? "";
+  const r = (await callGateway(body)) as { choices?: Array<{ message?: { content?: string } }> };
+  return r.choices?.[0]?.message?.content ?? "";
 }
 
 export type AgentKind =

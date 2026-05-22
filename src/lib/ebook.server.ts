@@ -1,12 +1,7 @@
 import { z } from "zod";
 import type { ProductIdentity, SizeSpec } from "./ebook/niches";
 import { AGENT_STORY_CHIEF } from "./agents";
-
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
+import { callGateway } from "@/lib/aiService";
 
 export const BriefingSchema = z.object({
   title: z.string(),
@@ -38,55 +33,7 @@ export interface AdInput {
   score?: number;
 }
 
-function getKey() {
-  const k = process.env.LOVABLE_API_KEY;
-  if (!k) throw new Error("LOVABLE_API_KEY ausente — habilite Lovable Cloud.");
-  return k;
-}
-
-async function aiChat(body: Record<string, unknown>): Promise<unknown> {
-  const key = getKey();
-  const model = (body as { model?: string }).model;
-  const delays = [0, 1000, 2500, 5000];
-  let lastErr: unknown;
-  for (let attempt = 0; attempt < delays.length; attempt++) {
-    if (delays[attempt]) await sleep(delays[attempt]);
-    try {
-      const res = await fetch(GATEWAY_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      if (res.status === 429) {
-        if (attempt < delays.length - 1) {
-          console.warn(`[ebook.ai] 429 attempt=${attempt} model=${model}`);
-          continue;
-        }
-        throw new Error("Limite de IA atingido. Tente novamente em alguns segundos.");
-      }
-      if (res.status === 402)
-        throw new Error("Créditos da IA esgotados. Adicione créditos no workspace.");
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        if (res.status >= 500 && attempt < delays.length - 1) {
-          lastErr = new Error(`AI gateway ${res.status}`);
-          continue;
-        }
-        throw new Error(`AI gateway ${res.status}: ${txt.slice(0, 200)}`);
-      }
-      return await res.json();
-    } catch (e) {
-      lastErr = e;
-      // Network failure: retry on transient
-      if (attempt < delays.length - 1 && e instanceof TypeError) continue;
-      throw e;
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error("Falha de IA");
-}
+const aiChat = callGateway;
 
 function safeParseToolArgs(raw: unknown): unknown {
   if (typeof raw !== "string") return raw ?? {};

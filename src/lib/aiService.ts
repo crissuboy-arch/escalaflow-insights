@@ -35,7 +35,7 @@ function sleep(ms: number) {
   return new Promise<void>((r) => setTimeout(r, ms));
 }
 
-function safeJSON(raw: unknown): unknown {
+export function safeJSON(raw: unknown): unknown {
   if (typeof raw !== "string") return raw ?? {};
   try {
     return JSON.parse(raw);
@@ -52,7 +52,25 @@ function safeJSON(raw: unknown): unknown {
   }
 }
 
-async function callGateway(body: Record<string, unknown>): Promise<unknown> {
+// Exported so server modules can resolve provider details for custom fetch logic.
+export function resolveAIProvider() {
+  return resolveProvider();
+}
+
+type OpenAITool = {
+  type: string;
+  function: { name: string; description?: string; parameters?: unknown };
+};
+
+// Normalize OpenAI tool_choice to Anthropic format
+function toAnthropicToolChoice(tc: unknown): Record<string, unknown> | undefined {
+  if (!tc) return undefined;
+  if ((tc as Record<string, unknown>).type === "function") return { type: "auto" };
+  if (typeof tc === "string" && tc === "required") return { type: "any" };
+  return { type: "auto" };
+}
+
+export async function callGateway(body: Record<string, unknown>): Promise<unknown> {
   const provider = resolveProvider();
   const delays = [0, 1200, 3000];
   let lastErr: unknown;
@@ -72,11 +90,26 @@ async function callGateway(body: Record<string, unknown>): Promise<unknown> {
       const userMessages = messages
         .filter((m) => m.role !== "system")
         .map((m) => ({ role: m.role, content: m.content }));
+
+      // Convert OpenAI tools → Anthropic tools
+      const openAITools = body.tools as OpenAITool[] | undefined;
+      const anthropicTools = openAITools?.map((t) => ({
+        name: t.function.name,
+        description: t.function.description ?? "",
+        input_schema: t.function.parameters ?? { type: "object", properties: {} },
+      }));
+
       reqBody = {
         model: body.model ?? provider.model,
         max_tokens: (body.max_tokens as number) ?? 4096,
         messages: userMessages,
         ...(system ? { system } : {}),
+        ...(anthropicTools?.length
+          ? {
+              tools: anthropicTools,
+              tool_choice: toAnthropicToolChoice(body.tool_choice) ?? { type: "auto" },
+            }
+          : {}),
       };
       headers = {
         "x-api-key": provider.key,
@@ -116,8 +149,28 @@ async function callGateway(body: Record<string, unknown>): Promise<unknown> {
 
     // Normalize Anthropic response to OpenAI format
     if (isAnthropic) {
-      const content = (json as { content?: Array<{ text?: string }> }).content;
-      const text = content?.[0]?.text ?? "";
+      type AnthropicBlock = { type?: string; text?: string; name?: string; input?: unknown };
+      const content = (json as { content?: AnthropicBlock[] }).content ?? [];
+
+      // Tool use response
+      const toolBlock = content.find((c) => c.type === "tool_use");
+      if (toolBlock) {
+        return {
+          choices: [{
+            message: {
+              tool_calls: [{
+                function: {
+                  name: toolBlock.name,
+                  arguments: JSON.stringify(toolBlock.input ?? {}),
+                },
+              }],
+            },
+          }],
+        };
+      }
+
+      // Regular text response
+      const text = content.find((c) => c.type === "text")?.text ?? "";
       return { choices: [{ message: { content: text } }] };
     }
 
