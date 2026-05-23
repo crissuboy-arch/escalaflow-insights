@@ -114,6 +114,207 @@ export type Database = {
           },
         ]
       }
+      analyses: {
+        Row: {
+          content: Json | null
+          created_at: string
+          id: string
+          mining_run_id: string | null
+          offer_id: string | null
+          project_id: string | null
+          status: string
+          title: string | null
+          type: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string
+          id?: string
+          mining_run_id?: string | null
+          offer_id?: string | null
+          project_id?: string | null
+          status?: string
+          title?: string | null
+          type?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string
+          id?: string
+          mining_run_id?: string | null
+          offer_id?: string | null
+          project_id?: string | null
+          status?: string
+          title?: string | null
+          type?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analyses_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "mined_offers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "analyses_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      anuncios_escalados: {
+        Row: {
+          ai_analysis: Json | null
+          comments: number
+          created_at: string
+          creator: string
+          description: string
+          enhanced_score: number
+          hashtags: string[]
+          hook: string
+          id: string
+          likes: number
+          notes: string | null
+          playbook: Json | null
+          scaled_at: string
+          shares: number
+          source: string
+          tags: string[] | null
+          thumbnail_url: string
+          user_id: string
+          video_id: string
+          video_url: string
+          views: number
+          viral_score: number
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          comments?: number
+          created_at?: string
+          creator?: string
+          description?: string
+          enhanced_score?: number
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          notes?: string | null
+          playbook?: Json | null
+          scaled_at?: string
+          shares?: number
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string
+          user_id: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Update: {
+          ai_analysis?: Json | null
+          comments?: number
+          created_at?: string
+          creator?: string
+          description?: string
+          enhanced_score?: number
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          notes?: string | null
+          playbook?: Json | null
+          scaled_at?: string
+          shares?: number
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string
+          user_id?: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Relationships: []
+      }
+      anuncios_salvos: {
+        Row: {
+          ai_analysis: Json | null
+          comments: number
+          created_at: string
+          creator: string
+          description: string
+          enhanced_score: number
+          hashtags: string[]
+          hook: string
+          id: string
+          likes: number
+          notes: string | null
+          shares: number
+          source: string
+          tags: string[] | null
+          thumbnail_url: string
+          user_id: string
+          video_id: string
+          video_url: string
+          views: number
+          viral_score: number
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          comments?: number
+          created_at?: string
+          creator?: string
+          description?: string
+          enhanced_score?: number
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          notes?: string | null
+          shares?: number
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string
+          user_id: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Update: {
+          ai_analysis?: Json | null
+          comments?: number
+          created_at?: string
+          creator?: string
+          description?: string
+          enhanced_score?: number
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          notes?: string | null
+          shares?: number
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string
+          user_id?: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Relationships: []
+      }
       collected_ads: {
         Row: {
           ad_library_id: string | null
@@ -129,6 +330,7 @@ export type Database = {
           id: string
           image_url: string | null
           keyword: string | null
+          mining_run_id: string | null
           niche: string
           platform: string
           raw: Json | null
@@ -136,6 +338,7 @@ export type Database = {
           source: string
           status: string
           updated_at: string
+          user_id: string | null
           video_url: string | null
         }
         Insert: {
@@ -152,6 +355,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           keyword?: string | null
+          mining_run_id?: string | null
           niche?: string
           platform?: string
           raw?: Json | null
@@ -159,6 +363,7 @@ export type Database = {
           source?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
           video_url?: string | null
         }
         Update: {
@@ -175,6 +380,7 @@ export type Database = {
           id?: string
           image_url?: string | null
           keyword?: string | null
+          mining_run_id?: string | null
           niche?: string
           platform?: string
           raw?: Json | null
@@ -182,7 +388,50 @@ export type Database = {
           source?: string
           status?: string
           updated_at?: string
+          user_id?: string | null
           video_url?: string | null
+        }
+        Relationships: []
+      }
+      creators_salvos: {
+        Row: {
+          avg_views: number
+          avg_viral_score: number
+          creator: string
+          id: string
+          notes: string | null
+          profile_url: string
+          saved_at: string
+          source: string
+          top_hashtags: string[]
+          total_videos: number
+          user_id: string
+        }
+        Insert: {
+          avg_views?: number
+          avg_viral_score?: number
+          creator: string
+          id?: string
+          notes?: string | null
+          profile_url?: string
+          saved_at?: string
+          source?: string
+          top_hashtags?: string[]
+          total_videos?: number
+          user_id: string
+        }
+        Update: {
+          avg_views?: number
+          avg_viral_score?: number
+          creator?: string
+          id?: string
+          notes?: string | null
+          profile_url?: string
+          saved_at?: string
+          source?: string
+          top_hashtags?: string[]
+          total_videos?: number
+          user_id?: string
         }
         Relationships: []
       }
@@ -249,6 +498,202 @@ export type Database = {
         }
         Relationships: []
       }
+      extension_logs: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          source: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          source?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          source?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      favorites: {
+        Row: {
+          ad_id: string | null
+          favorited_at: string
+          id: string
+          mining_run_id: string | null
+          notes: string | null
+          offer_id: string | null
+          user_id: string
+        }
+        Insert: {
+          ad_id?: string | null
+          favorited_at?: string
+          id?: string
+          mining_run_id?: string | null
+          notes?: string | null
+          offer_id?: string | null
+          user_id: string
+        }
+        Update: {
+          ad_id?: string | null
+          favorited_at?: string
+          id?: string
+          mining_run_id?: string | null
+          notes?: string | null
+          offer_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "collected_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_mining_run_id_fkey"
+            columns: ["mining_run_id"]
+            isOneToOne: false
+            referencedRelation: "mining_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "mined_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      google_trends_minerados: {
+        Row: {
+          ai_analysis: Json | null
+          avg_interest: number
+          created_at: string
+          geo: string
+          id: string
+          keyword: string
+          peak_interest: number
+          points: Json | null
+          related_queries: string[]
+          related_topics: string[]
+          timeframe: string
+          trend: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          avg_interest?: number
+          created_at?: string
+          geo?: string
+          id?: string
+          keyword: string
+          peak_interest?: number
+          points?: Json | null
+          related_queries?: string[]
+          related_topics?: string[]
+          timeframe?: string
+          trend?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          avg_interest?: number
+          created_at?: string
+          geo?: string
+          id?: string
+          keyword?: string
+          peak_interest?: number
+          points?: Json | null
+          related_queries?: string[]
+          related_topics?: string[]
+          timeframe?: string
+          trend?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      instagram_minerados: {
+        Row: {
+          ai_analysis: Json | null
+          caption: string
+          comments_count: number
+          created_at: string
+          display_url: string
+          engagement_score: number
+          hashtags: string[]
+          id: string
+          likes_count: number
+          mentions: string[]
+          owner_full_name: string
+          owner_username: string
+          post_url: string
+          raw: Json | null
+          results_type: string
+          search: string
+          search_type: string
+          short_code: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          caption?: string
+          comments_count?: number
+          created_at?: string
+          display_url?: string
+          engagement_score?: number
+          hashtags?: string[]
+          id?: string
+          likes_count?: number
+          mentions?: string[]
+          owner_full_name?: string
+          owner_username?: string
+          post_url?: string
+          raw?: Json | null
+          results_type?: string
+          search: string
+          search_type?: string
+          short_code: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          caption?: string
+          comments_count?: number
+          created_at?: string
+          display_url?: string
+          engagement_score?: number
+          hashtags?: string[]
+          id?: string
+          likes_count?: number
+          mentions?: string[]
+          owner_full_name?: string
+          owner_username?: string
+          post_url?: string
+          raw?: Json | null
+          results_type?: string
+          search?: string
+          search_type?: string
+          short_code?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mined_offers: {
         Row: {
           ads_count: number
@@ -294,6 +739,153 @@ export type Database = {
           scale_score?: number
           status?: Database["public"]["Enums"]["offer_status"]
           summary?: string | null
+        }
+        Relationships: []
+      }
+      mining_runs: {
+        Row: {
+          completed_at: string | null
+          country: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          language: string
+          query: string
+          results_count: number
+          started_at: string
+          status: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          country?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          language?: string
+          query: string
+          results_count?: number
+          started_at?: string
+          status?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          country?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          language?: string
+          query?: string
+          results_count?: number
+          started_at?: string
+          status?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      offers: {
+        Row: {
+          advertiser: string | null
+          copy: string | null
+          country: string | null
+          created_at: string
+          creative_type: string | null
+          cta: string | null
+          engagement: Json | null
+          headline: string | null
+          id: string
+          keyword: string | null
+          landing_page: string | null
+          language: string | null
+          mining_run_id: string | null
+          niche: string | null
+          platform: string | null
+          score: number
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          advertiser?: string | null
+          copy?: string | null
+          country?: string | null
+          created_at?: string
+          creative_type?: string | null
+          cta?: string | null
+          engagement?: Json | null
+          headline?: string | null
+          id?: string
+          keyword?: string | null
+          landing_page?: string | null
+          language?: string | null
+          mining_run_id?: string | null
+          niche?: string | null
+          platform?: string | null
+          score?: number
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          advertiser?: string | null
+          copy?: string | null
+          country?: string | null
+          created_at?: string
+          creative_type?: string | null
+          cta?: string | null
+          engagement?: Json | null
+          headline?: string | null
+          id?: string
+          keyword?: string | null
+          landing_page?: string | null
+          language?: string | null
+          mining_run_id?: string | null
+          niche?: string | null
+          platform?: string | null
+          score?: number
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      page_builder_projects: {
+        Row: {
+          created_at: string
+          design_system_id: string
+          form_data: Json | null
+          html: string
+          id: string
+          skill_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          design_system_id?: string
+          form_data?: Json | null
+          html?: string
+          id?: string
+          skill_id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          design_system_id?: string
+          form_data?: Json | null
+          html?: string
+          id?: string
+          skill_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -353,6 +945,75 @@ export type Database = {
           title?: string
           unique_mechanism?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      produtos_minerados: {
+        Row: {
+          ai_analysis: Json | null
+          category: string
+          created_at: string
+          currency: string
+          discount: number
+          id: string
+          image_url: string
+          opportunity_score: number
+          original_price: number
+          platform: string
+          price: number
+          product_id: string
+          product_url: string
+          query: string
+          rating: number
+          review_count: number
+          seller: string
+          sold_count: number
+          title: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          category?: string
+          created_at?: string
+          currency?: string
+          discount?: number
+          id?: string
+          image_url?: string
+          opportunity_score?: number
+          original_price?: number
+          platform: string
+          price?: number
+          product_id: string
+          product_url?: string
+          query: string
+          rating?: number
+          review_count?: number
+          seller?: string
+          sold_count?: number
+          title?: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          category?: string
+          created_at?: string
+          currency?: string
+          discount?: number
+          id?: string
+          image_url?: string
+          opportunity_score?: number
+          original_price?: number
+          platform?: string
+          price?: number
+          product_id?: string
+          product_url?: string
+          query?: string
+          rating?: number
+          review_count?: number
+          seller?: string
+          sold_count?: number
+          title?: string
           user_id?: string
         }
         Relationships: []
@@ -687,26 +1348,90 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_ads: {
+        Row: {
+          ad_id: string | null
+          id: string
+          mining_run_id: string | null
+          notes: string | null
+          offer_id: string | null
+          saved_at: string
+          tags: string[] | null
+          user_id: string
+        }
+        Insert: {
+          ad_id?: string | null
+          id?: string
+          mining_run_id?: string | null
+          notes?: string | null
+          offer_id?: string | null
+          saved_at?: string
+          tags?: string[] | null
+          user_id: string
+        }
+        Update: {
+          ad_id?: string | null
+          id?: string
+          mining_run_id?: string | null
+          notes?: string | null
+          offer_id?: string | null
+          saved_at?: string
+          tags?: string[] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_ads_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "collected_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_ads_mining_run_id_fkey"
+            columns: ["mining_run_id"]
+            isOneToOne: false
+            referencedRelation: "mining_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_ads_offer_id_fkey"
+            columns: ["offer_id"]
+            isOneToOne: false
+            referencedRelation: "mined_offers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_offers: {
         Row: {
           created_at: string
           id: string
           is_favorite: boolean
+          mining_run_id: string | null
+          notes: string | null
           offer_id: string
+          tags: string[] | null
           user_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           is_favorite?: boolean
+          mining_run_id?: string | null
+          notes?: string | null
           offer_id: string
+          tags?: string[] | null
           user_id: string
         }
         Update: {
           created_at?: string
           id?: string
           is_favorite?: boolean
+          mining_run_id?: string | null
+          notes?: string | null
           offer_id?: string
+          tags?: string[] | null
           user_id?: string
         }
         Relationships: [
@@ -718,6 +1443,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tiktok_minerados: {
+        Row: {
+          ai_analysis: Json | null
+          audio_title: string
+          comments: number
+          create_time: string | null
+          created_at: string
+          creator: string
+          description: string
+          hashtag: string
+          hashtags: string[]
+          hook: string
+          id: string
+          likes: number
+          shares: number
+          thumbnail_url: string
+          user_id: string
+          video_id: string
+          video_url: string
+          views: number
+          viral_score: number
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          audio_title?: string
+          comments?: number
+          create_time?: string | null
+          created_at?: string
+          creator?: string
+          description?: string
+          hashtag: string
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          shares?: number
+          thumbnail_url?: string
+          user_id: string
+          video_id: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Update: {
+          ai_analysis?: Json | null
+          audio_title?: string
+          comments?: number
+          create_time?: string | null
+          created_at?: string
+          creator?: string
+          description?: string
+          hashtag?: string
+          hashtags?: string[]
+          hook?: string
+          id?: string
+          likes?: number
+          shares?: number
+          thumbnail_url?: string
+          user_id?: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Relationships: []
+      }
+      trends: {
+        Row: {
+          country: string | null
+          created_at: string
+          data: Json | null
+          id: string
+          language: string | null
+          mining_run_id: string | null
+          topic: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          language?: string | null
+          mining_run_id?: string | null
+          topic?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          data?: Json | null
+          id?: string
+          language?: string | null
+          mining_run_id?: string | null
+          topic?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       user_ad_actions: {
         Row: {
@@ -753,22 +1580,91 @@ export type Database = {
       }
       user_roles: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      youtube_minerados: {
+        Row: {
+          ai_analysis: Json | null
+          channel_id: string
+          channel_name: string
+          comments: number
+          created_at: string
+          description: string
+          duration: string
+          hashtags: string[]
+          id: string
+          is_short: boolean
+          likes: number
+          published_at: string | null
+          query: string
+          thumbnail_url: string
+          title: string
+          user_id: string
+          video_id: string
+          video_url: string
+          views: number
+          viral_score: number
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          channel_id?: string
+          channel_name?: string
+          comments?: number
+          created_at?: string
+          description?: string
+          duration?: string
+          hashtags?: string[]
+          id?: string
+          is_short?: boolean
+          likes?: number
+          published_at?: string | null
+          query: string
+          thumbnail_url?: string
+          title?: string
+          user_id: string
+          video_id: string
+          video_url?: string
+          views?: number
+          viral_score?: number
+        }
+        Update: {
+          ai_analysis?: Json | null
+          channel_id?: string
+          channel_name?: string
+          comments?: number
+          created_at?: string
+          description?: string
+          duration?: string
+          hashtags?: string[]
+          id?: string
+          is_short?: boolean
+          likes?: number
+          published_at?: string | null
+          query?: string
+          thumbnail_url?: string
+          title?: string
+          user_id?: string
+          video_id?: string
+          video_url?: string
+          views?: number
+          viral_score?: number
         }
         Relationships: []
       }
@@ -777,6 +1673,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_mining_run: {
+        Args: { _error?: string; _results_count?: number; _run_id: string }
+        Returns: undefined
+      }
+      create_mining_run: {
+        Args: {
+          _country?: string
+          _language?: string
+          _query: string
+          _type: string
+          _user_id: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

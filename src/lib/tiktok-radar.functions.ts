@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import type { Json } from "@/integrations/supabase/types";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
 import { generateAIJson } from "@/lib/aiService";
 
@@ -45,6 +46,60 @@ function pickNum(obj: Record<string, unknown>, paths: string[]): number {
   return 0;
 }
 
+// Extracts the best available thumbnail URL from any Apify TikTok actor output shape.
+// Priority: videoMeta.coverUrl > videoMeta.originalCoverUrl > covers[0] > flat fields > avatar fallback
+function extractThumbnailUrl(item: Record<string, unknown>): string {
+  // 1. videoMeta object (clockworks~tiktok-scraper primary shape)
+  const vm = getPath(item, "videoMeta");
+  if (vm && typeof vm === "object") {
+    const v = vm as Record<string, unknown>;
+    for (const k of ["coverUrl", "originalCoverUrl", "dynamicCoverUrl", "cover", "thumbnail"]) {
+      if (typeof v[k] === "string" && (v[k] as string).startsWith("http")) return v[k] as string;
+    }
+  }
+
+  // 2. covers array — can be strings or objects
+  const coversRaw = getPath(item, "covers");
+  if (Array.isArray(coversRaw) && coversRaw.length > 0) {
+    const first = coversRaw[0];
+    if (typeof first === "string" && first.startsWith("http")) return first;
+    if (first && typeof first === "object") {
+      const c = first as Record<string, unknown>;
+      for (const k of ["url", "coverUrl", "cover", "urlList"]) {
+        if (typeof c[k] === "string" && (c[k] as string).startsWith("http")) return c[k] as string;
+      }
+      // urlList is sometimes an array
+      if (Array.isArray(c["urlList"]) && typeof c["urlList"][0] === "string") return c["urlList"][0];
+    }
+  }
+
+  // 3. shareCover — array of cover URLs used for sharing
+  const shareCover = getPath(item, "shareCover");
+  if (Array.isArray(shareCover) && shareCover.length > 0 && typeof shareCover[0] === "string" && (shareCover[0] as string).startsWith("http")) {
+    return shareCover[0];
+  }
+
+  // 4. Flat-field fallbacks (various actor versions)
+  const flat = pickStr(item, [
+    "cover",
+    "coverUrl",
+    "coverImageUrl",
+    "thumbnail",
+    "thumbnailUrl",
+    "dynamicCover",
+    "dynamicCoverUrl",
+    "originCover",
+    "originalCoverUrl",
+    "coverMediumUrl",
+    "image",
+    "imageUrl",
+  ]);
+  if (flat) return flat;
+
+  // 5. Last resort: author avatar (always present, shows something)
+  return pickStr(item, ["authorMeta.avatar", "author.avatarMedium", "authorAvatar"]) ?? "";
+}
+
 function extractHashtags(obj: Record<string, unknown>): string[] {
   const raw = getPath(obj, "hashtags") ?? [];
   if (Array.isArray(raw)) {
@@ -58,8 +113,9 @@ function extractHashtags(obj: Record<string, unknown>): string[] {
 
 function normalizeItem(item: Record<string, unknown>, hashtag: string) {
   const videoId = pickStr(item, ["id", "video_id", "videoId"]) ?? "";
+  // Prefer uniqueId (username) over display name so video_url can be reconstructed as @username/video/id
   const creator =
-    pickStr(item, ["authorMeta.name", "author.uniqueId", "author", "author_name", "creator"]) ??
+    pickStr(item, ["authorMeta.uniqueId", "author.uniqueId", "authorMeta.name", "author", "author_name", "creator"]) ??
     "Desconhecido";
   const videoUrl =
     pickStr(item, ["webVideoUrl", "video_url", "downloadUrl", "videoUrl", "shareUrl"]) ?? "";
@@ -79,22 +135,8 @@ function normalizeItem(item: Record<string, unknown>, hashtag: string) {
     pickStr(item, ["musicMeta.musicName", "music", "audioTitle", "sound_name"]) ?? "";
   const createTime = pickStr(item, ["createTimeISO", "createTime", "created_at", "timestamp"]);
 
-  // Extract thumbnail/cover from various Apify field shapes
-  let thumbnailUrl = "";
-  const covers = getPath(item, "covers");
-  if (Array.isArray(covers) && covers.length > 0 && typeof covers[0] === "string") {
-    thumbnailUrl = covers[0];
-  } else {
-    thumbnailUrl =
-      pickStr(item, [
-        "videoMeta.coverUrl",
-        "cover",
-        "coverImageUrl",
-        "thumbnail",
-        "dynamicCover",
-        "originCover",
-      ]) ?? "";
-  }
+  // Extract thumbnail — try every field the clockworks~tiktok-scraper actor can return
+  const thumbnailUrl = extractThumbnailUrl(item);
 
   const viralScore = Math.min(
     100,
@@ -124,10 +166,7 @@ function normalizeItem(item: Record<string, unknown>, hashtag: string) {
   };
 }
 
-// Supabase types don't include tiktok_minerados yet (migration pending on remote).
-// Using typed helper to avoid casting throughout.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const tiktokTable = () => (supabaseAdmin as any).from("tiktok_minerados");
+const tiktokTable = () => supabaseAdmin.from("tiktok_minerados");
 
 // ── input schemas ─────────────────────────────────────────────────────────────
 
@@ -163,26 +202,76 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
       proxyCountryCode: "None",
       excludePinnedPosts: false,
       scrapeRelatedVideos: false,
+      shouldDownloadCovers: true,
+      shouldDownloadSlideshowImages: false,
+      shouldDownloadVideos: false,
     };
 
-    console.log("[apify] url=", `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?token=***&timeout=120`);
-    console.log("[apify] payload=", payload);
+    console.log("[tiktok-radar] mining hashtag:", cleanHashtag, "limit:", limit);
 
     const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, payload);
 
     if (!raw.length) return { inserted: 0, skipped: 0 };
+
+    // DEBUG: log full structure of first item so we can see real field names
+    if (raw[0]) {
+      console.log("[tiktok-radar] FIRST RAW ITEM KEYS:", Object.keys(raw[0]).join(", "));
+      const vm = raw[0]["videoMeta"];
+      const covers = raw[0]["covers"];
+      console.log("[tiktok-radar] videoMeta:", JSON.stringify(vm ?? null));
+      console.log("[tiktok-radar] covers sample:", JSON.stringify(Array.isArray(covers) ? covers[0] : covers ?? null));
+      console.log("[tiktok-radar] thumbnail_extracted:", extractThumbnailUrl(raw[0]));
+      // log ALL fields that look like image URLs
+      const imgFields: Record<string, unknown> = {};
+      for (const k of Object.keys(raw[0])) {
+        const v = raw[0][k];
+        if (typeof v === "string" && (v.includes("tiktok") || v.includes("cdn") || v.includes("image") || v.includes("cover") || v.includes("thumb"))) {
+          imgFields[k] = v;
+        }
+      }
+      if (Object.keys(imgFields).length) console.log("[tiktok-radar] flat image-like fields:", JSON.stringify(imgFields));
+    }
 
     const rows = raw
       .map((item) => normalizeItem(item, cleanHashtag))
       .filter((r) => r.video_id)
       .map((r) => ({ ...r, user_id: userId }));
 
-    const { data: inserted, error } = await tiktokTable()
-      .upsert(rows, { onConflict: "user_id,video_id", ignoreDuplicates: true })
-      .select("id");
+    const videoIds = rows.map(r => r.video_id).filter(Boolean);
 
-    if (error) throw new Error(`Supabase error: ${error.message}`);
-    return { inserted: inserted?.length ?? 0, skipped: rows.length - (inserted?.length ?? 0) };
+    // Fetch which video_ids already exist for this user (and whether they have a thumbnail)
+    const { data: existing } = await tiktokTable()
+      .select("id,video_id,thumbnail_url")
+      .eq("user_id", userId)
+      .in("video_id", videoIds);
+
+    const existingMap = new Map((existing ?? []).map(e => [e.video_id as string, e as { id: string; video_id: string; thumbnail_url: string }]));
+
+    const newRows = rows.filter(r => !existingMap.has(r.video_id));
+    // Rows where video already exists but had an empty thumbnail — update just that field
+    const thumbUpdates = rows.filter(r => {
+      const ex = existingMap.get(r.video_id);
+      return ex && !ex.thumbnail_url && r.thumbnail_url;
+    });
+
+    // Insert truly new videos
+    let insertedCount = 0;
+    if (newRows.length > 0) {
+      const { data: ins, error } = await tiktokTable().insert(newRows).select("id");
+      if (error) throw new Error(`Supabase insert error: ${error.message}`);
+      insertedCount = ins?.length ?? 0;
+    }
+
+    // Patch thumbnail_url only — never touch ai_analysis or other fields
+    for (const r of thumbUpdates) {
+      await tiktokTable()
+        .update({ thumbnail_url: r.thumbnail_url })
+        .eq("user_id", userId)
+        .eq("video_id", r.video_id);
+    }
+
+    console.log("[tiktok-radar] inserted:", insertedCount, "thumb_patches:", thumbUpdates.length, "skipped:", rows.length - insertedCount - thumbUpdates.length);
+    return { inserted: insertedCount, skipped: rows.length - insertedCount };
   });
 
 export const listTikTokMinedFn = createServerFn({ method: "POST" })
@@ -201,6 +290,57 @@ export const listTikTokMinedFn = createServerFn({ method: "POST" })
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
     return rows ?? [];
+  });
+
+// ── oEmbed thumbnail repair ───────────────────────────────────────────────────
+
+export const fetchThumbnailsOembedFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const userId = (context as any).userId as string;
+
+    // 1. Find rows missing thumbnail
+    const { data: rows, error } = await tiktokTable()
+      .select("id, video_id, creator, video_url, thumbnail_url")
+      .eq("user_id", userId)
+      .or("thumbnail_url.is.null,thumbnail_url.eq.");
+
+    if (error) throw new Error(error.message);
+    if (!rows || rows.length === 0) return { updated: 0 };
+
+    let updated = 0;
+    for (const row of rows) {
+      const videoId = row.video_id as string | null;
+      const storedUrl = (row.video_url as string | null) ?? "";
+      if (!videoId) continue;
+
+      // Prefer stored video_url (already has @creator/video/id format) over constructing one
+      const targetUrl = storedUrl.includes("tiktok.com")
+        ? storedUrl
+        : `https://www.tiktok.com/video/${videoId}`;
+
+      try {
+        const res = await fetch(
+          `https://www.tiktok.com/oembed?url=${encodeURIComponent(targetUrl)}`,
+          { headers: { "User-Agent": "Mozilla/5.0 (compatible; TikTokCrawler)" } }
+        );
+        if (!res.ok) continue;
+        const json = (await res.json()) as Record<string, unknown>;
+        const thumb = typeof json.thumbnail_url === "string" ? json.thumbnail_url : "";
+        if (!thumb) continue;
+
+        await tiktokTable()
+          .update({ thumbnail_url: thumb })
+          .eq("id", row.id as string)
+          .eq("user_id", userId);
+
+        updated++;
+      } catch {
+        // skip individual failures silently
+      }
+    }
+
+    return { updated };
   });
 
 export type TikTokAiAnalysis = {
@@ -372,9 +512,8 @@ export const saveAnuncioFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof AdPayloadInput>) => AdPayloadInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
-    const row = { ...data, user_id: userId };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabaseAdmin as any)
+    const row = { ...data, user_id: userId, ai_analysis: data.ai_analysis as Json | null };
+    const { error } = await supabaseAdmin
       .from("anuncios_salvos")
       .insert(row);
     // Ignore unique-constraint duplicates silently
@@ -390,9 +529,8 @@ export const escalateAnuncioFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof EscalateInput>) => EscalateInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
-    const row = { ...data, user_id: userId };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabaseAdmin as any)
+    const row = { ...data, user_id: userId, ai_analysis: data.ai_analysis as Json | null, playbook: data.playbook as Json | null };
+    const { error } = await supabaseAdmin
       .from("anuncios_escalados")
       .upsert(row, { onConflict: "user_id,video_id", ignoreDuplicates: false });
     if (error) throw new Error(error.message);
@@ -406,8 +544,7 @@ export const saveCreatorFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof SaveCreatorInput>) => SaveCreatorInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabaseAdmin as any)
+    const { error } = await supabaseAdmin
       .from("creators_salvos")
       .upsert({ ...data, user_id: userId }, { onConflict: "user_id,creator,source", ignoreDuplicates: true });
     if (error) throw new Error(error.message);

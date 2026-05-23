@@ -56,6 +56,7 @@ import {
   saveCreatorFn,
   generatePlaybookFn,
   generateEscalatePackFn,
+  fetchThumbnailsOembedFn,
 } from "@/lib/tiktok-radar.functions";
 import type { TikTokAiAnalysis, TikTokPlaybook, EscalatePack } from "@/lib/tiktok-radar.functions";
 
@@ -272,21 +273,41 @@ function EnhancedScoreDisplay({ es }: { es: EnhancedScore }) {
 
 // ── SkeletonCard ──────────────────────────────────────────────────────────────
 
+function ShimmerBar({ w = "100%", h = 12, r = 6 }: { w?: string | number; h?: number; r?: number }) {
+  return (
+    <div className="relative overflow-hidden" style={{ width: w, height: h, borderRadius: r, background: "rgba(255,255,255,0.05)" }}>
+      <motion.div
+        className="absolute inset-0"
+        style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.10) 50%, transparent 100%)" }}
+        animate={{ x: ["-100%", "200%"] }}
+        transition={{ repeat: Infinity, duration: 1.6, ease: "linear" }}
+      />
+    </div>
+  );
+}
+
 function SkeletonCard() {
   return (
     <div className="rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0d0d16" }}>
-      <div className="w-full animate-pulse" style={{ height: 200, background: "rgba(255,255,255,0.04)" }} />
-      <div className="p-3 space-y-2">
+      <div className="relative overflow-hidden" style={{ height: 200, background: "rgba(255,255,255,0.04)" }}>
+        <motion.div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)" }}
+          animate={{ x: ["-100%", "200%"] }}
+          transition={{ repeat: Infinity, duration: 1.6, ease: "linear" }}
+        />
+      </div>
+      <div className="p-3 space-y-2.5">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full animate-pulse" style={{ background: "rgba(255,255,255,0.07)" }} />
-          <div className="h-3 w-20 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.07)" }} />
+          <div className="w-6 h-6 rounded-full shrink-0" style={{ background: "rgba(255,255,255,0.07)" }} />
+          <ShimmerBar w="80px" h={10} />
         </div>
-        <div className="h-3 w-full rounded animate-pulse" style={{ background: "rgba(255,255,255,0.05)" }} />
-        <div className="h-3 w-2/3 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.05)" }} />
-        <div className="flex gap-3 mt-1">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-3 w-10 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
-          ))}
+        <ShimmerBar w="100%" h={10} />
+        <ShimmerBar w="65%" h={10} />
+        <div className="flex gap-3 pt-0.5">
+          <ShimmerBar w="36px" h={9} r={12} />
+          <ShimmerBar w="36px" h={9} r={12} />
+          <ShimmerBar w="36px" h={9} r={12} />
         </div>
       </div>
     </div>
@@ -1010,6 +1031,7 @@ function VideoModal({
   const es = useMemo(() => calcEnhancedScore(row), [row]);
   const isSaved     = savedIds.has(row.id);
   const isEscalated = escalatedIds.has(row.id);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -1043,20 +1065,50 @@ function VideoModal({
 
         <div className="flex flex-col lg:flex-row overflow-auto" style={{ maxHeight: "92vh" }}>
           {/* Video panel */}
-          <div className="lg:w-[300px] xl:w-[320px] shrink-0 bg-black overflow-hidden" style={{ minHeight: 280 }}>
+          <div className="lg:w-[300px] xl:w-[320px] shrink-0 bg-black overflow-hidden flex flex-col" style={{ minHeight: 280 }}>
             {embedUrl ? (
-              <iframe src={embedUrl} className="w-full" style={{ height: "clamp(280px, 60vh, 560px)", border: 0 }}
-                allowFullScreen allow="encrypted-media" title="TikTok Video" />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: "clamp(280px, 60vh, 560px)" }}>
-                <Play className="h-12 w-12 mb-3 opacity-20" />
-                <p className="text-sm">Vídeo indisponível</p>
-                {row.video_url && (
-                  <a href={row.video_url} target="_blank" rel="noopener noreferrer" className="mt-2 text-xs text-[#3BA3FF] hover:underline">
-                    Abrir no TikTok
-                  </a>
+              <div className="relative flex-1" style={{ height: "clamp(280px, 60vh, 560px)" }}>
+                {/* Skeleton while iframe loads */}
+                {!iframeLoaded && (
+                  <div className="absolute inset-0 z-[1] flex flex-col items-center justify-center gap-3"
+                    style={{ background: "#080810" }}>
+                    <div className="relative w-12 h-12">
+                      <div className="absolute inset-0 rounded-full border-2 border-[#ff0050]/20" />
+                      <div className="absolute inset-0 rounded-full border-2 border-[#ff0050] border-t-transparent animate-spin" />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">Carregando vídeo...</span>
+                  </div>
                 )}
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full"
+                  style={{ border: 0, opacity: iframeLoaded ? 1 : 0, transition: "opacity 0.4s ease" }}
+                  allowFullScreen
+                  allow="encrypted-media"
+                  title="TikTok Video"
+                  onLoad={() => setIframeLoaded(true)}
+                />
               </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-muted-foreground flex-1"
+                style={{ height: "clamp(280px, 60vh, 560px)", background: "#080810" }}>
+                <Play className="h-12 w-12 mb-3 opacity-20" />
+                <p className="text-sm">Sem embed disponível</p>
+              </div>
+            )}
+            {/* Abrir no TikTok — sempre visível */}
+            {(row.video_url || row.video_id) && (
+              <a
+                href={row.video_url || `https://www.tiktok.com/@${row.creator}/video/${row.video_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 text-xs font-medium transition-colors"
+                style={{ background: "rgba(255,0,80,0.08)", color: "#ff6680", borderTop: "1px solid rgba(255,0,80,0.15)" }}
+                onClick={e => e.stopPropagation()}
+              >
+                <Play className="h-3 w-3" />
+                Abrir no TikTok
+              </a>
             )}
           </div>
 
@@ -1149,14 +1201,184 @@ function VideoModal({
               ))}
             </div>
 
-            {/* External */}
-            {row.video_url && (
-              <a href={row.video_url} target="_blank" rel="noopener noreferrer"
+            {/* External link — shown when no video_url in embed panel */}
+            {!row.video_url && row.video_id && (
+              <a href={`https://www.tiktok.com/@${row.creator}/video/${row.video_id}`} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 Ver original no TikTok <ChevronRight className="h-3 w-3" />
               </a>
             )}
           </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── CloneStructureModal ───────────────────────────────────────────────────────
+
+function CloneStructureModal({
+  row,
+  onClose,
+  onGeneratePlaybook,
+}: {
+  row: TikTokRow;
+  onClose: () => void;
+  onGeneratePlaybook: (row: TikTokRow) => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const ai = row.ai_analysis;
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(null), 1500); });
+  };
+
+  const CopyBtn = ({ text, id }: { text: string; id: string }) => (
+    <button onClick={() => copy(text, id)}
+      className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors">
+      {copied === id ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+
+  const Field = ({ label, value, accent }: { label: string; value?: string; accent?: string }) => {
+    if (!value) return null;
+    return (
+      <div className="rounded-xl border border-white/8 bg-white/3 p-3 flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+          <div className="text-xs leading-snug" style={accent ? { color: accent, fontWeight: 600 } : { color: "hsl(var(--foreground))" }}>
+            {value}
+          </div>
+        </div>
+        <CopyBtn text={value} id={`clone-${label}`} />
+      </div>
+    );
+  };
+
+  const allText = [
+    `HOOK: ${row.hook}`,
+    ai?.hook_formula  ? `FÓRMULA: ${ai.hook_formula}`  : "",
+    ai?.promise       ? `PROMESSA: ${ai.promise}`       : "",
+    ai?.mechanism     ? `MECANISMO: ${ai.mechanism}`    : "",
+    ai?.narrative     ? `ESTRUTURA: ${ai.narrative}`    : "",
+    ai?.cta           ? `CTA: ${ai.cta}`                : "",
+    ai?.emotion       ? `EMOÇÃO: ${ai.emotion}`         : "",
+    ai?.retention     ? `RETENÇÃO: ${ai.retention}`     : "",
+    ai?.vsl_hook      ? `HOOK VSL: ${ai.vsl_hook}`      : "",
+  ].filter(Boolean).join("\n\n");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative w-full max-w-2xl rounded-2xl border border-white/10 overflow-hidden"
+        style={{ background: "#080812", boxShadow: "0 30px 90px rgba(0,0,0,0.8)", maxHeight: "90vh" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8"
+          style={{ background: "linear-gradient(135deg, rgba(10,108,255,0.10), rgba(0,0,0,0))" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #0A6CFF, #00f2ea)" }}>
+              <Copy className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-foreground">Clonar Estrutura</div>
+              <div className="text-[10px] text-muted-foreground">@{row.creator} · {fmtNum(row.views)} views</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline"
+              className="h-7 text-xs gap-1 border-white/10 hover:bg-white/5"
+              onClick={() => copy(allText, "all")}>
+              {copied === "all" ? <CheckCircle2 className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+              Copiar Tudo
+            </Button>
+            <button onClick={onClose}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto p-5 space-y-3" style={{ maxHeight: "calc(90vh - 130px)" }}>
+          {/* Hook original */}
+          <div className="rounded-xl border border-[#0A6CFF]/30 bg-[#0A6CFF]/6 p-3 flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-[#3BA3FF] mb-1">Hook Original</div>
+              <div className="text-sm text-foreground leading-snug font-medium">"{row.hook}"</div>
+            </div>
+            <CopyBtn text={row.hook} id="hook-orig" />
+          </div>
+
+          {!ai ? (
+            <div className="rounded-xl border border-white/8 bg-white/3 p-5 text-center space-y-3">
+              <Sparkles className="h-8 w-8 mx-auto text-[#3BA3FF] opacity-50" />
+              <div>
+                <div className="text-sm font-medium text-foreground">Análise IA não disponível</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Analise este vídeo com IA para desbloquear fórmula do hook, mecanismo, promessa e estrutura narrativa.
+                </div>
+              </div>
+              <Button size="sm" className="gap-2 bg-[#0A6CFF] hover:bg-[#0A6CFF]/80 text-white"
+                onClick={() => { onClose(); onGeneratePlaybook(row); }}>
+                <Rocket className="h-3.5 w-3.5" /> Gerar Playbook Completo
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Fórmula do Hook"  value={ai.hook_formula}  accent="#3BA3FF" />
+                <Field label="Emoção Dominante" value={ai.emotion} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Promessa Principal" value={ai.promise} />
+                <Field label="Mecanismo Único"    value={ai.mechanism} />
+              </div>
+              <Field label="Estrutura Narrativa" value={ai.narrative} />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="CTA" value={ai.cta} accent="#00c896" />
+                <Field label="Técnicas de Retenção" value={ai.retention} />
+              </div>
+              <Field label="Análise do Hook (3s)" value={ai.hook_analysis} />
+              {ai.vsl_hook && (
+                <div className="rounded-xl border border-[#ff9500]/20 bg-[#ff9500]/5 p-3 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] uppercase tracking-wider text-[#ff9500] mb-1">Hook VSL (15s)</div>
+                    <div className="text-xs text-foreground leading-snug italic">"{ai.vsl_hook}"</div>
+                  </div>
+                  <CopyBtn text={ai.vsl_hook} id="vsl-hook" />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-2 p-4 border-t border-white/8">
+          <Button className="flex-1 gap-2 text-white"
+            style={{ background: "linear-gradient(135deg, #0A6CFF, #ff0050)" }}
+            onClick={() => { onClose(); onGeneratePlaybook(row); }}>
+            <Rocket className="h-4 w-4" /> Gerar Playbook Completo
+          </Button>
         </div>
       </motion.div>
     </motion.div>
@@ -1180,6 +1402,24 @@ function VideoCard({
 }) {
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [imgLoading, setImgLoading] = useState(true);
+
+  const isViral = row.viral_score >= 70;
+  const isHot   = row.viral_score >= 45 && row.viral_score < 70;
+
+  const glowColor = isEscalated ? "rgba(255,77,77,0.45)"
+                  : isSaved     ? "rgba(0,200,150,0.35)"
+                  : isViral     ? "rgba(255,77,77,0.30)"
+                  : isHot       ? "rgba(255,149,0,0.25)"
+                  : hovered     ? "rgba(10,108,255,0.30)"
+                  : "transparent";
+
+  const borderColor = isEscalated ? "rgba(255,77,77,0.5)"
+                    : isSaved     ? "rgba(0,200,150,0.4)"
+                    : isViral     ? "rgba(255,77,77,0.35)"
+                    : isHot       ? "rgba(255,149,0,0.30)"
+                    : hovered     ? "rgba(10,108,255,0.40)"
+                    : "rgba(255,255,255,0.06)";
 
   return (
     <motion.div
@@ -1190,8 +1430,12 @@ function VideoCard({
       className="group relative rounded-2xl border overflow-hidden cursor-pointer"
       style={{
         background: "#0d0d16",
-        boxShadow: hovered ? "0 8px 40px rgba(10,108,255,0.18), 0 0 0 1px rgba(10,108,255,0.3)" : "0 2px 12px rgba(0,0,0,0.4)",
-        borderColor: isEscalated ? "rgba(255,77,77,0.4)" : isSaved ? "rgba(0,200,150,0.3)" : hovered ? "rgba(10,108,255,0.35)" : "rgba(255,255,255,0.06)",
+        boxShadow: hovered
+          ? `0 8px 40px ${glowColor}, 0 0 0 1px ${borderColor}`
+          : isViral || isEscalated
+          ? `0 4px 24px ${glowColor}`
+          : "0 2px 12px rgba(0,0,0,0.4)",
+        borderColor,
         transition: "all 0.25s ease",
       }}
       onMouseEnter={() => setHovered(true)}
@@ -1200,16 +1444,29 @@ function VideoCard({
     >
       {/* Thumbnail */}
       <div className="relative w-full overflow-hidden" style={{ height: 200 }}>
+        {/* Shimmer while loading */}
+        {imgLoading && row.thumbnail_url && !imgError && (
+          <div className="absolute inset-0 z-[1]" style={{ background: "rgba(255,255,255,0.04)" }}>
+            <motion.div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.09) 50%, transparent 100%)" }}
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ repeat: Infinity, duration: 1.6, ease: "linear" }}
+            />
+          </div>
+        )}
         {row.thumbnail_url && !imgError ? (
           <img src={row.thumbnail_url} alt={row.hook}
             className="w-full h-full object-cover transition-transform duration-500"
-            style={{ transform: hovered ? "scale(1.05)" : "scale(1)" }}
+            style={{ transform: hovered ? "scale(1.05)" : "scale(1)", opacity: imgLoading ? 0 : 1, transition: "opacity 0.3s ease, transform 0.5s ease" }}
             loading="lazy"
-            onError={() => setImgError(true)} />
+            onLoad={() => setImgLoading(false)}
+            onError={() => { setImgError(true); setImgLoading(false); }} />
         ) : (
-          <div className="w-full h-full flex items-center justify-center"
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2"
             style={{ background: "linear-gradient(135deg, rgba(255,0,80,0.12) 0%, rgba(0,242,234,0.08) 100%)" }}>
             <Play className="h-10 w-10 text-white/15" />
+            <span className="text-[9px] text-white/20 font-medium uppercase tracking-wider">sem thumbnail</span>
           </div>
         )}
 
@@ -1550,6 +1807,8 @@ function TikTokRadarPage() {
   const [playbookLoading, setPlaybookLoading] = useState(false);
   const [escalatingPb, setEscalatingPb]       = useState(false);
   const [escalatedPb, setEscalatedPb]         = useState(false);
+  // Clone structure modal
+  const [cloneFor, setCloneFor]               = useState<TikTokRow | null>(null);
 
   // Auto-clear error after 6s
   useEffect(() => {
@@ -1568,6 +1827,7 @@ function TikTokRadarPage() {
   const saveCreator    = useServerFn(saveCreatorFn);
   const genPlaybook    = useServerFn(generatePlaybookFn);
   const genEscalatePack = useServerFn(generateEscalatePackFn);
+  const fetchOembed    = useServerFn(fetchThumbnailsOembedFn);
 
   const activeTabDef = TABS.find(t => t.id === activeTab) ?? TABS[0];
 
@@ -1697,7 +1957,7 @@ function TikTokRadarPage() {
       case "playbook": handleGeneratePlaybook(row); return;
       case "ebook":    navigate({ to: "/produtos/ebook" }); return;
       case "vsl":      navigate({ to: "/pagina-venda" }); return;
-      case "clone":
+      case "clone":    setSelectedVideo(null); setCloneFor(row); return;
       case "creative": navigate({ to: "/criativos" }); return;
     }
   };
@@ -1720,6 +1980,25 @@ function TikTokRadarPage() {
     }
     setBatchRunning(false);
     setBatchProgress(null);
+  };
+
+  // ── Fix thumbnails via TikTok oEmbed API (server-side, no Apify needed) ──
+
+  const handleFixThumbnails = async () => {
+    setMining(true); setError(null);
+    try {
+      const result = await fetchOembed({});
+      await loadVideos(filterHashtag ?? undefined);
+      if (result && typeof result === "object" && "updated" in result) {
+        if ((result as { updated: number }).updated === 0) {
+          setError("Nenhuma thumbnail nova encontrada via oEmbed. Tente minerar novamente.");
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao buscar thumbnails");
+    } finally {
+      setMining(false);
+    }
   };
 
   // ── Mining queue ─────────────────────────────────────────────────────────────
@@ -1922,6 +2201,17 @@ function TikTokRadarPage() {
             </Button>
           )}
 
+          {/* Fix thumbnails button — only when there are videos with empty thumbnails */}
+          {videos.filter(v => !v.thumbnail_url).length > 0 && !mining && (
+            <Button size="sm" variant="outline"
+              className="h-7 text-xs border-[#ff9500]/30 text-[#ff9500] hover:bg-[#ff9500]/10"
+              onClick={handleFixThumbnails}
+              title="Busca thumbnails reais via TikTok oEmbed para vídeos sem imagem">
+              <Search className="h-3 w-3 mr-1" />
+              Buscar thumbnails ({videos.filter(v => !v.thumbnail_url).length})
+            </Button>
+          )}
+
           {/* Mining queue toggle */}
           <div className="flex items-center gap-1">
             <Input value={queueInput} onChange={e => setQueueInput(e.target.value)}
@@ -2071,6 +2361,17 @@ function TikTokRadarPage() {
               const result = await genEscalatePack({ data: { id } });
               return result as EscalatePack;
             }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Clone Structure Modal ── */}
+      <AnimatePresence>
+        {cloneFor && (
+          <CloneStructureModal
+            row={cloneFor}
+            onClose={() => setCloneFor(null)}
+            onGeneratePlaybook={(row) => { setCloneFor(null); handleGeneratePlaybook(row); }}
           />
         )}
       </AnimatePresence>
