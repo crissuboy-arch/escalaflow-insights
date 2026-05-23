@@ -37,6 +37,13 @@ import {
   ChevronDown,
   ChevronUp,
   Rocket,
+  Target,
+  Layers,
+  BarChart3,
+  Globe,
+  ListPlus,
+  Tag,
+  Loader,
 } from "lucide-react";
 import {
   mineTikTokHashtagFn,
@@ -48,8 +55,9 @@ import {
   escalateAnuncioFn,
   saveCreatorFn,
   generatePlaybookFn,
+  generateEscalatePackFn,
 } from "@/lib/tiktok-radar.functions";
-import type { TikTokAiAnalysis, TikTokPlaybook } from "@/lib/tiktok-radar.functions";
+import type { TikTokAiAnalysis, TikTokPlaybook, EscalatePack } from "@/lib/tiktok-radar.functions";
 
 export const Route = createFileRoute("/_authenticated/tiktok-radar")({
   component: TikTokRadarPage,
@@ -285,6 +293,38 @@ function SkeletonCard() {
   );
 }
 
+// ── Auto-categorization (rule-based, instant, no AI needed) ───────────────────
+
+const CATEGORY_RULES: { label: string; color: string; bg: string; keywords: string[] }[] = [
+  { label: "E-commerce",   color: "#ff9500", bg: "rgba(255,149,0,0.12)",   keywords: ["tiktokshop","shopnow","tiktokmademebuyit","dropshipping","ecommerce","shopify","produto","loja"] },
+  { label: "Info-produto", color: "#0A6CFF", bg: "rgba(10,108,255,0.12)",  keywords: ["curso","mentoria","coaching","ebook","infoproduto","treinamento","masterclass","aula"] },
+  { label: "Saúde",        color: "#00c896", bg: "rgba(0,200,150,0.12)",   keywords: ["emagrecimento","saude","fitness","academia","dieta","nutrição","treino","emagrecer","saúde"] },
+  { label: "VSL / Ads",    color: "#ff4d4d", bg: "rgba(255,77,77,0.12)",   keywords: ["vsl","videovendas","salesletter","ugcads","ads","adsnotsponsored","sponsored","publi"] },
+  { label: "UGC / Review", color: "#a78bfa", bg: "rgba(167,139,250,0.12)", keywords: ["unboxing","review","testei","comprei","ugc","avaliação","usandoo"] },
+  { label: "Renda Extra",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  keywords: ["rendaextra","trabalharremoto","freelancer","ganhandodinheiro","homeoffice","renda"] },
+  { label: "Beleza",       color: "#ec4899", bg: "rgba(236,72,153,0.12)",  keywords: ["makeup","beleza","skincare","maquiagem","cabelo","pele","glow"] },
+  { label: "Creator",      color: "#06b6d4", bg: "rgba(6,182,212,0.12)",   keywords: ["contentcreator","creatortiktok","ugccreator","influencer","tiktoker"] },
+];
+
+function detectCategory(row: TikTokRow): { label: string; color: string; bg: string } | null {
+  const text = [row.hook, row.description, ...(row.hashtags ?? [])].join(" ").toLowerCase();
+  for (const rule of CATEGORY_RULES) {
+    if (rule.keywords.some(k => text.includes(k))) return rule;
+  }
+  return null;
+}
+
+function CategoryBadge({ row }: { row: TikTokRow }) {
+  const cat = detectCategory(row);
+  if (!cat) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold whitespace-nowrap"
+      style={{ background: cat.bg, color: cat.color, border: `1px solid ${cat.color}30` }}>
+      <Tag className="h-2.5 w-2.5" />{cat.label}
+    </span>
+  );
+}
+
 // ── AiSection helper ──────────────────────────────────────────────────────────
 
 function AiSection({ label, value, accent, italic }: { label: string; value?: string; accent?: boolean; italic?: boolean }) {
@@ -372,8 +412,10 @@ function AiAnalysisDisplay({ analysis }: { analysis: TikTokAiAnalysis }) {
           </div>
         </>}
         {tab === "oferta" && <>
+          <AiSection label="Produto Detectado"      value={analysis.produto_detectado} accent />
+          <AiSection label="Formato VSL"            value={analysis.formato_vsl} />
           <AiSection label="Ângulo de oferta"       value={analysis.offer_angle} />
-          <AiSection label="Título Ebook sugerido"  value={analysis.ebook_title} accent />
+          <AiSection label="Título Ebook sugerido"  value={analysis.ebook_title} />
           <AiSection label="Hook VSL (15s)"         value={analysis.vsl_hook} italic />
         </>}
       </div>
@@ -597,6 +639,349 @@ function PlaybookModal({
             </Button>
           </div>
         )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── EscalateHubModal ──────────────────────────────────────────────────────────
+
+type EscalateHubTab = "hooks" | "creatives" | "meta" | "tiktok" | "google";
+
+function EscalateHubModal({
+  row,
+  onClose,
+  onSave,
+  onEscalate,
+  savedIds,
+  escalatedIds,
+  genPack,
+}: {
+  row: TikTokRow;
+  onClose: () => void;
+  onSave: (row: TikTokRow) => void;
+  onEscalate: (row: TikTokRow) => void;
+  savedIds: Set<string>;
+  escalatedIds: Set<string>;
+  genPack: (id: string) => Promise<EscalatePack>;
+}) {
+  const [tab, setTab] = useState<EscalateHubTab>("hooks");
+  const [pack, setPack] = useState<EscalatePack | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const isSaved     = savedIds.has(row.id);
+  const isEscalated = escalatedIds.has(row.id);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const generate = async () => {
+    setLoading(true); setError(null);
+    try {
+      const result = await genPack(row.id);
+      setPack(result as EscalatePack);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Erro ao gerar pacote");
+    } finally { setLoading(false); }
+  };
+
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(null), 1500); });
+  };
+
+  const HUB_TABS: { id: EscalateHubTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: "hooks",     label: "Hooks",      icon: Zap },
+    { id: "creatives", label: "Criativos",  icon: Layers },
+    { id: "meta",      label: "Meta Ads",   icon: Target },
+    { id: "tiktok",    label: "TikTok Ads", icon: Play },
+    { id: "google",    label: "Google Ads", icon: Globe },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.9)", backdropFilter: "blur(10px)" }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative w-full max-w-3xl rounded-2xl border border-white/10 overflow-hidden"
+        style={{ background: "#080812", boxShadow: "0 30px 90px rgba(0,0,0,0.8)", maxHeight: "90vh" }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8"
+          style={{ background: "linear-gradient(135deg, rgba(255,77,77,0.10), rgba(10,108,255,0.08))" }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, #ff4d4d, #0A6CFF)" }}>
+              <Flame className="h-4 w-4 text-white" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-foreground">Escalar Anúncio</div>
+              <div className="text-[10px] text-muted-foreground">@{row.creator} · {fmtNum(row.views)} views</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline"
+              className="h-7 text-xs gap-1 border-white/10 hover:bg-white/5"
+              style={isSaved ? { borderColor: "#00c896", color: "#00c896" } : {}}
+              onClick={() => onSave(row)}>
+              {isSaved ? <CheckCircle2 className="h-3 w-3" /> : <Bookmark className="h-3 w-3" />}
+              {isSaved ? "Salvo" : "Salvar"}
+            </Button>
+            <Button size="sm"
+              className="h-7 text-xs gap-1"
+              style={isEscalated
+                ? { background: "#00c896", color: "#fff" }
+                : { background: "linear-gradient(135deg, #ff4d4d, #0A6CFF)", color: "#fff" }}
+              onClick={() => onEscalate(row)}>
+              {isEscalated ? <CheckCircle2 className="h-3 w-3" /> : <Rocket className="h-3 w-3" />}
+              {isEscalated ? "Escalado!" : "Escalar"}
+            </Button>
+            <button onClick={onClose}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(90vh - 68px)" }}>
+          {!pack && !loading && (
+            <div className="flex flex-col items-center justify-center py-16 gap-5">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, rgba(255,77,77,0.15), rgba(10,108,255,0.15))", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <Rocket className="h-8 w-8 text-white/40" />
+              </div>
+              <div className="text-center">
+                <div className="text-base font-semibold text-foreground">Gerar Pacote Completo de Escala</div>
+                <div className="text-xs text-muted-foreground mt-1 max-w-xs">
+                  5 hooks virais · 3 criativos · Meta Ads · TikTok Ads · Google Ads
+                </div>
+              </div>
+              {error && <p className="text-xs text-red-400 text-center max-w-sm">{error}</p>}
+              <Button onClick={generate}
+                className="gap-2 text-white"
+                style={{ background: "linear-gradient(135deg, #ff4d4d, #0A6CFF)", boxShadow: "0 0 30px rgba(255,77,77,0.3)" }}>
+                <Sparkles className="h-4 w-4" /> Gerar Pacote com IA
+              </Button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <div className="relative w-14 h-14">
+                <div className="absolute inset-0 rounded-full border-2 border-[#ff4d4d]/20" />
+                <div className="absolute inset-0 rounded-full border-2 border-[#ff4d4d] border-t-transparent animate-spin" />
+                <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-[#ff4d4d]" />
+              </div>
+              <div className="text-sm font-medium text-foreground">Gerando pacote de escala...</div>
+              <div className="text-xs text-muted-foreground">Hooks, criativos, Meta, TikTok e Google Ads</div>
+            </div>
+          )}
+
+          {pack && !loading && (
+            <div className="p-5 space-y-4">
+              {/* Tab nav */}
+              <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+                {HUB_TABS.map(t => {
+                  const Icon = t.icon;
+                  return (
+                    <button key={t.id} onClick={() => setTab(t.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all"
+                      style={tab === t.id
+                        ? { background: "rgba(255,77,77,0.15)", color: "#ff6680", border: "1px solid rgba(255,77,77,0.3)" }
+                        : { color: "hsl(var(--muted-foreground))", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      <Icon className="h-3.5 w-3.5" />{t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Hooks tab */}
+              {tab === "hooks" && (
+                <div className="space-y-2">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">5 Hooks Virais</div>
+                  {pack.hooks?.map((hook, i) => (
+                    <div key={i} className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/3 p-3">
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                        style={{ background: ["#ff4d4d","#ff9500","#0A6CFF","#00c896","#a78bfa"][i % 5], color: "#fff" }}>
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 text-sm text-foreground leading-snug">{hook}</div>
+                      <button onClick={() => copy(hook, `hook-${i}`)}
+                        className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 text-muted-foreground hover:text-foreground transition-colors">
+                        {copied === `hook-${i}` ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Creatives tab */}
+              {tab === "creatives" && (
+                <div className="space-y-3">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-3">3 Briefings de Criativos</div>
+                  {pack.creatives?.map((c, i) => (
+                    <div key={i} className="rounded-xl border border-white/8 bg-white/3 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                          style={{ background: i === 0 ? "#ff4d4d" : i === 1 ? "#0A6CFF" : "#ff9500", color: "#fff" }}>
+                          {i + 1}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-xs text-foreground leading-relaxed">{c}</div>
+                        </div>
+                        <button onClick={() => copy(c, `creative-${i}`)}
+                          className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 text-muted-foreground transition-colors">
+                          {copied === `creative-${i}` ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Meta tab */}
+              {tab === "meta" && pack.meta_campaign && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Meta Ads</div>
+                    <button onClick={() => copy(
+                      `OBJETIVO: ${pack.meta_campaign.objective}\nAUDIÊNCIA: ${pack.meta_campaign.audience}\nCOPY: ${pack.meta_campaign.primary_text}\nHEADLINE: ${pack.meta_campaign.headline}\nCTA: ${pack.meta_campaign.cta}`,
+                      "meta-all"
+                    )} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                      {copied === "meta-all" ? <CheckCircle2 className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                      Copiar tudo
+                    </button>
+                  </div>
+                  {[
+                    { label: "Objetivo",      value: pack.meta_campaign.objective },
+                    { label: "Audiência",     value: pack.meta_campaign.audience },
+                    { label: "Copy principal",value: pack.meta_campaign.primary_text },
+                    { label: "Headline",      value: pack.meta_campaign.headline },
+                    { label: "Botão CTA",     value: pack.meta_campaign.cta },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl border border-white/8 bg-white/3 p-3 flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+                        <div className="text-xs text-foreground leading-snug">{value}</div>
+                      </div>
+                      <button onClick={() => copy(value, `meta-${label}`)}
+                        className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 text-muted-foreground transition-colors">
+                        {copied === `meta-${label}` ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* TikTok tab */}
+              {tab === "tiktok" && pack.tiktok_campaign && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">TikTok Ads</div>
+                    <button onClick={() => copy(
+                      `FORMATO: ${pack.tiktok_campaign.format}\nHOOK SCRIPT: ${pack.tiktok_campaign.hook_script}\nLEGENDA: ${pack.tiktok_campaign.caption}\nCTA: ${pack.tiktok_campaign.cta}\nHASHTAGS: ${pack.tiktok_campaign.hashtags?.join(" ")}`,
+                      "tiktok-all"
+                    )} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                      {copied === "tiktok-all" ? <CheckCircle2 className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                      Copiar tudo
+                    </button>
+                  </div>
+                  {[
+                    { label: "Formato",      value: pack.tiktok_campaign.format },
+                    { label: "Hook Script",  value: pack.tiktok_campaign.hook_script },
+                    { label: "Legenda",      value: pack.tiktok_campaign.caption },
+                    { label: "Botão CTA",    value: pack.tiktok_campaign.cta },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="rounded-xl border border-white/8 bg-white/3 p-3 flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">{label}</div>
+                        <div className="text-xs text-foreground leading-snug">{value}</div>
+                      </div>
+                      <button onClick={() => copy(value, `tiktok-${label}`)}
+                        className="shrink-0 p-1.5 rounded-lg border border-white/10 hover:bg-white/8 text-muted-foreground transition-colors">
+                        {copied === `tiktok-${label}` ? <CheckCircle2 className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  ))}
+                  {pack.tiktok_campaign.hashtags?.length > 0 && (
+                    <div className="rounded-xl border border-white/8 bg-white/3 p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Hashtags</div>
+                      <div className="flex flex-wrap gap-1">
+                        {pack.tiktok_campaign.hashtags.map(h => (
+                          <span key={h} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#ff0050]/10 text-[#ff6680]">#{h}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Google tab */}
+              {tab === "google" && pack.google_ads && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Google Ads</div>
+                    <button onClick={() => copy(
+                      `H1: ${pack.google_ads.headline1} | H2: ${pack.google_ads.headline2} | H3: ${pack.google_ads.headline3}\nD1: ${pack.google_ads.description1}\nD2: ${pack.google_ads.description2}\nKWs: ${pack.google_ads.keywords?.join(", ")}`,
+                      "google-all"
+                    )} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+                      {copied === "google-all" ? <CheckCircle2 className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                      Copiar tudo
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[pack.google_ads.headline1, pack.google_ads.headline2, pack.google_ads.headline3].map((h, i) => (
+                      <div key={i} className="rounded-xl border border-[#4285f4]/20 bg-[#4285f4]/5 p-3">
+                        <div className="text-[9px] uppercase tracking-wider text-[#4285f4] mb-1">Headline {i + 1}</div>
+                        <div className="text-xs text-foreground font-medium">{h}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[pack.google_ads.description1, pack.google_ads.description2].map((d, i) => (
+                      <div key={i} className="rounded-xl border border-white/8 bg-white/3 p-3">
+                        <div className="text-[9px] uppercase tracking-wider text-muted-foreground mb-1">Descrição {i + 1}</div>
+                        <div className="text-xs text-foreground leading-snug">{d}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {pack.google_ads.keywords?.length > 0 && (
+                    <div className="rounded-xl border border-white/8 bg-white/3 p-3">
+                      <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">Palavras-chave</div>
+                      <div className="flex flex-wrap gap-1">
+                        {pack.google_ads.keywords.map(k => (
+                          <span key={k} className="rounded-full px-2 py-0.5 text-[10px] font-medium bg-[#4285f4]/10 text-[#4285f4]">{k}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Regenerate */}
+              <div className="pt-2 border-t border-white/8">
+                <Button variant="outline" size="sm" onClick={generate}
+                  className="w-full text-xs gap-2 border-white/10 hover:bg-white/5 text-muted-foreground">
+                  <Loader className="h-3 w-3" /> Regenerar pacote
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -885,13 +1270,12 @@ function VideoCard({
           <span className="flex items-center gap-0.5"><Heart className="h-3 w-3" />{fmtNum(row.likes)}</span>
           <span className="flex items-center gap-0.5"><Share2 className="h-3 w-3" />{fmtNum(row.shares)}</span>
         </div>
-        {row.hashtags?.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {row.hashtags.slice(0, 3).map(h => (
-              <span key={h} className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]">#{h}</span>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-1">
+          <CategoryBadge row={row} />
+          {row.hashtags?.slice(0, 2).map(h => (
+            <span key={h} className="rounded-full px-1.5 py-0.5 text-[9px] font-medium bg-[#0A6CFF]/10 text-[#3BA3FF]">#{h}</span>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
@@ -1138,6 +1522,16 @@ function TikTokRadarPage() {
   const [hashtag, setHashtag]                 = useState("");
   const [limit, setLimit]                     = useState(20);
   const [page, setPage]                       = useState(1);
+  // Batch analysis
+  const [batchRunning, setBatchRunning]       = useState(false);
+  const [batchProgress, setBatchProgress]     = useState<{ done: number; total: number } | null>(null);
+  // Mining queue
+  const [queueInput, setQueueInput]           = useState("");
+  const [mineQueue, setMineQueue]             = useState<string[]>([]);
+  const [queueRunning, setQueueRunning]       = useState(false);
+  const [queueProgress, setQueueProgress]    = useState<{ done: number; total: number; current: string } | null>(null);
+  // Escalate hub
+  const [escalateHubFor, setEscalateHubFor]  = useState<TikTokRow | null>(null);
   const [mining, setMining]                   = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [videos, setVideos]                   = useState<TikTokRow[]>([]);
@@ -1173,6 +1567,7 @@ function TikTokRadarPage() {
   const escalateAnuncio = useServerFn(escalateAnuncioFn);
   const saveCreator    = useServerFn(saveCreatorFn);
   const genPlaybook    = useServerFn(generatePlaybookFn);
+  const genEscalatePack = useServerFn(generateEscalatePackFn);
 
   const activeTabDef = TABS.find(t => t.id === activeTab) ?? TABS[0];
 
@@ -1298,13 +1693,65 @@ function TikTokRadarPage() {
 
     switch (action) {
       case "save":     handleSave(row); return;
-      case "escalate": handleEscalate(row); return;
+      case "escalate": handleOpenEscalateHub(row); return;
       case "playbook": handleGeneratePlaybook(row); return;
       case "ebook":    navigate({ to: "/produtos/ebook" }); return;
       case "vsl":      navigate({ to: "/pagina-venda" }); return;
       case "clone":
       case "creative": navigate({ to: "/criativos" }); return;
     }
+  };
+
+  // ── Batch analysis ──────────────────────────────────────────────────────────
+
+  const handleBatchAnalyze = async () => {
+    const unanalyzed = videos.filter(v => !v.ai_analysis);
+    if (!unanalyzed.length) return;
+    setBatchRunning(true);
+    setBatchProgress({ done: 0, total: unanalyzed.length });
+    for (let i = 0; i < unanalyzed.length; i++) {
+      try {
+        const analysis = await analyzeVideo({ data: { id: unanalyzed[i].id } });
+        const id = unanalyzed[i].id;
+        const update = (v: TikTokRow) => v.id === id ? { ...v, ai_analysis: analysis as TikTokAiAnalysis } : v;
+        setVideos(prev => prev.map(update));
+      } catch { /* skip failed */ }
+      setBatchProgress({ done: i + 1, total: unanalyzed.length });
+    }
+    setBatchRunning(false);
+    setBatchProgress(null);
+  };
+
+  // ── Mining queue ─────────────────────────────────────────────────────────────
+
+  const addToQueue = () => {
+    const tags = queueInput.split(/[,\s]+/).map(t => t.replace(/^#/, "").trim()).filter(Boolean);
+    setMineQueue(prev => [...new Set([...prev, ...tags])]);
+    setQueueInput("");
+  };
+
+  const handleQueueMine = async () => {
+    if (!mineQueue.length || queueRunning) return;
+    setQueueRunning(true);
+    const queue = [...mineQueue];
+    for (let i = 0; i < queue.length; i++) {
+      const tag = queue[i];
+      setQueueProgress({ done: i, total: queue.length, current: tag });
+      try {
+        await mineHashtag({ data: { hashtag: tag, limit } });
+      } catch { /* skip failed */ }
+    }
+    setMineQueue([]);
+    setQueueRunning(false);
+    setQueueProgress(null);
+    await loadVideos(filterHashtag ?? undefined);
+  };
+
+  // ── Escalate hub ──────────────────────────────────────────────────────────────
+
+  const handleOpenEscalateHub = (row: TikTokRow) => {
+    setSelectedVideo(null);
+    setEscalateHubFor(row);
   };
 
   // ── Tab filtering ───────────────────────────────────────────────────────────
@@ -1425,39 +1872,89 @@ function TikTokRadarPage() {
           </p>
         )}
 
+        {/* Batch analysis progress */}
+        {batchRunning && batchProgress && (
+          <div className="rounded-lg border border-[#0A6CFF]/30 bg-[#0A6CFF]/8 p-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-[#3BA3FF] font-medium flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 animate-pulse" />
+                Analisando com IA...
+              </span>
+              <span className="text-muted-foreground">{batchProgress.done}/{batchProgress.total}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full bg-[#0A6CFF] transition-all duration-300"
+                style={{ width: `${(batchProgress.done / batchProgress.total) * 100}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Queue progress */}
+        {queueRunning && queueProgress && (
+          <div className="rounded-lg border border-[#ff9500]/30 bg-[#ff9500]/8 p-3 space-y-2">
+            <div className="flex justify-between text-xs">
+              <span className="text-[#ff9500] font-medium flex items-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Minerando fila — #{queueProgress.current}
+              </span>
+              <span className="text-muted-foreground">{queueProgress.done}/{queueProgress.total}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full rounded-full bg-[#ff9500] transition-all duration-300"
+                style={{ width: `${(queueProgress.done / queueProgress.total) * 100}%` }} />
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2 items-center flex-wrap">
           <Button size="sm" variant="outline" className="h-7 text-xs border-white/10" disabled={loading}
             onClick={() => loadVideos(filterHashtag ?? undefined)}>
             {loading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
             Carregar salvos
           </Button>
-          {uniqueHashtags.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
-              <button className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
-                style={filterHashtag === null
-                  ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
-                  : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}
-                onClick={() => setFilterHashtag(null)}>
-                Todos ({videos.length})
-              </button>
-              {uniqueHashtags.map(h => (
-                <div key={h} className="flex items-center gap-0.5">
-                  <button className="rounded-full px-2 py-0.5 text-[11px] font-medium border transition-colors"
-                    style={filterHashtag === h
-                      ? { background: "rgba(10,108,255,0.15)", borderColor: "rgba(10,108,255,0.5)", color: "#3BA3FF" }
-                      : { borderColor: "rgba(255,255,255,0.1)", color: "hsl(var(--muted-foreground))" }}
-                    onClick={() => setFilterHashtag(filterHashtag === h ? null : h)}>
-                    #{h} ({videos.filter(v => v.hashtag === h).length})
-                  </button>
-                  <button className="text-muted-foreground/40 hover:text-red-400 transition-colors"
-                    onClick={() => handleClearHashtag(h)}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
+
+          {/* Batch analyze button */}
+          {videos.filter(v => !v.ai_analysis).length > 0 && !batchRunning && (
+            <Button size="sm" variant="outline" className="h-7 text-xs border-[#0A6CFF]/30 text-[#3BA3FF] hover:bg-[#0A6CFF]/10"
+              onClick={handleBatchAnalyze}>
+              <Sparkles className="h-3 w-3 mr-1" />
+              Analisar todos ({videos.filter(v => !v.ai_analysis).length})
+            </Button>
           )}
+
+          {/* Mining queue toggle */}
+          <div className="flex items-center gap-1">
+            <Input value={queueInput} onChange={e => setQueueInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addToQueue()}
+              placeholder="fila: hashtag1, hashtag2..."
+              className="h-7 text-xs bg-transparent border-white/10 w-44 focus:border-[#ff9500]/50" />
+            <Button size="sm" variant="outline" className="h-7 text-xs border-white/10 shrink-0"
+              onClick={addToQueue} disabled={!queueInput.trim()}>
+              <ListPlus className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
+
+        {/* Queue pills */}
+        {mineQueue.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap items-center">
+            <span className="text-[10px] text-muted-foreground">Fila:</span>
+            {mineQueue.map(tag => (
+              <div key={tag} className="flex items-center gap-0.5">
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border border-[#ff9500]/30 bg-[#ff9500]/10 text-[#ff9500]">#{tag}</span>
+                <button onClick={() => setMineQueue(prev => prev.filter(t => t !== tag))}
+                  className="text-muted-foreground/40 hover:text-red-400 transition-colors">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            <Button size="sm" className="h-6 text-[10px] gap-1 bg-[#ff9500] hover:bg-[#ff9500]/80 text-black font-bold shrink-0"
+              disabled={queueRunning} onClick={handleQueueMine}>
+              {queueRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+              Minerar fila ({mineQueue.length})
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* ── Error ── */}
@@ -1557,6 +2054,24 @@ function TikTokRadarPage() {
             onClose={() => { setPlaybookFor(null); setPlaybook(null); }}
             onEscalate={handlePlaybookEscalate}
             escalating={escalatingPb} escalated={escalatedPb} />
+        )}
+      </AnimatePresence>
+
+      {/* ── Escalate Hub Modal ── */}
+      <AnimatePresence>
+        {escalateHubFor && (
+          <EscalateHubModal
+            row={escalateHubFor}
+            onClose={() => setEscalateHubFor(null)}
+            onSave={handleSave}
+            onEscalate={(row) => handleEscalate(row)}
+            savedIds={savedIds}
+            escalatedIds={escalatedIds}
+            genPack={async (id) => {
+              const result = await genEscalatePack({ data: { id } });
+              return result as EscalatePack;
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

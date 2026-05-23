@@ -226,6 +226,9 @@ export type TikTokAiAnalysis = {
   // Produtos digitais
   ebook_title: string;
   vsl_hook: string;
+  // Mining Engine v2
+  produto_detectado: string;
+  formato_vsl: string;
 };
 
 export const analyzeTikTokVideoFn = createServerFn({ method: "POST" })
@@ -260,6 +263,8 @@ Analise o vídeo do TikTok com profundidade e retorne um JSON com EXATAMENTE est
 - virality_reason: por que esse vídeo viralizou — em 1 frase objetiva
 - ebook_title: título de ebook premium para esse nicho (use números e promessa forte)
 - vsl_hook: abertura de VSL de 15 segundos inspirada nesse hook (comece com impacto)
+- produto_detectado: produto ou serviço específico detectado no vídeo (ex: "Suplemento para emagrecimento", "Curso de tráfego pago", "Gadget de cozinha") — se não identificar produto direto, descreva o conteúdo monetizável
+- formato_vsl: classifique o formato para VSL (ex: "Gancho direto 15s + CTA", "Problema-solução 30s", "VSL completa 90s com prova social", "Tutorial + upsell", "Depoimento + produto")
 Responda APENAS com o JSON válido, sem texto extra, sem markdown.`;
 
     const userPrompt = `Vídeo TikTok para análise:
@@ -455,4 +460,99 @@ Viral Score: ${row.viral_score}/100
 Gere um playbook completo para escalar esse produto/oferta.`;
 
     return await generateAIJson<TikTokPlaybook>(userPrompt, { systemPrompt });
+  });
+
+// ── EscalatePack type ─────────────────────────────────────────────────────────
+
+export type EscalatePack = {
+  hooks: string[];
+  creatives: string[];
+  meta_campaign: {
+    objective: string;
+    audience: string;
+    primary_text: string;
+    headline: string;
+    cta: string;
+  };
+  tiktok_campaign: {
+    format: string;
+    hook_script: string;
+    caption: string;
+    cta: string;
+    hashtags: string[];
+  };
+  google_ads: {
+    headline1: string;
+    headline2: string;
+    headline3: string;
+    description1: string;
+    description2: string;
+    keywords: string[];
+  };
+};
+
+// ── generate escalate pack (hooks + creatives + Meta + TikTok + Google) ───────
+
+export const generateEscalatePackFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof IdInput>) => IdInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const userId = (context as any).userId as string;
+
+    const { data: row, error } = await tiktokTable()
+      .select("*")
+      .eq("id", data.id)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !row) throw new Error("Vídeo não encontrado");
+
+    const ai = row.ai_analysis as TikTokAiAnalysis | null;
+    const aiCtx = ai
+      ? `Nicho: ${ai.niche} | Produto: ${ai.produto_detectado ?? ""} | Promessa: ${ai.promise} | Mecanismo: ${ai.mechanism ?? ""} | Ângulo: ${ai.offer_angle} | CTA: ${ai.cta ?? ""}`
+      : "";
+
+    const systemPrompt = `Você é um expert em tráfego pago e performance marketing para TikTok, Meta e Google.
+Com base nos dados do vídeo TikTok viral, gere um pacote completo de escala.
+Retorne APENAS JSON válido sem markdown com exatamente esta estrutura:
+{
+  "hooks": ["hook1","hook2","hook3","hook4","hook5"],
+  "creatives": ["criativo1","criativo2","criativo3"],
+  "meta_campaign": {
+    "objective": "objetivo da campanha Meta (ex: Conversões, Tráfego, Alcance)",
+    "audience": "avatar detalhado: idade, gênero, interesses, comportamentos",
+    "primary_text": "copy principal do anúncio (máx 125 caracteres, inclua emoji)",
+    "headline": "headline do anúncio (máx 27 caracteres)",
+    "cta": "botão CTA Meta (ex: Saiba Mais, Comprar Agora, Inscrever-se)"
+  },
+  "tiktok_campaign": {
+    "format": "formato do ad TikTok (Spark Ad, In-Feed, TopView)",
+    "hook_script": "roteiro do gancho 0-3s (exatamente o que falar/mostrar)",
+    "caption": "legenda do TikTok com emojis (máx 150 chars)",
+    "cta": "botão CTA TikTok (ex: Saiba Mais, Comprar Agora)",
+    "hashtags": ["hashtag1","hashtag2","hashtag3","hashtag4","hashtag5"]
+  },
+  "google_ads": {
+    "headline1": "título 1 (máx 30 chars)",
+    "headline2": "título 2 (máx 30 chars)",
+    "headline3": "título 3 (máx 30 chars)",
+    "description1": "descrição 1 (máx 90 chars)",
+    "description2": "descrição 2 (máx 90 chars)",
+    "keywords": ["kw1","kw2","kw3","kw4","kw5","kw6","kw7","kw8"]
+  }
+}
+hooks: 5 hooks de alta conversão — cada um em 1 frase impactante, variando o ângulo (choque, curiosidade, dor, desejo, identidade)
+creatives: 3 briefings completos de criativos: formato + roteiro 3 etapas + chamada final`;
+
+    const userPrompt = `Vídeo TikTok Viral:
+Criador: @${row.creator}
+Hook: ${row.description}
+Views: ${Number(row.views).toLocaleString("pt-BR")} | Shares: ${Number(row.shares).toLocaleString("pt-BR")} | Likes: ${Number(row.likes).toLocaleString("pt-BR")}
+Viral Score: ${row.viral_score}/100
+Hashtags: ${(row.hashtags as string[])?.join(", ") ?? ""}
+${aiCtx}
+
+Gere o pacote completo para escalar esse anúncio.`;
+
+    return await generateAIJson<EscalatePack>(userPrompt, { systemPrompt });
   });
