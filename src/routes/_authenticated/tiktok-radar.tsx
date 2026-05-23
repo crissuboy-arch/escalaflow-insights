@@ -262,6 +262,29 @@ function EnhancedScoreDisplay({ es }: { es: EnhancedScore }) {
   );
 }
 
+// ── SkeletonCard ──────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl border border-white/6 overflow-hidden" style={{ background: "#0d0d16" }}>
+      <div className="w-full animate-pulse" style={{ height: 200, background: "rgba(255,255,255,0.04)" }} />
+      <div className="p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-full animate-pulse" style={{ background: "rgba(255,255,255,0.07)" }} />
+          <div className="h-3 w-20 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.07)" }} />
+        </div>
+        <div className="h-3 w-full rounded animate-pulse" style={{ background: "rgba(255,255,255,0.05)" }} />
+        <div className="h-3 w-2/3 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.05)" }} />
+        <div className="flex gap-3 mt-1">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-3 w-10 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── AiSection helper ──────────────────────────────────────────────────────────
 
 function AiSection({ label, value, accent, italic }: { label: string; value?: string; accent?: boolean; italic?: boolean }) {
@@ -379,6 +402,16 @@ function PlaybookModal({
 }) {
   const [vslOpen, setVslOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
 
   const copyAll = () => {
     if (!playbook) return;
@@ -593,6 +626,16 @@ function VideoModal({
   const isSaved     = savedIds.has(row.id);
   const isEscalated = escalatedIds.has(row.id);
 
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -615,12 +658,12 @@ function VideoModal({
 
         <div className="flex flex-col lg:flex-row overflow-auto" style={{ maxHeight: "92vh" }}>
           {/* Video panel */}
-          <div className="lg:w-[300px] xl:w-[320px] shrink-0 bg-black overflow-hidden" style={{ minHeight: 400 }}>
+          <div className="lg:w-[300px] xl:w-[320px] shrink-0 bg-black overflow-hidden" style={{ minHeight: 280 }}>
             {embedUrl ? (
-              <iframe src={embedUrl} className="w-full" style={{ height: 560, border: 0 }}
+              <iframe src={embedUrl} className="w-full" style={{ height: "clamp(280px, 60vh, 560px)", border: 0 }}
                 allowFullScreen allow="encrypted-media" title="TikTok Video" />
             ) : (
-              <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: 560 }}>
+              <div className="flex flex-col items-center justify-center text-muted-foreground" style={{ height: "clamp(280px, 60vh, 560px)" }}>
                 <Play className="h-12 w-12 mb-3 opacity-20" />
                 <p className="text-sm">Vídeo indisponível</p>
                 {row.video_url && (
@@ -633,7 +676,7 @@ function VideoModal({
           </div>
 
           {/* Details panel */}
-          <div className="flex-1 p-5 space-y-4 overflow-y-auto" style={{ maxHeight: 560 }}>
+          <div className="flex-1 p-5 space-y-4 overflow-y-auto" style={{ maxHeight: "clamp(280px, 60vh, 560px)" }}>
             {/* Creator */}
             <div className="flex items-start gap-3 pr-8">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
@@ -751,6 +794,7 @@ function VideoCard({
   isEscalated?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   return (
     <motion.div
@@ -771,11 +815,12 @@ function VideoCard({
     >
       {/* Thumbnail */}
       <div className="relative w-full overflow-hidden" style={{ height: 200 }}>
-        {row.thumbnail_url ? (
+        {row.thumbnail_url && !imgError ? (
           <img src={row.thumbnail_url} alt={row.hook}
             className="w-full h-full object-cover transition-transform duration-500"
             style={{ transform: hovered ? "scale(1.05)" : "scale(1)" }}
-            loading="lazy" />
+            loading="lazy"
+            onError={() => setImgError(true)} />
         ) : (
           <div className="w-full h-full flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, rgba(255,0,80,0.12) 0%, rgba(0,242,234,0.08) 100%)" }}>
@@ -953,6 +998,21 @@ function ShopRadarView({
   const [sub, setSub] = useState<ShopSubTab>("produtos");
   const def = SHOP_SUBTABS.find(s => s.id === sub)!;
 
+  const subCounts = useMemo(() => {
+    const counts = {} as Record<ShopSubTab, number>;
+    for (const s of SHOP_SUBTABS) {
+      if (s.id === "creators") {
+        counts[s.id] = new Set(videos.map(v => v.creator)).size;
+      } else {
+        counts[s.id] = videos.filter(v =>
+          s.hashtags.some(h => v.hashtags?.some(vh => vh.toLowerCase().includes(h))) ||
+          s.keywords.some(k => (v.description + v.hook).toLowerCase().includes(k))
+        ).length;
+      }
+    }
+    return counts;
+  }, [videos]);
+
   const filtered = useMemo(() => {
     if (sub === "creators") {
       // Group by creator — show top video per creator
@@ -980,9 +1040,7 @@ function ShopRadarView({
               ? { background: "rgba(255,0,80,0.15)", color: "#ff6680", border: "1px solid rgba(255,0,80,0.3)" }
               : { color: "hsl(var(--muted-foreground))", border: "1px solid rgba(255,255,255,0.08)" }}>
             {s.label}
-            <span className="text-[10px] opacity-60">
-              ({sub === s.id ? filtered.length : "?"})
-            </span>
+            <span className="text-[10px] opacity-60">({subCounts[s.id]})</span>
           </button>
         ))}
       </div>
@@ -993,7 +1051,7 @@ function ShopRadarView({
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence>
             {filtered.map(row => (
               <VideoCard key={row.id} row={row} onClick={() => onSelect(row)} onDelete={onDelete}
                 isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
@@ -1074,9 +1132,12 @@ function CreatorsView({
 function TikTokRadarPage() {
   const navigate = useNavigate();
 
+  const PAGE_SIZE = 20;
+
   const [activeTab, setActiveTab]             = useState<RadarTab>("trending");
   const [hashtag, setHashtag]                 = useState("");
   const [limit, setLimit]                     = useState(20);
+  const [page, setPage]                       = useState(1);
   const [mining, setMining]                   = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [videos, setVideos]                   = useState<TikTokRow[]>([]);
@@ -1095,6 +1156,13 @@ function TikTokRadarPage() {
   const [playbookLoading, setPlaybookLoading] = useState(false);
   const [escalatingPb, setEscalatingPb]       = useState(false);
   const [escalatedPb, setEscalatedPb]         = useState(false);
+
+  // Auto-clear error after 6s
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   const mineHashtag    = useServerFn(mineTikTokHashtagFn);
   const listMined      = useServerFn(listTikTokMinedFn);
@@ -1241,15 +1309,27 @@ function TikTokRadarPage() {
 
   // ── Tab filtering ───────────────────────────────────────────────────────────
 
-  const base = filterHashtag ? videos.filter(v => v.hashtag === filterHashtag) : videos;
+  const base = useMemo(
+    () => (filterHashtag ? videos.filter(v => v.hashtag === filterHashtag) : videos),
+    [filterHashtag, videos],
+  );
 
-  const tabFiltered: TikTokRow[] =
-    activeTab === "viral-hooks"      ? base.filter(v => v.viral_score >= 60) :
-    activeTab === "tiktok-shop"      ? base.filter(v => v.hashtags?.some(h => ["tiktokshop","shop","tiktokmademebuyit","produto","shopnow"].includes(h.toLowerCase()))) :
-    activeTab === "ads-spy"          ? base.filter(v => v.hashtags?.some(h => ["ads","adsnotsponsored","ugcads","ugc","sponsored","ad"].includes(h.toLowerCase()))) :
-    activeTab === "winning-products" ? base.filter(v => v.hashtags?.some(h => ["dropshipping","produto","winningproduct","product","ecommerce","shopify"].includes(h.toLowerCase()))) :
-    activeTab === "vsls"             ? base.filter(v => v.hashtags?.some(h => ["vsl","videovendas","salesletter"].includes(h.toLowerCase())) || v.viral_score >= 55) :
-    base;
+  const tabFiltered = useMemo<TikTokRow[]>(() => {
+    if (activeTab === "viral-hooks")      return base.filter(v => v.viral_score >= 60);
+    if (activeTab === "tiktok-shop")      return base.filter(v => v.hashtags?.some(h => ["tiktokshop","shop","tiktokmademebuyit","produto","shopnow"].includes(h.toLowerCase())));
+    if (activeTab === "ads-spy")          return base.filter(v => v.hashtags?.some(h => ["ads","adsnotsponsored","ugcads","ugc","sponsored","ad"].includes(h.toLowerCase())));
+    if (activeTab === "winning-products") return base.filter(v => v.hashtags?.some(h => ["dropshipping","produto","winningproduct","product","ecommerce","shopify"].includes(h.toLowerCase())));
+    if (activeTab === "vsls")             return base.filter(v => v.hashtags?.some(h => ["vsl","videovendas","salesletter"].includes(h.toLowerCase())));
+    return base;
+  }, [activeTab, base]);
+
+  // Reset pagination on tab/filter change
+  useEffect(() => setPage(1), [activeTab, filterHashtag]);
+
+  const paginatedVideos = useMemo(
+    () => tabFiltered.slice(0, page * PAGE_SIZE),
+    [tabFiltered, page],
+  );
 
   const uniqueHashtags = [...new Set(videos.map(v => v.hashtag))];
   const viralCount = videos.filter(v => v.viral_score >= 70).length;
@@ -1388,11 +1468,10 @@ function TikTokRadarPage() {
         </div>
       )}
 
-      {/* ── Loading ── */}
+      {/* ── Skeleton Loading ── */}
       {loading && (
-        <div className="flex items-center justify-center py-20 gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin text-[#3BA3FF]" />
-          <span className="text-sm">Carregando vídeos...</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {Array.from({ length: 10 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       )}
 
@@ -1408,9 +1487,17 @@ function TikTokRadarPage() {
       )}
 
       {/* ── Creators ── */}
-      {!loading && activeTab === "creators" && tabFiltered.length > 0 && (
-        <CreatorsView videos={tabFiltered} onSelect={setSelectedVideo} onDelete={handleDelete}
-          savedIds={savedIds} escalatedIds={escalatedIds} onSaveCreator={handleSaveCreator} />
+      {!loading && activeTab === "creators" && (
+        tabFiltered.length > 0 ? (
+          <CreatorsView videos={tabFiltered} onSelect={setSelectedVideo} onDelete={handleDelete}
+            savedIds={savedIds} escalatedIds={escalatedIds} onSaveCreator={handleSaveCreator} />
+        ) : !error ? (
+          <div className="text-center py-20 text-muted-foreground">
+            <Users className="h-10 w-10 mx-auto mb-3 opacity-20" />
+            <p className="text-sm">Nenhum criador minerado ainda.</p>
+            <p className="text-xs mt-1 opacity-55">Mine #{activeTabDef.defaultHashtag} para descobrir criadores.</p>
+          </div>
+        ) : null
       )}
 
       {/* ── Grid view (all other tabs) ── */}
@@ -1431,14 +1518,25 @@ function TikTokRadarPage() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              <AnimatePresence mode="popLayout">
-                {tabFiltered.map(row => (
-                  <VideoCard key={row.id} row={row} onClick={() => setSelectedVideo(row)} onDelete={handleDelete}
-                    isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
-                ))}
-              </AnimatePresence>
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <AnimatePresence>
+                  {paginatedVideos.map(row => (
+                    <VideoCard key={row.id} row={row} onClick={() => setSelectedVideo(row)} onDelete={handleDelete}
+                      isSaved={savedIds.has(row.id)} isEscalated={escalatedIds.has(row.id)} />
+                  ))}
+                </AnimatePresence>
+              </div>
+              {paginatedVideos.length < tabFiltered.length && (
+                <div className="flex justify-center pt-2">
+                  <Button variant="outline" size="sm"
+                    className="gap-2 border-white/10 hover:bg-white/5 text-muted-foreground"
+                    onClick={() => setPage(p => p + 1)}>
+                    Carregar mais ({tabFiltered.length - paginatedVideos.length} restantes)
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
