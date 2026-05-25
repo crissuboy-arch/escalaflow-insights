@@ -37,8 +37,14 @@ function StorybookPage() {
   useEffect(() => {
     listFn().then((d) => {
       const all = (d ?? []) as unknown as StoryRow[];
-      const seen = new Set<string>();
-      setRows(all.filter((r) => !seen.has(r.id) && !!seen.add(r.id)));
+      const seenIds = new Set<string>();
+      const seenTitles = new Set<string>();
+      setRows(all.filter((r) => {
+        if (seenIds.has(r.id) || seenTitles.has(r.title)) return false;
+        seenIds.add(r.id);
+        seenTitles.add(r.title);
+        return true;
+      }));
     }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
