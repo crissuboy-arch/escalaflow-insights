@@ -41,7 +41,8 @@ import { exportEbookDocx } from "@/lib/ebook/docx";
 import { exportEbookEpub } from "@/lib/ebook/epub";
 import { EbookPreview } from "@/components/ebook/EbookPreview";
 import { DraftList, type DraftRow } from "@/components/ebook/DraftList";
-import { EbookHub, type AiKickstart } from "@/components/ebook/EbookHub";
+import { type AiKickstart } from "@/components/ebook/EbookHub";
+import { PremiumTemplates } from "@/components/ebook/PremiumTemplates";
 
 export const Route = createFileRoute("/_authenticated/produtos/ebook")({
   beforeLoad: async () => {
@@ -317,12 +318,13 @@ function EbookPage() {
   };
 
   const onDeleteDraft = async (id: string) => {
+    setDrafts((prev) => prev.filter((d) => d.id !== id));
+    if (ebookId === id) setEbookId(null);
     try {
       await fnDelete({ data: { id } });
-      if (ebookId === id) setEbookId(null);
-      refreshDrafts();
       toast.success("Rascunho excluído");
     } catch (e) {
+      refreshDrafts();
       toast.error(e instanceof Error ? e.message : "Falha ao excluir");
     }
   };
@@ -715,38 +717,21 @@ function EbookPage() {
 
       {showHub && (
         <>
-          <EbookHub
-            onUseMined={onHubMined}
-            onScratch={onHubScratch}
-            onAiGenerate={onHubAi}
-            onPdfImport={(b, sc) => {
-              setEntryStarted(true);
-              setMode("premium");
-              setStyle("clean");
-              setBriefing(b);
-              setChapterCount(sc);
-              setStep(2);
-              (async () => {
-                setBusy("Gerando estrutura com IA…");
-                try {
-                  const o = await fnOutline({ data: { briefing: b, chapterCount: sc } });
-                  setOutline(o);
-                } catch (e) {
-                  toast.error(await errMsg(e, "Falha ao gerar estrutura"));
-                  setStep(1);
-                } finally {
-                  setBusy(null);
-                }
-              })();
-            }}
-            busy={!!busy}
-          />
+          <PremiumTemplates onAiGenerate={onHubAi} busy={!!busy} />
           {drafts.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-sm font-semibold text-muted-foreground">Continuar onde parou</h2>
               <DraftList drafts={drafts} onResume={onResumeDraft} onDelete={onDeleteDraft} busy={!!busy} />
             </div>
           )}
+          <div className="pt-2 text-center">
+            <a
+              href="/ebook-forge"
+              className="text-xs text-muted-foreground transition-colors hover:text-primary"
+            >
+              Usar engine avançada (briefing por anúncio, PDF, scratch) →
+            </a>
+          </div>
         </>
       )}
 

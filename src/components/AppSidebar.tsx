@@ -26,7 +26,6 @@ import {
   BarChart2,
   Youtube,
   ShoppingBag,
-  LibraryBig,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,9 +81,7 @@ export function AppSidebar() {
   ];
   const esteira: Item[] = [
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
-    { to: "/ebook-forge", label: "Ebook Forge V3", icon: Sparkles },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
-    { to: "/livro-template-mestre", label: "Livro Template Mestre", icon: LibraryBig },
     { to: "/storybook", label: "StoryBook IA", icon: BookText },
     { to: "/copy", label: "Copy de Vendas", icon: PenLine },
     { to: "/criativos", label: "Criativos & Anúncios", icon: Megaphone },
