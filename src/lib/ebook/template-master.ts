@@ -1772,9 +1772,10 @@ function makeStub(
   subtitle: string,
   audience: string,
   chapTitles: string[],
+  coverPrompt?: string,
 ): TemplateMaster {
   return {
-    id, name, category, pages, level, colorA, colorB, emoji,
+    id, name, category, pages, level, colorA, colorB, emoji, coverPrompt,
     hasMasterContent: false,
     meta: {
       title,
@@ -1807,34 +1808,79 @@ function makeStub(
   };
 }
 
+const PLANNER_FEMININO_STUB = makeStub(
+  "planner-feminino", "Planner Feminino", "Organização", 45, "Premium", "#EC4899", "#831843", "🌸",
+  "Planner da Mulher Realizada",
+  "Organização, metas, bem-estar e equilíbrio em 30 dias",
+  "Mulheres que querem mais organização, propósito e equilíbrio na vida",
+  ["Quem Você Quer Se Tornar", "Organizando Sua Semana Perfeita", "Rotina Matinal que Transforma", "Metas que Você Realmente Alcança", "Cuide da Sua Energia", "Relacionamentos que Nutrem", "Seu Plano de 30 Dias"],
+  "Elegant women's planner ebook cover, rose pink and gold gradient, floral botanical elements, feminine premium design, soft luxury lifestyle aesthetic, empowering and beautiful, professional quality",
+);
+
+const DEVOCIONAL_STUB = makeStub(
+  "devocional-cristao", "Devocional Cristão", "Espiritual", 60, "Premium", "#7C3AED", "#2E1065", "✝️",
+  "Devocionais que Transformam: 30 Dias na Presença de Deus",
+  "Reflexões diárias para uma fé ativa, propósito claro e vida transformada",
+  "Cristãos que buscam crescimento espiritual, propósito e intimidade com Deus",
+  ["A Fé que Age", "Oração: Conversa ou Protocolo?", "Identidade no Evangelho", "Propósito Divino e Vocação", "Superando os Desertos", "Comunidade e Discipulado", "Vivendo a Missão"],
+  "Premium Christian devotional ebook cover, deep purple and gold, cross with divine light rays, peaceful heavenly atmosphere, modern church aesthetic, inspiring and reverent, professional quality",
+);
+
+const KDP_STUB = makeStub(
+  "kdp-amazon", "Ebook KDP Amazon", "Publicação", 70, "Premium", "#0EA5E9", "#0C4A6E", "📚",
+  "KDP do Zero: Publique e Lucre na Amazon",
+  "Como escrever, formatar e vender ebooks na Amazon KDP — do zero ao primeiro royalty",
+  "Escritores e empreendedores que querem publicar na Amazon e gerar renda passiva",
+  ["Por Que a Amazon KDP é a Maior Oportunidade do Momento", "Escolhendo Nicho e Validando sua Ideia", "Escrevendo Rápido e com Qualidade", "Formatação Profissional para KDP", "Capa que Vende: Guia Completo", "Upload, Precificação e Lançamento", "Estratégias para Escalar Royalties"],
+  "Professional Amazon KDP publishing ebook cover, deep blue and cyan gradient, books and digital publishing concept, modern minimalist design, income and passive revenue theme, high quality",
+);
+
+const SEO_STUB = makeStub(
+  "seo", "SEO na Prática", "Marketing Digital", 55, "Premium", "#16A34A", "#14532D", "🔍",
+  "SEO na Prática: Ranqueie no Google e Atraia Clientes Grátis",
+  "O método completo para dominar o SEO, aparecer no Google e gerar tráfego orgânico em 90 dias",
+  "Empreendedores, freelancers e criadores de conteúdo que querem crescer organicamente",
+  ["Como o Google Realmente Funciona", "Pesquisa de Palavras-chave Estratégica", "SEO On-Page: A Anatomia do Artigo Perfeito", "Link Building Sem Parecer Spam", "SEO Técnico Simplificado", "Conteúdo que Ranqueia e Converte", "Medindo e Escalando seus Resultados"],
+  "Professional SEO marketing ebook cover, green gradient, search engine optimization concept, Google ranking, data analytics, modern digital marketing design, clean and authoritative",
+);
+
+const COPY_STUB = makeStub(
+  "copywriting", "Copywriting que Vende", "Marketing", 65, "Premium", "#EA580C", "#7C2D12", "✍️",
+  "Copy que Converte: O Método dos Copywriters de Alta Performance",
+  "As técnicas de persuasão usadas pelos maiores copywriters para escrever textos que vendem 24/7",
+  "Empreendedores, criadores de conteúdo e profissionais de marketing que querem escrever melhor",
+  ["A Psicologia Por Trás de Todo Texto que Vende", "A Estrutura do Headline Irresistível", "Storytelling como Arma de Vendas", "Gatilhos Mentais: Guia Completo", "Escrevendo Páginas de Vendas", "Email Marketing que Abre e Compra", "Revisão e Otimização de Copy"],
+  "Dynamic copywriting ebook cover, bold orange and dark brown, pen writing persuasive copy, marketing and sales energy, powerful typography, professional business book aesthetic",
+);
+
+const RECEITAS_STUB = makeStub(
+  "receitas", "Livro de Receitas", "Culinária", 60, "Iniciante", "#DC2626", "#7F1D1D", "🍳",
+  "Do Zero à Mesa: Receitas que Impressionam",
+  "60 receitas práticas, saborosas e fáceis para o dia a dia — do café da manhã à sobremesa",
+  "Pessoas que querem cozinhar melhor, comer bem e impressionar em casa",
+  ["Os Segredos dos Chefs para o Dia a Dia", "Café da Manhã que Dá Energia", "Almoços Rápidos e Nutritivos", "Jantares para Momentos Especiais", "Sobremesas Irresistíveis", "Receitas Fitness e Saudáveis", "Dicas de Mise en Place e Organização"],
+  "Beautiful recipe cookbook cover, warm red and cream colors, kitchen photography, fresh ingredients, herbs and spices, professional food styling, appetizing and inviting design",
+);
+
+const INFANTIL_STUB = makeStub(
+  "ebook-infantil", "Ebook Infantil", "Educação", 35, "Iniciante", "#2563EB", "#1E3A8A", "🧒",
+  "Aprender Brincando: Histórias que Ensinam",
+  "Histórias pedagógicas, atividades lúdicas e aprendizado que encanta crianças de 4 a 8 anos",
+  "Pais, educadores e criadores de conteúdo infantil",
+  ["A Magia das Histórias na Aprendizagem", "Contando Histórias que Prendem a Atenção", "Valores pelo Exemplo — Não pela Regra", "Atividades que Desenvolvem a Criatividade", "O Mundo das Letras e dos Números", "Emoções: Nomear para Entender", "Um Final Feliz que Começa Aqui"],
+  "Colorful children's educational ebook cover, bright blue and yellow, cute cartoon animals, stars and clouds, playful illustration style, fun and educational, warm and inviting for kids",
+);
+
 const STUB_TEMPLATES: TemplateMaster[] = [
-  makeStub("planner-feminino", "Planner Feminino", "Organização", 30, "Iniciante", "#EC4899", "#831843", "🌸",
-    "Planner da Mulher Realizada", "Organização, metas e bem-estar em 30 dias", "Mulheres que querem mais organização e equilíbrio na vida",
-    ["Quem Você Quer Se Tornar", "Organizando Sua Semana Perfeita", "Rotina Matinal que Transforma", "Metas que Você Realmente Alcança", "Cuidando da Sua Energia"]),
-
-  makeStub("fitness-receitas", "Ebook Receitas Fitness", "Saúde", 50, "Iniciante", "#22C55E", "#14532D", "🥗",
-    "Coma Bem, Viva Melhor", "50 Receitas Fitness Deliciosas e Práticas", "Pessoas que querem comer saudável sem abrir mão do sabor",
-    ["Por Que Comer Bem Não Precisa Ser Chato", "O Básico da Nutrição Funcional", "Café da Manhã: 10 Receitas Poderosas", "Almoços e Jantares que Nutrem", "Lanches e Pré-Treino Estratégicos"]),
-
   makeStub("dropshipping", "Ebook Dropshipping", "Negócios", 45, "Premium", "#8B5CF6", "#3B0764", "📦",
     "Dropshipping do Zero ao Primeiro R$10k", "O sistema validado para vender sem estoque e sem risco", "Empreendedores iniciantes que querem vender online sem estoque",
-    ["O Modelo de Negócio Que Mudou o E-commerce", "Encontrando Produtos Vencedores", "Construindo Sua Loja em 24h", "Tráfego Pago para Iniciantes", "Escalando Para R$10.000/mês"]),
-
-  makeStub("apostila-premium", "Apostila Premium", "Educação", 80, "Premium", "#3B82F6", "#1E3A8A", "📚",
-    "Aprenda [Tema] do Zero ao Avançado", "O guia completo e definitivo sobre [seu tema]", "Estudantes e profissionais que querem dominar [tema]",
-    ["Fundamentos que Ninguém Explica Direito", "O Framework Principal", "Aplicação Prática: Casos Reais", "Erros Comuns e Como Evitar", "Nível Avançado: Para Quem Quer Mais", "Recursos e Próximos Passos"]),
-
-  makeStub("kit-digital", "Kit Digital Completo", "Pacote", 60, "High Ticket", "#F97316", "#7C2D12", "🎁",
-    "Kit Digital Completo: Tudo que Você Precisa para [Resultado]", "O pacote definitivo com ebook + planilhas + checklists + bônus", "Pessoas buscando solução completa para [problema específico]",
-    ["Bem-vindo ao Kit: Como Usar Este Material", "Módulo 1: Fundação", "Módulo 2: Estratégia", "Módulo 3: Execução", "Módulo 4: Escala", "Recursos Bônus e Próximos Passos"]),
+    ["O Modelo de Negócio Que Mudou o E-commerce", "Encontrando Produtos Vencedores", "Construindo Sua Loja em 24h", "Tráfego Pago para Iniciantes", "Escalando Para R$10.000/mês"],
+    "Purple and dark premium dropshipping ebook cover, e-commerce and online store concept, boxes and packages, modern business aesthetic"),
 
   makeStub("instagram", "Guia Instagram", "Social Media", 30, "Iniciante", "#E879F9", "#701A75", "📸",
     "Instagram que Vende: Do 0 aos Primeiros Clientes", "Como transformar seu Instagram em uma máquina de vendas em 60 dias", "Empreendedores e profissionais que querem vender no Instagram",
-    ["O Instagram que Converte vs. O que Apenas Aparece", "Criando um Perfil que Atrai Compradores", "Conteúdo Estratégico: O Método 4C", "Stories que Vendem Todo Dia", "Fechar Vendas pelo Direct"]),
-
-  makeStub("gospel", "Ebook Gospel", "Espiritual", 50, "Iniciante", "#6366F1", "#1E1B4B", "✝️",
-    "A Fé que Move Montanhas", "Um guia prático de espiritualidade, propósito e força interior", "Pessoas de fé buscando crescimento espiritual e propósito",
-    ["O Fundamento: Por Que a Fé Precisa de Ação", "Oração como Ferramenta de Transformação", "Superando os Desertos da Vida", "Propósito Divino: Descobrindo Seu Chamado", "Comunidade e o Poder do Testemunho"]),
+    ["O Instagram que Converte vs. O que Apenas Aparece", "Criando um Perfil que Atrai Compradores", "Conteúdo Estratégico: O Método 4C", "Stories que Vendem Todo Dia", "Fechar Vendas pelo Direct"],
+    "Vibrant pink and purple Instagram marketing ebook cover, social media growth, followers and engagement concept, modern influencer aesthetic"),
 ];
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
@@ -1848,8 +1894,19 @@ export const MASTER_TEMPLATES: TemplateMaster[] = [
   RELACIONAMENTO,
 ];
 
+export const PREMIUM_TEMPLATES: TemplateMaster[] = [
+  PLANNER_FEMININO_STUB,
+  DEVOCIONAL_STUB,
+  KDP_STUB,
+  SEO_STUB,
+  COPY_STUB,
+  RECEITAS_STUB,
+  INFANTIL_STUB,
+];
+
 export const ALL_TEMPLATES: TemplateMaster[] = [
   ...MASTER_TEMPLATES,
+  ...PREMIUM_TEMPLATES,
   ...STUB_TEMPLATES,
 ];
 
