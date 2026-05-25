@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Crown, Eye, Sparkles } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -194,6 +195,7 @@ export function PremiumTemplates({
   onAiGenerate: (k: AiKickstart) => void;
   busy?: boolean;
 }) {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<PremiumTemplate | null>(null);
   const [preview, setPreview] = useState<PremiumTemplate | null>(null);
   const [form, setForm] = useState({
@@ -253,7 +255,7 @@ export function PremiumTemplates({
             key={t.id}
             t={t}
             index={i}
-            onUse={() => setSelected(t)}
+            onUse={() => navigate({ to: "/ebook-studio", search: { t: t.id } })}
             onPreview={() => setPreview(t)}
             busy={busy}
           />
@@ -290,7 +292,7 @@ export function PremiumTemplates({
               <Button
                 className="w-full"
                 style={{ background: "var(--gradient-primary)" }}
-                onClick={() => { setPreview(null); setSelected(preview); }}
+                onClick={() => { setPreview(null); navigate({ to: "/ebook-studio", search: { t: preview!.id } }); }}
               >
                 <Sparkles className="mr-2 h-4 w-4" /> Usar este Template
               </Button>
