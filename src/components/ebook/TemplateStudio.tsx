@@ -1,17 +1,15 @@
 import { useRef, useState, useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   BookOpen,
   Check,
-  ChevronDown,
-  ChevronRight,
   Download,
   FileText,
-  Image,
   Loader2,
-  Printer,
+  Palette,
   Save,
   Sparkles,
   Upload,
@@ -20,12 +18,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { generateStoryCoverFn } from "@/lib/storybook.functions";
+import { generateEbookCoverFn } from "@/lib/storybook.functions";
+import { generateEbookPDF } from "@/lib/pdf-generator";
 import type { TemplateMaster, TemplateChapter } from "@/lib/ebook/template-master";
+import type { DesignConfig } from "@/lib/pdf-generator";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface StudioState {
+export interface StudioState {
   title: string;
   subtitle: string;
   author: string;
@@ -34,13 +34,29 @@ interface StudioState {
   bonus: TemplateMaster["bonus"];
   cta: TemplateMaster["cta"];
   finalPage: string;
+  design: DesignConfig;
 }
+
+// ─── Persistence ─────────────────────────────────────────────────────────────
 
 function loadState(template: TemplateMaster): StudioState {
   const key = `ebook-studio-${template.id}`;
   try {
     const saved = localStorage.getItem(key);
-    if (saved) return JSON.parse(saved) as StudioState;
+    if (saved) {
+      const parsed = JSON.parse(saved) as Partial<StudioState>;
+      return {
+        title: parsed.title ?? template.meta.title,
+        subtitle: parsed.subtitle ?? template.meta.subtitle,
+        author: parsed.author ?? template.meta.authorPlaceholder,
+        coverUrl: parsed.coverUrl ?? "",
+        chapters: parsed.chapters ?? template.chapters.map((c) => ({ ...c })),
+        bonus: parsed.bonus ?? (template.bonus ? { ...template.bonus, items: [...template.bonus.items] } : undefined),
+        cta: parsed.cta ?? { ...template.cta },
+        finalPage: parsed.finalPage ?? template.finalPage,
+        design: parsed.design ?? { colorA: template.colorA, colorB: template.colorB, font: "sans" },
+      };
+    }
   } catch { /* ignore */ }
   return {
     title: template.meta.title,
@@ -51,6 +67,7 @@ function loadState(template: TemplateMaster): StudioState {
     bonus: template.bonus ? { ...template.bonus, items: [...template.bonus.items] } : undefined,
     cta: { ...template.cta },
     finalPage: template.finalPage,
+    design: { colorA: template.colorA, colorB: template.colorB, font: "sans" },
   };
 }
 
@@ -58,41 +75,33 @@ function saveState(template: TemplateMaster, state: StudioState) {
   localStorage.setItem(`ebook-studio-${template.id}`, JSON.stringify(state));
 }
 
-// ─── Sidebar Items ────────────────────────────────────────────────────────────
+// ─── Section types ────────────────────────────────────────────────────────────
 
-type SidebarSection = "chapters" | "cover" | "export";
+type SideSection = "chapters" | "cover" | "design" | "export";
 
-// ─── HTML Export ─────────────────────────────────────────────────────────────
+// ─── HTML export ─────────────────────────────────────────────────────────────
 
 function buildHtml(state: StudioState, template: TemplateMaster): string {
-  const chapterHtml = state.chapters.map((ch, i) => `
+  const cA = state.design.colorA;
+  const cB = state.design.colorB;
+
+  const chaptersHtml = state.chapters
+    .map(
+      (ch, i) => `
     <section class="chapter">
       ${ch.badge ? `<div class="badge">${ch.badge}</div>` : ""}
       <h2>${i + 1}. ${ch.title}</h2>
       ${ch.pullQuote ? `<blockquote>${ch.pullQuote}</blockquote>` : ""}
       <div class="body">${ch.body.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>")}</div>
-      ${ch.checklist && ch.checklist.length > 0 ? `
-        <div class="checklist">
-          <h4>✅ Checklist</h4>
-          <ul>${ch.checklist.map((item) => `<li>${item}</li>`).join("")}</ul>
-        </div>` : ""}
+      ${ch.checklist?.length ? `<div class="checklist"><h4>✅ Checklist</h4><ul>${ch.checklist.map((it) => `<li>${it}</li>`).join("")}</ul></div>` : ""}
       ${ch.exercise ? `<div class="exercise"><h4>📝 Exercício</h4><p>${ch.exercise.replace(/\n/g, "<br>")}</p></div>` : ""}
-    </section>`).join("\n");
+    </section>`,
+    )
+    .join("\n");
 
-  const bonusHtml = state.bonus ? `
-    <section class="bonus">
-      <h2>🎁 ${state.bonus.title}</h2>
-      <p>${state.bonus.description}</p>
-      <ul>${state.bonus.items.map((item) => `<li>${item}</li>`).join("")}</ul>
-    </section>` : "";
-
-  const ctaHtml = `
-    <section class="cta">
-      <h2>${state.cta.headline}</h2>
-      <p>${state.cta.body}</p>
-      <div class="cta-button">${state.cta.buttonText}</div>
-      <p class="urgency">${state.cta.urgency}</p>
-    </section>`;
+  const bonusHtml = state.bonus
+    ? `<section class="bonus"><h2>🎁 ${state.bonus.title}</h2><p>${state.bonus.description}</p><ul>${state.bonus.items.map((it) => `<li>${it}</li>`).join("")}</ul></section>`
+    : "";
 
   const toc = state.chapters.map((ch, i) => `<li>${i + 1}. ${ch.title}</li>`).join("");
 
@@ -100,71 +109,56 @@ function buildHtml(state: StudioState, template: TemplateMaster): string {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${state.title}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;500;600&display=swap');
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', sans-serif; background: #FAFAF8; color: #1a1a1a; line-height: 1.7; }
-    .cover { background: linear-gradient(140deg, ${template.colorA} 0%, ${template.colorB} 100%); color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 40px; page-break-after: always; }
-    ${state.coverUrl ? `.cover { background-image: url('${state.coverUrl}'); background-size: cover; background-position: center; }` : ""}
-    .cover-emoji { font-size: 64px; margin-bottom: 24px; }
-    .cover h1 { font-family: 'Playfair Display', Georgia, serif; font-size: clamp(32px, 5vw, 56px); font-weight: 900; line-height: 1.15; margin-bottom: 16px; text-shadow: 0 2px 12px rgba(0,0,0,0.4); }
-    .cover .subtitle { font-size: 18px; opacity: 0.9; max-width: 600px; margin-bottom: 24px; }
-    .cover .author { font-size: 14px; opacity: 0.75; text-transform: uppercase; letter-spacing: 2px; }
-    .toc { max-width: 720px; margin: 60px auto; padding: 48px 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
-    .toc h2 { font-family: 'Playfair Display', serif; font-size: 28px; margin-bottom: 24px; }
-    .toc ol { padding-left: 20px; }
-    .toc li { padding: 6px 0; font-size: 15px; color: #4a4a4a; }
-    .chapter { max-width: 720px; margin: 0 auto 60px; padding: 48px 40px; background: #fff; border-radius: 12px; box-shadow: 0 2px 20px rgba(0,0,0,0.06); page-break-inside: avoid; }
-    .badge { display: inline-block; background: ${template.colorA}18; color: ${template.colorA}; border: 1px solid ${template.colorA}40; border-radius: 20px; padding: 3px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
-    .chapter h2 { font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700; margin-bottom: 20px; color: #111; line-height: 1.25; }
-    .chapter blockquote { border-left: 4px solid ${template.colorA}; padding: 12px 20px; margin: 20px 0; font-style: italic; color: #555; background: ${template.colorA}08; border-radius: 0 8px 8px 0; }
-    .body p { margin-bottom: 16px; font-size: 16px; color: #333; }
-    .checklist { margin-top: 28px; background: #f8fafb; border-radius: 8px; padding: 20px 24px; }
-    .checklist h4 { font-size: 14px; font-weight: 700; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .checklist ul { list-style: none; }
-    .checklist li { padding: 6px 0 6px 24px; position: relative; font-size: 14px; color: #444; }
-    .checklist li::before { content: '☐'; position: absolute; left: 0; color: ${template.colorA}; }
-    .exercise { margin-top: 24px; background: ${template.colorA}08; border: 1px solid ${template.colorA}25; border-radius: 8px; padding: 20px 24px; }
-    .exercise h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-    .exercise p { font-size: 14px; color: #444; }
-    .bonus { max-width: 720px; margin: 0 auto 60px; padding: 48px 40px; background: linear-gradient(135deg, ${template.colorA}12 0%, ${template.colorB}10 100%); border: 2px solid ${template.colorA}30; border-radius: 12px; }
-    .bonus h2 { font-family: 'Playfair Display', serif; font-size: 26px; margin-bottom: 12px; }
-    .bonus ul { padding-left: 20px; margin-top: 16px; }
-    .bonus li { padding: 6px 0; font-size: 15px; }
-    .cta { max-width: 720px; margin: 0 auto 60px; padding: 60px 40px; background: linear-gradient(140deg, ${template.colorA} 0%, ${template.colorB} 100%); color: #fff; border-radius: 16px; text-align: center; }
-    .cta h2 { font-family: 'Playfair Display', serif; font-size: 30px; margin-bottom: 16px; }
-    .cta p { font-size: 16px; opacity: 0.9; max-width: 560px; margin: 0 auto 24px; }
-    .cta-button { display: inline-block; background: #fff; color: ${template.colorB}; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; margin-bottom: 16px; }
-    .urgency { font-size: 13px; opacity: 0.75; }
-    @media print {
-      .cover { min-height: 100vmin; }
-      .chapter, .bonus, .cta { box-shadow: none; margin: 0 auto 40px; }
-      body { background: #fff; }
-    }
-    @media (max-width: 600px) {
-      .chapter, .bonus, .cta, .toc { padding: 32px 20px; }
-    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:#FAFAF8;color:#1a1a1a;line-height:1.7}
+    .cover{background:linear-gradient(140deg,${cA} 0%,${cB} 100%);${state.coverUrl ? `background-image:url('${state.coverUrl}');background-size:cover;background-position:center;` : ""}color:#fff;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 40px;page-break-after:always}
+    .cover h1{font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,52px);font-weight:900;margin-bottom:16px;text-shadow:0 2px 12px rgba(0,0,0,.4)}
+    .cover .subtitle{font-size:17px;opacity:.9;max-width:580px;margin-bottom:20px}
+    .cover .author{font-size:13px;opacity:.7;letter-spacing:2px;text-transform:uppercase}
+    .toc{max-width:720px;margin:60px auto;padding:48px 40px;background:#fff;border-radius:12px;box-shadow:0 2px 20px rgba(0,0,0,.06)}
+    .toc h2{font-family:'Playfair Display',serif;font-size:26px;margin-bottom:20px}
+    .toc ol{padding-left:20px}.toc li{padding:6px 0;font-size:15px;color:#4a4a4a}
+    .chapter{max-width:720px;margin:0 auto 60px;padding:48px 40px;background:#fff;border-radius:12px;box-shadow:0 2px 20px rgba(0,0,0,.06);page-break-inside:avoid}
+    .badge{display:inline-block;background:${cA}18;color:${cA};border:1px solid ${cA}40;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+    .chapter h2{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:18px;color:#111;line-height:1.25}
+    .chapter blockquote{border-left:4px solid ${cA};padding:12px 20px;margin:20px 0;font-style:italic;color:#555;background:${cA}08;border-radius:0 8px 8px 0}
+    .body p{margin-bottom:16px;font-size:16px;color:#333}
+    .checklist{margin-top:24px;background:#f8fafb;border-radius:8px;padding:20px 24px}
+    .checklist h4{font-size:13px;font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+    .checklist ul{list-style:none}.checklist li{padding:5px 0 5px 22px;position:relative;font-size:14px;color:#444}
+    .checklist li::before{content:'☐';position:absolute;left:0;color:${cA}}
+    .exercise{margin-top:22px;background:${cA}08;border:1px solid ${cA}25;border-radius:8px;padding:20px 24px}
+    .exercise h4{font-size:13px;font-weight:700;margin-bottom:8px}.exercise p{font-size:14px;color:#444}
+    .bonus{max-width:720px;margin:0 auto 60px;padding:48px 40px;background:linear-gradient(135deg,${cA}12 0%,${cB}10 100%);border:2px solid ${cA}30;border-radius:12px}
+    .bonus h2{font-family:'Playfair Display',serif;font-size:24px;margin-bottom:10px}.bonus ul{padding-left:20px;margin-top:14px}.bonus li{padding:5px 0;font-size:15px}
+    .cta{max-width:720px;margin:0 auto 60px;padding:60px 40px;background:linear-gradient(140deg,${cA} 0%,${cB} 100%);color:#fff;border-radius:16px;text-align:center}
+    .cta h2{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:14px}
+    .cta p{font-size:15px;opacity:.9;max-width:540px;margin:0 auto 22px}
+    .cta-btn{display:inline-block;background:#fff;color:${cB};padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;margin-bottom:14px}
+    .urgency{font-size:12px;opacity:.7}
+    @media print{.cover{min-height:100vmin}.chapter,.bonus,.cta{box-shadow:none}body{background:#fff}}
   </style>
 </head>
 <body>
   <div class="cover">
-    <div class="cover-emoji">${template.emoji}</div>
+    <div style="font-size:52px;margin-bottom:20px">${template.emoji}</div>
     <h1>${state.title}</h1>
     <p class="subtitle">${state.subtitle}</p>
     <p class="author">por ${state.author}</p>
   </div>
-  <div class="toc">
-    <h2>Índice</h2>
-    <ol>${toc}</ol>
-  </div>
-  <div class="chapters-wrap">
-    ${chapterHtml}
-  </div>
+  <div class="toc"><h2>Índice</h2><ol>${toc}</ol></div>
+  ${chaptersHtml}
   ${bonusHtml}
-  ${ctaHtml}
-  <div style="max-width:720px;margin:0 auto 80px;padding:40px;text-align:center;color:#999;font-size:13px;">
+  <section class="cta">
+    <h2>${state.cta.headline}</h2>
+    <p>${state.cta.body}</p>
+    <div class="cta-btn">${state.cta.buttonText}</div>
+    <p class="urgency">${state.cta.urgency}</p>
+  </section>
+  <div style="max-width:720px;margin:0 auto 80px;padding:40px;text-align:center;color:#999;font-size:13px">
     ${state.finalPage.replace(/\n/g, "<br>")}
   </div>
 </body>
@@ -173,22 +167,19 @@ function buildHtml(state: StudioState, template: TemplateMaster): string {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-interface Props {
-  template: TemplateMaster;
-}
-
-export function TemplateStudio({ template }: Props) {
+export function TemplateStudio({ template }: { template: TemplateMaster }) {
   const navigate = useNavigate();
   const [state, setState] = useState<StudioState>(() => loadState(template));
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [activeChapterId, setActiveChapterId] = useState<string>(template.chapters[0]?.id ?? "meta");
-  const [sideSection, setSideSection] = useState<SidebarSection>("chapters");
-  const [aiCoverPrompt, setAiCoverPrompt] = useState("");
-  const [aiCoverLoading, setAiCoverLoading] = useState(false);
-  const [aiCoverOpen, setAiCoverOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string>(template.chapters[0]?.id ?? "meta");
+  const [sideSection, setSideSection] = useState<SideSection>("chapters");
+  const [aiPrompt, setAiPrompt] = useState(template.coverPrompt ?? "");
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const genCover = useServerFn(generateStoryCoverFn);
+  const genCover = useServerFn(generateEbookCoverFn);
 
   const update = useCallback((patch: Partial<StudioState>) => {
     setState((prev) => ({ ...prev, ...patch }));
@@ -199,7 +190,7 @@ export function TemplateStudio({ template }: Props) {
   const updateChapter = useCallback((id: string, patch: Partial<TemplateChapter>) => {
     setState((prev) => ({
       ...prev,
-      chapters: prev.chapters.map((c) => c.id === id ? { ...c, ...patch } : c),
+      chapters: prev.chapters.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     }));
     setDirty(true);
     setSaved(false);
@@ -210,30 +201,29 @@ export function TemplateStudio({ template }: Props) {
     setDirty(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    toast.success("Ebook salvo!");
   }
 
   function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      update({ coverUrl: reader.result as string });
-    };
+    reader.onload = () => update({ coverUrl: reader.result as string });
     reader.readAsDataURL(file);
   }
 
   async function handleAiCover() {
-    if (!aiCoverPrompt.trim()) return;
-    setAiCoverLoading(true);
+    if (!aiPrompt.trim()) return;
+    setAiLoading(true);
     try {
-      const result = await genCover({ data: { prompt: aiCoverPrompt } });
+      const result = await genCover({ data: { prompt: aiPrompt } });
       update({ coverUrl: result.url });
-      setAiCoverOpen(false);
-      setAiCoverPrompt("");
+      setAiOpen(false);
+      toast.success("Capa gerada com sucesso!");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Erro ao gerar capa");
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar capa com IA");
     } finally {
-      setAiCoverLoading(false);
+      setAiLoading(false);
     }
   }
 
@@ -249,146 +239,240 @@ export function TemplateStudio({ template }: Props) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    toast.success("HTML exportado!");
   }
 
-  function handlePrint() {
-    const html = buildHtml(state, template);
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => { w.print(); }, 500);
+  async function handleExportPdf() {
+    setPdfLoading(true);
+    try {
+      await generateEbookPDF(state, template, state.design);
+      toast.success("PDF exportado com sucesso!");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar PDF");
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
-  const activeChapter = state.chapters.find((c) => c.id === activeChapterId);
-  const isMetaActive = activeChapterId === "meta";
-  const isBonusActive = activeChapterId === "bonus";
-  const isCtaActive = activeChapterId === "cta";
+  const activeChapter = state.chapters.find((c) => c.id === activeId);
+  const isMetaActive = activeId === "meta";
+  const isBonusActive = activeId === "bonus";
+  const isCtaActive = activeId === "cta";
 
-  const sidebarBg = "background: #0D1526";
-  const borderColor = "rgba(255,255,255,0.07)";
+  const BD = "rgba(255,255,255,0.07)";
+  const cA = state.design.colorA;
+
+  const SIDE_TABS: { key: SideSection; label: string }[] = [
+    { key: "chapters", label: "Capítulos" },
+    { key: "cover", label: "Capa" },
+    { key: "design", label: "Design" },
+    { key: "export", label: "Exportar" },
+  ];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#080D1A", color: "#F0F4FF", fontFamily: "Inter, sans-serif", overflow: "hidden" }}>
-
-      {/* ── Top Bar ── */}
-      <header style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: `1px solid ${borderColor}`, background: "#080D1A", flexShrink: 0, minHeight: 52 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        background: "#080D1A",
+        color: "#F0F4FF",
+        fontFamily: "Inter, sans-serif",
+        overflow: "hidden",
+      }}
+    >
+      {/* ── Top bar ── */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "0 18px",
+          borderBottom: `1px solid ${BD}`,
+          background: "#080D1A",
+          flexShrink: 0,
+          height: 50,
+        }}
+      >
         <button
-          onClick={() => navigate({ to: "/ebook-forge" })}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#6B7FA8", cursor: "pointer", fontSize: 13, padding: "4px 8px", borderRadius: 6 }}
+          onClick={() => navigate({ to: "/produtos/ebook" })}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            background: "none",
+            border: "none",
+            color: "#6B7FA8",
+            cursor: "pointer",
+            fontSize: 12,
+            padding: "4px 6px",
+            borderRadius: 6,
+          }}
         >
-          <ArrowLeft size={14} /> Voltar
+          <ArrowLeft size={13} /> Voltar
         </button>
 
-        <div style={{ width: 1, height: 20, background: borderColor }} />
+        <div style={{ width: 1, height: 18, background: BD }} />
+        <BookOpen size={15} color={cA} />
 
-        <BookOpen size={16} color={template.colorA} />
+        <input
+          value={state.title}
+          onChange={(e) => update({ title: e.target.value })}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            background: "none",
+            border: "none",
+            color: "#F0F4FF",
+            fontSize: 14,
+            fontWeight: 700,
+            outline: "none",
+            fontFamily: "inherit",
+          }}
+        />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <input
-            value={state.title}
-            onChange={(e) => update({ title: e.target.value })}
-            style={{ background: "none", border: "none", color: "#F0F4FF", fontSize: 15, fontWeight: 700, width: "100%", outline: "none", fontFamily: "inherit" }}
-          />
-        </div>
-
-        <div style={{ fontSize: 12, color: dirty ? "#F59E0B" : saved ? "#10B981" : "#6B7FA8", display: "flex", alignItems: "center", gap: 4 }}>
-          {saved ? <Check size={12} /> : null}
+        <span
+          style={{
+            fontSize: 11,
+            color: dirty ? "#F59E0B" : saved ? "#10B981" : "#6B7FA8",
+            display: "flex",
+            alignItems: "center",
+            gap: 3,
+            flexShrink: 0,
+          }}
+        >
+          {saved && <Check size={11} />}
           {saved ? "Salvo" : dirty ? "● Não salvo" : ""}
-        </div>
+        </span>
 
         <Button
           size="sm"
           variant="outline"
-          style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 12, height: 32, gap: 6 }}
+          style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 11, height: 30, gap: 5 }}
           onClick={handleSave}
         >
-          <Save size={13} /> Salvar
+          <Save size={12} /> Salvar
         </Button>
 
         <Button
           size="sm"
-          style={{ background: `linear-gradient(135deg, ${template.colorA}, ${template.colorB})`, fontSize: 12, height: 32, gap: 6 }}
-          onClick={handleExportHtml}
+          disabled={pdfLoading}
+          style={{
+            background: `linear-gradient(135deg, ${cA}, ${state.design.colorB})`,
+            fontSize: 11,
+            height: 30,
+            gap: 5,
+          }}
+          onClick={handleExportPdf}
         >
-          <Download size={13} /> Exportar HTML
+          {pdfLoading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+          Exportar PDF
         </Button>
       </header>
 
       {/* ── Body ── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-
         {/* ── Sidebar ── */}
-        <aside style={{ width: 240, flexShrink: 0, borderRight: `1px solid ${borderColor}`, display: "flex", flexDirection: "column", overflow: "hidden", background: "#0A0F1E" }}>
-
+        <aside
+          style={{
+            width: 232,
+            flexShrink: 0,
+            borderRight: `1px solid ${BD}`,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            background: "#0A0F1E",
+          }}
+        >
           {/* Section tabs */}
-          <div style={{ display: "flex", borderBottom: `1px solid ${borderColor}` }}>
-            {(["chapters", "cover", "export"] as SidebarSection[]).map((s) => (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              borderBottom: `1px solid ${BD}`,
+            }}
+          >
+            {SIDE_TABS.map((tab) => (
               <button
-                key={s}
-                onClick={() => setSideSection(s)}
-                style={{ flex: 1, padding: "10px 4px", background: sideSection === s ? "#111827" : "none", border: "none", color: sideSection === s ? "#F0F4FF" : "#6B7FA8", fontSize: 11, cursor: "pointer", textTransform: "capitalize", fontFamily: "inherit", borderBottom: sideSection === s ? `2px solid ${template.colorA}` : "2px solid transparent" }}
+                key={tab.key}
+                onClick={() => setSideSection(tab.key)}
+                style={{
+                  padding: "9px 2px",
+                  background: sideSection === tab.key ? "#111827" : "none",
+                  border: "none",
+                  color: sideSection === tab.key ? "#F0F4FF" : "#6B7FA8",
+                  fontSize: 10,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  borderBottom: `2px solid ${sideSection === tab.key ? cA : "transparent"}`,
+                }}
               >
-                {s === "chapters" ? "Capítulos" : s === "cover" ? "Capa" : "Exportar"}
+                {tab.label}
               </button>
             ))}
           </div>
 
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
-
-            {/* Chapters section */}
+            {/* ── Chapters ── */}
             {sideSection === "chapters" && (
               <>
-                {/* Meta */}
-                <SideItem
-                  label="📋 Informações gerais"
-                  active={isMetaActive}
-                  onClick={() => setActiveChapterId("meta")}
-                  accentColor={template.colorA}
-                />
-                {/* Chapters */}
+                <SideItem label="📋 Informações gerais" active={isMetaActive} onClick={() => setActiveId("meta")} color={cA} />
                 {state.chapters.map((ch, i) => (
                   <SideItem
                     key={ch.id}
                     label={`${i + 1}. ${ch.title}`}
-                    active={activeChapterId === ch.id}
-                    onClick={() => setActiveChapterId(ch.id)}
-                    accentColor={template.colorA}
+                    active={activeId === ch.id}
+                    onClick={() => setActiveId(ch.id)}
+                    color={cA}
                     badge={ch.badge}
                   />
                 ))}
-                {/* Bonus */}
                 {state.bonus && (
-                  <SideItem
-                    label="🎁 Bônus"
-                    active={isBonusActive}
-                    onClick={() => setActiveChapterId("bonus")}
-                    accentColor={template.colorA}
-                  />
+                  <SideItem label="🎁 Bônus" active={isBonusActive} onClick={() => setActiveId("bonus")} color={cA} />
                 )}
-                {/* CTA */}
-                <SideItem
-                  label="🎯 CTA Final"
-                  active={isCtaActive}
-                  onClick={() => setActiveChapterId("cta")}
-                  accentColor={template.colorA}
-                />
+                <SideItem label="🎯 CTA Final" active={isCtaActive} onClick={() => setActiveId("cta")} color={cA} />
               </>
             )}
 
-            {/* Cover section */}
+            {/* ── Cover ── */}
             {sideSection === "cover" && (
-              <div style={{ padding: "12px 14px" }}>
+              <div style={{ padding: "12px 13px" }}>
                 {/* Preview */}
-                <div style={{ aspectRatio: "3/4", borderRadius: 10, overflow: "hidden", marginBottom: 14, background: `linear-gradient(140deg, ${template.colorA}, ${template.colorB})`, position: "relative" }}>
+                <div
+                  style={{
+                    aspectRatio: "3/4",
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    marginBottom: 12,
+                    background: `linear-gradient(140deg, ${cA}, ${state.design.colorB})`,
+                    position: "relative",
+                  }}
+                >
                   {state.coverUrl && (
-                    <img src={state.coverUrl} alt="Capa" style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }} />
+                    <img
+                      src={state.coverUrl}
+                      alt="Capa"
+                      style={{ width: "100%", height: "100%", objectFit: "cover", position: "absolute", inset: 0 }}
+                    />
                   )}
-                  <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 10, textAlign: "center", background: state.coverUrl ? "rgba(0,0,0,0.35)" : "transparent" }}>
-                    <span style={{ fontSize: 28, marginBottom: 6 }}>{template.emoji}</span>
-                    <p style={{ fontSize: 9, fontWeight: 700, color: "#fff", lineHeight: 1.3, textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>{state.title}</p>
-                    <p style={{ fontSize: 8, color: "rgba(255,255,255,0.7)", marginTop: 4 }}>por {state.author}</p>
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 8,
+                      textAlign: "center",
+                      background: state.coverUrl ? "rgba(0,0,0,0.32)" : "transparent",
+                    }}
+                  >
+                    <span style={{ fontSize: 24, marginBottom: 5 }}>{template.emoji}</span>
+                    <p style={{ fontSize: 8, fontWeight: 700, color: "#fff", lineHeight: 1.3, textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>
+                      {state.title}
+                    </p>
+                    <p style={{ fontSize: 7, color: "rgba(255,255,255,.65)", marginTop: 3 }}>por {state.author}</p>
                   </div>
                 </div>
 
@@ -397,42 +481,60 @@ export function TemplateStudio({ template }: Props) {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="w-full"
-                  style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 11, height: 30, gap: 5, marginBottom: 6 }}
+                  className="w-full mb-1.5"
+                  style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 11, height: 29, gap: 4 }}
                   onClick={() => fileRef.current?.click()}
                 >
                   <Upload size={11} /> Upload de imagem
                 </Button>
 
                 {/* AI generate */}
-                {!aiCoverOpen ? (
+                {!aiOpen ? (
                   <Button
                     size="sm"
                     className="w-full"
-                    style={{ background: `linear-gradient(135deg, ${template.colorA}, ${template.colorB})`, fontSize: 11, height: 30, gap: 5 }}
-                    onClick={() => setAiCoverOpen(true)}
+                    style={{
+                      background: `linear-gradient(135deg, ${cA}, ${state.design.colorB})`,
+                      fontSize: 11,
+                      height: 29,
+                      gap: 4,
+                    }}
+                    onClick={() => setAiOpen(true)}
                   >
-                    <Sparkles size={11} /> Gerar com IA
+                    <Sparkles size={11} /> Gerar Capa com IA
                   </Button>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                     <Textarea
-                      placeholder="Descreva a capa em inglês para melhores resultados... Ex: 'dramatic dark cover with golden title, professional business book'"
-                      value={aiCoverPrompt}
-                      onChange={(e) => setAiCoverPrompt(e.target.value)}
+                      placeholder="Descreva a capa em inglês... Ex: 'dramatic dark cover with golden title, professional business book'"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
                       rows={3}
                       style={{ fontSize: 11, resize: "none" }}
                     />
                     <div style={{ display: "flex", gap: 4 }}>
-                      <Button size="sm" variant="outline" style={{ flex: 1, fontSize: 10, height: 26 }} onClick={() => setAiCoverOpen(false)}>Cancelar</Button>
                       <Button
                         size="sm"
-                        disabled={aiCoverLoading || !aiCoverPrompt.trim()}
-                        style={{ flex: 2, background: `linear-gradient(135deg, ${template.colorA}, ${template.colorB})`, fontSize: 10, height: 26, gap: 4 }}
+                        variant="outline"
+                        style={{ flex: 1, fontSize: 10, height: 26 }}
+                        onClick={() => setAiOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={aiLoading || !aiPrompt.trim()}
+                        style={{
+                          flex: 2,
+                          background: `linear-gradient(135deg, ${cA}, ${state.design.colorB})`,
+                          fontSize: 10,
+                          height: 26,
+                          gap: 4,
+                        }}
                         onClick={handleAiCover}
                       >
-                        {aiCoverLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
-                        {aiCoverLoading ? "Gerando..." : "Gerar"}
+                        {aiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                        {aiLoading ? "Gerando..." : "Gerar"}
                       </Button>
                     </div>
                   </div>
@@ -441,7 +543,17 @@ export function TemplateStudio({ template }: Props) {
                 {state.coverUrl && (
                   <button
                     onClick={() => update({ coverUrl: "" })}
-                    style={{ width: "100%", marginTop: 8, padding: "4px 0", background: "none", border: "none", color: "#6B7FA8", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+                    style={{
+                      width: "100%",
+                      marginTop: 8,
+                      padding: "3px 0",
+                      background: "none",
+                      border: "none",
+                      color: "#6B7FA8",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
                   >
                     ✕ Remover capa
                   </button>
@@ -449,10 +561,131 @@ export function TemplateStudio({ template }: Props) {
               </div>
             )}
 
-            {/* Export section */}
+            {/* ── Design ── */}
+            {sideSection === "design" && (
+              <div style={{ padding: "12px 13px", display: "flex", flexDirection: "column", gap: 14 }}>
+                <DesignField label="Cor principal">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="color"
+                      value={state.design.colorA}
+                      onChange={(e) =>
+                        update({ design: { ...state.design, colorA: e.target.value } })
+                      }
+                      style={{ width: 32, height: 26, border: "none", cursor: "pointer", borderRadius: 4, background: "none" }}
+                    />
+                    <span style={{ fontSize: 11, color: "#9BAAC8", fontFamily: "monospace" }}>
+                      {state.design.colorA}
+                    </span>
+                  </div>
+                </DesignField>
+
+                <DesignField label="Cor secundária">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="color"
+                      value={state.design.colorB}
+                      onChange={(e) =>
+                        update({ design: { ...state.design, colorB: e.target.value } })
+                      }
+                      style={{ width: 32, height: 26, border: "none", cursor: "pointer", borderRadius: 4, background: "none" }}
+                    />
+                    <span style={{ fontSize: 11, color: "#9BAAC8", fontFamily: "monospace" }}>
+                      {state.design.colorB}
+                    </span>
+                  </div>
+                </DesignField>
+
+                <DesignField label="Fonte">
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["sans", "serif"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => update({ design: { ...state.design, font: f } })}
+                        style={{
+                          flex: 1,
+                          padding: "5px 0",
+                          borderRadius: 6,
+                          border: `1px solid ${state.design.font === f ? cA : "rgba(255,255,255,0.12)"}`,
+                          background: state.design.font === f ? `${cA}20` : "none",
+                          color: state.design.font === f ? "#F0F4FF" : "#6B7FA8",
+                          fontSize: 11,
+                          cursor: "pointer",
+                          fontFamily: f === "serif" ? "Georgia, serif" : "Inter, sans-serif",
+                        }}
+                      >
+                        {f === "sans" ? "Sans-serif" : "Serifada"}
+                      </button>
+                    ))}
+                  </div>
+                </DesignField>
+
+                {/* Preview gradient */}
+                <div style={{ marginTop: 4 }}>
+                  <p style={{ fontSize: 10, color: "#6B7FA8", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                    Preview
+                  </p>
+                  <div
+                    style={{
+                      height: 60,
+                      borderRadius: 8,
+                      background: `linear-gradient(135deg, ${state.design.colorA}, ${state.design.colorB})`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: state.design.font === "serif" ? "Georgia" : "Inter" }}>
+                      {state.title.slice(0, 22)}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => update({ design: { colorA: template.colorA, colorB: template.colorB, font: "sans" } })}
+                  style={{
+                    padding: "6px",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: 6,
+                    color: "#6B7FA8",
+                    fontSize: 11,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 5,
+                  }}
+                >
+                  <Palette size={11} /> Restaurar cores do template
+                </button>
+              </div>
+            )}
+
+            {/* ── Export ── */}
             {sideSection === "export" && (
-              <div style={{ padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                <p style={{ fontSize: 11, color: "#6B7FA8", marginBottom: 4 }}>Salve antes de exportar para incluir todas as edições.</p>
+              <div style={{ padding: "12px 13px", display: "flex", flexDirection: "column", gap: 7 }}>
+                <p style={{ fontSize: 10.5, color: "#6B7FA8", marginBottom: 2 }}>
+                  Salve antes de exportar para incluir todas as edições.
+                </p>
+
+                <Button
+                  size="sm"
+                  disabled={pdfLoading}
+                  style={{
+                    background: `linear-gradient(135deg, ${cA}, ${state.design.colorB})`,
+                    fontSize: 12,
+                    height: 34,
+                    gap: 6,
+                    justifyContent: "flex-start",
+                  }}
+                  onClick={handleExportPdf}
+                >
+                  {pdfLoading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                  Exportar PDF Profissional
+                </Button>
+
                 <Button
                   size="sm"
                   variant="outline"
@@ -461,21 +694,32 @@ export function TemplateStudio({ template }: Props) {
                 >
                   <FileText size={13} /> Exportar HTML
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 12, height: 34, gap: 6, justifyContent: "flex-start" }}
-                  onClick={handlePrint}
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "10px 12px",
+                    background: "rgba(255,255,255,0.04)",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    color: "#6B7FA8",
+                    lineHeight: 1.6,
+                  }}
                 >
-                  <Printer size={13} /> Imprimir / Salvar PDF
-                </Button>
-                <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(255,255,255,0.04)", borderRadius: 8, fontSize: 11, color: "#6B7FA8", lineHeight: 1.6 }}>
-                  <strong style={{ color: "#9BAAC8" }}>Dica PDF:</strong> Use "Imprimir" e selecione "Salvar como PDF" no diálogo do navegador para exportar com design premium.
+                  <strong style={{ color: "#9BAAC8" }}>PDF Profissional</strong> inclui: capa com suas cores, índice, capítulos formatados, checklists, exercícios, bônus e CTA final.
                 </div>
+
                 <div style={{ marginTop: 4, padding: "10px 12px", background: "rgba(255,255,255,0.04)", borderRadius: 8 }}>
-                  <p style={{ fontSize: 11, color: "#9BAAC8", fontWeight: 600, marginBottom: 6 }}>Informações do ebook</p>
+                  <p style={{ fontSize: 11, color: "#9BAAC8", fontWeight: 600, marginBottom: 6 }}>
+                    Estatísticas
+                  </p>
                   <p style={{ fontSize: 11, color: "#6B7FA8" }}>{state.chapters.length} capítulos</p>
-                  <p style={{ fontSize: 11, color: "#6B7FA8" }}>{state.chapters.reduce((sum, c) => sum + c.body.split(" ").length, 0).toLocaleString()} palavras</p>
+                  <p style={{ fontSize: 11, color: "#6B7FA8" }}>
+                    {state.chapters
+                      .reduce((s, c) => s + c.body.split(/\s+/).length, 0)
+                      .toLocaleString("pt-BR")}{" "}
+                    palavras
+                  </p>
                   <p style={{ fontSize: 11, color: "#6B7FA8" }}>{template.pages} páginas estimadas</p>
                 </div>
               </div>
@@ -483,40 +727,70 @@ export function TemplateStudio({ template }: Props) {
           </div>
         </aside>
 
-        {/* ── Editor Main ── */}
-        <main style={{ flex: 1, overflowY: "auto", padding: "32px 40px" }}>
-
-          {/* Meta panel */}
+        {/* ── Editor ── */}
+        <main style={{ flex: 1, overflowY: "auto", padding: "28px 36px" }}>
+          {/* Meta */}
           {isMetaActive && (
-            <div style={{ maxWidth: 760, margin: "0 auto" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 24, color: "#F0F4FF" }}>Informações do Ebook</h2>
-              <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ maxWidth: 740, margin: "0 auto" }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 22, color: "#F0F4FF" }}>
+                Informações do Ebook
+              </h2>
+              <div style={{ display: "grid", gap: 14 }}>
                 <Field label="Título">
-                  <Input value={state.title} onChange={(e) => update({ title: e.target.value })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.title}
+                    onChange={(e) => update({ title: e.target.value })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
                 <Field label="Subtítulo">
-                  <Textarea value={state.subtitle} onChange={(e) => update({ subtitle: e.target.value })} rows={2} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }} />
+                  <Textarea
+                    value={state.subtitle}
+                    onChange={(e) => update({ subtitle: e.target.value })}
+                    rows={2}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }}
+                  />
                 </Field>
                 <Field label="Autor">
-                  <Input value={state.author} onChange={(e) => update({ author: e.target.value })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.author}
+                    onChange={(e) => update({ author: e.target.value })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
               </div>
-              <div style={{ marginTop: 28, padding: "16px 20px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)" }}>
-                <p style={{ fontSize: 13, color: "#9BAAC8", fontWeight: 600, marginBottom: 8 }}>Proposta de Valor Original</p>
-                <p style={{ fontSize: 13, color: "#6B7FA8", lineHeight: 1.7 }}>{template.meta.promise}</p>
-                <p style={{ fontSize: 12, color: "#6B7FA8", marginTop: 8 }}><strong style={{ color: "#9BAAC8" }}>Mecanismo único:</strong> {template.meta.uniqueMechanism}</p>
-                <p style={{ fontSize: 12, color: "#6B7FA8" }}><strong style={{ color: "#9BAAC8" }}>Transformação:</strong> {template.meta.transformation}</p>
+              <div
+                style={{
+                  marginTop: 24,
+                  padding: "14px 18px",
+                  background: "rgba(255,255,255,0.04)",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.07)",
+                }}
+              >
+                <p style={{ fontSize: 12, color: "#9BAAC8", fontWeight: 600, marginBottom: 7 }}>
+                  Proposta de Valor Original
+                </p>
+                <p style={{ fontSize: 12, color: "#6B7FA8", lineHeight: 1.7 }}>{template.meta.promise}</p>
+                <p style={{ fontSize: 11, color: "#6B7FA8", marginTop: 7 }}>
+                  <strong style={{ color: "#9BAAC8" }}>Mecanismo único:</strong> {template.meta.uniqueMechanism}
+                </p>
+                <p style={{ fontSize: 11, color: "#6B7FA8" }}>
+                  <strong style={{ color: "#9BAAC8" }}>Transformação:</strong> {template.meta.transformation}
+                </p>
               </div>
             </div>
           )}
 
           {/* Chapter editor */}
           {activeChapter && (
-            <div style={{ maxWidth: 760, margin: "0 auto" }}>
-              {/* Chapter header */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <div style={{ maxWidth: 740, margin: "0 auto" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 {activeChapter.badge && (
-                  <Badge variant="outline" style={{ borderColor: `${template.colorA}50`, color: template.colorA, fontSize: 10 }}>
+                  <Badge
+                    variant="outline"
+                    style={{ borderColor: `${cA}50`, color: cA, fontSize: 10 }}
+                  >
                     {activeChapter.badge}
                   </Badge>
                 )}
@@ -525,66 +799,136 @@ export function TemplateStudio({ template }: Props) {
               <Input
                 value={activeChapter.title}
                 onChange={(e) => updateChapter(activeChapter.id, { title: e.target.value })}
-                style={{ background: "none", border: "none", borderBottom: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", fontSize: 22, fontWeight: 700, padding: "4px 0", marginBottom: 16, borderRadius: 0, outline: "none", fontFamily: "Georgia, serif" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  borderBottom: "1px solid rgba(255,255,255,0.10)",
+                  color: "#F0F4FF",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  padding: "4px 0",
+                  marginBottom: 14,
+                  borderRadius: 0,
+                  outline: "none",
+                  fontFamily: "Georgia, serif",
+                }}
               />
 
-              {/* Pull quote */}
               {activeChapter.pullQuote !== undefined && (
-                <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 11, color: "#6B7FA8", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Pull quote</p>
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ fontSize: 10, color: "#6B7FA8", marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>
+                    Pull quote
+                  </p>
                   <Textarea
                     value={activeChapter.pullQuote ?? ""}
                     onChange={(e) => updateChapter(activeChapter.id, { pullQuote: e.target.value })}
                     rows={2}
-                    style={{ background: `${template.colorA}08`, border: `1px solid ${template.colorA}20`, color: "#9BAAC8", fontStyle: "italic", resize: "none", fontSize: 14 }}
+                    style={{
+                      background: `${cA}08`,
+                      border: `1px solid ${cA}22`,
+                      color: "#9BAAC8",
+                      fontStyle: "italic",
+                      resize: "none",
+                      fontSize: 13,
+                    }}
                   />
                 </div>
               )}
 
-              {/* Body */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                  <p style={{ fontSize: 11, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1 }}>Conteúdo</p>
-                  <p style={{ fontSize: 11, color: "#4A5568" }}>{activeChapter.body.split(" ").length} palavras</p>
+              <div style={{ marginBottom: 22 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 5,
+                  }}
+                >
+                  <p style={{ fontSize: 10, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1 }}>
+                    Conteúdo
+                  </p>
+                  <p style={{ fontSize: 10, color: "#4A5568" }}>
+                    {activeChapter.body.split(/\s+/).length} palavras
+                  </p>
                 </div>
                 <Textarea
                   value={activeChapter.body}
                   onChange={(e) => updateChapter(activeChapter.id, { body: e.target.value })}
                   rows={20}
-                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#C8D4F0", fontSize: 14, lineHeight: 1.8, resize: "vertical", fontFamily: "Georgia, serif" }}
+                  style={{
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#C8D4F0",
+                    fontSize: 14,
+                    lineHeight: 1.8,
+                    resize: "vertical",
+                    fontFamily:
+                      state.design.font === "serif"
+                        ? "Georgia, serif"
+                        : "Inter, sans-serif",
+                  }}
                 />
               </div>
 
-              {/* Checklist editor */}
               {activeChapter.checklist && (
-                <div style={{ marginBottom: 20, padding: "16px 20px", background: "rgba(255,255,255,0.04)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p style={{ fontSize: 11, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>✅ Checklist</p>
+                <div
+                  style={{
+                    marginBottom: 18,
+                    padding: "14px 18px",
+                    background: "rgba(255,255,255,0.04)",
+                    borderRadius: 10,
+                    border: "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  <p style={{ fontSize: 10, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
+                    ✅ Checklist
+                  </p>
                   {activeChapter.checklist.map((item, i) => (
-                    <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                      <span style={{ color: "#6B7FA8", fontSize: 13, marginTop: 6 }}>•</span>
+                    <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                      <span style={{ color: "#6B7FA8", fontSize: 12, marginTop: 5 }}>•</span>
                       <Input
                         value={item}
                         onChange={(e) => {
-                          const newList = [...(activeChapter.checklist ?? [])];
-                          newList[i] = e.target.value;
-                          updateChapter(activeChapter.id, { checklist: newList });
+                          const nl = [...(activeChapter.checklist ?? [])];
+                          nl[i] = e.target.value;
+                          updateChapter(activeChapter.id, { checklist: nl });
                         }}
-                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#C8D4F0", fontSize: 13, height: 32 }}
+                        style={{
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          color: "#C8D4F0",
+                          fontSize: 12,
+                          height: 30,
+                        }}
                       />
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* Exercise editor */}
               {activeChapter.exercise !== undefined && (
-                <div style={{ padding: "16px 20px", background: `${template.colorA}08`, borderRadius: 10, border: `1px solid ${template.colorA}20` }}>
-                  <p style={{ fontSize: 11, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>📝 Exercício</p>
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    background: `${cA}08`,
+                    borderRadius: 10,
+                    border: `1px solid ${cA}20`,
+                  }}
+                >
+                  <p style={{ fontSize: 10, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 7 }}>
+                    📝 Exercício
+                  </p>
                   <Textarea
                     value={activeChapter.exercise ?? ""}
                     onChange={(e) => updateChapter(activeChapter.id, { exercise: e.target.value })}
                     rows={4}
-                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#C8D4F0", fontSize: 13, resize: "none" }}
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      color: "#C8D4F0",
+                      fontSize: 12,
+                      resize: "none",
+                    }}
                   />
                 </div>
               )}
@@ -593,18 +937,29 @@ export function TemplateStudio({ template }: Props) {
 
           {/* Bonus editor */}
           {isBonusActive && state.bonus && (
-            <div style={{ maxWidth: 760, margin: "0 auto" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 24, color: "#F0F4FF" }}>🎁 Seção de Bônus</h2>
-              <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ maxWidth: 740, margin: "0 auto" }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 22, color: "#F0F4FF" }}>
+                🎁 Seção de Bônus
+              </h2>
+              <div style={{ display: "grid", gap: 14 }}>
                 <Field label="Título do bônus">
-                  <Input value={state.bonus.title} onChange={(e) => update({ bonus: { ...state.bonus!, title: e.target.value } })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.bonus.title}
+                    onChange={(e) => update({ bonus: { ...state.bonus!, title: e.target.value } })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
                 <Field label="Descrição">
-                  <Textarea value={state.bonus.description} onChange={(e) => update({ bonus: { ...state.bonus!, description: e.target.value } })} rows={2} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }} />
+                  <Textarea
+                    value={state.bonus.description}
+                    onChange={(e) => update({ bonus: { ...state.bonus!, description: e.target.value } })}
+                    rows={2}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }}
+                  />
                 </Field>
                 <Field label="Itens do bônus">
                   {state.bonus.items.map((item, i) => (
-                    <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <div key={i} style={{ marginBottom: 5 }}>
                       <Input
                         value={item}
                         onChange={(e) => {
@@ -612,7 +967,7 @@ export function TemplateStudio({ template }: Props) {
                           items[i] = e.target.value;
                           update({ bonus: { ...state.bonus!, items } });
                         }}
-                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", fontSize: 13 }}
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", fontSize: 12 }}
                       />
                     </div>
                   ))}
@@ -623,32 +978,90 @@ export function TemplateStudio({ template }: Props) {
 
           {/* CTA editor */}
           {isCtaActive && (
-            <div style={{ maxWidth: 760, margin: "0 auto" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 24, color: "#F0F4FF" }}>🎯 CTA Final</h2>
-              <div style={{ display: "grid", gap: 16 }}>
+            <div style={{ maxWidth: 740, margin: "0 auto" }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 22, color: "#F0F4FF" }}>
+                🎯 CTA Final
+              </h2>
+              <div style={{ display: "grid", gap: 14 }}>
                 <Field label="Headline do CTA">
-                  <Input value={state.cta.headline} onChange={(e) => update({ cta: { ...state.cta, headline: e.target.value } })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.cta.headline}
+                    onChange={(e) => update({ cta: { ...state.cta, headline: e.target.value } })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
                 <Field label="Corpo do texto">
-                  <Textarea value={state.cta.body} onChange={(e) => update({ cta: { ...state.cta, body: e.target.value } })} rows={3} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }} />
+                  <Textarea
+                    value={state.cta.body}
+                    onChange={(e) => update({ cta: { ...state.cta, body: e.target.value } })}
+                    rows={3}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "none" }}
+                  />
                 </Field>
                 <Field label="Texto do botão">
-                  <Input value={state.cta.buttonText} onChange={(e) => update({ cta: { ...state.cta, buttonText: e.target.value } })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.cta.buttonText}
+                    onChange={(e) => update({ cta: { ...state.cta, buttonText: e.target.value } })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
                 <Field label="Urgência">
-                  <Input value={state.cta.urgency} onChange={(e) => update({ cta: { ...state.cta, urgency: e.target.value } })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }} />
+                  <Input
+                    value={state.cta.urgency}
+                    onChange={(e) => update({ cta: { ...state.cta, urgency: e.target.value } })}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF" }}
+                  />
                 </Field>
-                <Field label="Página final (mensagem de encerramento)">
-                  <Textarea value={state.finalPage} onChange={(e) => update({ finalPage: e.target.value })} rows={5} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "vertical" }} />
+                <Field label="Mensagem final">
+                  <Textarea
+                    value={state.finalPage}
+                    onChange={(e) => update({ finalPage: e.target.value })}
+                    rows={5}
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#F0F4FF", resize: "vertical" }}
+                  />
                 </Field>
               </div>
 
               {/* CTA preview */}
-              <div style={{ marginTop: 32, borderRadius: 12, overflow: "hidden", background: `linear-gradient(140deg, ${template.colorA}, ${template.colorB})`, padding: "36px 32px", textAlign: "center" }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: "#fff", marginBottom: 10 }}>{state.cta.headline}</h3>
-                <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", marginBottom: 20, maxWidth: 460, margin: "0 auto 20px" }}>{state.cta.body}</p>
-                <div style={{ display: "inline-block", background: "#fff", color: template.colorB, padding: "12px 28px", borderRadius: 8, fontWeight: 700, fontSize: 14, marginBottom: 12 }}>{state.cta.buttonText}</div>
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>{state.cta.urgency}</p>
+              <div
+                style={{
+                  marginTop: 28,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: `linear-gradient(140deg, ${cA}, ${state.design.colorB})`,
+                  padding: "32px 28px",
+                  textAlign: "center",
+                }}
+              >
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 10 }}>
+                  {state.cta.headline}
+                </h3>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "rgba(255,255,255,.85)",
+                    marginBottom: 18,
+                    maxWidth: 440,
+                    margin: "0 auto 18px",
+                  }}
+                >
+                  {state.cta.body}
+                </p>
+                <div
+                  style={{
+                    display: "inline-block",
+                    background: "#fff",
+                    color: state.design.colorB,
+                    padding: "10px 24px",
+                    borderRadius: 7,
+                    fontWeight: 700,
+                    fontSize: 13,
+                    marginBottom: 10,
+                  }}
+                >
+                  {state.cta.buttonText}
+                </div>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,.6)" }}>{state.cta.urgency}</p>
               </div>
             </div>
           )}
@@ -660,7 +1073,19 @@ export function TemplateStudio({ template }: Props) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function SideItem({ label, active, onClick, accentColor, badge }: { label: string; active: boolean; onClick: () => void; accentColor: string; badge?: string }) {
+function SideItem({
+  label,
+  active,
+  onClick,
+  color,
+  badge,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  color: string;
+  badge?: string;
+}) {
   return (
     <button
       onClick={onClick}
@@ -668,15 +1093,15 @@ function SideItem({ label, active, onClick, accentColor, badge }: { label: strin
         display: "block",
         width: "100%",
         textAlign: "left",
-        padding: "8px 14px",
-        background: active ? `${accentColor}15` : "none",
+        padding: "7px 13px",
+        background: active ? `${color}15` : "none",
         border: "none",
-        borderLeft: `3px solid ${active ? accentColor : "transparent"}`,
+        borderLeft: `3px solid ${active ? color : "transparent"}`,
         color: active ? "#F0F4FF" : "#6B7FA8",
-        fontSize: 12,
+        fontSize: 11.5,
         cursor: "pointer",
         fontFamily: "inherit",
-        lineHeight: 1.4,
+        lineHeight: 1.35,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
@@ -684,7 +1109,7 @@ function SideItem({ label, active, onClick, accentColor, badge }: { label: strin
     >
       {label}
       {badge && !active && (
-        <span style={{ marginLeft: 6, fontSize: 9, opacity: 0.5 }}>({badge})</span>
+        <span style={{ marginLeft: 5, fontSize: 9, opacity: 0.45 }}>({badge})</span>
       )}
     </button>
   );
@@ -693,7 +1118,36 @@ function SideItem({ label, active, onClick, accentColor, badge }: { label: strin
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p style={{ fontSize: 11, color: "#6B7FA8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{label}</p>
+      <p
+        style={{
+          fontSize: 10,
+          color: "#6B7FA8",
+          textTransform: "uppercase",
+          letterSpacing: 1,
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function DesignField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p
+        style={{
+          fontSize: 10,
+          color: "#6B7FA8",
+          textTransform: "uppercase",
+          letterSpacing: 0.8,
+          marginBottom: 6,
+        }}
+      >
+        {label}
+      </p>
       {children}
     </div>
   );

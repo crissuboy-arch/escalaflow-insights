@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { generateStoryCoverFn } from "@/lib/storybook.functions";
+import { generateEbookCoverFn } from "@/lib/storybook.functions";
 import { ALL_TEMPLATES, type TemplateMaster } from "@/lib/ebook/template-master";
 import type { AiKickstart } from "./EbookHub";
 
@@ -397,7 +397,7 @@ export function PremiumTemplates({
   const [covers, setCovers] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [preview, setPreview] = useState<TemplateMaster | null>(null);
-  const genCover = useServerFn(generateStoryCoverFn);
+  const genCover = useServerFn(generateEbookCoverFn);
 
   // Load saved covers from localStorage on mount
   useEffect(() => {

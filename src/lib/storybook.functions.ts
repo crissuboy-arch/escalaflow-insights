@@ -401,6 +401,34 @@ export const generateStoryCoverFn = createServerFn({ method: "POST" })
     return { url };
   });
 
+// ---------- Ebook cover (Gemini Imagen 3) ----------
+
+export const generateEbookCoverFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { prompt: string }) => z.object({ prompt: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        instances: [{ prompt: data.prompt }],
+        parameters: { sampleCount: 1, aspectRatio: "9:16", safetyFilterLevel: "block_few" },
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => res.statusText);
+      throw new Error(`Gemini Imagen error ${res.status}: ${body}`);
+    }
+    const json = await res.json() as { predictions?: { bytesBase64Encoded?: string; mimeType?: string }[] };
+    const b64 = json.predictions?.[0]?.bytesBase64Encoded;
+    const mime = json.predictions?.[0]?.mimeType ?? "image/png";
+    if (!b64) throw new Error("Imagem não gerada pela API Gemini.");
+    return { url: `data:${mime};base64,${b64}` };
+  });
+
 // ---------- Share token ----------
 
 export const generateShareTokenFn = createServerFn({ method: "POST" })
