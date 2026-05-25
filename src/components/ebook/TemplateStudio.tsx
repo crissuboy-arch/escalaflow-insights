@@ -112,7 +112,13 @@ function loadState(template: TemplateMaster): StudioState {
         subtitle: p.subtitle ?? template.meta.subtitle,
         author: p.author ?? template.meta.authorPlaceholder,
         coverUrl: p.coverUrl ?? "",
-        chapters: p.chapters ?? template.chapters.map(migrateChapter),
+        chapters: p.chapters
+          ? p.chapters.map((ch) =>
+              Array.isArray((ch as StudioChapter).blocks)
+                ? (ch as StudioChapter)
+                : migrateChapter(ch as unknown as TemplateChapter),
+            )
+          : template.chapters.map(migrateChapter),
         bonus: p.bonus ?? (template.bonus ? { ...template.bonus } : undefined),
         cta: p.cta ?? { ...template.cta },
         finalPage: p.finalPage ?? template.finalPage,
@@ -137,13 +143,14 @@ function loadState(template: TemplateMaster): StudioState {
 
 function toPdfChapters(chapters: StudioChapter[]): PdfChapter[] {
   return chapters.map((ch) => {
-    const textContent = ch.blocks
+    const blocks: Block[] = Array.isArray(ch.blocks) ? ch.blocks : [];
+    const textContent = blocks
       .filter((b) => b.type === "text" || b.type === "cta")
       .map((b) => b.content)
       .join("\n\n");
-    const quoteBlock = ch.blocks.find((b) => b.type === "quote");
-    const checkBlock = ch.blocks.find((b) => b.type === "checklist");
-    const calloutBlock = ch.blocks.find((b) => b.type === "callout");
+    const quoteBlock = blocks.find((b) => b.type === "quote");
+    const checkBlock = blocks.find((b) => b.type === "checklist");
+    const calloutBlock = blocks.find((b) => b.type === "callout");
     return {
       id: ch.id,
       title: ch.title,
@@ -737,7 +744,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
 
   const currentChapter = state.chapters[chapterIdx];
   const totalWords = state.chapters.reduce(
-    (s, ch) => s + ch.blocks.filter((b) => b.type === "text").reduce((s2, b) => s2 + b.content.split(/\s+/).filter(Boolean).length, 0),
+    (s, ch) => s + (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type === "text").reduce((s2, b) => s2 + b.content.split(/\s+/).filter(Boolean).length, 0),
     0,
   );
 
