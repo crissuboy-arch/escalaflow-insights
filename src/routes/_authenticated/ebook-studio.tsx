@@ -20,7 +20,7 @@ function EbookStudioPage() {
       <div style={{ minHeight: "100vh", background: "#080D1A", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 16, color: "#F0F4FF", fontFamily: "Inter, sans-serif" }}>
         <BookOpen size={40} color="#6B7FA8" />
         <p style={{ fontSize: 16, color: "#6B7FA8" }}>Template não encontrado.</p>
-        <a href="/ebook-forge" style={{ fontSize: 14, color: "#0A6CFF" }}>← Voltar para Templates</a>
+        <a href="/produtos/ebook" style={{ fontSize: 14, color: "#0A6CFF" }}>← Voltar para Templates</a>
       </div>
     );
   }
