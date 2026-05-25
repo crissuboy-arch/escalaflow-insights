@@ -26,6 +26,7 @@ import {
   Wand2,
   Download,
   Copy,
+  Share2,
 } from "lucide-react";
 import {
   loadStory,
@@ -36,6 +37,7 @@ import {
   generateCoverPrompts,
   generateShorts,
   generateAudiobookScript,
+  generateShareTokenFn,
 } from "@/lib/storybook.functions";
 import {
   COVER_STYLES,
@@ -84,6 +86,7 @@ function StorybookWorkspace() {
   const genCover = useServerFn(generateCoverPrompts);
   const genShortsFn = useServerFn(generateShorts);
   const genAudio = useServerFn(generateAudiobookScript);
+  const genShare = useServerFn(generateShareTokenFn);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [story, setStory] = useState<any>(null);
@@ -95,6 +98,8 @@ function StorybookWorkspace() {
   const [voice, setVoice] = useState("feminina-doce");
   const [speed, setSpeed] = useState(1);
   const [soundtrack, setSoundtrack] = useState<string>("piano-melancolico");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [readerMode, setReaderMode] = useState(false);
 
   const refresh = async () => {
     const { story: s } = await load({ data: { id } });
@@ -242,6 +247,93 @@ function StorybookWorkspace() {
     );
   }
 
+  // ─── MODO LEITOR ───────────────────────────────────────────────────────────
+  if (readerMode) {
+    const readChapters: { id: string; index: number; title: string; body: string }[] = chapters;
+    return (
+      <div style={{ background: "#050A14", minHeight: "100vh", color: "#F0F4FF", fontFamily: "Outfit, sans-serif" }}>
+        {/* Header leitor */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-3 border-b"
+          style={{ background: "rgba(5,10,20,0.95)", borderColor: "#1E2D4A", backdropFilter: "blur(8px)" }}>
+          <button onClick={() => setReaderMode(false)}
+            className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
+            style={{ color: "#6B7FA8" }}>
+            <ArrowLeft className="h-4 w-4" /> Voltar ao editor
+          </button>
+          <div className="flex items-center gap-2" style={{ fontFamily: "Georgia, serif", fontSize: 14, color: "#F0F4FF" }}>
+            <BookOpen className="h-4 w-4" style={{ color: "#E8623A" }} />
+            {planning?.title}
+          </div>
+          <div style={{ fontSize: 12, color: "#6B7FA8" }}>
+            {readChapters.filter(c => c.body).length}/{readChapters.length} caps gerados
+          </div>
+        </div>
+
+        <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px 80px" }}>
+          {/* Capa */}
+          <div style={{ textAlign: "center", marginBottom: 64, padding: "48px 0", borderBottom: "1px solid #1E2D4A" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", color: "#E8623A", textTransform: "uppercase", marginBottom: 16 }}>
+              {planning?.type ?? "Romance"}
+            </div>
+            <h1 style={{ fontFamily: "Georgia, serif", fontSize: "clamp(28px,5vw,48px)", fontWeight: 800, lineHeight: 1.15, marginBottom: 12 }}>
+              {planning?.title}
+            </h1>
+            {planning?.subtitle && (
+              <p style={{ fontSize: 16, color: "#9BAAC8", fontStyle: "italic", marginBottom: 12 }}>{planning.subtitle}</p>
+            )}
+            {planning?.author && (
+              <p style={{ fontSize: 14, color: "#6B7FA8" }}>por {planning.author}</p>
+            )}
+            {readChapters.length > 0 && (
+              <div style={{ marginTop: 32, display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, background: "rgba(232,98,58,0.12)", border: "1px solid rgba(232,98,58,0.25)" }}>
+                <BookOpen className="h-3.5 w-3.5" style={{ color: "#E8623A" }} />
+                <span style={{ fontSize: 13, color: "#E8623A" }}>{readChapters.length} capítulos · {readChapters.reduce((s, c) => s + (c.body?.split(/\s+/).filter(Boolean).length ?? 0), 0).toLocaleString()} palavras</span>
+              </div>
+            )}
+          </div>
+
+          {/* Capítulos */}
+          {readChapters.length === 0 ? (
+            <div style={{ textAlign: "center", color: "#6B7FA8", padding: "48px 0" }}>
+              <BookOpen className="h-10 w-10 mx-auto mb-4" style={{ opacity: 0.3 }} />
+              <p>Nenhum capítulo gerado ainda.</p>
+              <button onClick={() => setReaderMode(false)} style={{ marginTop: 16, fontSize: 13, color: "#E8623A", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}>
+                Ir para o editor →
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 64 }}>
+              {readChapters.map((ch, i) => (
+                <article key={ch.id}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 24 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(232,98,58,0.15)", border: "1px solid rgba(232,98,58,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontFamily: "Georgia, serif", fontWeight: 700, color: "#E8623A", fontSize: 14 }}>
+                      {i + 1}
+                    </div>
+                    <h2 style={{ fontFamily: "Georgia, serif", fontSize: "clamp(18px,2.5vw,24px)", fontWeight: 700 }}>
+                      {ch.title}
+                    </h2>
+                  </div>
+                  {ch.body ? (
+                    <div style={{ fontSize: 16, lineHeight: 1.9, color: "#C8D4F0", whiteSpace: "pre-wrap", letterSpacing: "0.01em" }}>
+                      {ch.body}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: 14, color: "#4A5568", fontStyle: "italic" }}>
+                      Capítulo ainda não gerado. <button onClick={() => setReaderMode(false)} style={{ color: "#E8623A", textDecoration: "underline", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>Gerar no editor →</button>
+                    </p>
+                  )}
+                  {i < readChapters.length - 1 && (
+                    <div style={{ marginTop: 48, textAlign: "center", color: "#1E2D4A" }}>✦ ✦ ✦</div>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -259,6 +351,11 @@ function StorybookWorkspace() {
           {planning?.subniche && <Badge variant="outline">{planning.subniche}</Badge>}
           <Badge variant="outline">{planning?.chapters} caps</Badge>
           <Badge variant="outline">{planning?.tone}</Badge>
+          {chapters.filter((c: { body: string }) => c.body).length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => setReaderMode(true)}>
+              <BookOpen className="mr-1.5 h-3.5 w-3.5" /> Ler livro
+            </Button>
+          )}
         </div>
       </div>
 
@@ -595,6 +692,47 @@ function StorybookWorkspace() {
               </Button>
             ))}
             <Button variant="outline" onClick={exportTxt}><Download className="mr-1 h-4 w-4" /> TXT</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* LINK COMPARTILHÁVEL */}
+      {step === 8 && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Share2 className="h-4 w-4" /> Link Compartilhável</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {shareUrl && (
+              <div className="flex items-center gap-2 rounded-lg p-3 bg-muted">
+                <span className="flex-1 truncate font-mono text-sm">{shareUrl}</span>
+                <Button size="sm" variant="ghost" onClick={() => copy(shareUrl)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              disabled={!!busy}
+              onClick={async () => {
+                setBusy("share");
+                try {
+                  const { token } = await genShare({ data: { id } });
+                  const url = `${window.location.origin}/storybook-share/${token}`;
+                  setShareUrl(url);
+                  toast.success("Link criado!");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Erro ao gerar link");
+                } finally {
+                  setBusy(null);
+                }
+              }}>
+              {busy === "share" ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Share2 className="mr-1 h-4 w-4" />}
+              {shareUrl ? "Renovar link" : "Gerar link compartilhável"}
+            </Button>
+            {shareUrl && (
+              <p className="text-xs text-muted-foreground">
+                Qualquer pessoa com este link pode ler a história sem precisar de login.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

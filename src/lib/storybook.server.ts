@@ -28,6 +28,7 @@ export const StoryPlanningSchema = z.object({
   hotLevel: z.string().default("sensual"),
   tone: z.string().default("cinematografico"),
   author: z.string().optional().default(""),
+  coverImageUrl: z.string().optional().default(""),
 });
 export type StoryPlanning = z.infer<typeof StoryPlanningSchema>;
 

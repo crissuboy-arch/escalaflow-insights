@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StorybookShareTokenRouteImport } from './routes/storybook-share.$token'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
 import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
@@ -58,6 +59,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StorybookShareTokenRoute = StorybookShareTokenRouteImport.update({
+  id: '/storybook-share/$token',
+  path: '/storybook-share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
@@ -273,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/storybook-share/$token': typeof StorybookShareTokenRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
@@ -310,6 +317,7 @@ export interface FileRoutesByTo {
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/storybook-share/$token': typeof StorybookShareTokenRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
@@ -349,6 +357,7 @@ export interface FileRoutesById {
   '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/_authenticated/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/storybook-share/$token': typeof StorybookShareTokenRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
@@ -388,6 +397,7 @@ export interface FileRouteTypes {
     | '/tiktok-radar'
     | '/youtube-radar'
     | '/api/ingest'
+    | '/storybook-share/$token'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/projetos/$id'
@@ -425,6 +435,7 @@ export interface FileRouteTypes {
     | '/tiktok-radar'
     | '/youtube-radar'
     | '/api/ingest'
+    | '/storybook-share/$token'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/projetos/$id'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tiktok-radar'
     | '/_authenticated/youtube-radar'
     | '/api/ingest'
+    | '/storybook-share/$token'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/projetos/$id'
@@ -475,6 +487,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  StorybookShareTokenRoute: typeof StorybookShareTokenRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
 }
 
@@ -499,6 +512,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/storybook-share/$token': {
+      id: '/storybook-share/$token'
+      path: '/storybook-share/$token'
+      fullPath: '/storybook-share/$token'
+      preLoaderRoute: typeof StorybookShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/ingest': {
@@ -835,6 +855,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
   ApiIngestRoute: ApiIngestRoute,
+  StorybookShareTokenRoute: StorybookShareTokenRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
 }
 export const routeTree = rootRouteImport

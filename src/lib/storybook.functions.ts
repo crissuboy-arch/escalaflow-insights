@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   StoryPlanningSchema,
   CharacterSchema,
@@ -93,6 +94,7 @@ export const createStory = createServerFn({ method: "POST" })
       briefing: {} as never,
       outline: [] as never,
       meta: { story } as never,
+      cover_url: data.planning.coverImageUrl || null,
       step: 1,
       status: "draft",
     };
@@ -374,4 +376,56 @@ export const listStories = createServerFn({ method: "GET" })
       .limit(50);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+// ---------- Cover image (DALL-E 3) ----------
+
+export const generateStoryCoverFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { prompt: string }) => z.object({ prompt: z.string().min(1) }).parse(d))
+  .handler(async ({ data }) => {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY não configurada. Adicione a chave no .env.");
+    const res = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "dall-e-3", prompt: data.prompt, n: 1, size: "1024x1024", quality: "standard" }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => res.statusText);
+      throw new Error(`OpenAI error ${res.status}: ${body}`);
+    }
+    const json = await res.json() as { data?: { url?: string }[] };
+    const url = json.data?.[0]?.url;
+    if (!url) throw new Error("Imagem não gerada pela API.");
+    return { url };
+  });
+
+// ---------- Share token ----------
+
+export const generateShareTokenFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const token = crypto.randomUUID();
+    const { error } = await context.supabase
+      .from("projects")
+      .update({ share_token: token } as never)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { token };
+  });
+
+// ---------- Load shared story (public — no auth) ----------
+
+export const loadSharedStoryFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { token: string }) => z.object({ token: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: project, error } = await supabaseAdmin
+      .from("projects")
+      .select("id, title, niche, status, meta, cover_url")
+      .eq("share_token" as never, data.token)
+      .single();
+    if (error || !project) throw new Error("História não encontrada ou link inválido.");
+    return { project };
   });
