@@ -42,6 +42,7 @@ export interface TemplateMaster {
   colorA: string;
   colorB: string;
   emoji: string;
+  coverPrompt?: string;
   meta: TemplateMeta;
   chapters: TemplateChapter[];
   bonus?: TemplateBonus;
@@ -61,6 +62,7 @@ const LOW_TICKET: TemplateMaster = {
   colorA: "#0A6CFF",
   colorB: "#003A8C",
   emoji: "💡",
+  coverPrompt: "Professional ebook cover design, bold blue gradient background, gold and white accents, modern digital entrepreneurship aesthetic, glowing lightbulb or circuit motif, clean premium typography, 2024 style, high quality digital art",
   hasMasterContent: true,
   meta: {
     title: "O Método da Primeira Venda Digital",
@@ -367,6 +369,7 @@ const PLANNER_FINANCEIRO: TemplateMaster = {
   colorA: "#F59E0B",
   colorB: "#78350F",
   emoji: "💰",
+  coverPrompt: "Elegant personal finance ebook cover, deep amber gold and dark brown gradient, wealth and prosperity aesthetic, abstract rising chart or golden coins element, sophisticated premium typography, luxury financial design, high quality digital art",
   hasMasterContent: true,
   meta: {
     title: "A Virada Financeira",
@@ -650,6 +653,7 @@ const PLANNER_EMAGRECIMENTO: TemplateMaster = {
   colorA: "#10B981",
   colorB: "#064E3B",
   emoji: "🏃",
+  coverPrompt: "Health and wellness ebook cover, emerald green and dark forest gradient, clean minimalist aesthetic, botanical leaves and wellness elements, silhouette of fit woman, white premium typography, fresh modern design, high quality digital art",
   hasMasterContent: true,
   meta: {
     title: "Método Corpo Novo 30 Dias",
@@ -911,6 +915,7 @@ const TIKTOK_SHOP: TemplateMaster = {
   colorA: "#06B6D4",
   colorB: "#0E4F5C",
   emoji: "📱",
+  coverPrompt: "Digital commerce ebook cover, cyan and dark teal gradient, modern social media aesthetic, smartphone with TikTok style interface, dynamic energetic design, white bold typography, neon accents, premium quality digital art",
   hasMasterContent: true,
   meta: {
     title: "Venda no TikTok Shop Sem Aparecer",
@@ -1136,6 +1141,7 @@ const HIGH_TICKET: TemplateMaster = {
   colorA: "#EAB308",
   colorB: "#78350F",
   emoji: "⭐",
+  coverPrompt: "Premium luxury coaching ebook cover, deep gold and dark brown gradient, authority and prestige aesthetic, subtle crown or diamond elements, sophisticated typography, exclusive high-end consulting design, high quality digital art",
   hasMasterContent: true,
   meta: {
     title: "O Método Magnético",
@@ -1393,6 +1399,364 @@ Comece pelo Pilar 1 esta semana. Especialização radical. Uma frase, uma audiê
 [Seu contato]`,
 };
 
+// ─── Template 6: Relacionamento & Conquista ───────────────────────────────────
+
+const RELACIONAMENTO: TemplateMaster = {
+  id: "relacionamento",
+  name: "Relacionamento & Conquista",
+  category: "Relacionamentos",
+  pages: 75,
+  level: "Premium",
+  colorA: "#8B0000",
+  colorB: "#1a0a0a",
+  emoji: "💋",
+  coverPrompt: "Romantic luxury ebook cover, deep wine red and black gradient, elegant mysterious aesthetic, golden rose petals or silhouette of couple, gold foil typography accents, premium seduction theme, sophisticated passionate design, high quality digital art",
+  hasMasterContent: true,
+  meta: {
+    title: "O Protocolo da Atração",
+    subtitle: "A psicologia completa do desejo — como se tornar irresistível, criar conexões que duram e reconquistar quem você ama",
+    authorPlaceholder: "Seu Nome Aqui",
+    promise: "Desenvolver presença magnética, comunicação que seduz e reconquistar o amor em 30 dias — com psicologia real, não manipulação",
+    uniqueMechanism: "Método DESEJO — 7 protocolos da psicologia emocional para relacionamentos de alta vibração",
+    transformation: "De invisível e inseguro para magnético, confiante e irresistível nas relações",
+    audience: "Pessoas que querem se tornar mais atraentes, melhorar relacionamentos existentes ou reconquistar um amor",
+  },
+  chapters: [
+    {
+      id: "rel-c1",
+      title: "A Psicologia do Desejo: Por Que Certas Pessoas São Irresistíveis",
+      badge: "Fundação",
+      pullQuote: "A irresistibilidade não é uma questão de aparência. É uma questão de como você faz as pessoas se sentirem quando estão com você.",
+      body: `Existe uma diferença fundamental entre ser bonito e ser irresistível. Muitas das pessoas mais atraentes do mundo são esquecíveis. E algumas pessoas com aparência comum magnetizam todos que entram em contato com elas. O que explica isso?
+
+A resposta está na psicologia do desejo — e ela tem muito menos a ver com como você parece e muito mais com como você se apresenta.
+
+O PRINCÍPIO DO FRAME (MOLDURA)
+
+Em psicologia social, "frame" é a realidade que você projeta para os outros. Pessoas de alta atração vivem dentro de um frame poderoso: elas são o centro de gravidade social, não a lua girando ao redor de outros. Quando entram em um ambiente, não tentam conquistar aprovação — oferecem presença.
+
+A maioria das pessoas inverte essa lógica. Agem como se precisassem provar que merecem atenção. Isso cria a dinâmica oposta: quanto mais você busca aprovação, menos você a recebe.
+
+O paradoxo do desejo: quanto menos você precisa de alguém, mais essa pessoa te quer.
+
+OS 3 FATORES PULL QUE CRIAM ATRAÇÃO IRRESISTÍVEL
+
+Fator 1 — Presença Plena: pessoas irresistíveis fazem quem está com elas sentir que são a única pessoa no mundo. Elas escutam com os olhos, não só com os ouvidos. Fazem perguntas genuínas e se lembram de detalhes. Essa atenção total é rara — e extremamente magnética.
+
+Fator 2 — Mistério Calculado: não revelar tudo de uma vez. Irresistibilidade é curiosidade não completamente satisfeita. Quando alguém te conhece completamente em 2 horas, a fascínação cai. Quando você mantém camadas de profundidade, a pessoa quer continuar descobrindo.
+
+Fator 3 — Congruência Interna: agir de acordo com seus próprios valores, sem se dobrar à pressão social. Pessoas que mudam de opinião com base em quem está ao redor são previsíveis e sem atração. Quem mantém sua perspectiva mesmo sob pressão projeta solidez — e solidez é magneticamente atraente.
+
+O DETECTOR DE VALOR SOCIAL
+
+Todos nós temos um "detector" primitivo que avalia constantemente o valor social dos outros. Ele não analisa currículos — analisa postura, tom de voz, velocidade das respostas, como você fala de si mesmo, como reage a pressão. Em milissegundos, antes de qualquer lógica consciente, já formamos uma impressão de quem tem alto ou baixo valor social.
+
+Este ebook te ensina a calibrar todos esses sinais para projetar o valor que você realmente tem — mas que talvez ainda não esteja comunicando.`,
+      checklist: [
+        "Observar: você busca aprovação na maioria das interações sociais?",
+        "Praticar escuta ativa por 3 dias — olhar nos olhos, fazer perguntas de continuação",
+        "Identificar um valor pessoal que você costuma esconder por medo de julgamento",
+        "Criar o hábito de ser o último a responder mensagens (não imediatamente)",
+        "Anotar 5 qualidades suas que você genuinamente admira",
+      ],
+      exercise: `ANÁLISE DO FRAME: Por 3 dias, observe cada interação social e responda:
+• Você estava buscando aprovação ou oferecendo presença?
+• Você revelou mais do que precisava ou manteve mistério natural?
+• Você manteve seu ponto de vista ou cedeu à pressão do outro?
+
+Este exercício não é sobre jogar games. É sobre reconhecer padrões que comunicam valor sem você perceber.`,
+    },
+    {
+      id: "rel-c2",
+      title: "Autoestima Magnética: O Alicerce que Transforma",
+      badge: "Mentalidade",
+      pullQuote: "Você não pode atrair amor que você não acredita merecer. A autoestima não é vaidade — é o pré-requisito de toda relação saudável.",
+      body: `A baixa autoestima é a origem de 90% dos problemas relacionais. Não porque torna você menos atraente externamente — mas porque ela distorce cada interação, cada mensagem, cada silêncio do outro.
+
+Com baixa autoestima, você interpreta uma resposta tarde como rejeição. Um "não sei" como desinteresse. Um dia difícil do outro como consequência da sua inadequação. Você vive em estado permanente de alerta emocional — o que drena tanto você quanto quem está com você.
+
+O PROBLEMA DA VALIDAÇÃO EXTERNA
+
+Pessoas que dependem de validação externa para se sentir bem vivem em uma montanha-russa emocional controlada pelos outros. Quando recebem atenção: euforia. Quando não recebem: ansiedade, ciúme, checagem compulsiva do celular.
+
+Esse ciclo cria exatamente o comportamento que afasta as pessoas que você quer manter por perto.
+
+A CONSTRUÇÃO DA AUTOESTIMA MAGNÉTICA
+
+Autoestima magnética não é se convencer de que você é perfeito. É ter uma base sólida de identidade que não depende das reações dos outros para existir.
+
+3 pilares práticos:
+
+Pilar 1 — Padrões pessoais: defina como você quer viver, o que você aceita e o que não aceita em relacionamentos. Quando você tem padrões claros, para de perseguir quem não os cumpre.
+
+Pilar 2 — Provas de competência: construa habilidades, conquistas e experiências que você genuinamente admira em si mesmo. Autoestima real vem de ações, não de afirmações.
+
+Pilar 3 — Independência emocional: tenha uma vida que você ama, com amigos, projetos e interesses que não dependem de nenhum relacionamento específico. Quando sua vida é plena, você para de agarrar o que não serve.
+
+A REGRA DO ESPELHO EMOCIONAL
+
+As pessoas espelham nossa energia. Quando você entra em um relacionamento se sentindo completo, você atrai alguém que também se sente completo. Quando você entra carente, você atrai quem se alimenta de carência ou quem se afasta dela.
+
+Sua vibração emocional é a sua maior ferramenta de atração.`,
+      checklist: [
+        "Listar 10 conquistas reais suas (não importa o tamanho)",
+        "Definir 3 padrões inegociáveis para seus relacionamentos",
+        "Identificar 1 hábito ou projeto que te faz sentir genuinamente orgulhoso de si mesmo",
+        "Praticar a frase 'eu sou suficiente como sou' ao acordar por 21 dias",
+        "Cancelar 1 compromisso que você aceita por medo de dizer não",
+      ],
+      exercise: `INVENTÁRIO DE IDENTIDADE: Responda sem pensar mais de 30 segundos:
+• Quem eu sou além dos meus relacionamentos?
+• O que eu faria se soubesse que ninguém estaria me julgando?
+• Se a pessoa que eu quero conquistar me rejeitasse hoje, minha vida continuaria sendo boa?
+
+Se a resposta à última pergunta for "não", você tem trabalho a fazer antes de reconquistar qualquer pessoa.`,
+    },
+    {
+      id: "rel-c3",
+      title: "Comunicação que Cativa: A Arte de Ser Inesquecível",
+      badge: "Conexão",
+      pullQuote: "As pessoas esquecerão o que você disse e o que você fez. Nunca esquecerão como você as fez sentir.",
+      body: `A comunicação que cativa não é sobre falar bem. É sobre fazer a outra pessoa se sentir profundamente compreendida — o que é uma das experiências mais raras e poderosas que um ser humano pode ter.
+
+Vivemos em um mundo de comunicação rasa: as pessoas ouvem para responder, não para entender. Quando você muda esse padrão, você se torna instantaneamente memorável.
+
+A ESCUTA DE 3 NÍVEIS
+
+Nível 1 — Escuta superficial: você ouve as palavras mas já está formulando sua resposta. 80% das pessoas ficam aqui.
+
+Nível 2 — Escuta ativa: você ouve o conteúdo e faz perguntas de aprofundamento. "O que você quis dizer com isso?" / "Como isso te fez sentir?" Apenas 18% das pessoas chegam aqui.
+
+Nível 3 — Escuta empática: você ouve as palavras, percebe a emoção por trás delas, e reflete a emoção de volta. "Parece que você ficou frustrado quando isso aconteceu, não foi?" Menos de 2% das pessoas praticam isso consistentemente. E é exatamente isso que cria a sensação de "finalmente alguém que me entende".
+
+A TÉCNICA DA PERGUNTA PODEROSA
+
+Perguntas comuns geram respostas comuns. Perguntas profundas geram conexão real.
+
+Perguntas rasas: "Como foi seu dia?" / "O que você faz?"
+Perguntas que criam conexão: "Qual foi o momento mais desafiador da sua semana e como você lidou com ele?" / "O que você faria se não tivesse medo de errar?"
+
+A regra: faça 1 pergunta por vez, espere a resposta completa, e então aprofunde. Nunca interrogue — explore.
+
+MIRRORING E RAPPORT INSTANTÂNEO
+
+Espelhamento sutil — usar vocabulário parecido, ritmo de fala similar, linguagem corporal compatível — cria rapport em nível inconsciente. A pessoa sente que "há algo nesta pessoa que ressoa comigo" sem saber exatamente o quê.
+
+Não copie roboticamente. Adapte naturalmente seu estilo de comunicação ao da pessoa com quem está.`,
+      checklist: [
+        "Praticar escuta de Nível 2 em pelo menos 3 conversas por dia",
+        "Criar 5 'perguntas poderosas' sobre temas que te interessam genuinamente",
+        "Eliminar o hábito de checar o celular durante conversas importantes",
+        "Depois de cada conversa: o que a pessoa se sentiu ao falar comigo?",
+        "Usar o nome da pessoa pelo menos 1 vez em cada conversa",
+      ],
+    },
+    {
+      id: "rel-c4",
+      title: "A Linguagem do Corpo que Fala Mais Alto",
+      badge: "Presença",
+      pullQuote: "Seu corpo comunica 55% da sua mensagem antes de você abrir a boca. Aprenda o idioma que nunca para de falar.",
+      body: `Pesquisas de Albert Mehrabian estabeleceram que em comunicações de conteúdo emocional: 55% da mensagem é transmitida pela linguagem corporal, 38% pelo tom de voz, e apenas 7% pelas palavras em si. Isso significa que a forma como você se apresenta fisicamente comunica mais do que o roteiro mais elaborado.
+
+A linguagem corporal não pode ser fingida de forma sustentável — mas pode ser desenvolvida para refletir sua versão mais confiante e presente.
+
+OS 5 ELEMENTOS DA PRESENÇA FÍSICA MAGNÉTICA
+
+Elemento 1 — Postura de Abertura: ombros para trás, peito levemente aberto, posição ereta mas não rígida. Esta postura não é sobre parecer grande — é sobre estar aberto à conexão. Postura fechada (ombros curvados, braços cruzados) comunica insegurança ou hostilidade mesmo quando você está apenas nervoso.
+
+Elemento 2 — Contato Visual Calibrado: 60-70% de contato visual durante escuta, 40-60% durante fala. Contato visual constante demais parece intensidade estranha; pouco de menos parece fuga. O olhar certo comunica: "Estou completamente aqui com você".
+
+Elemento 3 — Velocidade dos Movimentos: pessoas seguras se movem com calma. Gestos rápidos e agitados sinalizam ansiedade. Falar mais devagar, fazer pausas confortáveis, não preencher todo silêncio com palavras — isso projeta domínio do momento.
+
+Elemento 4 — O Sorriso Real: o sorriso genuíno (Duchenne) envolve os olhos, não só a boca. Você consegue distinguir instantaneamente entre um sorriso de fachada e um sorriso real. Use o segundo. E para ativá-lo genuinamente: pense em algo que você realmente aprecia antes de entrar em uma interação importante.
+
+Elemento 5 — Proxêmica Intencional: a distância física comunica intimidade. Aproximar-se gradualmente (e observar se a pessoa espelha ou recua) é o radar mais preciso de interesse mútuo.
+
+PRESENÇA VS. PERFORMANCE
+
+A maior armadilha: tentar parecer confiante em vez de estar confiante. A performance é detectável — e ironicamente comunica insegurança. A presença genuína vem de estar tão absorto no momento e na pessoa à sua frente que você para de se monitorar. Esse estado é o que cria magnetismo real.`,
+      checklist: [
+        "Gravar 60 segundos de vídeo se apresentando e analisar postura, tom e contato visual",
+        "Praticar postura de abertura ao sentar (não cruzar os braços por 1 semana)",
+        "Exercício de respiração antes de interações importantes (4-7-8: inspire 4s, segure 7s, expire 8s)",
+        "Observar: você preenche silêncios porque é natural ou porque sente desconforto?",
+        "Praticar falar 20% mais devagar em conversas comuns",
+      ],
+      exercise: `CALIBRAÇÃO DE PRESENÇA: Em seu próximo encontro importante, monitore estes 3 pontos:
+1. Seu telefone ficou no bolso/bolsa durante toda a conversa? (sim = presença total)
+2. Você se lembrou de fazer pelo menos 2 perguntas de aprofundamento? (sim = escuta real)
+3. Sua postura estava aberta e seus movimentos eram calmos? (sim = presença física)
+
+O objetivo não é performance — é consciência.`,
+    },
+    {
+      id: "rel-c5",
+      title: "Gatilhos Emocionais: A Ciência do Desejo Sustentável",
+      badge: "Psicologia",
+      pullQuote: "O desejo não é sustentado pela presença constante. É sustentado pela antecipação, pelo mistério e pela certeza alternada com incerteza.",
+      body: `A neurociência do desejo revela algo que parece paradoxal: dopamina (o neurotransmissor do desejo) não é liberada quando recebemos o que queremos — é liberada na antecipação de possivelmente receber. Isso explica por que a conquista é muitas vezes mais emocionante do que a posse, e por que relacionamentos que começam com 100% de disponibilidade frequentemente perdem a faísca rápido.
+
+Entender isso não é sobre manipulação — é sobre criar dinâmicas que mantêm o desejo vivo de forma sustentável.
+
+O SISTEMA DOPAMINÉRGICO NOS RELACIONAMENTOS
+
+O sistema de recompensa cerebral responde mais intensamente a recompensas variáveis do que a recompensas previsíveis. Isso é o mesmo mecanismo que torna jogos de azar viciantes. Aplicado a relacionamentos de forma saudável: a imprevisibilidade calibrada mantém a pessoa genuinamente curiosa sobre você.
+
+Imprevisibilidade saudável não é jogar games — é ter uma vida rica o suficiente para que você nem sempre esteja disponível. É ter opiniões que às vezes surpreendem. É ser consistente em valores mas nunca completamente previsível em ações.
+
+OS 4 GATILHOS QUE SUSTENTAM O DESEJO
+
+Gatilho 1 — Escassez Real: você tem uma vida que acontece independentemente de qualquer relacionamento. Você cancela planos quando precisa. Você não muda de agenda para agradar — isso não é descuido, é ter limites.
+
+Gatilho 2 — Reconhecimento Específico: elogios genéricos não emocionam. Elogios específicos e sinceros criam conexão. "Você é incrível" não. "A forma como você lidou com aquela situação difícil na semana passada me impressionou muito" — sim.
+
+Gatilho 3 — Tensão e Resolução: pequenas tensões e desafios seguidos de resolução criam os picos de dopamina mais poderosos. Uma brincadeira leve que cria tensão, seguida de afeto — é o padrão clássico de casais com alta atração mútua sustentada.
+
+Gatilho 4 — Crescimento Compartilhado: o desejo se mantém quando ambos continuam evoluindo. Relacionamentos que estagnam em rotina perdem a faísca porque o cérebro para de liberar dopamina para o que é completamente familiar. Criar experiências novas juntos reinicia o sistema.
+
+A DIFERENÇA ENTRE ATRAÇÃO E APEGO
+
+Atração = eu quero estar com você porque você é fascinante.
+Apego ansioso = eu preciso estar com você porque tenho medo de perdê-lo.
+
+Um cria desejo. O outro cria sufocamento. A diferença está na sua relação com você mesmo — o que nos leva de volta ao Capítulo 2.`,
+      checklist: [
+        "Avaliar: você tem uma vida que existe independentemente de seus relacionamentos?",
+        "Praticar dar 1 elogio específico e sincero por semana (não genérico)",
+        "Criar pelo menos 1 experiência nova por mês com quem você quer manter próximo",
+        "Identificar quando você age por medo de perder vs. genuína vontade de estar",
+        "Reduzir a disponibilidade imediata em 30% (não responder toda mensagem em segundos)",
+      ],
+    },
+    {
+      id: "rel-c6",
+      title: "O Protocolo Digital — Mensagens que Criam Desejo",
+      badge: "Comunicação Digital",
+      pullQuote: "No mundo digital, cada mensagem é uma escolha. As pessoas se apaixonam por como você as faz sentir — mesmo através de uma tela.",
+      body: `Vivemos a maior parte da nossa comunicação interpessoal através de telas. Isso criou uma nova habilidade crítica: a arte de criar conexão e desejo através de texto, áudio e vídeo.
+
+A maioria das pessoas destrói o interesse que construiu pessoalmente ao enviar mensagens genéricas, longas demais, cedo demais ou tarde demais. A comunicação digital tem regras próprias — não escritas, mas poderosas.
+
+AS 5 REGRAS DO PROTOCOLO DIGITAL
+
+Regra 1 — Timing calibrado: não responder sempre imediatamente cria a percepção (real) de que você tem uma vida. A regra geral: responda em proporção à intimidade atual da relação. No início: não mais rápido do que o outro responde. Com intimidade estabelecida: responsividade é sinal de cuidado.
+
+Regra 2 — Mensagens com gancho: toda mensagem que você envia deve criar uma razão para continuar a conversa ou para pensar em você. Mensagens que terminam em declarações encerram a conversa. Mensagens que terminam em perguntas leves ou gancho de curiosidade a mantêm.
+
+Regra 3 — A proporção 3:1: para cada pergunta que você faz, tenha 3 coisas interessantes para compartilhar. Conversas unilaterais (só você perguntando) criam desequilíbrio.
+
+Regra 4 — Conteúdo específico vs. genérico: "Oi, como foi seu dia?" = conversa de elevador. "Passando aqui e lembrei da sua história sobre [algo específico]" = conexão real. Referências a conversas anteriores mostram que você esteve presente e se importou o suficiente para lembrar.
+
+Regra 5 — A mensagem que não pede nada: periodicamente, envie algo genuinamente interessante (um artigo, vídeo, piada interna) sem nenhuma expectativa de resposta ou continuação. Isso cria presença positiva sem pressão.
+
+COMO SAIR DO LIMBO DIGITAL
+
+O "limbo digital" é quando você trocou mensagens mas não sabe onde está a relação. A saída: peça o encontro. "Tenho vontade de te ver, o que acha de [lugar/atividade] na [dia]?" — simples, direto, com uma proposta concreta. Pessoas que ficam no limbo digital por semanas constroem uma conexão artificial que raramente se converte em relação real.`,
+      checklist: [
+        "Auditar as últimas 10 mensagens que você enviou: elas criavam conexão ou eram genéricas?",
+        "Criar 3 'mensagens de gancho' que você pode adaptar para diferentes contextos",
+        "Praticar referenciar algo específico de conversas anteriores nas próximas 5 interações",
+        "Reduzir o uso de figurinhas como substituto de texto (figurinha não cria conexão)",
+        "Se está no limbo digital há mais de 1 semana: proponha um encontro real",
+      ],
+      exercise: `ANÁLISE DE CONVERSA: Pegue uma conversa de texto importante dos últimos 30 dias e analise:
+• Qual a proporção de perguntas que você fez vs. conteúdo que você compartilhou?
+• Suas mensagens terminavam em pontos finais (encerramento) ou criavam continuação?
+• Havia referências específicas a conversas anteriores ou eram trocas genéricas?
+• Você propôs encontros reais ou ficou no limbo digital?
+
+A análise honesta é o primeiro passo da melhoria.`,
+    },
+    {
+      id: "rel-c7",
+      title: "Reconquista — O Protocolo dos 30 Dias",
+      badge: "Reconquista",
+      pullQuote: "Reconquistar alguém não é sobre recuperar o passado. É sobre se apresentar como a versão evoluída de si mesmo que essa pessoa nunca conheceu.",
+      body: `A reconquista é o território mais emocionalmente carregado da psicologia dos relacionamentos. E também o mais cheio de erros evitáveis.
+
+O maior erro de quem quer reconquistar: tentar voltar ao ponto onde estava quando a relação terminou. Isso falha por uma razão simples — a relação terminou exatamente porque estava naquele ponto.
+
+O PROTOCOLO DOS 30 DIAS: POR QUE 30 DIAS?
+
+30 dias é o tempo mínimo para que mudanças visíveis aconteçam, para que a saudade se estabeleça e para que a outra pessoa veja que você não vai mendigar. É também o tempo necessário para você trabalhar nos capítulos anteriores deste guia e aparecer como alguém genuinamente diferente — não porque está performando, mas porque cresceu.
+
+SEMANA 1 — SILÊNCIO ESTRATÉGICO (Dias 1-7)
+
+Zero contato. Não "curtir" posts, não ver stories deliberadamente, não enviar mensagem de "oi, como você está?". O silêncio serve a dois propósitos: permite que a ansiedade do outro em relação à sua ausência se estabeleça, e força você a parar de agir pela emoção.
+
+Durante essa semana: foque exclusivamente no Capítulo 2 (autoestima) e no Capítulo 4 (presença física). Comece 1 hábito novo que te transforma visivelmente.
+
+SEMANA 2 — RECUPERAÇÃO VISÍVEL (Dias 8-14)
+
+Volte a ser ativo nas redes sociais — mas com conteúdo de qualidade que mostre sua vida em evolução. Não para provocar ciúme artificialmente, mas para comunicar que você está vivo, crescendo e não estava esperando. Primeira interação possível: responda a um story com algo genuíno (não uma pergunta vazia).
+
+SEMANA 3 — PRIMEIRO CONTATO DE ALTO VALOR (Dias 15-21)
+
+Uma mensagem única, específica e sem expectativa de resultado. Não "saudade de você". Não "você tem razão em tudo". Uma mensagem que referencia algo específico e mostra que você cresceu. Exemplo: "Vi um artigo sobre [tema que vocês discutiam] e pensei em você. Espero que esteja bem." Ponto final. Sem cobrar resposta.
+
+Se houver resposta: aplique o Protocolo Digital do Capítulo 6.
+
+SEMANA 4 — PROPOSTA DE REENCONTRO (Dias 22-30)
+
+Se houve troca de mensagens: proponha um encontro casual e de baixa pressão. "Tenho passado pelo [lugar] que a gente costumava frequentar. O que acha de um café?" — Sem reconstrução do relacionamento no texto. Sem promessas. Sem declarações. Um encontro para mostrar presencialmente quem você se tornou.
+
+O QUE VOCÊ NÃO DEVE FAZER (EM NENHUM DOS 30 DIAS)
+
+• Discutir o relacionamento por mensagem
+• Pedir desculpas longas por texto (se necessário, faça pessoalmente)
+• Demonstrar insegurança ou necessidade de validação
+• Monitorar compulsivamente as redes sociais da pessoa
+• Agir por impulso emocional em vez de protocolo
+
+O sucesso da reconquista depende de 90% do trabalho que você faz em você mesmo — e apenas 10% de como você se comunica com a outra pessoa.`,
+      checklist: [
+        "Comprometer-se com 7 dias de silêncio completo (sem contato, sem monitorar)",
+        "Definir 1 transformação visível para fazer nos 30 dias (academia, visual, novo projeto)",
+        "Escrever a mensagem do Dia 15 com antecedência — e pedir a um amigo honesto para avaliar",
+        "Criar lista de tópicos genuinamente interessantes para a conversa do reencontro",
+        "Estabelecer: qual mudança real houve em você que justifica tentar de novo?",
+        "Manter o plano mesmo que emocionalmente difícil — especialmente na semana 1",
+      ],
+      exercise: `CARTA DE CLAREZA (não enviar — apenas escrever):
+
+Escreva uma carta honesta para a pessoa que você quer reconquistar com 3 partes:
+1. O que eu entendo que aconteceu de verdade (sem culpas, sem vitimismo)
+2. O que mudou em mim desde então (específico, não genérico)
+3. O que eu ofereço agora que não oferecia antes
+
+Esta carta é para você, não para ela/ele. Ela vai clarear se a reconquista faz sentido — ou se o que você quer reconquistar é a sensação de segurança, não a pessoa em si.`,
+    },
+  ],
+  bonus: {
+    title: "Kit Protocolo da Atração: Scripts + Exercícios + Diagnóstico",
+    description: "Ferramentas práticas para implementar cada protocolo nos 30 dias de transformação.",
+    items: [
+      "Diagnóstico de Autoestima: 15 perguntas que revelam onde está o bloqueio",
+      "Banco de 20 Perguntas Poderosas para criar conexão profunda",
+      "5 Scripts de Mensagens de Alto Valor (adapte para o seu contexto)",
+      "Checklist diário dos 30 dias do Protocolo de Reconquista",
+      "Guia de Linguagem Corporal: 10 posições e o que comunicam",
+      "Exercício de Autoconhecimento: 'Quem sou eu quando ninguém está olhando?'",
+    ],
+  },
+  cta: {
+    headline: "Pronto para Se Tornar a Versão Mais Magnética de Você Mesmo?",
+    body: "Este protocolo funciona porque ataca a raiz do problema: não como você se apresenta, mas quem você é. Com acompanhamento individual, o processo é mais rápido e mais profundo — você para de repetir os mesmos padrões e começa a atrair relacionamentos que realmente servem à sua versão mais evoluída.",
+    buttonText: "Quero Acompanhamento Individual",
+    urgency: "Apenas 5 vagas mensais para mentorias de relacionamento.",
+  },
+  finalPage: `Você chegou ao final com 7 protocolos completos.
+
+A psicologia do desejo, a autoestima magnética, a comunicação que cativa, a presença física, os gatilhos emocionais, o protocolo digital e a reconquista — cada um deles sozinho pode transformar seus relacionamentos. Juntos, eles criam uma versão de você que não precisa perseguir amor porque já o atrai naturalmente.
+
+O maior insight deste guia: a pessoa mais difícil de conquistar não é quem você ama. É você mesmo.
+
+Comece por lá.
+
+[SEU NOME]
+[Seu contato]`,
+};
+
 // ─── Stub Templates (sem master content) ─────────────────────────────────────
 
 function makeStub(
@@ -1481,6 +1845,7 @@ export const MASTER_TEMPLATES: TemplateMaster[] = [
   PLANNER_EMAGRECIMENTO,
   TIKTOK_SHOP,
   HIGH_TICKET,
+  RELACIONAMENTO,
 ];
 
 export const ALL_TEMPLATES: TemplateMaster[] = [
