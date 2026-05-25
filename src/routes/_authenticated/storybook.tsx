@@ -38,11 +38,9 @@ function StorybookPage() {
     listFn().then((d) => {
       const all = (d ?? []) as unknown as StoryRow[];
       const seenIds = new Set<string>();
-      const seenTitles = new Set<string>();
       setRows(all.filter((r) => {
-        if (seenIds.has(r.id) || seenTitles.has(r.title)) return false;
+        if (seenIds.has(r.id)) return false;
         seenIds.add(r.id);
-        seenTitles.add(r.title);
         return true;
       }));
     }).catch(() => {});
