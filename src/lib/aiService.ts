@@ -12,7 +12,7 @@ function resolveProvider(): { url: string; key: string; model: string } {
     return {
       url: "https://api.anthropic.com/v1/messages",
       key: process.env.ANTHROPIC_API_KEY,
-      model: "claude-haiku-4-5",
+      model: "claude-haiku-4-5-20251001",
     };
   }
   throw new Error(
@@ -262,7 +262,7 @@ export async function callWithFallback(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5",
+          model: "claude-haiku-4-5-20251001",
           max_tokens: maxTok,
           messages: [{ role: "user", content: prompt }],
           ...(systemContent ? { system: systemContent } : {}),
