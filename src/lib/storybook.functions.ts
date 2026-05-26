@@ -608,7 +608,16 @@ export const generateOutlineFn = createServerFn({ method: "POST" })
     language: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const lang = data.language ?? "Português";
+    const langMap: Record<string, string> = {
+      "pt-BR": "Português do Brasil",
+      "pt-PT": "Português de Portugal",
+      "en-US": "English",
+      "es": "Español",
+      "fr": "Français",
+      "it": "Italiano",
+      "de": "Deutsch",
+    };
+    const lang = langMap[data.language ?? "pt-BR"] ?? "Português do Brasil";
     const prompt = `Escreva OBRIGATORIAMENTE em ${lang}. Todo o conteúdo deve estar neste idioma.
 
 You are a professional ebook architect. Create a detailed chapter outline.
@@ -620,7 +629,7 @@ Target Audience: "${data.audience}"
 Tone: "${data.tone}" / Goal: "${data.goal}"
 Keywords: "${data.keywords}"
 Red Lines (avoid): "${data.redLines}"
-Target: ${data.targetChapters} chapters
+Gere EXATAMENTE ${data.targetChapters ?? 5} capítulos. Nem mais, nem menos.
 Output language: ${lang}
 
 Return ONLY valid JSON:
