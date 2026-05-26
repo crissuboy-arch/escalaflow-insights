@@ -374,7 +374,7 @@ function TemplateCard({
               }}
               onClick={onUse}
             >
-              Abrir Studio
+              Abrir Ebook Studio
             </Button>
             <Button
               size="sm"
@@ -486,7 +486,7 @@ export function PremiumTemplates({
           <Crown className="h-4 w-4 text-white" />
         </div>
         <div>
-          <h2 className="text-base font-bold tracking-tight">Modelos Premium</h2>
+          <h2 className="text-base font-bold tracking-tight">Criar Ebook</h2>
           <p className="text-xs text-muted-foreground">
             Templates com conteúdo estratégico real — abra o Studio e personalize
           </p>
@@ -614,7 +614,7 @@ export function PremiumTemplates({
                   navigate({ to: "/ebook-studio", search: { t: preview!.id } });
                 }}
               >
-                <Sparkles className="mr-2 h-4 w-4" /> Abrir no Studio
+                <Sparkles className="mr-2 h-4 w-4" /> Abrir Ebook Studio
               </Button>
             </div>
           )}
