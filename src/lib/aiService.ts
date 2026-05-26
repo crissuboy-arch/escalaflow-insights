@@ -1,13 +1,6 @@
 import { z } from "zod";
 
 function resolveProvider(): { url: string; key: string; model: string } {
-  if (process.env.LOVABLE_API_KEY) {
-    return {
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      key: process.env.LOVABLE_API_KEY,
-      model: "google/gemini-2.5-flash",
-    };
-  }
   if (process.env.OPENAI_API_KEY) {
     return {
       url: "https://api.openai.com/v1/chat/completions",
@@ -23,7 +16,7 @@ function resolveProvider(): { url: string; key: string; model: string } {
     };
   }
   throw new Error(
-    "Nenhuma chave de IA configurada. Adicione OPENAI_API_KEY, ANTHROPIC_API_KEY ou LOVABLE_API_KEY no arquivo .env",
+    "Nenhuma chave de IA configurada. Adicione OPENAI_API_KEY ou ANTHROPIC_API_KEY no arquivo .env",
   );
 }
 
@@ -179,6 +172,125 @@ export async function callGateway(body: Record<string, unknown>): Promise<unknow
   throw lastErr instanceof Error ? lastErr : new Error("Falha de IA");
 }
 
+// ─── callWithFallback ─────────────────────────────────────────────────────────
+// Tries AI providers in order: Gemini → Anthropic → OpenAI.
+// Use for text/JSON generation in storybook.functions.ts so a single 429
+// never blocks the whole pipeline.
+
+export async function callWithFallback(
+  prompt: string,
+  opts: { json?: boolean; temp?: number; maxTokens?: number } = {},
+): Promise<string> {
+  const errors: string[] = [];
+  const maxTok = opts.maxTokens ?? 4096;
+  const temp = opts.temp ?? 0.7;
+
+  // 1. Gemini 2.0 Flash
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: temp,
+            maxOutputTokens: maxTok,
+            ...(opts.json ? { responseMimeType: "application/json" } : {}),
+          },
+        }),
+      });
+      if (res.ok) {
+        const j = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+        const text = j.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+        if (text) return text;
+        errors.push("Gemini: resposta vazia");
+      } else {
+        errors.push(`Gemini ${res.status}`);
+      }
+    } catch (e) {
+      errors.push(`Gemini: ${e instanceof Error ? e.message : "erro"}`);
+    }
+  }
+
+  // 2. Anthropic Claude Haiku
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey) {
+    try {
+      const systemContent = opts.json
+        ? "Respond ONLY with valid JSON. No markdown fences, no explanation."
+        : undefined;
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: maxTok,
+          messages: [{ role: "user", content: prompt }],
+          ...(systemContent ? { system: systemContent } : {}),
+        }),
+      });
+      if (res.ok) {
+        type AnthropicResp = { content?: Array<{ type?: string; text?: string }> };
+        const j = await res.json() as AnthropicResp;
+        const text = j.content?.find((c) => c.type === "text")?.text ?? "";
+        if (text) return text;
+        errors.push("Anthropic: resposta vazia");
+      } else {
+        errors.push(`Anthropic ${res.status}`);
+      }
+    } catch (e) {
+      errors.push(`Anthropic: ${e instanceof Error ? e.message : "erro"}`);
+    }
+  }
+
+  // 3. OpenAI gpt-4o-mini
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    try {
+      const messages: Array<{ role: string; content: string }> = [];
+      if (opts.json) messages.push({ role: "system", content: "Respond ONLY with valid JSON. No markdown fences." });
+      messages.push({ role: "user", content: prompt });
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages,
+          max_tokens: maxTok,
+          temperature: temp,
+          ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+      if (res.ok) {
+        type OpenAIResp = { choices?: Array<{ message?: { content?: string } }> };
+        const j = await res.json() as OpenAIResp;
+        const text = j.choices?.[0]?.message?.content ?? "";
+        if (text) return text;
+        errors.push("OpenAI: resposta vazia");
+      } else {
+        errors.push(`OpenAI ${res.status}`);
+      }
+    } catch (e) {
+      errors.push(`OpenAI: ${e instanceof Error ? e.message : "erro"}`);
+    }
+  }
+
+  throw new Error(
+    errors.length
+      ? `Todos os provedores de IA falharam: ${errors.join(" | ")}`
+      : "Nenhuma chave de IA configurada (GEMINI_API_KEY, ANTHROPIC_API_KEY ou OPENAI_API_KEY).",
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 export type AiOpts = {
   systemPrompt?: string;
   maxTokens?: number;
@@ -222,7 +334,7 @@ export async function generateAIJson<T = unknown>(
   const res = await callGateway({
     model: opts.model ?? provider.model,
     messages,
-    // json_object mode only supported by OpenAI/Lovable; Anthropic uses instruction instead
+    // json_object mode only supported by OpenAI; Anthropic uses instruction instead
     ...(!isAnthropic ? { response_format: { type: "json_object" } } : {}),
     ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
     ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),

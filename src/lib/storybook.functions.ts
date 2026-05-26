@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { callWithFallback } from "./aiService";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -497,9 +498,6 @@ export const generateMultiLanguageBookFn = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
-
     const langMap: Record<string, string> = {
       "pt-BR": "Brazilian Portuguese",
       "pt-PT": "European Portuguese (Portugal)",
@@ -529,29 +527,13 @@ Return this exact JSON structure:
   "chapters": [{"id": "same-id", "title": "translated chapter title", "body": "translated body text preserving paragraph breaks with double newlines"}]
 }`;
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => res.statusText);
-      throw new Error(`Gemini error ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const json = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    const rawText = await callWithFallback(prompt, { json: true, temp: 0.3 });
 
     let parsed: { title?: string; subtitle?: string; chapters?: Array<{ id: string; title: string; body: string }> };
     try {
-      parsed = JSON.parse(text) as typeof parsed;
+      parsed = JSON.parse(rawText) as typeof parsed;
     } catch {
-      const m = text.match(/\{[\s\S]*\}/);
+      const m = rawText.match(/\{[\s\S]*\}/);
       parsed = m ? JSON.parse(m[0]) as typeof parsed : {};
     }
 
@@ -595,38 +577,16 @@ export const loadSharedStoryFn = createServerFn({ method: "POST" })
 
 // ---------- Ebook pipeline (mkbook) ----------
 
-async function geminiJson<T>(apiKey: string, prompt: string, temp = 0.7): Promise<T> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: temp, responseMimeType: "application/json", maxOutputTokens: 4096 },
-    }),
-  });
-  if (!res.ok) throw new Error(`Gemini error ${res.status}`);
-  const json = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+async function geminiJson<T>(prompt: string, temp = 0.7): Promise<T> {
+  const text = await callWithFallback(prompt, { json: true, temp, maxTokens: 4096 });
   try { return JSON.parse(text) as T; } catch {
     const m = text.match(/\{[\s\S]*\}/);
     return (m ? JSON.parse(m[0]) : {}) as T;
   }
 }
 
-async function geminiText(apiKey: string, prompt: string, temp = 0.8): Promise<string> {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: temp, maxOutputTokens: 2048 },
-    }),
-  });
-  if (!res.ok) throw new Error(`Gemini error ${res.status}`);
-  const json = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-  return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+async function geminiText(prompt: string, temp = 0.8): Promise<string> {
+  return callWithFallback(prompt, { temp, maxTokens: 2048 });
 }
 
 export const generateOutlineFn = createServerFn({ method: "POST" })
@@ -640,8 +600,6 @@ export const generateOutlineFn = createServerFn({ method: "POST" })
     keywords: z.string(), redLines: z.string(), targetChapters: z.number().min(3).max(30),
   }).parse(d))
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
     const prompt = `You are a professional ebook architect. Create a detailed chapter outline.
 
 EBOOK BIBLE:
@@ -666,7 +624,7 @@ Return ONLY valid JSON:
       chapters?: Array<{ number: number; title: string; promise: string; transformation: string; wordTarget: number; notes: string }>;
       conclusion?: string;
     };
-    const parsed = await geminiJson<OutlineResult>(apiKey, prompt, 0.7);
+    const parsed = await geminiJson<OutlineResult>(prompt, 0.7);
     if (!parsed.chapters?.length) throw new Error("Outline sem capítulos válidos.");
     return { intro: parsed.intro ?? "", chapters: parsed.chapters, conclusion: parsed.conclusion ?? "", generatedAt: new Date().toISOString() };
   });
@@ -683,8 +641,6 @@ export const generateChapterDraftFn = createServerFn({ method: "POST" })
     audience: z.string(), keywords: z.string(), wordTarget: z.number().min(200).max(4000),
   }).parse(d))
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
     const prompt = `Write a complete chapter draft for an ebook.
 
 Book: "${data.bookTitle}"
@@ -696,7 +652,7 @@ Keywords: "${data.keywords}" / Target: ~${data.wordTarget} words
 
 Write in Brazilian Portuguese. Use ${data.tone} tone. Use clear paragraphs separated by double newlines.
 Do NOT include a chapter title heading — start directly with content.`;
-    const draft = await geminiText(apiKey, prompt, 0.8);
+    const draft = await geminiText(prompt, 0.8);
     if (!draft.trim()) throw new Error("IA não gerou conteúdo.");
     return { draft };
   });
@@ -710,8 +666,6 @@ export const editChapterFn = createServerFn({ method: "POST" })
     promise: z.string(), tone: z.string(), audience: z.string(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
     const prompt = `You are a professional ebook editor. Edit and improve this chapter draft.
 
 Book: "${data.bookTitle}" / Chapter: "${data.chapterTitle}"
@@ -729,7 +683,7 @@ Return ONLY valid JSON:
   "changes": ["Improved opening hook", "Strengthened transitions"]
 }`;
     type EditResult = { scoreBefore?: number; edited?: string; scoreAfter?: number; changes?: string[] };
-    const parsed = await geminiJson<EditResult>(apiKey, prompt, 0.4);
+    const parsed = await geminiJson<EditResult>(prompt, 0.4);
     if (!parsed.edited) throw new Error("Edição não retornou conteúdo.");
     return { scoreBefore: parsed.scoreBefore ?? 60, edited: parsed.edited, scoreAfter: parsed.scoreAfter ?? 80, changes: parsed.changes ?? [] };
   });
@@ -744,8 +698,6 @@ export const consistencyCheckFn = createServerFn({ method: "POST" })
     chapters: z.array(z.object({ id: z.string(), title: z.string(), body: z.string() })).max(30),
   }).parse(d))
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
     const chaptersText = data.chapters
       .map((c) => `Chapter: "${c.title}"\nPreview: ${c.body.slice(0, 300)}`)
       .join("\n\n---\n\n");
@@ -768,7 +720,7 @@ Return ONLY valid JSON:
 }
 If no issues: { "isClean": true, "issues": [] }`;
     type CheckResult = { isClean?: boolean; issues?: Array<{ type: string; chapter: string; problem: string; fix: string }> };
-    const parsed = await geminiJson<CheckResult>(apiKey, prompt, 0.3);
+    const parsed = await geminiJson<CheckResult>(prompt, 0.3);
     return { isClean: parsed.isClean ?? false, issues: parsed.issues ?? [], generatedAt: new Date().toISOString() };
   });
 
@@ -792,9 +744,6 @@ export const extractPdfBriefingFn = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data }) => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
-
     const instruction = `Analyze this document and extract briefing information for creating an ebook.
 Action requested: "${data.action}"
 Output language: "${data.language}"
@@ -807,23 +756,32 @@ Extract:
 Return ONLY valid JSON:
 {"title":"Ebook title","chapters":["Section 1","Section 2"],"language":"Português","chapterCount":5}`;
 
-    type Parts = Array<{ text: string } | { inlineData: { mimeType: string; data: string } }>;
-    const parts: Parts = data.mode === "text"
-      ? [{ text: `${instruction}\n\nDOCUMENT TEXT:\n${data.content.slice(0, 25000)}` }]
-      : [{ text: instruction }, { inlineData: { mimeType: data.mimeType ?? "application/pdf", data: data.content } }];
-
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
-      }),
-    });
-    if (!res.ok) throw new Error(`Gemini error ${res.status}`);
-    const json = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
-    const rawText = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    let rawText: string;
+    if (data.mode === "text") {
+      rawText = await callWithFallback(
+        `${instruction}\n\nDOCUMENT TEXT:\n${data.content.slice(0, 25000)}`,
+        { json: true, temp: 0.2 },
+      );
+    } else {
+      // base64 inline data — only Gemini supports this format
+      const geminiKey = process.env.GEMINI_API_KEY;
+      if (!geminiKey) throw new Error("GEMINI_API_KEY é obrigatória para processar arquivos DOCX.");
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: instruction },
+            { inlineData: { mimeType: data.mimeType ?? "application/pdf", data: data.content } },
+          ] }],
+          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+        }),
+      });
+      if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+      const json = await res.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+      rawText = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    }
     type R = { title?: string; chapters?: string[]; language?: string; chapterCount?: number };
     let parsed: R;
     try { parsed = JSON.parse(rawText) as R; }
