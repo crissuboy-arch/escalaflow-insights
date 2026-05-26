@@ -263,7 +263,7 @@ const BLOCK_DEFS: Record<BlockType, { label: string; color: string; placeholder:
   cta:       { label: "CTA",      color: "#F87171", placeholder: "Texto do call-to-action..." },
 };
 
-const BLOCK_TYPES_MENU: BlockType[] = ["text", "quote", "callout", "checklist", "divider", "cta"];
+const BLOCK_TYPES_MENU: BlockType[] = ["text", "quote", "callout", "checklist", "image", "divider", "cta"];
 
 // ─── Block Item ───────────────────────────────────────────────────────────────
 
@@ -433,10 +433,25 @@ function ToolBtn({ children, onClick, title, danger }: { children: React.ReactNo
 
 // ─── Add Block Menu ───────────────────────────────────────────────────────────
 
-function AddBlockMenu({ colorA, onAdd }: { colorA: string; onAdd: (type: BlockType) => void }) {
+function AddBlockMenu({ colorA, onAdd, onAddImage }: { colorA: string; onAdd: (type: BlockType) => void; onAddImage: (dataUrl: string) => void }) {
   const [open, setOpen] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
   return (
     <div style={{ position: "relative", marginTop: 18, textAlign: "center" }}>
+      <input
+        ref={imgInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => { onAddImage(reader.result as string); setOpen(false); };
+          reader.readAsDataURL(file);
+          e.target.value = "";
+        }}
+      />
       <button
         onClick={() => setOpen(!open)}
         style={{
@@ -460,7 +475,10 @@ function AddBlockMenu({ colorA, onAdd }: { colorA: string; onAdd: (type: BlockTy
           {BLOCK_TYPES_MENU.map((type) => {
             const def = BLOCK_DEFS[type];
             return (
-              <button key={type} onClick={() => { onAdd(type); setOpen(false); }} style={{
+              <button key={type} onClick={() => {
+                if (type === "image") { imgInputRef.current?.click(); return; }
+                onAdd(type); setOpen(false);
+              }} style={{
                 display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
                 background: "rgba(255,255,255,0.04)", border: `1px solid ${def.color}25`,
                 borderRadius: 6, color: def.color, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
@@ -470,6 +488,7 @@ function AddBlockMenu({ colorA, onAdd }: { colorA: string; onAdd: (type: BlockTy
                 {type === "quote" && <Quote size={11} />}
                 {type === "callout" && <Info size={11} />}
                 {type === "checklist" && <Check size={11} />}
+                {type === "image" && <ImageIcon size={11} />}
                 {type === "divider" && <Minus size={11} />}
                 {type === "cta" && <Download size={11} />}
                 {def.label}
@@ -543,6 +562,11 @@ function PreviewPanel({ state, template, chapterIndex }: { state: StudioState; t
             if (block.type === "cta") return (
               <div key={block.id} style={{ background: `linear-gradient(135deg,${cA}15,${cA}05)`, border: `1px solid ${cA}25`, borderRadius: 4, padding: "5px 6px", marginBottom: 5, textAlign: "center" }}>
                 <div style={{ fontSize: 6, color: cA, fontWeight: 700 }}>{block.content.slice(0, 40)}</div>
+              </div>
+            );
+            if (block.type === "image" && block.meta?.imageUrl) return (
+              <div key={block.id} style={{ textAlign: "center", marginBottom: 5 }}>
+                <img src={block.meta.imageUrl} alt="" style={{ maxWidth: "100%", borderRadius: 3 }} />
               </div>
             );
             return (
@@ -867,6 +891,12 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
     updateBlocks(chapterIdx, [...ch.blocks, { id: uid(), type, content: "" }]);
   }
 
+  function addImageBlock(dataUrl: string) {
+    const ch = state.chapters[chapterIdx];
+    if (!ch) return;
+    updateBlocks(chapterIdx, [...ch.blocks, { id: uid(), type: "image" as BlockType, content: "", meta: { imageUrl: dataUrl } }]);
+  }
+
   function updateBlock(blockIdx: number, block: Block) {
     const ch = state.chapters[chapterIdx];
     if (!ch) return;
@@ -1096,8 +1126,17 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
       update({ outline: result });
       toast.success(`Outline com ${result.chapters.length} capítulos gerado!`);
       setSideTab("outline");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao gerar outline");
+    } catch {
+      const fallbackChapters: OutlineChapter[] = [
+        { number: 1, title: "Introdução",   promise: "", transformation: "", wordTarget: 800, notes: "" },
+        { number: 2, title: "O Problema",   promise: "", transformation: "", wordTarget: 800, notes: "" },
+        { number: 3, title: "A Solução",    promise: "", transformation: "", wordTarget: 800, notes: "" },
+        { number: 4, title: "Como Aplicar", promise: "", transformation: "", wordTarget: 800, notes: "" },
+        { number: 5, title: "Conclusão",    promise: "", transformation: "", wordTarget: 800, notes: "" },
+      ];
+      update({ outline: { intro: "", chapters: fallbackChapters, conclusion: "", generatedAt: new Date().toISOString() } });
+      setSideTab("outline");
+      toast("IA indisponível — outline básico criado. Edite os títulos.", { icon: "⚠️" });
     } finally {
       setOutlineLoading(false);
     }
@@ -2051,7 +2090,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                   />
                 ))}
 
-                <AddBlockMenu colorA={cA} onAdd={addBlock} />
+                <AddBlockMenu colorA={cA} onAdd={addBlock} onAddImage={addImageBlock} />
 
                 {/* Word count */}
                 <div style={{ marginTop: 24, fontSize: 11, color: "#2D3748", textAlign: "right" }}>
