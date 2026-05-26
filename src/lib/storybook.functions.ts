@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { callWithFallback } from "./aiService";
+import { generateFallbackCoverSvg } from "./ebook.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -457,27 +458,32 @@ async function tryGeminiFlashImageGen(
 
 export const generateEbookCoverFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { prompt: string }) => z.object({ prompt: z.string().min(1) }).parse(d))
+  .inputValidator((d: { prompt: string; title?: string; subtitle?: string }) =>
+    z.object({ prompt: z.string().min(1), title: z.string().optional(), subtitle: z.string().optional() }).parse(d),
+  )
   .handler(async ({ data }) => {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY não configurada.");
+    const fallback = () => ({
+      url: generateFallbackCoverSvg(data.title ?? "Ebook", data.subtitle ?? "", "default"),
+      isFallback: true,
+    });
+
+    if (!apiKey) return fallback();
 
     // 1. Imagen 3 (best quality)
     const r1 = await tryImagenPredict("imagen-3.0-generate-001", data.prompt, apiKey);
-    if (r1.url) return { url: r1.url };
-    if (r1.status === 429) throw new Error("QUOTA_EXCEEDED");
+    if (r1.url) return { url: r1.url, isFallback: false };
 
-    // 2. Imagen 3 Fast (fallback)
+    // 2. Imagen 3 Fast
     const r2 = await tryImagenPredict("imagen-3.0-fast-generate-001", data.prompt, apiKey);
-    if (r2.url) return { url: r2.url };
-    if (r2.status === 429) throw new Error("QUOTA_EXCEEDED");
+    if (r2.url) return { url: r2.url, isFallback: false };
 
-    // 3. Gemini 2.0 Flash native image generation (last resort)
+    // 3. Gemini 2.0 Flash native image generation
     const r3 = await tryGeminiFlashImageGen(data.prompt, apiKey);
-    if (r3.url) return { url: r3.url };
-    if (r3.status === 429) throw new Error("QUOTA_EXCEEDED");
+    if (r3.url) return { url: r3.url, isFallback: false };
 
-    throw new Error("MODEL_UNAVAILABLE");
+    // All image models failed — return SVG fallback automatically
+    return fallback();
   });
 
 // ---------- Multi-language ebook generation ----------
@@ -594,13 +600,18 @@ export const generateOutlineFn = createServerFn({ method: "POST" })
   .inputValidator((d: {
     title: string; subtitle: string; promise: string; audience: string;
     tone: string; goal: string; keywords: string; redLines: string; targetChapters: number;
+    language?: string;
   }) => z.object({
     title: z.string().min(1), subtitle: z.string(), promise: z.string(),
     audience: z.string(), tone: z.string(), goal: z.string(),
     keywords: z.string(), redLines: z.string(), targetChapters: z.number().min(3).max(30),
+    language: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const prompt = `You are a professional ebook architect. Create a detailed chapter outline.
+    const lang = data.language ?? "Português";
+    const prompt = `Escreva OBRIGATORIAMENTE em ${lang}. Todo o conteúdo deve estar neste idioma.
+
+You are a professional ebook architect. Create a detailed chapter outline.
 
 EBOOK BIBLE:
 Title: "${data.title}" / Subtitle: "${data.subtitle}"
@@ -610,6 +621,7 @@ Tone: "${data.tone}" / Goal: "${data.goal}"
 Keywords: "${data.keywords}"
 Red Lines (avoid): "${data.redLines}"
 Target: ${data.targetChapters} chapters
+Output language: ${lang}
 
 Return ONLY valid JSON:
 {
@@ -634,24 +646,36 @@ export const generateChapterDraftFn = createServerFn({ method: "POST" })
   .inputValidator((d: {
     chapterNumber: number; chapterTitle: string; chapterPromise: string;
     chapterNotes: string; bookTitle: string; tone: string; audience: string;
-    keywords: string; wordTarget: number;
+    keywords: string; wordTarget: number; language?: string; niche?: string;
   }) => z.object({
     chapterNumber: z.number(), chapterTitle: z.string().min(1), chapterPromise: z.string(),
     chapterNotes: z.string(), bookTitle: z.string(), tone: z.string(),
     audience: z.string(), keywords: z.string(), wordTarget: z.number().min(200).max(4000),
+    language: z.string().optional(), niche: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const prompt = `Write a complete chapter draft for an ebook.
+    const lang = data.language ?? "Português";
+    const niche = data.niche ? ` (nicho: ${data.niche})` : "";
+    const target = Math.max(data.wordTarget, 600);
+    const prompt = `Escreva OBRIGATORIAMENTE em ${lang}. Todo o conteúdo deve estar neste idioma.
 
-Book: "${data.bookTitle}"
+Write a complete chapter draft for an ebook.
+
+Book: "${data.bookTitle}"${niche}
 Chapter ${data.chapterNumber}: "${data.chapterTitle}"
 Promise: "${data.chapterPromise}"
 Key points: "${data.chapterNotes}"
 Tone: "${data.tone}" / Audience: "${data.audience}"
-Keywords: "${data.keywords}" / Target: ~${data.wordTarget} words
+Keywords: "${data.keywords}" / Target: minimum ${target} words (write at least ${target} words)
 
-Write in Brazilian Portuguese. Use ${data.tone} tone. Use clear paragraphs separated by double newlines.
-Do NOT include a chapter title heading — start directly with content.`;
+MANDATORY REQUIREMENTS:
+1. Minimum ${target} words — do not stop before reaching this count
+2. Include at least 1 real story, case study, or practical example relevant to "${data.bookTitle}"
+3. End the chapter with a practical checklist of 4–6 actionable items (format: "✓ Item")
+4. Use ${data.tone} tone throughout — maintain it consistently
+5. Contextualize every point within the theme of "${data.bookTitle}"${niche}
+6. Use clear paragraphs separated by double newlines
+7. Do NOT include a chapter title heading — start directly with content`;
     const draft = await geminiText(prompt, 0.8);
     if (!draft.trim()) throw new Error("IA não gerou conteúdo.");
     return { draft };

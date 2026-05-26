@@ -1097,32 +1097,25 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
     const lang = state.config.language; // capture before any await
     setAiLoading(true);
     setAiCoverError(null);
-    let errorType: "quota" | "unavailable" | "unknown" | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt > 0) {
-        await new Promise<void>((r) => setTimeout(r, attempt * 2500));
-      }
-      try {
-        const result = await genCover({ data: { prompt: aiPrompt } });
-        saveCover(template.id, { imageUrl: result.url, prompt: aiPrompt, type: "ai", source: "gemini" });
-        saveCoverForLang(template.id, lang, result.url);
-        setState((p) => ({ ...p, coverUrl: result.url }));
-        setCoverTab("preview");
-        setAiCoverError(null);
+    try {
+      const result = await genCover({ data: { prompt: aiPrompt, title: state.title, subtitle: state.subtitle } });
+      const coverType = result.isFallback ? "fallback" : "ai";
+      saveCover(template.id, { imageUrl: result.url, prompt: aiPrompt, type: coverType, source: result.isFallback ? "css" : "gemini" });
+      saveCoverForLang(template.id, lang, result.url);
+      setState((p) => ({ ...p, coverUrl: result.url }));
+      setCoverTab("preview");
+      setAiCoverError(null);
+      if (result.isFallback) {
+        toast("Gemini indisponível — capa visual aplicada automaticamente.", { icon: "⚠️" });
+      } else {
         toast.success("Capa gerada e salva automaticamente!");
-        setAiLoading(false);
-        return;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "";
-        if (msg === "QUOTA_EXCEEDED") { errorType = "quota"; break; }
-        if (msg === "MODEL_UNAVAILABLE") { errorType = "unavailable"; break; }
-        errorType = "unknown";
       }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar capa");
+      setAiCoverError("unknown");
+    } finally {
+      setAiLoading(false);
     }
-    // All attempts failed — apply local SVG fallback automatically
-    handleFallbackCover();
-    setAiCoverError(errorType ?? "unknown");
-    setAiLoading(false);
   }
 
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1285,6 +1278,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           tone: state.bible.toneAdjectives, goal: state.bible.goal,
           keywords: state.bible.keywords, redLines: state.bible.redLines,
           targetChapters: state.bible.targetChapters,
+          language: state.config.language,
         },
       });
       update({ outline: result });
@@ -1320,6 +1314,8 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           bookTitle: state.title, tone: state.bible.toneAdjectives,
           audience: state.bible.audience, keywords: state.bible.keywords,
           wordTarget: outlineCh?.wordTarget ?? 800,
+          language: state.config.language,
+          niche: template.category,
         },
       });
       const textBlocks: Block[] = result.draft
