@@ -12,7 +12,7 @@ function resolveProvider(): { url: string; key: string; model: string } {
     return {
       url: "https://api.anthropic.com/v1/messages",
       key: process.env.ANTHROPIC_API_KEY,
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-haiku-4-5",
     };
   }
   throw new Error(
@@ -173,7 +173,7 @@ export async function callGateway(body: Record<string, unknown>): Promise<unknow
 }
 
 // ─── callWithFallback ─────────────────────────────────────────────────────────
-// Tries AI providers in order: Gemini → Anthropic → OpenAI.
+// Tries AI providers in order: Gemini → OpenAI → Anthropic.
 // Use for text/JSON generation in storybook.functions.ts so a single 429
 // never blocks the whole pipeline.
 
@@ -215,42 +215,7 @@ export async function callWithFallback(
     }
   }
 
-  // 2. Anthropic Claude Haiku
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    try {
-      const systemContent = opts.json
-        ? "Respond ONLY with valid JSON. No markdown fences, no explanation."
-        : undefined;
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: maxTok,
-          messages: [{ role: "user", content: prompt }],
-          ...(systemContent ? { system: systemContent } : {}),
-        }),
-      });
-      if (res.ok) {
-        type AnthropicResp = { content?: Array<{ type?: string; text?: string }> };
-        const j = await res.json() as AnthropicResp;
-        const text = j.content?.find((c) => c.type === "text")?.text ?? "";
-        if (text) return text;
-        errors.push("Anthropic: resposta vazia");
-      } else {
-        errors.push(`Anthropic ${res.status}`);
-      }
-    } catch (e) {
-      errors.push(`Anthropic: ${e instanceof Error ? e.message : "erro"}`);
-    }
-  }
-
-  // 3. OpenAI gpt-4o-mini
+  // 2. OpenAI gpt-4o-mini
   const openaiKey = process.env.OPENAI_API_KEY;
   if (openaiKey) {
     try {
@@ -282,10 +247,45 @@ export async function callWithFallback(
     }
   }
 
+  // 3. Anthropic Claude Haiku
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey) {
+    try {
+      const systemContent = opts.json
+        ? "Respond ONLY with valid JSON. No markdown fences, no explanation."
+        : undefined;
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          max_tokens: maxTok,
+          messages: [{ role: "user", content: prompt }],
+          ...(systemContent ? { system: systemContent } : {}),
+        }),
+      });
+      if (res.ok) {
+        type AnthropicResp = { content?: Array<{ type?: string; text?: string }> };
+        const j = await res.json() as AnthropicResp;
+        const text = j.content?.find((c) => c.type === "text")?.text ?? "";
+        if (text) return text;
+        errors.push("Anthropic: resposta vazia");
+      } else {
+        errors.push(`Anthropic ${res.status}`);
+      }
+    } catch (e) {
+      errors.push(`Anthropic: ${e instanceof Error ? e.message : "erro"}`);
+    }
+  }
+
   throw new Error(
     errors.length
       ? `Todos os provedores de IA falharam: ${errors.join(" | ")}`
-      : "Nenhuma chave de IA configurada (GEMINI_API_KEY, ANTHROPIC_API_KEY ou OPENAI_API_KEY).",
+      : "Nenhuma chave de IA configurada (GEMINI_API_KEY, OPENAI_API_KEY ou ANTHROPIC_API_KEY).",
   );
 }
 
