@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { generateStoryCoverFn } from "@/lib/storybook.functions";
+import { generateStoryCoverFn, extractPdfBriefingFn } from "@/lib/storybook.functions";
+import { extractPdfText } from "@/lib/ebook/pdf-extract";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -240,10 +241,11 @@ function buildPlanning(
   };
 
   return {
-    title: "Projeto PDF",
+    title: v["_pdf_title"] || "Projeto PDF",
     subtitle: v["O que deseja fazer com o PDF?"] ?? "Transformar em história narrativa",
     type: "romance-ceo", subniche: "",
-    audience: "Adultos", language: lang, chapters: 10,
+    audience: "Adultos", language: lang,
+    chapters: parseInt(v["_pdf_chapters"] || "10") || 10,
     ending: "feliz", intensity: "moderada", hotLevel: "sem-picancia",
     tone: "cinematografico", author: "",
   };
@@ -321,7 +323,11 @@ function ModePanel({ mode, onClose, onCreate }: {
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [generatingImage, setGeneratingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const generateCoverFn = useServerFn(generateStoryCoverFn);
+  const extractBriefingFn = useServerFn(extractPdfBriefingFn);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfExtracted, setPdfExtracted] = useState<{ title: string; chapters: string[]; language: string } | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -342,6 +348,45 @@ function ModePanel({ mode, onClose, onCreate }: {
       toast.error(e instanceof Error ? e.message : "Erro ao gerar imagem");
     } finally {
       setGeneratingImage(false);
+    }
+  };
+
+  const handlePdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) { toast.error("Arquivo maior que 50 MB"); return; }
+    setPdfLoading(true);
+    setPdfExtracted(null);
+    try {
+      const action = selectValues["O que deseja fazer com o PDF?"] ?? "Gerar ebook profissional";
+      const language = selectValues["Idioma de saída"] ?? "Português";
+      let result: { title: string; chapters: string[]; language: string; chapterCount: number };
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        const text = await extractPdfText(file, { maxChars: 20000 });
+        result = await extractBriefingFn({ data: { mode: "text", content: text, action, language } });
+      } else {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error("DOCX maior que 5 MB. Converta para PDF e tente novamente.");
+          return;
+        }
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const CHUNK = 8192;
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += CHUNK) {
+          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.length)));
+        }
+        result = await extractBriefingFn({ data: { mode: "base64", content: btoa(binary), mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", action, language } });
+      }
+      setPdfExtracted(result);
+      setTextValues(p => ({ ...p, "_pdf_title": result.title, "_pdf_chapters": String(result.chapterCount) }));
+      setSelectValues(p => ({ ...p, "Idioma de saída": result.language }));
+      toast.success(`Arquivo processado: "${result.title}"`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao processar arquivo");
+    } finally {
+      setPdfLoading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = "";
     }
   };
 
@@ -444,23 +489,51 @@ function ModePanel({ mode, onClose, onCreate }: {
                 </Select>
               )}
               {field.type === "file" && (
-                <div
-                  className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 px-4 transition-colors cursor-pointer hover:bg-white/5"
-                  style={{ borderColor: "#243352" }}
-                  onClick={() => toast.info("Upload de PDF em breve")}>
-                  <div className="flex items-center justify-center rounded-full"
-                    style={{ width: 48, height: 48, background: mode.bgLight }}>
-                    <Upload size={22} color={mode.color} />
-                  </div>
-                  <div className="text-center">
-                    <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 14, fontWeight: 600, color: "#C8D4F0" }}>
-                      Clique para enviar o PDF
+                <>
+                  <label
+                    className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-8 px-4 transition-colors cursor-pointer hover:bg-white/5"
+                    style={{ borderColor: pdfLoading ? mode.color : pdfExtracted ? `${mode.color}88` : "#243352" }}>
+                    <input
+                      ref={pdfInputRef}
+                      type="file"
+                      accept=".pdf,.docx"
+                      className="hidden"
+                      onChange={handlePdfChange}
+                      disabled={pdfLoading}
+                    />
+                    <div className="flex items-center justify-center rounded-full"
+                      style={{ width: 48, height: 48, background: mode.bgLight }}>
+                      {pdfLoading
+                        ? <Loader2 size={22} color={mode.color} className="animate-spin" />
+                        : <Upload size={22} color={mode.color} />}
                     </div>
-                    <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 12, color: "#6B7FA8", marginTop: 2 }}>
-                      Até 50 MB · PDF, DOCX
+                    <div className="text-center">
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 14, fontWeight: 600, color: "#C8D4F0" }}>
+                        {pdfLoading ? "Processando…" : pdfExtracted ? "Enviar outro arquivo" : "Clique para enviar o PDF"}
+                      </div>
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 12, color: "#6B7FA8", marginTop: 2 }}>
+                        Até 50 MB · PDF, DOCX
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </label>
+                  {pdfExtracted && (
+                    <div className="rounded-xl p-4 mt-1"
+                      style={{ background: mode.bgLight, border: `1px solid ${mode.color}44` }}>
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 12, fontWeight: 700, color: mode.color, marginBottom: 6 }}>
+                        ✓ Conteúdo extraído
+                      </div>
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 13, color: "#C8D4F0", marginBottom: 2 }}>
+                        <strong>Título:</strong> {pdfExtracted.title}
+                      </div>
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 13, color: "#C8D4F0", marginBottom: 2 }}>
+                        <strong>Capítulos:</strong> {pdfExtracted.chapters.length} identificados
+                      </div>
+                      <div style={{ fontFamily: "Outfit, sans-serif", fontSize: 13, color: "#C8D4F0" }}>
+                        <strong>Idioma:</strong> {pdfExtracted.language}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
