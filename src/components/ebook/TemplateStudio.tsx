@@ -1094,6 +1094,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   // Cover generation with retry + persistent save
   async function handleAiCover() {
     if (!aiPrompt.trim()) return;
+    const lang = state.config.language; // capture before any await
     setAiLoading(true);
     setAiCoverError(null);
     let errorType: "quota" | "unavailable" | "unknown" | null = null;
@@ -1104,7 +1105,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
       try {
         const result = await genCover({ data: { prompt: aiPrompt } });
         saveCover(template.id, { imageUrl: result.url, prompt: aiPrompt, type: "ai", source: "gemini" });
-        saveCoverForLang(template.id, state.config.language, result.url);
+        saveCoverForLang(template.id, lang, result.url);
         setState((p) => ({ ...p, coverUrl: result.url }));
         setCoverTab("preview");
         setAiCoverError(null);
@@ -1127,10 +1128,11 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    const lang = state.config.language; // capture before any await or callback
     try {
       const compressed = await compressForStorage(file);
       saveCover(template.id, { imageUrl: compressed, type: "upload", source: "upload" });
-      saveCoverForLang(template.id, state.config.language, compressed);
+      saveCoverForLang(template.id, lang, compressed);
       setState((p) => ({ ...p, coverUrl: compressed }));
       setCoverTab("preview");
       toast.success("Capa salva automaticamente!");
@@ -1140,7 +1142,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
       reader.onload = () => {
         const url = reader.result as string;
         saveCover(template.id, { imageUrl: url, type: "upload", source: "upload" });
-        saveCoverForLang(template.id, state.config.language, url);
+        saveCoverForLang(template.id, lang, url);
         setState((p) => ({ ...p, coverUrl: url }));
         setCoverTab("preview");
         toast.success("Capa salva automaticamente!");
