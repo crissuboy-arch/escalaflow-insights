@@ -345,6 +345,27 @@ export async function aiGenerateBookExtras(
   };
 }
 
+export function generateFallbackCoverSvg(title: string, subtitle: string, layout: string): string {
+  const palettes: Record<string, { bg: string; accent: string; text: string }> = {
+    classico: { bg: "#1a1a2e", accent: "#c9a84c", text: "#f5f0e8" },
+    moderno: { bg: "#0a6cff", accent: "#ffffff", text: "#ffffff" },
+    minimalista: { bg: "#ffffff", accent: "#111111", text: "#111111" },
+  };
+  const p = palettes[layout] ?? palettes.classico;
+  const words = title.split(" ");
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if ((cur + " " + w).trim().length > 22) { lines.push(cur.trim()); cur = w; }
+    else cur = (cur + " " + w).trim();
+  }
+  if (cur) lines.push(cur);
+  const titleLines = lines.map((l, i) => `<text x="512" y="${420 + i * 72}" font-family="Georgia,serif" font-size="58" font-weight="bold" fill="${p.text}" text-anchor="middle">${l}</text>`).join("\n");
+  const sub = subtitle.length > 60 ? subtitle.slice(0, 57) + "…" : subtitle;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1536"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${p.bg}"/><stop offset="100%" stop-color="${p.accent}" stop-opacity="0.25"/></linearGradient></defs><rect width="1024" height="1536" fill="url(#bg)"/><rect x="80" y="80" width="864" height="1376" rx="16" fill="none" stroke="${p.accent}" stroke-width="3" opacity="0.4"/>${titleLines}<text x="512" y="${420 + lines.length * 72 + 60}" font-family="Arial,sans-serif" font-size="32" fill="${p.text}" text-anchor="middle" opacity="0.75">${sub}</text></svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
 export async function aiGenerateCover(
   briefing: Briefing,
   layout: string,
@@ -362,17 +383,20 @@ export async function aiGenerateCover(
   const prompt =
     customPrompt?.trim() ||
     `Capa de ebook profissional. Título "${briefing.title}". Subtítulo "${briefing.subtitle}". Nicho: ${briefing.niche}. ${styleByLayout[layout] ?? ""}.${styleHint}${paletteHint} Sem rostos humanos, alta qualidade, formato vertical 1024x1536.`;
-  // TODO: futuro fallback DALL·E (requer OPENAI_API_KEY) e Stability.
-  const data = (await aiChat({
-    model: "google/gemini-3.1-flash-image-preview",
-    messages: [{ role: "user", content: prompt }],
-    modalities: ["image", "text"],
-  })) as any;
-  const imgUrl: string | undefined =
-    data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
-    data?.choices?.[0]?.message?.images?.[0]?.url;
-  if (!imgUrl) throw new Error("Modelo não retornou imagem.");
-  return imgUrl; // data:image/png;base64,...
+  try {
+    const data = (await aiChat({
+      model: "google/gemini-3.1-flash-image-preview",
+      messages: [{ role: "user", content: prompt }],
+      modalities: ["image", "text"],
+    })) as any;
+    const imgUrl: string | undefined =
+      data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
+      data?.choices?.[0]?.message?.images?.[0]?.url;
+    if (!imgUrl) throw new Error("Modelo não retornou imagem.");
+    return imgUrl;
+  } catch {
+    return generateFallbackCoverSvg(briefing.title, briefing.subtitle, layout);
+  }
 }
 
 export async function aiGenerateChapterImage(

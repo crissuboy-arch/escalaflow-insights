@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Crown, Eye, Sparkles, Wand2 } from "lucide-react";
+import { Crown, Eye, Sparkles, Upload, Wand2 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 import { generateEbookCoverFn } from "@/lib/storybook.functions";
 import { ALL_TEMPLATES, type TemplateMaster } from "@/lib/ebook/template-master";
 import type { AiKickstart } from "./EbookHub";
@@ -36,6 +37,13 @@ function persistCover(id: string, url: string) {
     const raw = localStorage.getItem(STUDIO_KEY(id));
     const s = raw ? (JSON.parse(raw) as object) : {};
     localStorage.setItem(STUDIO_KEY(id), JSON.stringify({ ...s, coverUrl: url }));
+  } catch {}
+  // Also write to the shared template-covers map read by PremiumTemplates
+  try {
+    const raw = localStorage.getItem("escala:template-covers");
+    const tc = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    tc[id] = url;
+    localStorage.setItem("escala:template-covers", JSON.stringify(tc));
   } catch {}
 }
 
@@ -389,25 +397,39 @@ function TemplateCard({
 export function PremiumTemplates({
   onAiGenerate: _onAiGenerate,
   busy: _busy,
+  initialTemplateId,
 }: {
   onAiGenerate?: (k: AiKickstart) => void;
   busy?: boolean;
+  initialTemplateId?: string;
 }) {
   const navigate = useNavigate();
   const [covers, setCovers] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [preview, setPreview] = useState<TemplateMaster | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
   const genCover = useServerFn(generateEbookCoverFn);
 
-  // Load saved covers from localStorage on mount
+  // Load saved covers from localStorage on mount (studio state + escala:template-covers)
   useEffect(() => {
     const saved: Record<string, string> = {};
     for (const t of ALL_TEMPLATES) {
       const url = loadCover(t.id);
       if (url) saved[t.id] = url;
     }
+    try {
+      const raw = localStorage.getItem("escala:template-covers");
+      if (raw) Object.assign(saved, JSON.parse(raw) as Record<string, string>);
+    } catch {}
     setCovers(saved);
   }, []);
+
+  // Open preview dialog if initialTemplateId is provided
+  useEffect(() => {
+    if (!initialTemplateId) return;
+    const t = ALL_TEMPLATES.find((x) => x.id === initialTemplateId);
+    if (t) setPreview(t);
+  }, [initialTemplateId]);
 
   async function handleGenCover(t: TemplateMaster) {
     if (!t.coverPrompt || generatingId) return;
@@ -423,6 +445,29 @@ export function PremiumTemplates({
     } finally {
       setGeneratingId(null);
     }
+  }
+
+  async function handleUploadCover(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !preview) return;
+    e.target.value = "";
+    let url: string;
+    try {
+      const path = `${preview.id}/${Date.now()}.${file.name.split(".").pop() ?? "jpg"}`;
+      const { data, error } = await supabase.storage.from("ebook-covers").upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from("ebook-covers").getPublicUrl(data.path);
+      url = publicUrl;
+    } catch {
+      url = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
+    setCovers((prev) => ({ ...prev, [preview.id]: url }));
+    persistCover(preview.id, url);
+    toast.success("Capa carregada e salva");
   }
 
   return (
@@ -542,6 +587,24 @@ export function PremiumTemplates({
                   {generatingId === preview.id ? "Gerando capa..." : "Gerar Capa com IA"}
                 </Button>
               )}
+
+              {/* Upload manual */}
+              <input
+                ref={uploadRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={handleUploadCover}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => uploadRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload manual
+              </Button>
 
               <Button
                 className="w-full"
