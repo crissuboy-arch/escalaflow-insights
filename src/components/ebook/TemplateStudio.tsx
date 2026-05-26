@@ -3,16 +3,23 @@ import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
-  AlignLeft, ArrowLeft, BookOpen, Check, ChevronDown, ChevronLeft,
-  ChevronRight, ChevronUp, Copy, Download, Eye, EyeOff, FileText,
-  Image as ImageIcon, Info, Loader2, Minus, Palette, Plus, Quote,
-  Save, Settings, Sparkles, Trash2, Upload, X,
+  AlignLeft, AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, CheckSquare,
+  ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, Download, Eye, EyeOff,
+  FileText, Image as ImageIcon, Info, ListOrdered, Loader2, Minus, Palette, Plus,
+  Quote, RefreshCw, Save, Settings, Sparkles, Trash2, Upload, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { generateEbookCoverFn } from "@/lib/storybook.functions";
+import {
+  generateEbookCoverFn, generateMultiLanguageBookFn,
+  generateOutlineFn, generateChapterDraftFn, editChapterFn, consistencyCheckFn,
+} from "@/lib/storybook.functions";
+import {
+  saveCover, loadCover, deleteCover, restoreCoverOnMount,
+  loadCoverForLang, saveCoverForLang, clearCoverForLang,
+} from "@/lib/ebook/cover-storage";
 import { generateEbookPDF, type PdfChapter } from "@/lib/pdf-generator";
 import type { TemplateMaster, TemplateChapter } from "@/lib/ebook/template-master";
 import type { DesignConfig } from "@/lib/pdf-generator";
@@ -37,7 +44,7 @@ interface StudioChapter {
 
 export interface EbookConfig {
   pages: number;
-  language: "pt-BR" | "en-US" | "es";
+  language: "pt-BR" | "pt-PT" | "en-US" | "es" | "fr" | "it" | "de";
   tone: "formal" | "informal" | "inspiracional" | "técnico" | "storytelling";
   goal: string;
   avatar: string;
@@ -61,6 +68,65 @@ export interface StudioState {
   finalPage: string;
   design: DesignConfig;
   config: EbookConfig;
+  bible: BookBible;
+  outline: EbookOutline | null;
+  pipeline: ChapterPipeline[];
+  consistencyReport: ConsistencyReport | null;
+}
+
+// ─── mkbook pipeline types ────────────────────────────────────────────────────
+
+interface BookBible {
+  promise: string;
+  audience: string;
+  toneAdjectives: string;
+  goal: string;
+  keywords: string;
+  redLines: string;
+  salesModel: string;
+  voiceSamples: string;
+  targetChapters: number;
+}
+
+interface OutlineChapter {
+  number: number;
+  title: string;
+  promise: string;
+  transformation: string;
+  wordTarget: number;
+  notes: string;
+}
+
+interface EbookOutline {
+  intro: string;
+  chapters: OutlineChapter[];
+  conclusion: string;
+  generatedAt: string;
+}
+
+interface ChapterPipeline {
+  chapterId: string;
+  draft: string;
+  edited: string;
+  scoreBefore?: number;
+  scoreAfter?: number;
+  changes?: string[];
+  isDraftGenerated: boolean;
+  isEdited: boolean;
+  lastUpdated?: string;
+}
+
+interface ConsistencyIssue {
+  type: string;
+  chapter: string;
+  problem: string;
+  fix: string;
+}
+
+interface ConsistencyReport {
+  isClean: boolean;
+  issues: ConsistencyIssue[];
+  generatedAt: string;
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -102,6 +168,20 @@ function defaultConfig(template: TemplateMaster): EbookConfig {
   };
 }
 
+function defaultBible(template: TemplateMaster): BookBible {
+  return {
+    promise: template.meta.promise,
+    audience: template.meta.audience,
+    toneAdjectives: "claro, prático, inspirador",
+    goal: template.meta.transformation,
+    keywords: template.category,
+    redLines: "",
+    salesModel: "lead magnet",
+    voiceSamples: "",
+    targetChapters: template.chapters.length || 8,
+  };
+}
+
 function loadState(template: TemplateMaster): StudioState {
   try {
     const raw = localStorage.getItem(`ebook-studio-${template.id}`);
@@ -111,7 +191,7 @@ function loadState(template: TemplateMaster): StudioState {
         title: p.title ?? template.meta.title,
         subtitle: p.subtitle ?? template.meta.subtitle,
         author: p.author ?? template.meta.authorPlaceholder,
-        coverUrl: p.coverUrl ?? "",
+        coverUrl: restoreCoverOnMount(template.id),
         chapters: p.chapters
           ? p.chapters.map((ch) =>
               Array.isArray((ch as StudioChapter).blocks)
@@ -124,6 +204,10 @@ function loadState(template: TemplateMaster): StudioState {
         finalPage: p.finalPage ?? template.finalPage,
         design: p.design ?? { colorA: template.colorA, colorB: template.colorB, font: "sans" },
         config: p.config ?? defaultConfig(template),
+        bible: (p as Partial<StudioState>).bible ?? defaultBible(template),
+        outline: (p as Partial<StudioState>).outline ?? null,
+        pipeline: (p as Partial<StudioState>).pipeline ?? [],
+        consistencyReport: (p as Partial<StudioState>).consistencyReport ?? null,
       };
     }
   } catch { /* ignore */ }
@@ -131,13 +215,17 @@ function loadState(template: TemplateMaster): StudioState {
     title: template.meta.title,
     subtitle: template.meta.subtitle,
     author: template.meta.authorPlaceholder,
-    coverUrl: "",
+    coverUrl: restoreCoverOnMount(template.id),
     chapters: template.chapters.map(migrateChapter),
     bonus: template.bonus ? { ...template.bonus } : undefined,
     cta: { ...template.cta },
     finalPage: template.finalPage,
     design: { colorA: template.colorA, colorB: template.colorB, font: "sans" },
     config: defaultConfig(template),
+    bible: defaultBible(template),
+    outline: null,
+    pipeline: [],
+    consistencyReport: null,
   };
 }
 
@@ -487,6 +575,15 @@ function PreviewPanel({ state, template, chapterIndex }: { state: StudioState; t
           borderRadius: 4, boxShadow: "0 4px 20px rgba(0,0,0,0.35)", overflow: "hidden",
           display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: "12px 14px",
         }}>
+          {/* FLOW seal */}
+          <div style={{
+            position: "absolute", top: 6, right: 6,
+            background: "linear-gradient(135deg,#FFD700,#FFA500)",
+            borderRadius: "50%", width: 18, height: 18,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 5, fontWeight: 900, color: "#000",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.5)", letterSpacing: 0.5,
+          }}>FLOW</div>
           {!state.coverUrl && (
             <>
               <div style={{ fontSize: 24, textAlign: "center", marginBottom: 6 }}>{template.emoji}</div>
@@ -506,14 +603,14 @@ function PreviewPanel({ state, template, chapterIndex }: { state: StudioState; t
 
 // ─── Sidebar Sections ─────────────────────────────────────────────────────────
 
-type SideTab = "estrutura" | "config" | "design" | "capa" | "exportar";
+type SideTab = "bible" | "outline" | "conteudo" | "design" | "capa" | "exportar";
 
 function SideLabel({ children }: { children: React.ReactNode }) {
-  return <p style={{ fontSize: 9, color: "#4B5563", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>{children}</p>;
+  return <p style={{ fontSize: 13, color: "#9BAAC8", fontWeight: 600, marginBottom: 8, letterSpacing: 0.2 }}>{children}</p>;
 }
 
 function SideGroup({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ marginBottom: 18, ...style }}>{children}</div>;
+  return <div style={{ marginBottom: 22, ...style }}>{children}</div>;
 }
 
 function ConfigToggle({ label, value, onChange, color }: { label: string; value: boolean; onChange: (v: boolean) => void; color: string }) {
@@ -522,21 +619,124 @@ function ConfigToggle({ label, value, onChange, color }: { label: string; value:
       onClick={() => onChange(!value)}
       style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "6px 0", cursor: "pointer", userSelect: "none",
+        padding: "10px 0", cursor: "pointer", userSelect: "none",
+        borderBottom: "1px solid rgba(255,255,255,0.04)",
       }}
     >
-      <span style={{ fontSize: 12, color: "#9BAAC8" }}>{label}</span>
+      <span style={{ fontSize: 14, color: "#C8D4F0" }}>{label}</span>
       <div style={{
-        width: 32, height: 18, borderRadius: 9, background: value ? color : "rgba(255,255,255,0.08)",
+        width: 38, height: 22, borderRadius: 11, background: value ? color : "rgba(255,255,255,0.10)",
         position: "relative", transition: "background 0.2s", flexShrink: 0,
       }}>
         <div style={{
-          position: "absolute", top: 2, left: value ? 16 : 2, width: 14, height: 14,
+          position: "absolute", top: 3, left: value ? 19 : 3, width: 16, height: 16,
           borderRadius: "50%", background: "#fff", transition: "left 0.2s",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
         }} />
       </div>
     </div>
   );
+}
+
+// ─── Cover utilities ──────────────────────────────────────────────────────────
+
+async function compressForStorage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 900;
+      const scale = img.width > MAX ? MAX / img.width : 1;
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(blobUrl); reject(new Error("canvas")); return; }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(blobUrl); // revoke immediately — result is JPEG data URL
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error("load")); };
+    img.src = blobUrl;
+  });
+}
+
+function generateFallbackCover(
+  title: string,
+  subtitle: string,
+  author: string,
+  colorA: string,
+  colorB: string,
+  pages: number,
+  chapters: number,
+  category?: string,
+): string {
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function wrapLines(text: string, maxChars: number): string[] {
+    const words = text.split(" ");
+    const lines: string[] = [];
+    let cur = "";
+    for (const w of words) {
+      if ((cur + " " + w).trim().length > maxChars) {
+        if (cur) lines.push(cur);
+        cur = w;
+        if (lines.length >= 3) break;
+      } else {
+        cur = (cur + " " + w).trim();
+      }
+    }
+    if (cur && lines.length < 3) lines.push(cur);
+    return lines.slice(0, 3);
+  }
+
+  const titleLines = wrapLines(esc(title), 20);
+  const titleSvg = titleLines
+    .map(
+      (l, i) =>
+        `<text x="30" y="${200 + i * 36}" font-family="system-ui,sans-serif" ` +
+        `font-size="28" font-weight="900" fill="#FFFFFF">${l}</text>`,
+    )
+    .join("\n");
+  const catW = category ? esc(category).length * 7 + 24 : 0;
+  const subY = 200 + titleLines.length * 36 + 28;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 594" width="420" height="594">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="420" y2="594" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="#070B17"/>
+    <stop offset="100%" stop-color="#0C1428"/>
+  </linearGradient>
+  <radialGradient id="glo" cx="210" cy="220" r="230" gradientUnits="userSpaceOnUse">
+    <stop offset="0%" stop-color="${colorA}" stop-opacity="0.3"/>
+    <stop offset="100%" stop-color="${colorA}" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="acc" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="${colorA}"/>
+    <stop offset="100%" stop-color="${colorB}"/>
+  </linearGradient>
+</defs>
+<rect width="420" height="594" fill="url(#bg)"/>
+<rect width="420" height="594" fill="url(#glo)"/>
+<rect x="0" y="0" width="7" height="594" fill="url(#acc)"/>
+<rect x="0" y="0" width="420" height="4" fill="url(#acc)"/>
+<rect x="0" y="590" width="420" height="4" fill="url(#acc)"/>
+${category ? `<rect x="26" y="46" width="${catW}" height="24" rx="12" fill="${colorA}" fill-opacity="0.14"/>
+<rect x="26" y="46" width="${catW}" height="24" rx="12" fill="none" stroke="${colorA}" stroke-opacity="0.45" stroke-width="1"/>
+<text x="38" y="62" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="${colorA}">${esc(category)}</text>` : ""}
+${titleSvg}
+<text x="30" y="${subY}" font-family="system-ui,sans-serif" font-size="13" fill="rgba(255,255,255,0.55)">${esc(subtitle).slice(0, 55)}</text>
+<text x="30" y="540" font-family="system-ui,sans-serif" font-size="11" fill="rgba(255,255,255,0.4)">por ${esc(author)}</text>
+<text x="30" y="558" font-family="system-ui,sans-serif" font-size="10" fill="rgba(255,255,255,0.25)">${pages} páginas · ${chapters} capítulos</text>
+<circle cx="382" cy="50" r="30" fill="${colorA}" fill-opacity="0.12" stroke="rgba(255,215,0,0.45)" stroke-width="1.5"/>
+<text x="382" y="47" font-family="system-ui,sans-serif" font-size="9" font-weight="900" fill="#FFD700" text-anchor="middle">FLOW</text>
+<text x="382" y="59" font-family="system-ui,sans-serif" font-size="7" fill="rgba(255,215,0,0.7)" text-anchor="middle">STUDIO</text>
+</svg>`;
+
+  try {
+    return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+  } catch { return ""; }
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -544,7 +744,7 @@ function ConfigToggle({ label, value, onChange, color }: { label: string; value:
 export function TemplateStudio({ template }: { template: TemplateMaster }) {
   const navigate = useNavigate();
   const [state, setState] = useState<StudioState>(() => loadState(template));
-  const [sideTab, setSideTab] = useState<SideTab>("estrutura");
+  const [sideTab, setSideTab] = useState<SideTab>("bible");
   const [chapterIdx, setChapterIdx] = useState(0);
   const [showPreview, setShowPreview] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -553,9 +753,22 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState(template.coverPrompt ?? "");
   const [coverTab, setCoverTab] = useState<"preview" | "ai" | "upload">("preview");
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [aiCoverError, setAiCoverError] = useState<"quota" | "unavailable" | "unknown" | null>(null);
   const autosaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
   const genCover = useServerFn(generateEbookCoverFn);
+  const genMultiLang = useServerFn(generateMultiLanguageBookFn);
+  const genOutline = useServerFn(generateOutlineFn);
+  const genChapterDraft = useServerFn(generateChapterDraftFn);
+  const editChapter = useServerFn(editChapterFn);
+  const checkConsistency = useServerFn(consistencyCheckFn);
+  const [multiLangLoading, setMultiLangLoading] = useState(false);
+  const [multiLangProgress, setMultiLangProgress] = useState("");
+  const [outlineLoading, setOutlineLoading] = useState(false);
+  const [chapterGenLoading, setChapterGenLoading] = useState<number | null>(null);
+  const [chapterEditLoading, setChapterEditLoading] = useState<number | null>(null);
+  const [consistencyLoading, setConsistencyLoading] = useState(false);
 
   const cA = state.design.colorA;
   const cB = state.design.colorB;
@@ -566,7 +779,11 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
     if (!dirty) return;
     if (autosaveRef.current) clearTimeout(autosaveRef.current);
     autosaveRef.current = setTimeout(() => {
-      localStorage.setItem(`ebook-studio-${template.id}`, JSON.stringify(state));
+      // Store cover separately (in ebook_covers_v2) — never in the full state —
+      // to prevent the base64 image from pushing the entry over the 5 MB quota.
+      const { coverUrl: _cv, ...stateWithoutCover } = state;
+      void _cv;
+      localStorage.setItem(`ebook-studio-${template.id}`, JSON.stringify(stateWithoutCover));
       setSaving(true);
       setTimeout(() => setSaving(false), 1200);
       setDirty(false);
@@ -682,28 +899,307 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
     updateBlocks(chapterIdx, blocks);
   }
 
-  // Cover generation
+  // Cover generation with retry + persistent save
   async function handleAiCover() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
+    setAiCoverError(null);
+    let errorType: "quota" | "unavailable" | "unknown" | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await new Promise<void>((r) => setTimeout(r, attempt * 2500));
+      }
+      try {
+        const result = await genCover({ data: { prompt: aiPrompt } });
+        saveCover(template.id, { imageUrl: result.url, prompt: aiPrompt, type: "ai", source: "gemini" });
+        saveCoverForLang(template.id, state.config.language, result.url);
+        setState((p) => ({ ...p, coverUrl: result.url }));
+        setCoverTab("preview");
+        setAiCoverError(null);
+        toast.success("Capa gerada e salva automaticamente!");
+        setAiLoading(false);
+        return;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (msg === "QUOTA_EXCEEDED") { errorType = "quota"; break; }
+        if (msg === "MODEL_UNAVAILABLE") { errorType = "unavailable"; break; }
+        errorType = "unknown";
+      }
+    }
+    // All attempts failed — apply local SVG fallback automatically
+    handleFallbackCover();
+    setAiCoverError(errorType ?? "unknown");
+    setAiLoading(false);
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
     try {
-      const result = await genCover({ data: { prompt: aiPrompt } });
-      update({ coverUrl: result.url });
+      const compressed = await compressForStorage(file);
+      saveCover(template.id, { imageUrl: compressed, type: "upload", source: "upload" });
+      saveCoverForLang(template.id, state.config.language, compressed);
+      setState((p) => ({ ...p, coverUrl: compressed }));
       setCoverTab("preview");
-      toast.success("Capa gerada com sucesso!");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao gerar capa com IA");
-    } finally {
-      setAiLoading(false);
+      toast.success("Capa salva automaticamente!");
+    } catch {
+      // Canvas unavailable — fall back to plain FileReader (no compression)
+      const reader = new FileReader();
+      reader.onload = () => {
+        const url = reader.result as string;
+        saveCover(template.id, { imageUrl: url, type: "upload", source: "upload" });
+        saveCoverForLang(template.id, state.config.language, url);
+        setState((p) => ({ ...p, coverUrl: url }));
+        setCoverTab("preview");
+        toast.success("Capa salva automaticamente!");
+      };
+      reader.readAsDataURL(file);
     }
   }
 
-  function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { update({ coverUrl: reader.result as string }); setCoverTab("preview"); };
-    reader.readAsDataURL(file);
+  function handleFallbackCover() {
+    const svg = generateFallbackCover(
+      state.title, state.subtitle, state.author,
+      cA, cB, state.config.pages, state.chapters.length,
+      template.category,
+    );
+    if (!svg) return;
+    saveCover(template.id, { imageUrl: svg, type: "fallback", source: "css" });
+    saveCoverForLang(template.id, state.config.language, svg);
+    setState((p) => ({ ...p, coverUrl: svg }));
+    setCoverTab("preview");
+    toast.success("Capa visual aplicada e salva!");
+  }
+
+  // Multi-language generation
+  async function handleMultiLang() {
+    const LANGS = [
+      { code: "pt-BR" as const, name: "Português Brasil" },
+      { code: "pt-PT" as const, name: "Português Portugal" },
+      { code: "en-US" as const, name: "English" },
+      { code: "es" as const, name: "Español" },
+      { code: "fr" as const, name: "Français" },
+      { code: "it" as const, name: "Italiano" },
+      { code: "de" as const, name: "Deutsch" },
+    ];
+    const toGenerate = LANGS.filter((l) => l.code !== state.config.language);
+    setMultiLangLoading(true);
+
+    const chaptersForTranslation = state.chapters.map((ch) => ({
+      id: ch.id,
+      title: ch.title,
+      body: (Array.isArray(ch.blocks) ? ch.blocks : [])
+        .filter((b) => b.type === "text" || b.type === "quote" || b.type === "callout" || b.type === "checklist")
+        .map((b) => b.content)
+        .join("\n\n")
+        .slice(0, 600),
+    }));
+
+    let successCount = 0;
+    for (let i = 0; i < toGenerate.length; i++) {
+      const lang = toGenerate[i];
+      setMultiLangProgress(`${lang.name} (${i + 1}/${toGenerate.length})`);
+      try {
+        const result = await genMultiLang({
+          data: {
+            language: lang.code,
+            title: state.title,
+            subtitle: state.subtitle,
+            chapters: chaptersForTranslation,
+          },
+        });
+        const translatedChapters: StudioChapter[] = state.chapters.map((ch) => {
+          const tch = result.chapters.find((t) => t.id === ch.id);
+          if (!tch) return ch;
+          const textBlocks: Block[] = tch.body
+            .split(/\n{2,}/)
+            .filter((t) => t.trim())
+            .map((t) => ({ id: uid(), type: "text" as BlockType, content: t.trim() }));
+          const nonTextBlocks = (Array.isArray(ch.blocks) ? ch.blocks : []).filter(
+            (b) => b.type !== "text",
+          );
+          return { ...ch, title: tch.title, blocks: [...textBlocks, ...nonTextBlocks] };
+        });
+        const translatedState: Partial<StudioState> = {
+          ...state,
+          title: result.title,
+          subtitle: result.subtitle,
+          chapters: translatedChapters,
+          config: { ...state.config, language: lang.code },
+        };
+        localStorage.setItem(
+          `ebook-studio-${template.id}-${lang.code}`,
+          JSON.stringify(translatedState),
+        );
+        successCount++;
+      } catch (e) {
+        toast.error(`${lang.name}: ${e instanceof Error ? e.message : "Falha"}`);
+      }
+    }
+
+    setMultiLangLoading(false);
+    setMultiLangProgress("");
+    if (successCount > 0) {
+      toast.success(
+        `Livro gerado em ${successCount} idioma${successCount !== 1 ? "s" : ""}! Troque o idioma em Config para acessar.`,
+      );
+    }
+  }
+
+  function handleLanguageChange(lang: EbookConfig["language"]) {
+    try {
+      const raw = localStorage.getItem(`ebook-studio-${template.id}-${lang}`);
+      if (raw) {
+        const p = JSON.parse(raw) as Partial<StudioState>;
+        const chapters = p.chapters
+          ? p.chapters.map((ch) =>
+              Array.isArray((ch as StudioChapter).blocks)
+                ? (ch as StudioChapter)
+                : migrateChapter(ch as unknown as TemplateChapter),
+            )
+          : undefined;
+        setState((prev) => ({
+          ...prev,
+          ...(p.title ? { title: p.title } : {}),
+          ...(p.subtitle ? { subtitle: p.subtitle } : {}),
+          ...(chapters?.length ? { chapters } : {}),
+          coverUrl: loadCoverForLang(template.id, lang) || prev.coverUrl,
+          config: { ...prev.config, language: lang },
+        }));
+        toast.info(`Versão em ${lang} carregada!`);
+        setDirty(true);
+        return;
+      }
+    } catch { /* ignore */ }
+    const cover = loadCoverForLang(template.id, lang);
+    setState((prev) => ({
+      ...prev,
+      coverUrl: cover || prev.coverUrl,
+      config: { ...prev.config, language: lang },
+    }));
+    setDirty(true);
+  }
+
+  // mkbook pipeline handlers
+  async function handleGenerateOutline() {
+    setOutlineLoading(true);
+    try {
+      const result = await genOutline({
+        data: {
+          title: state.title, subtitle: state.subtitle,
+          promise: state.bible.promise, audience: state.bible.audience,
+          tone: state.bible.toneAdjectives, goal: state.bible.goal,
+          keywords: state.bible.keywords, redLines: state.bible.redLines,
+          targetChapters: state.bible.targetChapters,
+        },
+      });
+      update({ outline: result });
+      toast.success(`Outline com ${result.chapters.length} capítulos gerado!`);
+      setSideTab("outline");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar outline");
+    } finally {
+      setOutlineLoading(false);
+    }
+  }
+
+  async function handleGenerateChapter(idx: number) {
+    const ch = state.chapters[idx];
+    if (!ch) return;
+    const outlineCh = state.outline?.chapters[idx];
+    setChapterGenLoading(idx);
+    try {
+      const result = await genChapterDraft({
+        data: {
+          chapterNumber: idx + 1, chapterTitle: ch.title,
+          chapterPromise: outlineCh?.promise ?? state.bible.promise,
+          chapterNotes: outlineCh?.notes ?? "",
+          bookTitle: state.title, tone: state.bible.toneAdjectives,
+          audience: state.bible.audience, keywords: state.bible.keywords,
+          wordTarget: outlineCh?.wordTarget ?? 800,
+        },
+      });
+      const textBlocks: Block[] = result.draft
+        .split(/\n{2,}/).filter((t) => t.trim())
+        .map((t) => ({ id: uid(), type: "text" as BlockType, content: t.trim() }));
+      const nonTextBlocks = (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type !== "text");
+      updateChapter(idx, { blocks: [...textBlocks, ...nonTextBlocks] });
+      const newPipeline = [...(state.pipeline ?? [])];
+      const pIdx = newPipeline.findIndex((p) => p.chapterId === ch.id);
+      const entry: ChapterPipeline = { chapterId: ch.id, draft: result.draft, edited: "", isDraftGenerated: true, isEdited: false, lastUpdated: new Date().toISOString() };
+      if (pIdx >= 0) newPipeline[pIdx] = { ...newPipeline[pIdx], ...entry };
+      else newPipeline.push(entry);
+      update({ pipeline: newPipeline });
+      toast.success(`Capítulo ${idx + 1} gerado!`);
+      setChapterIdx(idx);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao gerar capítulo");
+    } finally {
+      setChapterGenLoading(null);
+    }
+  }
+
+  async function handleEditChapter(idx: number) {
+    const ch = state.chapters[idx];
+    if (!ch) return;
+    const entry = (state.pipeline ?? []).find((p) => p.chapterId === ch.id);
+    const draft = entry?.draft || (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type === "text").map((b) => b.content).join("\n\n");
+    if (!draft.trim()) { toast.error("Gere o rascunho primeiro."); return; }
+    const outlineCh = state.outline?.chapters[idx];
+    setChapterEditLoading(idx);
+    try {
+      const result = await editChapter({
+        data: {
+          draft, bookTitle: state.title, chapterTitle: ch.title,
+          promise: outlineCh?.promise ?? state.bible.promise,
+          tone: state.bible.toneAdjectives, audience: state.bible.audience,
+        },
+      });
+      const newPipeline = [...(state.pipeline ?? [])];
+      const pIdx = newPipeline.findIndex((p) => p.chapterId === ch.id);
+      const updated: ChapterPipeline = { chapterId: ch.id, draft: entry?.draft ?? draft, edited: result.edited, scoreBefore: result.scoreBefore, scoreAfter: result.scoreAfter, changes: result.changes, isDraftGenerated: true, isEdited: true, lastUpdated: new Date().toISOString() };
+      if (pIdx >= 0) newPipeline[pIdx] = updated;
+      else newPipeline.push(updated);
+      update({ pipeline: newPipeline });
+      toast.success(`Cap. ${idx + 1} editado! Score: ${result.scoreBefore} → ${result.scoreAfter}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao editar capítulo");
+    } finally {
+      setChapterEditLoading(null);
+    }
+  }
+
+  function handleApplyToEditor(idx: number) {
+    const ch = state.chapters[idx];
+    if (!ch) return;
+    const entry = (state.pipeline ?? []).find((p) => p.chapterId === ch.id);
+    const content = entry?.edited || entry?.draft;
+    if (!content) { toast.error("Sem conteúdo para aplicar."); return; }
+    const textBlocks: Block[] = content.split(/\n{2,}/).filter((t) => t.trim()).map((t) => ({ id: uid(), type: "text" as BlockType, content: t.trim() }));
+    const nonTextBlocks = (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type !== "text");
+    updateChapter(idx, { blocks: [...textBlocks, ...nonTextBlocks] });
+    setChapterIdx(idx);
+    toast.success("Conteúdo aplicado ao editor!");
+  }
+
+  async function handleConsistencyCheck() {
+    setConsistencyLoading(true);
+    try {
+      const chapters = state.chapters.map((ch) => ({
+        id: ch.id, title: ch.title,
+        body: (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type === "text").map((b) => b.content).join("\n\n").slice(0, 500),
+      }));
+      const result = await checkConsistency({
+        data: { bookTitle: state.title, promise: state.bible.promise, tone: state.bible.toneAdjectives, audience: state.bible.audience, chapters },
+      });
+      update({ consistencyReport: result });
+      if (result.isClean) toast.success("Ebook consistente! Nenhum problema encontrado.");
+      else toast.warning(`${result.issues.length} problema${result.issues.length !== 1 ? "s" : ""} encontrado${result.issues.length !== 1 ? "s" : ""}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao verificar consistência");
+    } finally {
+      setConsistencyLoading(false);
+    }
   }
 
   // Export PDF
@@ -749,40 +1245,41 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   );
 
   const SIDE_TABS: { key: SideTab; label: string; icon: React.ReactNode }[] = [
-    { key: "estrutura", label: "Conteúdo", icon: <BookOpen size={13} /> },
-    { key: "config",    label: "Config",   icon: <Settings size={13} /> },
-    { key: "design",    label: "Design",   icon: <Palette size={13} /> },
-    { key: "capa",      label: "Capa",     icon: <ImageIcon size={13} /> },
-    { key: "exportar",  label: "Exportar", icon: <Download size={13} /> },
+    { key: "bible",    label: "Bíblia",   icon: <BookMarked size={13} /> },
+    { key: "outline",  label: "Outline",  icon: <ListOrdered size={13} /> },
+    { key: "conteudo", label: "Conteúdo", icon: <BookOpen size={13} /> },
+    { key: "design",   label: "Design",   icon: <Palette size={13} /> },
+    { key: "capa",     label: "Capa",     icon: <ImageIcon size={13} /> },
+    { key: "exportar", label: "Exportar", icon: <Download size={13} /> },
   ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#080D1A", color: "#F0F4FF", fontFamily: "Inter, sans-serif", overflow: "hidden" }}>
 
       {/* ── HEADER ── */}
-      <header style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 16px", height: 50, borderBottom: `1px solid ${BD}`, flexShrink: 0, background: "#080D1A" }}>
-        <button onClick={() => navigate({ to: "/produtos/ebook" })} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: "#6B7FA8", cursor: "pointer", fontSize: 12, padding: "4px 6px", borderRadius: 5, fontFamily: "inherit" }}>
-          <ArrowLeft size={13} /> Voltar
+      <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 20px", height: 58, borderBottom: `1px solid ${BD}`, flexShrink: 0, background: "#080D1A" }}>
+        <button onClick={() => navigate({ to: "/produtos/ebook" })} style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: "#6B7FA8", cursor: "pointer", fontSize: 13, padding: "5px 8px", borderRadius: 6, fontFamily: "inherit" }}>
+          <ArrowLeft size={14} /> Voltar
         </button>
-        <div style={{ width: 1, height: 18, background: BD }} />
-        <span style={{ fontSize: 16 }}>{template.emoji}</span>
+        <div style={{ width: 1, height: 22, background: BD }} />
+        <span style={{ fontSize: 18 }}>{template.emoji}</span>
         <input
           value={state.title}
           onChange={(e) => update({ title: e.target.value })}
-          style={{ flex: 1, minWidth: 0, background: "none", border: "none", color: "#F0F4FF", fontSize: 14, fontWeight: 700, outline: "none", fontFamily: "inherit" }}
+          style={{ flex: 1, minWidth: 0, background: "none", border: "none", color: "#F0F4FF", fontSize: 16, fontWeight: 700, outline: "none", fontFamily: "inherit" }}
         />
-        <span style={{ fontSize: 10, color: saving ? "#10B981" : dirty ? "#F59E0B" : "#4B5563", flexShrink: 0, display: "flex", alignItems: "center", gap: 3 }}>
-          {saving ? <><Check size={10} /> Salvo</> : dirty ? "● Não salvo" : `${totalWords.toLocaleString("pt-BR")} palavras`}
+        <span style={{ fontSize: 12, color: saving ? "#10B981" : dirty ? "#F59E0B" : "#4B5563", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}>
+          {saving ? <><Check size={12} /> Salvo</> : dirty ? "● Não salvo" : `${totalWords.toLocaleString("pt-BR")} palavras`}
         </span>
         <button
           onClick={() => setShowPreview(!showPreview)}
-          style={{ display: "flex", alignItems: "center", gap: 4, background: showPreview ? `${cA}20` : "rgba(255,255,255,0.04)", border: `1px solid ${showPreview ? cA : "rgba(255,255,255,0.10)"}`, color: showPreview ? cA : "#6B7FA8", cursor: "pointer", fontSize: 11, padding: "4px 10px", borderRadius: 6, fontFamily: "inherit" }}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: showPreview ? `${cA}20` : "rgba(255,255,255,0.04)", border: `1px solid ${showPreview ? cA : "rgba(255,255,255,0.10)"}`, color: showPreview ? cA : "#6B7FA8", cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, fontFamily: "inherit" }}
         >
-          {showPreview ? <Eye size={12} /> : <EyeOff size={12} />} Preview
+          {showPreview ? <Eye size={13} /> : <EyeOff size={13} />} Preview
         </button>
-        <Button size="sm" disabled={pdfLoading} onClick={handleExportPdf}
-          style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 11, height: 30, gap: 5, flexShrink: 0 }}>
-          {pdfLoading ? <Loader2 size={11} className="animate-spin" /> : <Download size={11} />}
+        <Button disabled={pdfLoading} onClick={handleExportPdf}
+          style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 13, height: 36, gap: 6, flexShrink: 0, borderRadius: 8, paddingLeft: 14, paddingRight: 14 }}>
+          {pdfLoading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
           Exportar PDF
         </Button>
       </header>
@@ -791,16 +1288,16 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
         {/* ── SIDEBAR ── */}
-        <aside style={{ width: 242, flexShrink: 0, borderRight: `1px solid ${BD}`, display: "flex", flexDirection: "column", background: "#090E1C", overflow: "hidden" }}>
+        <aside style={{ width: 380, flexShrink: 0, borderRight: `1px solid ${BD}`, display: "flex", flexDirection: "column", background: "#090E1C", overflow: "hidden" }}>
           {/* Tabs */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", borderBottom: `1px solid ${BD}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", borderBottom: `1px solid ${BD}` }}>
             {SIDE_TABS.map((tab) => (
               <button key={tab.key} onClick={() => setSideTab(tab.key)} style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                padding: "8px 2px", background: sideTab === tab.key ? "#111827" : "none",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                padding: "11px 2px 9px", background: sideTab === tab.key ? "#111827" : "none",
                 border: "none", borderBottom: `2px solid ${sideTab === tab.key ? cA : "transparent"}`,
-                color: sideTab === tab.key ? "#F0F4FF" : "#4B5563", fontSize: 9, cursor: "pointer",
-                fontFamily: "inherit", transition: "all 0.15s",
+                color: sideTab === tab.key ? "#F0F4FF" : "#4B5563", fontSize: 10, cursor: "pointer",
+                fontFamily: "inherit", transition: "all 0.15s", letterSpacing: 0.2,
               }}>
                 {tab.icon}
                 {tab.label}
@@ -809,182 +1306,331 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           </div>
 
           {/* Sidebar content */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "10px 0" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: "18px 0" }}>
 
-            {/* ── ESTRUTURA ── */}
-            {sideTab === "estrutura" && (
+            {/* ── OUTLINE ── */}
+            {sideTab === "outline" && (
+              <div style={{ padding: "4px 20px 24px" }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>📐 Outline & Geração</p>
+                <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 20 }}>Gere e edite cada capítulo com IA.</p>
+
+                {!state.outline && (
+                  <div style={{ padding: "16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, marginBottom: 20, textAlign: "center" }}>
+                    <ListOrdered size={28} style={{ color: "#4B5563", margin: "0 auto 10px", display: "block" }} />
+                    <p style={{ fontSize: 14, color: "#6B7FA8", lineHeight: 1.6, marginBottom: 14 }}>
+                      Nenhum outline gerado ainda.<br />
+                      Preencha a Bíblia e clique em <strong style={{ color: "#9BAAC8" }}>Gerar Outline</strong>.
+                    </p>
+                    <Button disabled={outlineLoading} onClick={handleGenerateOutline}
+                      style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 14, height: 44, gap: 8, borderRadius: 8, width: "100%" }}>
+                      {outlineLoading ? <Loader2 size={14} className="animate-spin" /> : <ListOrdered size={14} />}
+                      {outlineLoading ? "Gerando..." : "Gerar Outline com IA"}
+                    </Button>
+                  </div>
+                )}
+
+                {state.outline && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, color: "#6B7FA8" }}>Outline · {state.outline.chapters.length} capítulos</span>
+                      <button onClick={handleGenerateOutline} disabled={outlineLoading} style={{ fontSize: 12, color: cA, background: "none", border: `1px solid ${cA}40`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>
+                        {outlineLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />} Regerar
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#4B5563", lineHeight: 1.5, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 12, borderLeft: `3px solid ${cA}30` }}>
+                      {state.outline.intro}
+                    </div>
+                  </div>
+                )}
+
+                {state.chapters.map((ch, i) => {
+                  const pEntry = (state.pipeline ?? []).find((p) => p.chapterId === ch.id);
+                  const status = pEntry?.isEdited ? "editado" : pEntry?.isDraftGenerated ? "rascunho" : "vazio";
+                  const statusColor = status === "editado" ? "#10B981" : status === "rascunho" ? "#F59E0B" : "#4B5563";
+                  const oc = state.outline?.chapters[i];
+                  return (
+                    <div key={ch.id} style={{ marginBottom: 14, padding: "14px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 14, color: "#F0F4FF", fontWeight: 600, margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ fontSize: 11, color: "#4B5563", marginRight: 5 }}>{i + 1}.</span>{ch.title}
+                          </p>
+                          {oc && <p style={{ fontSize: 11, color: "#6B7FA8", margin: 0, lineHeight: 1.4 }}>{oc.promise.slice(0, 70)}{oc.promise.length > 70 ? "…" : ""}</p>}
+                        </div>
+                        <span style={{ fontSize: 11, color: statusColor, fontWeight: 700, flexShrink: 0, marginLeft: 8, marginTop: 2 }}>
+                          {status === "editado" ? "✓ Editado" : status === "rascunho" ? "~ Rascunho" : "· Vazio"}
+                        </span>
+                      </div>
+                      {pEntry?.isEdited && pEntry.scoreBefore !== undefined && (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 8, fontSize: 12, color: "#6B7FA8" }}>
+                          Score: <span style={{ color: "#F59E0B", fontWeight: 700 }}>{pEntry.scoreBefore}</span>
+                          <span style={{ color: "#374151" }}>→</span>
+                          <span style={{ color: "#10B981", fontWeight: 700 }}>{pEntry.scoreAfter}</span>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button disabled={chapterGenLoading === i} onClick={() => handleGenerateChapter(i)}
+                          style={{ flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: `${cA}15`, border: `1px solid ${cA}30`, color: cA }}>
+                          {chapterGenLoading === i ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />} Gerar
+                        </button>
+                        <button disabled={chapterEditLoading === i} onClick={() => handleEditChapter(i)}
+                          style={{ flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#9BAAC8" }}>
+                          {chapterEditLoading === i ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Editar
+                        </button>
+                        {pEntry && (pEntry.isDraftGenerated || pEntry.isEdited) && (
+                          <button onClick={() => handleApplyToEditor(i)}
+                            style={{ flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#10B981" }}>
+                            <Check size={11} /> Aplicar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── BÍBLIA ── */}
+            {sideTab === "bible" && (() => {
+              const SI: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#F0F4FF", fontSize: 15, height: 44, borderRadius: 8 };
+              const TA: React.CSSProperties = { background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#F0F4FF", fontSize: 15, resize: "none", borderRadius: 8, lineHeight: 1.6 };
+              const SE: React.CSSProperties = { width: "100%", background: "#0E1525", border: "1px solid rgba(255,255,255,0.12)", color: "#F0F4FF", fontSize: 15, height: 44, borderRadius: 8, padding: "0 12px" };
+              const CHIP = (active: boolean) => ({
+                padding: "7px 14px", borderRadius: 20, fontSize: 13,
+                background: active ? `${cA}30` : "rgba(255,255,255,0.05)",
+                border: `1px solid ${active ? cA : "rgba(255,255,255,0.10)"}`,
+                color: active ? cA : "#9BAAC8", cursor: "pointer" as const, fontFamily: "inherit",
+              });
+              return (
+                <div style={{ padding: "4px 20px 24px" }}>
+                  <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>📖 Bíblia do Ebook</p>
+                  <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 24 }}>Defina os fundamentos antes de escrever.</p>
+
+                  <SideGroup>
+                    <SideLabel>Título</SideLabel>
+                    <Input value={state.title} onChange={(e) => update({ title: e.target.value })} style={SI} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Subtítulo</SideLabel>
+                    <Textarea value={state.subtitle} onChange={(e) => update({ subtitle: e.target.value })} rows={2} style={TA} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Autor</SideLabel>
+                    <Input value={state.author} onChange={(e) => update({ author: e.target.value })} style={SI} />
+                  </SideGroup>
+
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "4px 0 24px" }} />
+
+                  <SideGroup>
+                    <SideLabel>Promessa central</SideLabel>
+                    <Textarea value={state.bible.promise} onChange={(e) => update({ bible: { ...state.bible, promise: e.target.value } })} rows={3} placeholder="O leitor vai conseguir X mesmo que Y..." style={TA} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Público-alvo</SideLabel>
+                    <Input value={state.bible.audience} onChange={(e) => update({ bible: { ...state.bible, audience: e.target.value } })} placeholder="Ex: empreendedores iniciantes que..." style={SI} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Tom de voz</SideLabel>
+                    <Input value={state.bible.toneAdjectives} onChange={(e) => update({ bible: { ...state.bible, toneAdjectives: e.target.value } })} placeholder="Ex: direto, motivador, sem jargões" style={SI} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Objetivo / Transformação</SideLabel>
+                    <Input value={state.bible.goal} onChange={(e) => update({ bible: { ...state.bible, goal: e.target.value } })} placeholder="De X para Y em Z dias..." style={SI} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Palavras-chave</SideLabel>
+                    <Input value={state.bible.keywords} onChange={(e) => update({ bible: { ...state.bible, keywords: e.target.value } })} placeholder="produtividade, foco, rotina matinal" style={SI} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Linhas vermelhas — não fazer</SideLabel>
+                    <Textarea value={state.bible.redLines} onChange={(e) => update({ bible: { ...state.bible, redLines: e.target.value } })} rows={2} placeholder="Não usar termos acadêmicos, não prometer X..." style={TA} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Modelo de distribuição</SideLabel>
+                    <select value={state.bible.salesModel} onChange={(e) => update({ bible: { ...state.bible, salesModel: e.target.value } })} style={SE}>
+                      <option value="lead magnet">Lead Magnet (gratuito)</option>
+                      <option value="produto pago">Produto Pago</option>
+                      <option value="upsell">Upsell / OTO</option>
+                      <option value="autoridade">Autoridade / Branding</option>
+                    </select>
+                  </SideGroup>
+
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "4px 0 24px" }} />
+
+                  <SideGroup>
+                    <SideLabel>Capítulos-alvo</SideLabel>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {[5, 7, 8, 10, 12, 15].map((n) => (
+                        <button key={n} onClick={() => update({ bible: { ...state.bible, targetChapters: n } })} style={CHIP(state.bible.targetChapters === n)}>{n}</button>
+                      ))}
+                    </div>
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Páginas estimadas</SideLabel>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {[30, 45, 60, 75, 100].map((p) => (
+                        <button key={p} onClick={() => update({ config: { ...state.config, pages: p } })} style={CHIP(state.config.pages === p)}>{p}p</button>
+                      ))}
+                    </div>
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Idioma do ebook</SideLabel>
+                    <select value={state.config.language} onChange={(e) => handleLanguageChange(e.target.value as EbookConfig["language"])} style={SE}>
+                      <option value="pt-BR">🇧🇷 Português (Brasil)</option>
+                      <option value="pt-PT">🇵🇹 Português (Portugal)</option>
+                      <option value="en-US">🇺🇸 English (US)</option>
+                      <option value="es">🇪🇸 Español</option>
+                      <option value="fr">🇫🇷 Français</option>
+                      <option value="it">🇮🇹 Italiano</option>
+                      <option value="de">🇩🇪 Deutsch</option>
+                    </select>
+                    <div style={{ marginTop: 10 }}>
+                      {multiLangLoading ? (
+                        <div style={{ fontSize: 13, color: "#9BAAC8", display: "flex", alignItems: "center", gap: 7, padding: "6px 0" }}>
+                          <Loader2 size={13} className="animate-spin" /> {multiLangProgress}
+                        </div>
+                      ) : (
+                        <button onClick={handleMultiLang} style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "10px 14px", background: `${cA}15`, border: `1px solid ${cA}35`, borderRadius: 8, color: cA, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+                          <Sparkles size={13} /> Gerar em todos os idiomas
+                        </button>
+                      )}
+                    </div>
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Tom de escrita</SideLabel>
+                    <select value={state.config.tone} onChange={(e) => update({ config: { ...state.config, tone: e.target.value as EbookConfig["tone"] } })} style={SE}>
+                      <option value="informal">Informal / Conversacional</option>
+                      <option value="formal">Formal / Acadêmico</option>
+                      <option value="inspiracional">Inspiracional</option>
+                      <option value="técnico">Técnico</option>
+                      <option value="storytelling">Storytelling</option>
+                    </select>
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Nível do público</SideLabel>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {(["iniciante", "intermediário", "avançado"] as const).map((l) => (
+                        <button key={l} onClick={() => update({ config: { ...state.config, publicLevel: l } })} style={{ ...CHIP(state.config.publicLevel === l), flex: 1, textAlign: "center" as const }}>{l.charAt(0).toUpperCase() + l.slice(1, 8)}</button>
+                      ))}
+                    </div>
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Elementos do ebook</SideLabel>
+                    <ConfigToggle label="Exercícios práticos" value={state.config.includeExercises} onChange={(v) => update({ config: { ...state.config, includeExercises: v } })} color={cA} />
+                    <ConfigToggle label="Checklists" value={state.config.includeChecklist} onChange={(v) => update({ config: { ...state.config, includeChecklist: v } })} color={cA} />
+                    <ConfigToggle label="Seção de Bônus" value={state.config.includeBonus} onChange={(v) => update({ config: { ...state.config, includeBonus: v } })} color={cA} />
+                    <ConfigToggle label="CTA no final" value={state.config.includeCTA} onChange={(v) => update({ config: { ...state.config, includeCTA: v } })} color={cA} />
+                  </SideGroup>
+
+                  <div style={{ paddingTop: 8, borderTop: `1px solid ${BD}` }}>
+                    <Button disabled={outlineLoading} onClick={handleGenerateOutline}
+                      style={{ width: "100%", background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 15, height: 48, gap: 8, borderRadius: 10, fontWeight: 700 }}>
+                      {outlineLoading ? <Loader2 size={16} className="animate-spin" /> : <ListOrdered size={16} />}
+                      {outlineLoading ? "Gerando outline..." : "Gerar Outline com IA"}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── CONTEÚDO ── */}
+            {sideTab === "conteudo" && (
               <>
-                {/* Meta */}
-                <button onClick={() => { setChapterIdx(-1); }} style={{
-                  display: "block", width: "100%", textAlign: "left", padding: "6px 13px",
+                <button onClick={() => setChapterIdx(-1)} style={{
+                  display: "block", width: "100%", textAlign: "left", padding: "11px 20px",
                   background: chapterIdx === -1 ? `${cA}12` : "none",
                   borderLeft: `3px solid ${chapterIdx === -1 ? cA : "transparent"}`,
-                  border: "none", color: chapterIdx === -1 ? "#F0F4FF" : "#6B7FA8", fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                  border: "none", color: chapterIdx === -1 ? "#F0F4FF" : "#6B7FA8",
+                  fontSize: 14, cursor: "pointer", fontFamily: "inherit",
                 }}>
                   📋 Informações do Ebook
                 </button>
 
-                {/* Chapter list */}
                 {state.chapters.map((ch, i) => (
-                  <div key={ch.id} style={{ position: "relative" }} onMouseEnter={(e) => { (e.currentTarget.querySelector(".ch-actions") as HTMLElement | null)?.style && ((e.currentTarget.querySelector(".ch-actions") as HTMLElement).style.opacity = "1"); }}
-                    onMouseLeave={(e) => { const el = e.currentTarget.querySelector(".ch-actions") as HTMLElement | null; if (el) el.style.opacity = "0"; }}>
-                    <button
-                      onClick={() => setChapterIdx(i)}
-                      style={{
-                        display: "block", width: "100%", textAlign: "left", padding: "6px 13px 6px 40px",
-                        background: chapterIdx === i ? `${cA}12` : "none",
-                        borderLeft: `3px solid ${chapterIdx === i ? cA : "transparent"}`,
-                        border: "none", color: chapterIdx === i ? "#F0F4FF" : "#6B7FA8",
-                        fontSize: 11, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.3,
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}
-                    >
-                      <span style={{ fontSize: 9, color: "#4B5563", marginRight: 4 }}>{i + 1}.</span>
+                  <div key={ch.id} style={{ position: "relative", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                    onMouseEnter={(e) => { const el = (e.currentTarget.querySelector(".ch-act") as HTMLElement | null); if (el) el.style.opacity = "1"; }}
+                    onMouseLeave={(e) => { const el = (e.currentTarget.querySelector(".ch-act") as HTMLElement | null); if (el) el.style.opacity = "0"; }}>
+                    <button onClick={() => setChapterIdx(i)} style={{
+                      display: "block", width: "100%", textAlign: "left", padding: "10px 20px 10px 44px",
+                      background: chapterIdx === i ? `${cA}12` : "none",
+                      borderLeft: `3px solid ${chapterIdx === i ? cA : "transparent"}`,
+                      border: "none", color: chapterIdx === i ? "#F0F4FF" : "#9BAAC8",
+                      fontSize: 14, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.35,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      <span style={{ fontSize: 11, color: "#4B5563", marginRight: 5 }}>{i + 1}.</span>
                       {ch.title}
                     </button>
-                    {/* Chapter actions */}
-                    <div className="ch-actions" style={{
-                      position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)",
-                      display: "flex", gap: 2, opacity: 0, transition: "opacity 0.15s",
-                    }}>
-                      {i > 0 && <ToolBtn title="Mover cima" onClick={() => moveChapter(i, -1)}><ChevronUp size={9} /></ToolBtn>}
-                      {i < state.chapters.length - 1 && <ToolBtn title="Mover baixo" onClick={() => moveChapter(i, 1)}><ChevronDown size={9} /></ToolBtn>}
-                      <ToolBtn title="Duplicar" onClick={() => duplicateChapter(i)}><Copy size={9} /></ToolBtn>
-                      <ToolBtn title="Excluir" onClick={() => deleteChapter(i)} danger><Trash2 size={9} /></ToolBtn>
+                    <div className="ch-act" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", display: "flex", gap: 3, opacity: 0, transition: "opacity 0.15s" }}>
+                      {i > 0 && <ToolBtn title="Mover cima" onClick={() => moveChapter(i, -1)}><ChevronUp size={10} /></ToolBtn>}
+                      {i < state.chapters.length - 1 && <ToolBtn title="Mover baixo" onClick={() => moveChapter(i, 1)}><ChevronDown size={10} /></ToolBtn>}
+                      <ToolBtn title="Duplicar" onClick={() => duplicateChapter(i)}><Copy size={10} /></ToolBtn>
+                      <ToolBtn title="Excluir" onClick={() => deleteChapter(i)} danger><Trash2 size={10} /></ToolBtn>
                     </div>
                   </div>
                 ))}
 
-                {/* Add chapter */}
                 <button onClick={addChapter} style={{
-                  display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "7px 13px",
+                  display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "11px 20px",
                   background: "none", border: "none", borderTop: `1px solid ${BD}`,
-                  color: "#4B5563", fontSize: 11, cursor: "pointer", fontFamily: "inherit", marginTop: 4,
+                  color: "#4B5563", fontSize: 14, cursor: "pointer", fontFamily: "inherit", marginTop: 4,
                 }}>
-                  <Plus size={12} /> Adicionar Capítulo
+                  <Plus size={14} /> Adicionar Capítulo
                 </button>
 
-                {/* Bonus */}
                 {state.bonus && (
                   <button onClick={() => setChapterIdx(-2)} style={{
-                    display: "block", width: "100%", textAlign: "left", padding: "6px 13px",
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 20px",
                     background: chapterIdx === -2 ? `${cA}12` : "none",
                     borderLeft: `3px solid ${chapterIdx === -2 ? cA : "transparent"}`,
                     border: "none", borderTop: `1px solid ${BD}`,
-                    color: chapterIdx === -2 ? "#F0F4FF" : "#6B7FA8", fontSize: 11, cursor: "pointer", fontFamily: "inherit",
-                  }}>
-                    🎁 Bônus
-                  </button>
+                    color: chapterIdx === -2 ? "#F0F4FF" : "#6B7FA8", fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                  }}>🎁 Bônus</button>
                 )}
-                {/* CTA */}
                 <button onClick={() => setChapterIdx(-3)} style={{
-                  display: "block", width: "100%", textAlign: "left", padding: "6px 13px",
+                  display: "block", width: "100%", textAlign: "left", padding: "10px 20px",
                   background: chapterIdx === -3 ? `${cA}12` : "none",
                   borderLeft: `3px solid ${chapterIdx === -3 ? cA : "transparent"}`,
                   border: "none", color: chapterIdx === -3 ? "#F0F4FF" : "#6B7FA8",
-                  fontSize: 11, cursor: "pointer", fontFamily: "inherit",
-                }}>
-                  🎯 CTA Final
-                </button>
+                  fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                }}>🎯 CTA Final</button>
               </>
-            )}
-
-            {/* ── CONFIG ── */}
-            {sideTab === "config" && (
-              <div style={{ padding: "10px 13px" }}>
-                <SideGroup>
-                  <SideLabel>Título do Ebook</SideLabel>
-                  <Input value={state.title} onChange={(e) => update({ title: e.target.value })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 12, height: 30 }} />
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Subtítulo</SideLabel>
-                  <Textarea value={state.subtitle} onChange={(e) => update({ subtitle: e.target.value })} rows={2} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 12, resize: "none" }} />
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Autor</SideLabel>
-                  <Input value={state.author} onChange={(e) => update({ author: e.target.value })} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 12, height: 30 }} />
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Páginas estimadas</SideLabel>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                    {[30, 45, 60, 75, 100].map((p) => (
-                      <button key={p} onClick={() => update({ config: { ...state.config, pages: p } })} style={{
-                        padding: "3px 10px", borderRadius: 20, fontSize: 11,
-                        background: state.config.pages === p ? `${cA}30` : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${state.config.pages === p ? cA : "rgba(255,255,255,0.08)"}`,
-                        color: state.config.pages === p ? cA : "#9BAAC8", cursor: "pointer", fontFamily: "inherit",
-                      }}>{p}p</button>
-                    ))}
-                  </div>
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Idioma</SideLabel>
-                  <select value={state.config.language} onChange={(e) => update({ config: { ...state.config, language: e.target.value as EbookConfig["language"] } })}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 12, height: 30, borderRadius: 6, padding: "0 8px" }}>
-                    <option value="pt-BR">Português (BR)</option>
-                    <option value="en-US">English (US)</option>
-                    <option value="es">Español</option>
-                  </select>
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Tom de escrita</SideLabel>
-                  <select value={state.config.tone} onChange={(e) => update({ config: { ...state.config, tone: e.target.value as EbookConfig["tone"] } })}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 12, height: 30, borderRadius: 6, padding: "0 8px" }}>
-                    <option value="informal">Informal / Conversacional</option>
-                    <option value="formal">Formal / Acadêmico</option>
-                    <option value="inspiracional">Inspiracional</option>
-                    <option value="técnico">Técnico</option>
-                    <option value="storytelling">Storytelling</option>
-                  </select>
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Nível do público</SideLabel>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {(["iniciante", "intermediário", "avançado"] as const).map((l) => (
-                      <button key={l} onClick={() => update({ config: { ...state.config, publicLevel: l } })} style={{
-                        flex: 1, padding: "4px 0", borderRadius: 6, fontSize: 10,
-                        background: state.config.publicLevel === l ? `${cA}25` : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${state.config.publicLevel === l ? cA : "rgba(255,255,255,0.08)"}`,
-                        color: state.config.publicLevel === l ? cA : "#6B7FA8", cursor: "pointer", fontFamily: "inherit",
-                      }}>{l.slice(0, 6)}</button>
-                    ))}
-                  </div>
-                </SideGroup>
-                <SideGroup>
-                  <SideLabel>Elementos</SideLabel>
-                  <ConfigToggle label="Exercícios práticos" value={state.config.includeExercises} onChange={(v) => update({ config: { ...state.config, includeExercises: v } })} color={cA} />
-                  <ConfigToggle label="Checklists" value={state.config.includeChecklist} onChange={(v) => update({ config: { ...state.config, includeChecklist: v } })} color={cA} />
-                  <ConfigToggle label="Seção de Bônus" value={state.config.includeBonus} onChange={(v) => update({ config: { ...state.config, includeBonus: v } })} color={cA} />
-                  <ConfigToggle label="CTA no final" value={state.config.includeCTA} onChange={(v) => update({ config: { ...state.config, includeCTA: v } })} color={cA} />
-                </SideGroup>
-              </div>
             )}
 
             {/* ── DESIGN ── */}
             {sideTab === "design" && (
-              <div style={{ padding: "10px 13px" }}>
+              <div style={{ padding: "4px 20px 24px" }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>🎨 Design</p>
+                <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 24 }}>Cores, tipografia e estilo visual.</p>
+
                 <SideGroup>
                   <SideLabel>Cor principal</SideLabel>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10 }}>
                     <input type="color" value={state.design.colorA} onChange={(e) => update({ design: { ...state.design, colorA: e.target.value } })}
-                      style={{ width: 36, height: 28, border: "none", cursor: "pointer", borderRadius: 4, background: "none" }} />
-                    <code style={{ fontSize: 11, color: "#9BAAC8" }}>{state.design.colorA}</code>
+                      style={{ width: 44, height: 44, border: "none", cursor: "pointer", borderRadius: 8, background: "none", padding: 0 }} />
+                    <div>
+                      <code style={{ fontSize: 15, color: "#F0F4FF", fontWeight: 600 }}>{state.design.colorA}</code>
+                      <p style={{ fontSize: 11, color: "#4B5563", margin: "2px 0 0" }}>Títulos, destaques, CTAs</p>
+                    </div>
                   </div>
                 </SideGroup>
                 <SideGroup>
                   <SideLabel>Cor secundária</SideLabel>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 10 }}>
                     <input type="color" value={state.design.colorB} onChange={(e) => update({ design: { ...state.design, colorB: e.target.value } })}
-                      style={{ width: 36, height: 28, border: "none", cursor: "pointer", borderRadius: 4, background: "none" }} />
-                    <code style={{ fontSize: 11, color: "#9BAAC8" }}>{state.design.colorB}</code>
+                      style={{ width: 44, height: 44, border: "none", cursor: "pointer", borderRadius: 8, background: "none", padding: 0 }} />
+                    <div>
+                      <code style={{ fontSize: 15, color: "#F0F4FF", fontWeight: 600 }}>{state.design.colorB}</code>
+                      <p style={{ fontSize: 11, color: "#4B5563", margin: "2px 0 0" }}>Gradiente, fundos</p>
+                    </div>
                   </div>
                 </SideGroup>
                 <SideGroup>
-                  <SideLabel>Fonte</SideLabel>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <SideLabel>Tipografia</SideLabel>
+                  <div style={{ display: "flex", gap: 8 }}>
                     {(["sans", "serif"] as const).map((f) => (
                       <button key={f} onClick={() => update({ design: { ...state.design, font: f } })} style={{
-                        flex: 1, padding: "6px 0", borderRadius: 6, fontSize: 11,
+                        flex: 1, padding: "11px 0", borderRadius: 8, fontSize: 14,
                         border: `1px solid ${state.design.font === f ? cA : "rgba(255,255,255,0.10)"}`,
                         background: state.design.font === f ? `${cA}20` : "rgba(255,255,255,0.04)",
                         color: state.design.font === f ? "#F0F4FF" : "#6B7FA8", cursor: "pointer",
@@ -997,10 +1643,10 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                 </SideGroup>
                 <SideGroup>
                   <SideLabel>Estilo visual</SideLabel>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {(["clean", "premium", "luxury", "dark", "feminino", "corporate", "neon"] as const).map((s) => (
                       <button key={s} onClick={() => update({ config: { ...state.config, visualStyle: s } })} style={{
-                        padding: "3px 9px", borderRadius: 20, fontSize: 10,
+                        padding: "6px 12px", borderRadius: 20, fontSize: 13,
                         background: state.config.visualStyle === s ? `${cA}25` : "rgba(255,255,255,0.04)",
                         border: `1px solid ${state.config.visualStyle === s ? cA : "rgba(255,255,255,0.08)"}`,
                         color: state.config.visualStyle === s ? cA : "#6B7FA8", cursor: "pointer", fontFamily: "inherit",
@@ -1010,14 +1656,14 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                 </SideGroup>
                 <SideGroup>
                   <SideLabel>Preview</SideLabel>
-                  <div style={{ height: 56, borderRadius: 8, background: `linear-gradient(135deg,${cA},${cB})`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, fontFamily: state.design.font === "serif" ? "Georgia" : "Inter" }}>
-                      {state.title.slice(0, 22)}
+                  <div style={{ height: 72, borderRadius: 10, background: `linear-gradient(135deg,${cA},${cB})`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${cA}40` }}>
+                    <span style={{ color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: state.design.font === "serif" ? "Georgia" : "Inter", textShadow: "0 1px 4px rgba(0,0,0,0.4)", padding: "0 16px", textAlign: "center" }}>
+                      {state.title.slice(0, 28)}
                     </span>
                   </div>
                 </SideGroup>
                 <button onClick={() => update({ design: { colorA: template.colorA, colorB: template.colorB, font: "sans" } })}
-                  style={{ width: "100%", padding: "6px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 6, color: "#6B7FA8", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+                  style={{ width: "100%", padding: "11px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#6B7FA8", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
                   Restaurar cores do template
                 </button>
               </div>
@@ -1025,67 +1671,201 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
 
             {/* ── CAPA ── */}
             {sideTab === "capa" && (
-              <div style={{ padding: "10px 13px" }}>
-                {/* Cover preview */}
-                <div style={{
-                  aspectRatio: "0.707", borderRadius: 8, overflow: "hidden", marginBottom: 10,
-                  background: state.coverUrl ? `url(${state.coverUrl}) center/cover` : `linear-gradient(145deg,${cA},${cB})`,
-                  position: "relative",
-                }}>
+              <div style={{ padding: "4px 20px 24px" }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>🖼 Capa</p>
+                <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 20 }}>Gere com IA, envie uma imagem ou use o visual automático.</p>
+
+                {/* Error recovery card */}
+                {aiCoverError && (
+                  <div style={{ marginBottom: 20, padding: "16px", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.30)", borderRadius: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <AlertCircle size={16} style={{ color: "#FBBF24", flexShrink: 0 }} />
+                      <p style={{ fontSize: 13, color: "#F0F4FF", fontWeight: 600, margin: 0 }}>
+                        {aiCoverError === "quota" ? "Limite da IA atingido" : aiCoverError === "unavailable" ? "IA temporariamente indisponível" : "Erro ao gerar capa"}
+                      </p>
+                    </div>
+                    <p style={{ fontSize: 13, color: "#9BAAC8", lineHeight: 1.55, margin: "0 0 14px" }}>
+                      Limite da IA atingido. Você pode enviar uma capa manual ou usar a capa automática.
+                    </p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <button onClick={() => { handleFallbackCover(); setAiCoverError(null); }} style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                        padding: "11px 16px", background: `${cA}20`, border: `1px solid ${cA}50`,
+                        borderRadius: 8, color: cA, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                        <Sparkles size={13} /> Usar capa automática
+                      </button>
+                      <button onClick={() => { coverFileRef.current?.click(); }} style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                        padding: "11px 16px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                        borderRadius: 8, color: "#C8D4F0", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                        <Upload size={13} /> Enviar capa manual
+                      </button>
+                      <button onClick={() => { setAiCoverError(null); setCoverTab("ai"); }} style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+                        padding: "11px 16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 8, color: "#6B7FA8", fontSize: 13, cursor: "pointer", fontFamily: "inherit",
+                      }}>
+                        <RefreshCw size={13} /> Tentar novamente
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cover thumbnail — click to open full-size modal */}
+                <div
+                  onClick={() => state.coverUrl && setCoverModalOpen(true)}
+                  style={{
+                    aspectRatio: "0.707", borderRadius: 10, overflow: "hidden", marginBottom: 14,
+                    background: state.coverUrl ? `url(${state.coverUrl}) center/cover` : `linear-gradient(145deg,${cA},${cB})`,
+                    position: "relative", cursor: state.coverUrl ? "zoom-in" : "default",
+                    boxShadow: state.coverUrl ? "0 8px 32px rgba(0,0,0,0.5)" : "none",
+                  }}
+                >
+                  <div style={{
+                    position: "absolute", top: 10, right: 10, zIndex: 10,
+                    background: "linear-gradient(135deg,#FFD700,#FFA500)",
+                    borderRadius: "50%", width: 30, height: 30,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 900, color: "#000",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.5)", letterSpacing: 0.5,
+                    pointerEvents: "none",
+                  }}>FLOW</div>
+                  {state.coverUrl && (
+                    <div style={{
+                      position: "absolute", inset: 0, background: "rgba(0,0,0,0)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      transition: "background 0.2s",
+                    }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(0,0,0,0.3)"; (e.currentTarget.querySelector("svg") as SVGElement | null)?.setAttribute("style", "opacity:1;color:#fff"); }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = "rgba(0,0,0,0)"; (e.currentTarget.querySelector("svg") as SVGElement | null)?.setAttribute("style", "opacity:0;color:#fff"); }}
+                    >
+                      <Eye size={28} style={{ color: "#fff", opacity: 0, transition: "opacity 0.2s", pointerEvents: "none" }} />
+                    </div>
+                  )}
                   {!state.coverUrl && (
-                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", padding: 10, textAlign: "center" }}>
-                      <span style={{ fontSize: 32, marginBottom: 6 }}>{template.emoji}</span>
-                      <p style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.3, textShadow: "0 1px 6px rgba(0,0,0,.5)" }}>{state.title.slice(0, 40)}</p>
-                      <p style={{ fontSize: 9, opacity: 0.65, marginTop: 4 }}>por {state.author}</p>
+                    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", padding: 14, textAlign: "center" }}>
+                      <span style={{ fontSize: 40, marginBottom: 8 }}>{template.emoji}</span>
+                      <p style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3, textShadow: "0 1px 6px rgba(0,0,0,.5)", margin: "0 0 6px" }}>{state.title.slice(0, 40)}</p>
+                      <p style={{ fontSize: 11, opacity: 0.65, margin: 0 }}>por {state.author}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Sub-tabs */}
-                <div style={{ display: "flex", gap: 3, marginBottom: 10 }}>
+                <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
                   {(["preview", "ai", "upload"] as const).map((t) => (
                     <button key={t} onClick={() => setCoverTab(t)} style={{
-                      flex: 1, padding: "4px 0", fontSize: 10, borderRadius: 5, cursor: "pointer", fontFamily: "inherit",
+                      flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit",
                       background: coverTab === t ? `${cA}25` : "rgba(255,255,255,0.04)",
                       border: `1px solid ${coverTab === t ? cA : "rgba(255,255,255,0.08)"}`,
                       color: coverTab === t ? cA : "#6B7FA8",
                     }}>
-                      {t === "preview" ? "Ver" : t === "ai" ? "✨ IA" : "Upload"}
+                      {t === "preview" ? "Ver" : t === "ai" ? "✨ IA" : "📎 Upload"}
                     </button>
                   ))}
                 </div>
 
+                {/* ── Ver tab ── */}
+                {coverTab === "preview" && (() => {
+                  const saved = loadCover(template.id);
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {state.coverUrl ? (
+                        <>
+                          <button onClick={() => setCoverModalOpen(true)} style={{
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%",
+                            padding: "11px 16px", background: `${cA}18`,
+                            border: `1px solid ${cA}40`, borderRadius: 8,
+                            color: cA, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                          }}>
+                            <Eye size={13} /> Abrir em tamanho real
+                          </button>
+                          {saved && (
+                            <p style={{ fontSize: 12, color: "#6B7FA8", margin: 0 }}>
+                              {saved.source === "gemini" ? "✨ Gerada por IA" : saved.source === "upload" ? "⬆ Upload manual" : "🎨 Visual premium"}
+                              {" · "}
+                              {new Date(saved.updatedAt).toLocaleDateString("pt-BR")}
+                            </p>
+                          )}
+                          {saved?.prompt && (
+                            <p style={{ fontSize: 12, color: "#4B5563", lineHeight: 1.5, margin: 0, fontStyle: "italic" }}>
+                              "{saved.prompt.slice(0, 70)}{saved.prompt.length > 70 ? "…" : ""}"
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ fontSize: 13, color: "#6B7FA8", lineHeight: 1.6, margin: 0 }}>
+                            Sem capa definida. Gere com IA, faça upload ou use a capa visual automática.
+                          </p>
+                          <button onClick={handleFallbackCover} style={{
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%",
+                            padding: "11px 16px", background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8,
+                            color: "#9BAAC8", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                          }}>
+                            <Sparkles size={13} /> Gerar capa visual automática
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* ── IA tab ── */}
                 {coverTab === "ai" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <SideLabel>Prompt da capa (inglês)</SideLabel>
                     <Textarea
                       value={aiPrompt}
                       onChange={(e) => setAiPrompt(e.target.value)}
                       rows={4}
-                      placeholder="Professional ebook cover, dark premium gradient..."
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#F0F4FF", fontSize: 11, resize: "none" }}
+                      placeholder="Professional ebook cover, dark premium gradient, minimalist typography..."
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#F0F4FF", fontSize: 14, resize: "none", borderRadius: 8, lineHeight: 1.6 }}
                     />
-                    <Button size="sm" disabled={aiLoading || !aiPrompt.trim()} onClick={handleAiCover}
-                      style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 11, height: 30, gap: 5 }}>
-                      {aiLoading ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                      {aiLoading ? "Gerando..." : "Gerar com Gemini IA"}
+                    <Button disabled={aiLoading || !aiPrompt.trim()} onClick={handleAiCover}
+                      style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 14, height: 48, gap: 8, borderRadius: 10, fontWeight: 700, width: "100%" }}>
+                      {aiLoading ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                      {aiLoading ? "Gerando capa..." : "Gerar com Gemini IA"}
                     </Button>
+                    <button onClick={handleFallbackCover}
+                      style={{ fontSize: 13, color: "#4B5563", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "center", padding: "4px 0" }}>
+                      Sem IA? → Usar capa automática gratuita
+                    </button>
                   </div>
                 )}
 
+                {/* ── Upload tab ── */}
                 {coverTab === "upload" && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <p style={{ fontSize: 13, color: "#6B7FA8", lineHeight: 1.6, margin: 0 }}>
+                      A imagem é comprimida e salva automaticamente. Funciona offline e em qualquer dispositivo.
+                    </p>
                     <input ref={coverFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleCoverUpload} />
-                    <Button size="sm" variant="outline" className="w-full" onClick={() => coverFileRef.current?.click()}
-                      style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 11, height: 30, gap: 4 }}>
-                      <Upload size={11} /> Escolher imagem
-                    </Button>
+                    <button onClick={() => coverFileRef.current?.click()} style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
+                      padding: "13px 16px", background: "rgba(255,255,255,0.05)", border: `1px dashed ${cA}50`,
+                      borderRadius: 10, color: cA, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                    }}>
+                      <Upload size={15} /> Escolher imagem do dispositivo
+                    </button>
+                    <p style={{ fontSize: 12, color: "#374151", margin: 0, textAlign: "center" }}>
+                      JPG, PNG, WebP · máx ~3 MB
+                    </p>
                   </div>
                 )}
 
                 {state.coverUrl && (
-                  <button onClick={() => update({ coverUrl: "" })} style={{ width: "100%", marginTop: 8, padding: "4px", background: "none", border: "none", color: "#4B5563", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
-                    ✕ Remover capa
+                  <button
+                    onClick={() => {
+                      deleteCover(template.id);
+                      clearCoverForLang(template.id, state.config.language);
+                      setState((p) => ({ ...p, coverUrl: "" }));
+                    }}
+                    style={{ width: "100%", marginTop: 14, padding: "8px", background: "none", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 7, color: "#374151", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    ✕ Remover capa atual
                   </button>
                 )}
               </div>
@@ -1093,27 +1873,75 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
 
             {/* ── EXPORTAR ── */}
             {sideTab === "exportar" && (
-              <div style={{ padding: "10px 13px", display: "flex", flexDirection: "column", gap: 7 }}>
-                <p style={{ fontSize: 11, color: "#4B5563", lineHeight: 1.5 }}>
-                  O PDF inclui: capa, índice, capítulos formatados, checklists, exercícios, bônus e CTA.
-                </p>
-                <Button size="sm" disabled={pdfLoading} onClick={handleExportPdf}
-                  style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 12, height: 34, gap: 6, justifyContent: "flex-start" }}>
-                  {pdfLoading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                  Exportar PDF Profissional
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleExportHtml}
-                  style={{ borderColor: "rgba(255,255,255,0.12)", fontSize: 12, height: 34, gap: 6, justifyContent: "flex-start" }}>
-                  <FileText size={13} /> Exportar HTML
-                </Button>
+              <div style={{ padding: "4px 20px 24px" }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>📤 Exportar</p>
+                <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 24 }}>PDF, HTML e verificação de consistência.</p>
 
-                <div style={{ marginTop: 8, padding: "10px 12px", background: "rgba(255,255,255,0.04)", borderRadius: 8, fontSize: 11, color: "#6B7FA8", lineHeight: 1.7 }}>
-                  <strong style={{ color: "#9BAAC8", display: "block", marginBottom: 4 }}>Estatísticas</strong>
-                  <span style={{ display: "block" }}>{state.chapters.length} capítulos</span>
-                  <span style={{ display: "block" }}>{totalWords.toLocaleString("pt-BR")} palavras</span>
-                  <span style={{ display: "block" }}>~{state.config.pages} páginas</span>
-                  <span style={{ display: "block" }}>Idioma: {state.config.language}</span>
-                </div>
+                <SideGroup>
+                  <Button disabled={pdfLoading} onClick={handleExportPdf}
+                    style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 15, height: 48, gap: 8, borderRadius: 10, fontWeight: 700, width: "100%", justifyContent: "center" }}>
+                    {pdfLoading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    {pdfLoading ? "Gerando PDF..." : "Exportar PDF Profissional"}
+                  </Button>
+                  <p style={{ fontSize: 12, color: "#374151", margin: "8px 0 0", lineHeight: 1.5 }}>
+                    Inclui capa, índice, capítulos, checklists, exercícios, bônus e CTA.
+                  </p>
+                </SideGroup>
+
+                <SideGroup>
+                  <button onClick={handleExportHtml} style={{
+                    display: "flex", alignItems: "center", gap: 8, width: "100%",
+                    padding: "11px 16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 8, color: "#9BAAC8", fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                  }}>
+                    <FileText size={14} /> Exportar HTML
+                  </button>
+                </SideGroup>
+
+                {/* Stats */}
+                <SideGroup>
+                  <SideLabel>Estatísticas</SideLabel>
+                  <div style={{ padding: "14px 16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 0" }}>
+                    {[
+                      ["Capítulos", state.chapters.length],
+                      ["Palavras", totalWords.toLocaleString("pt-BR")],
+                      ["Páginas", `~${state.config.pages}`],
+                      ["Idioma", state.config.language],
+                    ].map(([label, value]) => (
+                      <div key={String(label)}>
+                        <p style={{ fontSize: 11, color: "#4B5563", margin: "0 0 2px", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</p>
+                        <p style={{ fontSize: 15, color: "#F0F4FF", fontWeight: 700, margin: 0 }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </SideGroup>
+
+                {/* Consistency check */}
+                <SideGroup>
+                  <SideLabel>Revisão de consistência</SideLabel>
+                  <Button disabled={consistencyLoading} onClick={handleConsistencyCheck}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#9BAAC8", fontSize: 14, height: 44, gap: 8, borderRadius: 8, justifyContent: "center" }}>
+                    {consistencyLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckSquare size={14} />}
+                    {consistencyLoading ? "Verificando..." : "Verificar consistência com IA"}
+                  </Button>
+                  {state.consistencyReport && (
+                    <div style={{ marginTop: 14, padding: "14px 16px", background: state.consistencyReport.isClean ? "rgba(16,185,129,0.08)" : "rgba(251,191,36,0.08)", border: `1px solid ${state.consistencyReport.isClean ? "rgba(16,185,129,0.25)" : "rgba(251,191,36,0.25)"}`, borderRadius: 10 }}>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: state.consistencyReport.isClean ? "#10B981" : "#FBBF24", margin: "0 0 8px" }}>
+                        {state.consistencyReport.isClean ? "✓ Ebook consistente!" : `⚠ ${state.consistencyReport.issues.length} problema${state.consistencyReport.issues.length !== 1 ? "s" : ""} encontrado${state.consistencyReport.issues.length !== 1 ? "s" : ""}`}
+                      </p>
+                      {state.consistencyReport.issues.map((issue, i) => (
+                        <div key={i} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: i < state.consistencyReport!.issues.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
+                          <p style={{ fontSize: 12, color: "#FBBF24", fontWeight: 600, margin: "0 0 3px" }}>{issue.chapter} — {issue.type}</p>
+                          <p style={{ fontSize: 12, color: "#9BAAC8", margin: "0 0 4px", lineHeight: 1.5 }}>{issue.problem}</p>
+                          <p style={{ fontSize: 12, color: "#10B981", margin: 0, lineHeight: 1.5 }}>→ {issue.fix}</p>
+                        </div>
+                      ))}
+                      <p style={{ fontSize: 11, color: "#374151", margin: "6px 0 0" }}>
+                        {new Date(state.consistencyReport.generatedAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                  )}
+                </SideGroup>
               </div>
             )}
           </div>
@@ -1124,22 +1952,22 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
 
           {/* Chapter navigation */}
           {chapterIdx >= 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 32px 0", marginBottom: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 36px 0", marginBottom: 0, borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
               <button onClick={() => setChapterIdx((p) => Math.max(0, p - 1))} disabled={chapterIdx === 0}
-                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: chapterIdx === 0 ? "#2D3748" : "#6B7FA8", cursor: chapterIdx === 0 ? "default" : "pointer", fontSize: 11, fontFamily: "inherit" }}>
-                <ChevronLeft size={14} /> Anterior
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: chapterIdx === 0 ? "#2D3748" : "#6B7FA8", cursor: chapterIdx === 0 ? "default" : "pointer", fontSize: 13, fontFamily: "inherit", padding: "4px 0" }}>
+                <ChevronLeft size={15} /> Anterior
               </button>
-              <span style={{ fontSize: 11, color: "#4B5563" }}>
+              <span style={{ fontSize: 12, color: "#4B5563" }}>
                 Capítulo {chapterIdx + 1} de {state.chapters.length}
               </span>
               <button onClick={() => setChapterIdx((p) => Math.min(state.chapters.length - 1, p + 1))} disabled={chapterIdx === state.chapters.length - 1}
-                style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: chapterIdx === state.chapters.length - 1 ? "#2D3748" : "#6B7FA8", cursor: chapterIdx === state.chapters.length - 1 ? "default" : "pointer", fontSize: 11, fontFamily: "inherit" }}>
-                Próximo <ChevronRight size={14} />
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", color: chapterIdx === state.chapters.length - 1 ? "#2D3748" : "#6B7FA8", cursor: chapterIdx === state.chapters.length - 1 ? "default" : "pointer", fontSize: 13, fontFamily: "inherit", padding: "4px 0" }}>
+                Próximo <ChevronRight size={15} />
               </button>
             </div>
           )}
 
-          <div style={{ maxWidth: 740, margin: "0 auto", padding: "24px 32px" }}>
+          <div style={{ maxWidth: 760, margin: "0 auto", padding: "32px 40px" }}>
 
             {/* ── Meta editor ── */}
             {chapterIdx === -1 && (
@@ -1307,6 +2135,57 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           </aside>
         )}
       </div>
+
+      {/* ── Cover modal / lightbox ── */}
+      {coverModalOpen && state.coverUrl && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setCoverModalOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 2000,
+            background: "rgba(0,0,0,0.92)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: "relative", maxWidth: "min(90vw, 480px)", maxHeight: "92vh" }}
+          >
+            <img
+              src={state.coverUrl}
+              alt="Capa do ebook"
+              style={{
+                width: "100%", maxHeight: "88vh",
+                objectFit: "contain", borderRadius: 10,
+                boxShadow: "0 24px 80px rgba(0,0,0,0.9)",
+              }}
+            />
+            <button
+              onClick={() => setCoverModalOpen(false)}
+              style={{
+                position: "absolute", top: -14, right: -14,
+                background: "#1E293B", border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: "50%", width: 34, height: 34,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#F0F4FF", cursor: "pointer",
+              }}
+            >
+              <X size={16} />
+            </button>
+            {/* FLOW badge on modal */}
+            <div style={{
+              position: "absolute", bottom: 16, right: 16,
+              background: "linear-gradient(135deg,#FFD700,#FFA500)",
+              borderRadius: "50%", width: 40, height: 40,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 9, fontWeight: 900, color: "#000",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.6)", letterSpacing: 0.5,
+            }}>FLOW</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

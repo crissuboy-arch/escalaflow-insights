@@ -384,19 +384,13 @@ export async function aiGenerateCover(
     customPrompt?.trim() ||
     `Capa de ebook profissional. Título "${briefing.title}". Subtítulo "${briefing.subtitle}". Nicho: ${briefing.niche}. ${styleByLayout[layout] ?? ""}.${styleHint}${paletteHint} Sem rostos humanos, alta qualidade, formato vertical 1024x1536.`;
   try {
-    const data = (await aiChat({
-      model: "google/gemini-3.1-flash-image-preview",
-      messages: [{ role: "user", content: prompt }],
-      modalities: ["image", "text"],
-    })) as any;
-    const imgUrl: string | undefined =
-      data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ??
-      data?.choices?.[0]?.message?.images?.[0]?.url;
-    if (!imgUrl) throw new Error("Modelo não retornou imagem.");
-    return imgUrl;
-  } catch {
-    return generateFallbackCoverSvg(briefing.title, briefing.subtitle, layout);
+    const data = (await aiChat({ model: "google/gemini-3.1-flash-image-preview", messages: [{ role: "user", content: prompt }], modalities: ["image", "text"] })) as any;
+    const imgUrl: string | undefined = data?.choices?.[0]?.message?.images?.[0]?.image_url?.url ?? data?.choices?.[0]?.message?.images?.[0]?.url;
+    if (imgUrl) return imgUrl;
+  } catch (e) {
+    console.warn("[ebook] Gemini falhou, usando capa local:", e instanceof Error ? e.message : e);
   }
+  return generateFallbackCoverSvg(briefing.title, briefing.subtitle, layout);
 }
 
 export async function aiGenerateChapterImage(
