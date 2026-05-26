@@ -17,6 +17,7 @@ export interface PdfChapter {
   checklist?: string[];
   exercise?: string;
   pullQuote?: string;
+  images?: { dataUrl: string; aspectRatio: number }[];
 }
 
 export interface PdfState {
@@ -402,6 +403,23 @@ export async function generateEbookPDF(
 
       addParagraph(ch.exercise, { size: 9.5, color: [40, 40, 40], indent: 2, spaceAfter: 4 });
       page.y += 4;
+    }
+
+    // Block images
+    if (ch.images && ch.images.length > 0) {
+      for (const img of ch.images) {
+        const imgW = TW;
+        const imgH = Math.min(imgW / Math.max(img.aspectRatio, 0.1), 150);
+        checkSpace(imgH + 10);
+        page.y += 5;
+        try {
+          const fmt = img.dataUrl.startsWith("data:image/png") ? "PNG"
+            : img.dataUrl.startsWith("data:image/gif") ? "GIF"
+            : "JPEG";
+          doc.addImage(img.dataUrl, fmt, ML, page.y, imgW, imgH);
+          page.y += imgH + 7;
+        } catch { /* skip broken image */ }
+      }
     }
   }
 

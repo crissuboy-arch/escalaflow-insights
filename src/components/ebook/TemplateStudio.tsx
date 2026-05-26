@@ -229,8 +229,8 @@ function loadState(template: TemplateMaster): StudioState {
   };
 }
 
-function toPdfChapters(chapters: StudioChapter[]): PdfChapter[] {
-  return chapters.map((ch) => {
+async function toPdfChapters(chapters: StudioChapter[]): Promise<PdfChapter[]> {
+  return Promise.all(chapters.map(async (ch) => {
     const blocks: Block[] = Array.isArray(ch.blocks) ? ch.blocks : [];
     const textContent = blocks
       .filter((b) => b.type === "text" || b.type === "cta")
@@ -239,6 +239,19 @@ function toPdfChapters(chapters: StudioChapter[]): PdfChapter[] {
     const quoteBlock = blocks.find((b) => b.type === "quote");
     const checkBlock = blocks.find((b) => b.type === "checklist");
     const calloutBlock = blocks.find((b) => b.type === "callout");
+    const imageBlocks = blocks.filter((b) => b.type === "image" && b.meta?.imageUrl);
+    const images = await Promise.all(
+      imageBlocks.map(async (b) => {
+        const dataUrl = b.meta!.imageUrl!;
+        const aspectRatio = await new Promise<number>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img.width / Math.max(img.height, 1));
+          img.onerror = () => resolve(4 / 3);
+          img.src = dataUrl;
+        });
+        return { dataUrl, aspectRatio };
+      }),
+    );
     return {
       id: ch.id,
       title: ch.title,
@@ -247,8 +260,9 @@ function toPdfChapters(chapters: StudioChapter[]): PdfChapter[] {
       pullQuote: quoteBlock?.content,
       checklist: checkBlock?.content.split("\n").filter(Boolean),
       exercise: calloutBlock?.content,
+      images: images.length > 0 ? images : undefined,
     };
-  });
+  }));
 }
 
 // ─── Block metadata ───────────────────────────────────────────────────────────
@@ -428,6 +442,153 @@ function ToolBtn({ children, onClick, title, danger }: { children: React.ReactNo
     }}>
       {children}
     </button>
+  );
+}
+
+// ─── Full Preview Modal ───────────────────────────────────────────────────────
+
+function FullPreviewModal({
+  state, template, onClose,
+}: {
+  state: StudioState;
+  template: TemplateMaster;
+  onClose: () => void;
+}) {
+  const cA = state.design.colorA;
+  const cB = state.design.colorB;
+  const ff = state.design.font === "serif" ? "Georgia,serif" : "Inter,sans-serif";
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  function renderBlock(block: Block): React.ReactNode {
+    switch (block.type) {
+      case "divider":
+        return <hr key={block.id} style={{ border: "none", borderTop: `1px solid ${cA}25`, margin: "20px 0" }} />;
+      case "image":
+        return block.meta?.imageUrl ? (
+          <div key={block.id} style={{ textAlign: "center", margin: "24px 0" }}>
+            <img src={block.meta.imageUrl} alt="" style={{ maxWidth: "100%", borderRadius: 8, boxShadow: "0 2px 16px rgba(0,0,0,0.1)" }} />
+          </div>
+        ) : null;
+      case "quote":
+        return (
+          <blockquote key={block.id} style={{ borderLeft: `4px solid ${cA}`, background: `${cA}06`, borderRadius: "0 8px 8px 0", padding: "14px 18px 14px 20px", margin: "20px 0", fontStyle: "italic", color: "#555" }}>
+            <span style={{ fontSize: 15, lineHeight: 1.8 }}>"{block.content}"</span>
+          </blockquote>
+        );
+      case "callout":
+        return (
+          <div key={block.id} style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "16px 20px", margin: "20px 0" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: 0.8, margin: "0 0 8px" }}>📝 Exercício</p>
+            <p style={{ color: "#78350F", margin: 0, lineHeight: 1.75, fontSize: 14 }}>{block.content}</p>
+          </div>
+        );
+      case "checklist":
+        return (
+          <div key={block.id} style={{ background: "#f8fafb", borderRadius: 8, padding: "16px 20px", margin: "20px 0" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.8, color: "#374151", margin: "0 0 12px" }}>✔ Checklist</p>
+            {block.content.split("\n").filter(Boolean).map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 7 }}>
+                <div style={{ width: 16, height: 16, border: `1.5px solid ${cA}60`, borderRadius: 3, flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 14, color: "#333", lineHeight: 1.6 }}>{item}</span>
+              </div>
+            ))}
+          </div>
+        );
+      case "cta":
+        return (
+          <div key={block.id} style={{ background: `linear-gradient(135deg,${cA}18,${cA}08)`, border: `1px solid ${cA}30`, borderRadius: 10, padding: "22px 24px", margin: "20px 0", textAlign: "center" }}>
+            <p style={{ fontSize: 16, fontWeight: 700, color: "#111", margin: "0 0 14px", lineHeight: 1.5 }}>{block.content}</p>
+            <span style={{ display: "inline-block", background: cA, color: "#fff", padding: "9px 26px", borderRadius: 6, fontSize: 14, fontWeight: 700 }}>Clique aqui</span>
+          </div>
+        );
+      default:
+        return block.content ? (
+          <p key={block.id} style={{ fontSize: 15, lineHeight: 1.9, color: "#222", margin: "0 0 16px", fontFamily: ff, whiteSpace: "pre-wrap" }}>{block.content}</p>
+        ) : null;
+    }
+  }
+
+  const page: React.CSSProperties = {
+    width: "100%", maxWidth: 794, background: "#fff",
+    borderRadius: 6, boxShadow: "0 6px 40px rgba(0,0,0,0.5)",
+    marginBottom: 20, overflow: "hidden",
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 2100, background: "rgba(5,8,20,0.96)", overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", padding: "56px 20px 40px" }}
+      onClick={onClose}
+    >
+      {/* Close bar */}
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 2200, background: "rgba(8,13,26,0.95)", backdropFilter: "blur(8px)", borderBottom: "1px solid rgba(255,255,255,0.08)", height: 48, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px" }}>
+        <span style={{ fontSize: 13, color: "#9BAAC8" }}>{template.emoji} {state.title}</span>
+        <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#F0F4FF", borderRadius: 6, padding: "5px 14px", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>
+          <X size={13} /> Fechar (Esc)
+        </button>
+      </div>
+
+      {/* Page 1 — Cover */}
+      <div style={page} onClick={(e) => e.stopPropagation()}>
+        <div style={{ minHeight: 560, background: state.coverUrl ? `url(${state.coverUrl}) center/cover no-repeat` : `linear-gradient(145deg,${cA},${cB})`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "64px 48px", textAlign: "center" }}>
+          {!state.coverUrl && <p style={{ fontSize: 56, margin: "0 0 20px" }}>{template.emoji}</p>}
+          <h1 style={{ fontSize: 38, fontWeight: 900, color: "#fff", lineHeight: 1.15, margin: "0 0 14px", fontFamily: ff, textShadow: "0 2px 16px rgba(0,0,0,0.4)" }}>{state.title}</h1>
+          <p style={{ fontSize: 17, color: "rgba(255,255,255,0.8)", margin: "0 0 28px", fontFamily: ff, maxWidth: 420 }}>{state.subtitle}</p>
+          <div style={{ width: 40, height: 2, background: "rgba(255,255,255,0.45)", margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.65)", fontFamily: ff }}>por {state.author}</p>
+        </div>
+      </div>
+
+      {/* Page 2 — Table of contents */}
+      <div style={page} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "48px 52px", fontFamily: ff }}>
+          <div style={{ borderLeft: `5px solid ${cA}`, paddingLeft: 18, marginBottom: 36 }}>
+            <p style={{ fontSize: 11, color: cA, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 700, margin: "0 0 4px" }}>Conteúdo</p>
+            <h2 style={{ fontSize: 30, fontWeight: 800, color: "#111", margin: 0 }}>Sumário</h2>
+          </div>
+          {state.chapters.map((ch, i) => (
+            <div key={ch.id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "12px 0", borderBottom: "1px solid #f0f0f0" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: cA, minWidth: 28 }}>{String(i + 1).padStart(2, "0")}</span>
+              <span style={{ fontSize: 15, color: "#111", flex: 1, lineHeight: 1.4 }}>{ch.title}</span>
+              {ch.badge && <span style={{ fontSize: 11, color: "#888", background: "#f5f5f5", padding: "2px 8px", borderRadius: 10, flexShrink: 0 }}>{ch.badge}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Chapter pages */}
+      {state.chapters.map((ch, chIdx) => (
+        <div key={ch.id} style={page} onClick={(e) => e.stopPropagation()}>
+          <div style={{ background: `linear-gradient(135deg,${cA},${cB})`, padding: "24px 52px 20px" }}>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 700, margin: "0 0 6px" }}>Capítulo {chIdx + 1}</p>
+            <h2 style={{ fontSize: 26, fontWeight: 800, color: "#fff", margin: 0, lineHeight: 1.2 }}>{ch.title}</h2>
+            {ch.badge && <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", margin: "8px 0 0" }}>{ch.badge}</p>}
+          </div>
+          <div style={{ padding: "32px 52px 48px", fontFamily: ff }}>
+            {(Array.isArray(ch.blocks) ? ch.blocks : []).map(renderBlock)}
+          </div>
+        </div>
+      ))}
+
+      {/* Last page — Author */}
+      <div style={page} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "64px 52px", textAlign: "center", fontFamily: ff, display: "flex", flexDirection: "column", alignItems: "center", minHeight: 360 }}>
+          <div style={{ width: 88, height: 88, borderRadius: "50%", background: `linear-gradient(135deg,${cA},${cB})`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24, boxShadow: `0 4px 24px ${cA}40` }}>
+            <span style={{ fontSize: 36 }}>✍</span>
+          </div>
+          <h3 style={{ fontSize: 26, fontWeight: 800, color: "#111", margin: "0 0 14px" }}>{state.author}</h3>
+          {state.bible?.salesModel ? (
+            <p style={{ fontSize: 15, color: "#555", maxWidth: 440, lineHeight: 1.75, margin: "0 auto 28px" }}>{state.bible.salesModel}</p>
+          ) : null}
+          <div style={{ width: 48, height: 3, background: `linear-gradient(90deg,${cA},${cB})`, borderRadius: 2, margin: "0 auto 20px" }} />
+          <p style={{ fontSize: 13, color: "#aaa" }}>{state.title}</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -771,6 +932,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   const [sideTab, setSideTab] = useState<SideTab>("bible");
   const [chapterIdx, setChapterIdx] = useState(0);
   const [showPreview, setShowPreview] = useState(true);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -1245,13 +1407,14 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   async function handleExportPdf() {
     setPdfLoading(true);
     try {
+      const chapters = await toPdfChapters(state.chapters);
       await generateEbookPDF(
         {
           title: state.title,
           subtitle: state.subtitle,
           author: state.author,
           coverUrl: state.coverUrl,
-          chapters: toPdfChapters(state.chapters),
+          chapters,
           bonus: state.bonus,
           cta: state.cta,
           finalPage: state.finalPage,
@@ -1311,10 +1474,10 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           {saving ? <><Check size={12} /> Salvo</> : dirty ? "● Não salvo" : `${totalWords.toLocaleString("pt-BR")} palavras`}
         </span>
         <button
-          onClick={() => setShowPreview(!showPreview)}
-          style={{ display: "flex", alignItems: "center", gap: 5, background: showPreview ? `${cA}20` : "rgba(255,255,255,0.04)", border: `1px solid ${showPreview ? cA : "rgba(255,255,255,0.10)"}`, color: showPreview ? cA : "#6B7FA8", cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, fontFamily: "inherit" }}
+          onClick={() => setPreviewModalOpen(true)}
+          style={{ display: "flex", alignItems: "center", gap: 5, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", color: "#9BAAC8", cursor: "pointer", fontSize: 12, padding: "6px 12px", borderRadius: 7, fontFamily: "inherit" }}
         >
-          {showPreview ? <Eye size={13} /> : <EyeOff size={13} />} Preview
+          <Eye size={13} /> Preview
         </button>
         <Button disabled={pdfLoading} onClick={handleExportPdf}
           style={{ background: `linear-gradient(135deg,${cA},${cB})`, fontSize: 13, height: 36, gap: 6, flexShrink: 0, borderRadius: 8, paddingLeft: 14, paddingRight: 14 }}>
@@ -2174,6 +2337,11 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           </aside>
         )}
       </div>
+
+      {/* ── Full preview modal ── */}
+      {previewModalOpen && (
+        <FullPreviewModal state={state} template={template} onClose={() => setPreviewModalOpen(false)} />
+      )}
 
       {/* ── Cover modal / lightbox ── */}
       {coverModalOpen && state.coverUrl && (
