@@ -50,26 +50,29 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
     if (!result.ok) throw new Error(result.error ?? "YouTube skill failed");
     if (!result.data.length) return { inserted: 0, skipped: 0 };
 
+    const safe = (v: unknown, fallback = "") =>
+      v == null ? fallback : typeof v === "object" ? JSON.stringify(v) : String(v);
+
     const rows = result.data
       .filter((v) => v.videoId)
       .map((v) => ({
         user_id: userId,
         query: data.query.trim(),
-        video_id: v.videoId,
-        title: v.title,
-        channel_name: v.channelName,
-        channel_id: v.channelId,
-        video_url: v.videoUrl,
-        description: v.description.slice(0, 500),
-        hashtags: v.hashtags,
-        views: v.views,
-        likes: v.likes,
-        comments: v.comments,
-        duration: v.duration,
-        is_short: detectShort(v.duration, v.videoUrl),
-        published_at: v.publishedAt,
-        thumbnail_url: v.thumbnailUrl,
-        viral_score: v.viralScore,
+        video_id: safe(v.videoId),
+        title: safe(v.title),
+        channel_name: safe(v.channelName),
+        channel_id: safe(v.channelId),
+        video_url: safe(v.videoUrl),
+        description: safe(v.description).slice(0, 500),
+        hashtags: Array.isArray(v.hashtags) ? v.hashtags.map(String) : [],
+        views: v.views ?? 0,
+        likes: v.likes ?? 0,
+        comments: v.comments ?? 0,
+        duration: safe(v.duration),
+        is_short: detectShort(safe(v.duration), safe(v.videoUrl)),
+        published_at: v.publishedAt != null ? safe(v.publishedAt) : null,
+        thumbnail_url: safe(v.thumbnailUrl),
+        viral_score: v.viralScore ?? 0,
       }));
 
     const { data: inserted, error } = await ytTable()
