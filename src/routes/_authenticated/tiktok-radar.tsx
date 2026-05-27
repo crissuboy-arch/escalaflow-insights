@@ -1387,6 +1387,15 @@ function CloneStructureModal({
 
 // ── VideoCard ─────────────────────────────────────────────────────────────────
 
+function creatorColor(name: string): string {
+  const palettes = [
+    ["#FF006E", "#FB5607"], ["#8338EC", "#3A86FF"], ["#06D6A0", "#118AB2"],
+    ["#FFD166", "#EF476F"], ["#00B4D8", "#0077B6"], ["#F72585", "#7209B7"],
+  ];
+  const idx = (name || "?").split("").reduce((a, c) => a + c.charCodeAt(0), 0) % palettes.length;
+  return `linear-gradient(135deg, ${palettes[idx][0]}55 0%, ${palettes[idx][1]}33 100%)`;
+}
+
 function VideoCard({
   row,
   onClick,
@@ -1461,12 +1470,22 @@ function VideoCard({
             style={{ transform: hovered ? "scale(1.05)" : "scale(1)", opacity: imgLoading ? 0 : 1, transition: "opacity 0.3s ease, transform 0.5s ease" }}
             loading="lazy"
             onLoad={() => setImgLoading(false)}
-            onError={() => { setImgError(true); setImgLoading(false); }} />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2"
-            style={{ background: "linear-gradient(135deg, rgba(255,0,80,0.12) 0%, rgba(0,242,234,0.08) 100%)" }}>
-            <Play className="h-10 w-10 text-white/15" />
-            <span className="text-[9px] text-white/20 font-medium uppercase tracking-wider">sem thumbnail</span>
+            onError={(e) => { e.currentTarget.style.display = "none"; setImgError(true); setImgLoading(false); }} />
+        ) : null}
+        {(!row.thumbnail_url || imgError) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+            style={{ background: creatorColor(row.creator) }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: "rgba(255,255,255,0.15)",
+              border: "2px solid rgba(255,255,255,0.28)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 19, fontWeight: 800, color: "rgba(255,255,255,0.85)",
+              letterSpacing: 1,
+            }}>
+              {(row.creator || "?").replace(/^@/, "").slice(0, 2).toUpperCase()}
+            </div>
+            <Play className="h-4 w-4 text-white/50" />
           </div>
         )}
 
@@ -2043,9 +2062,21 @@ function TikTokRadarPage() {
   const tabFiltered = useMemo<TikTokRow[]>(() => {
     if (activeTab === "viral-hooks")      return base.filter(v => v.viral_score >= 60);
     if (activeTab === "tiktok-shop")      return base.filter(v => v.hashtags?.some(h => ["tiktokshop","shop","tiktokmademebuyit","produto","shopnow"].includes(h.toLowerCase())));
-    if (activeTab === "ads-spy")          return base.filter(v => v.hashtags?.some(h => ["ads","adsnotsponsored","ugcads","ugc","sponsored","ad"].includes(h.toLowerCase())));
+    if (activeTab === "ads-spy") {
+      const adWords = ["ads","adsnotsponsored","ugcads","ugc","sponsored","ad","publicidade","anuncio","anúncio","patrocinado"];
+      return base.filter(v =>
+        v.hashtags?.some(h => adWords.includes(h.toLowerCase())) ||
+        adWords.some(w => v.description?.toLowerCase().includes(w) || v.hook?.toLowerCase().includes(w))
+      );
+    }
     if (activeTab === "winning-products") return base.filter(v => v.hashtags?.some(h => ["dropshipping","produto","winningproduct","product","ecommerce","shopify"].includes(h.toLowerCase())));
-    if (activeTab === "vsls")             return base.filter(v => v.hashtags?.some(h => ["vsl","videovendas","salesletter"].includes(h.toLowerCase())));
+    if (activeTab === "vsls") {
+      const vslWords = ["vsl","videovendas","salesletter","sales","oferta","compre","desconto","resultado","ganhe","clique","acesse","comprar","promoção","promocao","garanta"];
+      return base.filter(v =>
+        v.hashtags?.some(h => vslWords.includes(h.toLowerCase())) ||
+        vslWords.some(w => v.description?.toLowerCase().includes(w) || v.hook?.toLowerCase().includes(w))
+      );
+    }
     return base;
   }, [activeTab, base]);
 
