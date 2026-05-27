@@ -1281,7 +1281,14 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           language: state.config.language,
         },
       });
-      update({ outline: result });
+      // Sincronizar capítulos do editor com o outline gerado
+      const newChapters = result.chapters.map((oc: any, i: number) => ({
+        id: state.chapters[i]?.id ?? crypto.randomUUID(),
+        title: oc.title,
+        blocks: state.chapters[i]?.blocks ?? [],
+        theme: oc.theme ?? "",
+      }));
+      update({ outline: result, chapters: newChapters });
       toast.success(`Outline com ${result.chapters.length} capítulos gerado!`);
       setSideTab("outline");
     } catch {
