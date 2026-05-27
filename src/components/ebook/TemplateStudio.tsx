@@ -87,6 +87,7 @@ interface BookBible {
   voiceSamples: string;
   targetChapters: number;
   personalStories: string;
+  genre: string;
 }
 
 interface OutlineChapter {
@@ -181,6 +182,7 @@ function defaultBible(template: TemplateMaster): BookBible {
     voiceSamples: "",
     targetChapters: template.chapters.length || 8,
     personalStories: "",
+    genre: "",
   };
 }
 
@@ -1283,6 +1285,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           keywords: state.bible.keywords, redLines: state.bible.redLines,
           targetChapters: state.bible.targetChapters,
           language: state.config.language,
+          genre: state.bible.genre || undefined,
         },
       });
       // Sincronizar capítulos do editor com o outline gerado
@@ -1328,6 +1331,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           language: state.config.language,
           niche: template.category,
           personalStories: state.bible.personalStories || undefined,
+          genre: state.bible.genre || undefined,
         },
       });
       const textBlocks: Block[] = result.draft
@@ -1657,6 +1661,35 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                 <div style={{ padding: "4px 20px 24px" }}>
                   <p style={{ fontSize: 22, fontWeight: 800, color: "#F0F4FF", margin: "0 0 4px" }}>📖 Bíblia do Ebook</p>
                   <p style={{ fontSize: 13, color: "#4B5563", marginBottom: 24 }}>Defina os fundamentos antes de escrever.</p>
+
+                  <SideGroup>
+                    <SideLabel>Gênero do Ebook</SideLabel>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+                      {([
+                        { emoji: "📈", label: "Negócios & Marketing" },
+                        { emoji: "💰", label: "Finanças & Investimento" },
+                        { emoji: "❤️", label: "Relacionamento & Conquista" },
+                        { emoji: "💪", label: "Saúde & Emagrecimento" },
+                        { emoji: "🧠", label: "Desenvolvimento Pessoal" },
+                        { emoji: "👶", label: "Infantil & Educativo" },
+                        { emoji: "📖", label: "Ficção & Romance" },
+                        { emoji: "😱", label: "Thriller & Suspense" },
+                        { emoji: "🔥", label: "Tráfego & Vendas" },
+                        { emoji: "👑", label: "Liderança & CEO" },
+                        { emoji: "🎨", label: "Criatividade & Arte" },
+                        { emoji: "🙏", label: "Espiritualidade" },
+                      ] as const).map(({ emoji, label }) => {
+                        const active = state.bible.genre === label;
+                        return (
+                          <button key={label} onClick={() => update({ bible: { ...state.bible, genre: active ? "" : label } })}
+                            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 4px 8px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", background: active ? `${cA}20` : "rgba(255,255,255,0.04)", border: `1px solid ${active ? cA : "rgba(255,255,255,0.09)"}`, transition: "all 0.15s" }}>
+                            <span style={{ fontSize: 18, lineHeight: 1 }}>{emoji}</span>
+                            <span style={{ fontSize: 9, color: active ? cA : "#6B7FA8", textAlign: "center", lineHeight: 1.3, fontWeight: active ? 700 : 400 }}>{label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </SideGroup>
 
                   <SideGroup>
                     <SideLabel>Título</SideLabel>

@@ -600,12 +600,12 @@ export const generateOutlineFn = createServerFn({ method: "POST" })
   .inputValidator((d: {
     title: string; subtitle: string; promise: string; audience: string;
     tone: string; goal: string; keywords: string; redLines: string; targetChapters: number;
-    language?: string;
+    language?: string; genre?: string;
   }) => z.object({
     title: z.string().min(1), subtitle: z.string(), promise: z.string(),
     audience: z.string(), tone: z.string(), goal: z.string(),
     keywords: z.string(), redLines: z.string(), targetChapters: z.number().min(3).max(30),
-    language: z.string().optional(),
+    language: z.string().optional(), genre: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
     const langMap: Record<string, string> = {
@@ -618,6 +618,9 @@ export const generateOutlineFn = createServerFn({ method: "POST" })
       "de": "Deutsch",
     };
     const lang = langMap[data.language ?? "pt-BR"] ?? "Português do Brasil";
+    const genreInstruction = data.genre
+      ? `\nGênero: ${data.genre}. Adapte completamente o tom, vocabulário, estrutura e exemplos para este gênero. Um livro infantil tem linguagem simples e histórias curtas. Um thriller tem suspense e cliffhangers. Um livro de negócios tem casos reais e frameworks.`
+      : "";
     const prompt = `Escreva OBRIGATORIAMENTE em ${lang}. Todo o conteúdo deve estar neste idioma.
 
 You are a professional ebook architect. Create a detailed chapter outline.
@@ -630,7 +633,7 @@ Tone: "${data.tone}" / Goal: "${data.goal}"
 Keywords: "${data.keywords}"
 Red Lines (avoid): "${data.redLines}"
 Gere EXATAMENTE ${data.targetChapters ?? 5} capítulos. Nem mais, nem menos.
-Output language: ${lang}
+Output language: ${lang}${genreInstruction}
 
 Return ONLY valid JSON:
 {
@@ -656,18 +659,21 @@ export const generateChapterDraftFn = createServerFn({ method: "POST" })
     chapterNumber: number; chapterTitle: string; chapterPromise: string;
     chapterNotes: string; bookTitle: string; tone: string; audience: string;
     keywords: string; wordTarget: number; language?: string; niche?: string;
-    personalStories?: string;
+    personalStories?: string; genre?: string;
   }) => z.object({
     chapterNumber: z.number(), chapterTitle: z.string().min(1), chapterPromise: z.string(),
     chapterNotes: z.string(), bookTitle: z.string(), tone: z.string(),
     audience: z.string(), keywords: z.string(), wordTarget: z.number().min(200).max(4000),
     language: z.string().optional(), niche: z.string().optional(),
-    personalStories: z.string().optional(),
+    personalStories: z.string().optional(), genre: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
     const lang = data.language ?? "Português";
     const niche = data.niche ? ` (nicho: ${data.niche})` : "";
     const target = Math.max(data.wordTarget, 600);
+    const genreInstruction = data.genre
+      ? `\nGênero: ${data.genre}. Adapte completamente o tom, vocabulário, estrutura e exemplos para este gênero. Um livro infantil tem linguagem simples e histórias curtas. Um thriller tem suspense e cliffhangers. Um livro de negócios tem casos reais e frameworks.`
+      : "";
     const storiesSection = data.personalStories?.trim()
       ? `\nPERSONAL STORIES / REAL EXAMPLES TO USE:\n${data.personalStories.slice(0, 1000)}\nIncorporate one of these stories naturally into the chapter.`
       : "";
@@ -680,7 +686,7 @@ Chapter ${data.chapterNumber}: "${data.chapterTitle}"
 Promise: "${data.chapterPromise}"
 Key points: "${data.chapterNotes}"
 Tone: "${data.tone}" / Audience: "${data.audience}"
-Keywords: "${data.keywords}" / Target: minimum ${target} words (write at least ${target} words)${storiesSection}
+Keywords: "${data.keywords}" / Target: minimum ${target} words (write at least ${target} words)${genreInstruction}${storiesSection}
 
 MANDATORY REQUIREMENTS:
 1. Minimum ${target} words — do not stop before reaching this count
