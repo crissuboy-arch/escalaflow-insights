@@ -656,16 +656,21 @@ export const generateChapterDraftFn = createServerFn({ method: "POST" })
     chapterNumber: number; chapterTitle: string; chapterPromise: string;
     chapterNotes: string; bookTitle: string; tone: string; audience: string;
     keywords: string; wordTarget: number; language?: string; niche?: string;
+    personalStories?: string;
   }) => z.object({
     chapterNumber: z.number(), chapterTitle: z.string().min(1), chapterPromise: z.string(),
     chapterNotes: z.string(), bookTitle: z.string(), tone: z.string(),
     audience: z.string(), keywords: z.string(), wordTarget: z.number().min(200).max(4000),
     language: z.string().optional(), niche: z.string().optional(),
+    personalStories: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
     const lang = data.language ?? "Português";
     const niche = data.niche ? ` (nicho: ${data.niche})` : "";
     const target = Math.max(data.wordTarget, 600);
+    const storiesSection = data.personalStories?.trim()
+      ? `\nPERSONAL STORIES / REAL EXAMPLES TO USE:\n${data.personalStories.slice(0, 1000)}\nIncorporate one of these stories naturally into the chapter.`
+      : "";
     const prompt = `Escreva OBRIGATORIAMENTE em ${lang}. Todo o conteúdo deve estar neste idioma.
 
 Write a complete chapter draft for an ebook.
@@ -675,7 +680,7 @@ Chapter ${data.chapterNumber}: "${data.chapterTitle}"
 Promise: "${data.chapterPromise}"
 Key points: "${data.chapterNotes}"
 Tone: "${data.tone}" / Audience: "${data.audience}"
-Keywords: "${data.keywords}" / Target: minimum ${target} words (write at least ${target} words)
+Keywords: "${data.keywords}" / Target: minimum ${target} words (write at least ${target} words)${storiesSection}
 
 MANDATORY REQUIREMENTS:
 1. Minimum ${target} words — do not stop before reaching this count
@@ -694,12 +699,18 @@ export const editChapterFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     draft: string; bookTitle: string; chapterTitle: string; promise: string; tone: string; audience: string;
+    mode?: string;
   }) => z.object({
     draft: z.string().min(50), bookTitle: z.string(), chapterTitle: z.string(),
     promise: z.string(), tone: z.string(), audience: z.string(),
+    mode: z.string().optional(),
   }).parse(d))
   .handler(async ({ data }) => {
-    const prompt = `You are a professional ebook editor. Edit and improve this chapter draft.
+    const isCruel = data.mode === "cruel";
+    const editInstruction = isCruel
+      ? `You are a brutally honest ebook editor doing a CRUEL EDIT. No mercy — cut everything generic, fix the opening to be irresistible, eliminate repetitions, ensure every paragraph has a reason to exist. Minimum 600 words.`
+      : `You are a professional ebook editor. Edit and improve this chapter draft.`;
+    const prompt = `${editInstruction}
 
 Book: "${data.bookTitle}" / Chapter: "${data.chapterTitle}"
 Promise: "${data.promise}" / Tone: ${data.tone} / Audience: ${data.audience}

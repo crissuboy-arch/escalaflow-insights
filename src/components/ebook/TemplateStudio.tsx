@@ -86,6 +86,7 @@ interface BookBible {
   salesModel: string;
   voiceSamples: string;
   targetChapters: number;
+  personalStories: string;
 }
 
 interface OutlineChapter {
@@ -179,6 +180,7 @@ function defaultBible(template: TemplateMaster): BookBible {
     salesModel: "lead magnet",
     voiceSamples: "",
     targetChapters: template.chapters.length || 8,
+    personalStories: "",
   };
 }
 
@@ -954,7 +956,9 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
   const [outlineLoading, setOutlineLoading] = useState(false);
   const [chapterGenLoading, setChapterGenLoading] = useState<number | null>(null);
   const [chapterEditLoading, setChapterEditLoading] = useState<number | null>(null);
+  const [chapterCruelLoading, setChapterCruelLoading] = useState<number | null>(null);
   const [consistencyLoading, setConsistencyLoading] = useState(false);
+  const [consistencyModalOpen, setConsistencyModalOpen] = useState(false);
 
   const cA = state.design.colorA;
   const cB = state.design.colorB;
@@ -1323,6 +1327,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
           wordTarget: outlineCh?.wordTarget ?? 800,
           language: state.config.language,
           niche: template.category,
+          personalStories: state.bible.personalStories || undefined,
         },
       });
       const textBlocks: Block[] = result.draft
@@ -1375,6 +1380,37 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
     }
   }
 
+  async function handleCruelEdit(idx: number) {
+    const ch = state.chapters[idx];
+    if (!ch) return;
+    const entry = (state.pipeline ?? []).find((p) => p.chapterId === ch.id);
+    const draft = entry?.draft || (Array.isArray(ch.blocks) ? ch.blocks : []).filter((b) => b.type === "text").map((b) => b.content).join("\n\n");
+    if (!draft.trim()) { toast.error("Gere o rascunho primeiro."); return; }
+    const outlineCh = state.outline?.chapters[idx];
+    setChapterCruelLoading(idx);
+    try {
+      const result = await editChapter({
+        data: {
+          draft, bookTitle: state.title, chapterTitle: ch.title,
+          promise: outlineCh?.promise ?? state.bible.promise,
+          tone: state.bible.toneAdjectives, audience: state.bible.audience,
+          mode: "cruel",
+        },
+      });
+      const newPipeline = [...(state.pipeline ?? [])];
+      const pIdx = newPipeline.findIndex((p) => p.chapterId === ch.id);
+      const updated: ChapterPipeline = { chapterId: ch.id, draft: entry?.draft ?? draft, edited: result.edited, scoreBefore: result.scoreBefore, scoreAfter: result.scoreAfter, changes: result.changes, isDraftGenerated: true, isEdited: true, lastUpdated: new Date().toISOString() };
+      if (pIdx >= 0) newPipeline[pIdx] = updated;
+      else newPipeline.push(updated);
+      update({ pipeline: newPipeline });
+      toast.success(`Edição Cruel concluída! Score: ${result.scoreBefore} → ${result.scoreAfter}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro na Edição Cruel");
+    } finally {
+      setChapterCruelLoading(null);
+    }
+  }
+
   function handleApplyToEditor(idx: number) {
     const ch = state.chapters[idx];
     if (!ch) return;
@@ -1399,6 +1435,7 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
         data: { bookTitle: state.title, promise: state.bible.promise, tone: state.bible.toneAdjectives, audience: state.bible.audience, chapters },
       });
       update({ consistencyReport: result });
+      setConsistencyModalOpen(true);
       if (result.isClean) toast.success("Ebook consistente! Nenhum problema encontrado.");
       else toast.warning(`${result.issues.length} problema${result.issues.length !== 1 ? "s" : ""} encontrado${result.issues.length !== 1 ? "s" : ""}.`);
     } catch (e) {
@@ -1538,12 +1575,16 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
 
                 {state.outline && (
                   <div style={{ marginBottom: 20 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                       <span style={{ fontSize: 13, color: "#6B7FA8" }}>Outline · {state.outline.chapters.length} capítulos</span>
                       <button onClick={handleGenerateOutline} disabled={outlineLoading} style={{ fontSize: 12, color: cA, background: "none", border: `1px solid ${cA}40`, borderRadius: 6, padding: "4px 10px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4 }}>
                         {outlineLoading ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />} Regerar
                       </button>
                     </div>
+                    <button onClick={() => { void handleConsistencyCheck(); }} disabled={consistencyLoading}
+                      style={{ width: "100%", marginBottom: 12, padding: "9px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.28)", color: "#F59E0B" }}>
+                      {consistencyLoading ? <Loader2 size={11} className="animate-spin" /> : <span style={{ fontSize: 13 }}>⚠</span>} Verificar Consistência
+                    </button>
                     <div style={{ fontSize: 12, color: "#4B5563", lineHeight: 1.5, padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 12, borderLeft: `3px solid ${cA}30` }}>
                       {state.outline.intro}
                     </div>
@@ -1583,6 +1624,10 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                         <button disabled={chapterEditLoading === i} onClick={() => handleEditChapter(i)}
                           style={{ flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", color: "#9BAAC8" }}>
                           {chapterEditLoading === i ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Editar
+                        </button>
+                        <button disabled={chapterCruelLoading === i} onClick={() => handleCruelEdit(i)}
+                          style={{ flex: 1, padding: "8px 0", fontSize: 12, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 5, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.28)", color: "#EF4444" }}>
+                          {chapterCruelLoading === i ? <Loader2 size={11} className="animate-spin" /> : <span style={{ fontSize: 11 }}>🔥</span>} Cruel
                         </button>
                         {pEntry && (pEntry.isDraftGenerated || pEntry.isEdited) && (
                           <button onClick={() => handleApplyToEditor(i)}
@@ -1651,6 +1696,10 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
                   <SideGroup>
                     <SideLabel>Linhas vermelhas — não fazer</SideLabel>
                     <Textarea value={state.bible.redLines} onChange={(e) => update({ bible: { ...state.bible, redLines: e.target.value } })} rows={2} placeholder="Não usar termos acadêmicos, não prometer X..." style={TA} />
+                  </SideGroup>
+                  <SideGroup>
+                    <SideLabel>Banco de histórias pessoais</SideLabel>
+                    <Textarea value={state.bible.personalStories ?? ""} onChange={(e) => update({ bible: { ...state.bible, personalStories: e.target.value } })} rows={4} placeholder="Cole aqui histórias reais suas para a IA usar nos capítulos. Ex: 'Em 2021 perdi meu emprego e decidi...' A IA vai incorporar essas histórias no conteúdo gerado." style={TA} />
                   </SideGroup>
                   <SideGroup>
                     <SideLabel>Modelo de distribuição</SideLabel>
@@ -2346,6 +2395,48 @@ export function TemplateStudio({ template }: { template: TemplateMaster }) {
       {/* ── Full preview modal ── */}
       {previewModalOpen && (
         <FullPreviewModal state={state} template={template} onClose={() => setPreviewModalOpen(false)} />
+      )}
+
+      {/* ── Consistency report modal ── */}
+      {consistencyModalOpen && state.consistencyReport && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConsistencyModalOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 2000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#0E1525", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 14, width: "min(520px,92vw)", maxHeight: "80vh", overflow: "hidden", display: "flex", flexDirection: "column" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: "#F0F4FF" }}>
+                {state.consistencyReport.isClean ? "✅ Ebook Consistente" : `⚠️ ${state.consistencyReport.issues.length} Problema${state.consistencyReport.issues.length !== 1 ? "s" : ""} Encontrado${state.consistencyReport.issues.length !== 1 ? "s" : ""}`}
+              </span>
+              <button onClick={() => setConsistencyModalOpen(false)} style={{ background: "none", border: "none", color: "#6B7FA8", cursor: "pointer", padding: 4 }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ overflowY: "auto", padding: "16px 20px 20px" }}>
+              {state.consistencyReport.isClean ? (
+                <p style={{ fontSize: 14, color: "#10B981", lineHeight: 1.6 }}>Nenhum problema de consistência detectado. Seu ebook está coerente!</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {state.consistencyReport.issues.map((issue, i) => (
+                    <div key={i} style={{ padding: "12px 14px", background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.20)", borderRadius: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#F59E0B", background: "rgba(245,158,11,0.15)", padding: "2px 8px", borderRadius: 10 }}>{issue.type}</span>
+                        <span style={{ fontSize: 12, color: "#9BAAC8" }}>{issue.chapter}</span>
+                      </div>
+                      <p style={{ fontSize: 13, color: "#D1D5DB", margin: "0 0 6px", lineHeight: 1.5 }}>{issue.problem}</p>
+                      <p style={{ fontSize: 12, color: "#6EE7B7", margin: 0, lineHeight: 1.5 }}>💡 {issue.fix}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Cover modal / lightbox ── */}
