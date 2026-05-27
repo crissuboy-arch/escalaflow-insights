@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
+import { marked } from "marked";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -233,12 +234,31 @@ function loadState(template: TemplateMaster): StudioState {
   };
 }
 
+// Inject editor markdown styles once when module loads
+if (typeof document !== "undefined" && !document.getElementById("ebook-md-styles")) {
+  const s = document.createElement("style");
+  s.id = "ebook-md-styles";
+  s.textContent = `.ebook-md h1{font-size:19px;font-weight:800;color:#F0F4FF;margin:14px 0 7px;line-height:1.3}.ebook-md h2{font-size:16px;font-weight:700;color:#D1D9F0;margin:12px 0 6px;line-height:1.4}.ebook-md h3{font-size:14px;font-weight:600;color:#C8D4F0;margin:10px 0 4px}.ebook-md p{margin:0 0 9px;line-height:1.85}.ebook-md ul,.ebook-md ol{padding-left:20px;margin:0 0 9px}.ebook-md li{margin-bottom:4px;line-height:1.7}.ebook-md strong{color:#F0F4FF;font-weight:700}.ebook-md em{font-style:italic}.ebook-md blockquote{border-left:3px solid rgba(255,255,255,0.2);padding-left:12px;margin:8px 0;opacity:0.85}`;
+  document.head.appendChild(s);
+}
+
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*\*(.+?)\*\*\*/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/^[-*+]\s+/gm, "• ")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1");
+}
+
 async function toPdfChapters(chapters: StudioChapter[]): Promise<PdfChapter[]> {
   return Promise.all(chapters.map(async (ch) => {
     const blocks: Block[] = Array.isArray(ch.blocks) ? ch.blocks : [];
     const textContent = blocks
       .filter((b) => b.type === "text" || b.type === "cta")
-      .map((b) => b.content)
+      .map((b) => stripMarkdown(b.content))
       .join("\n\n");
     const quoteBlock = blocks.find((b) => b.type === "quote");
     const checkBlock = blocks.find((b) => b.type === "checklist");
@@ -379,7 +399,8 @@ function BlockItem({
         </div>
       );
     }
-    return <div style={{ fontSize: 14, lineHeight: 1.85, color: "#C8D4F0", whiteSpace: "pre-wrap" }}>{block.content || <span style={{ opacity: 0.3, fontStyle: "italic" }}>Vazio — clique para editar</span>}</div>;
+    if (!block.content) return <div style={{ fontSize: 14, lineHeight: 1.85, color: "#C8D4F0" }}><span style={{ opacity: 0.3, fontStyle: "italic" }}>Vazio — clique para editar</span></div>;
+    return <div className="ebook-md" style={{ fontSize: 14, color: "#C8D4F0" }} dangerouslySetInnerHTML={{ __html: marked.parse(block.content) as string }} />;
   }
 
   return (
@@ -2557,7 +2578,7 @@ function buildHtml(state: StudioState, template: TemplateMaster): string {
       if (b.type === "checklist") return `<div style="background:#f8fafb;border-radius:8px;padding:14px 16px;margin:16px 0"><strong style="font-size:11px;text-transform:uppercase">✔ Checklist</strong><ul style="list-style:none;padding-left:0;margin-top:8px">${b.content.split("\n").filter(Boolean).map((it) => `<li style="padding:4px 0;padding-left:22px;position:relative;font-size:14px">☐ ${it}</li>`).join("")}</ul></div>`;
       if (b.type === "cta") return `<div style="background:linear-gradient(135deg,${cA}20,${cA}08);border:1px solid ${cA}30;border-radius:8px;padding:16px;margin:16px 0;text-align:center"><strong>${b.content}</strong></div>`;
       if (b.type === "image" && b.meta?.imageUrl) return `<img src="${b.meta.imageUrl}" style="max-width:100%;border-radius:8px;margin:16px 0">`;
-      return `<p style="margin-bottom:14px;line-height:1.8;color:#333">${b.content}</p>`;
+      return `<div class="ch-text">${marked.parse(b.content)}</div>`;
     }).join("");
 
     return `<section class="chapter">
@@ -2575,6 +2596,7 @@ body{font-family:Inter,sans-serif;background:#FAFAF8;color:#1a1a1a;line-height:1
 .chapter{max-width:720px;margin:0 auto 60px;padding:48px 40px;background:#fff;border-radius:12px;box-shadow:0 2px 20px rgba(0,0,0,.06)}
 .badge{display:inline-block;background:${cA}18;color:${cA};border:1px solid ${cA}30;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:14px}
 .chapter h2{font-size:28px;font-weight:700;margin-bottom:18px;color:#111}
+.ch-text p{margin-bottom:14px;line-height:1.8;color:#333}.ch-text h1{font-size:22px;font-weight:800;color:#111;margin:20px 0 10px}.ch-text h2{font-size:19px;font-weight:700;color:#222;margin:18px 0 9px}.ch-text h3{font-size:16px;font-weight:600;color:#333;margin:14px 0 7px}.ch-text ul,.ch-text ol{padding-left:22px;margin-bottom:14px}.ch-text li{margin-bottom:5px;line-height:1.7;color:#333}.ch-text strong{font-weight:700}.ch-text em{font-style:italic}
 @media print{body{background:#fff}.chapter{box-shadow:none}}
 </style></head><body>
 <div class="cover">
