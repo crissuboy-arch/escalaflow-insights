@@ -56,7 +56,7 @@ function Dashboard() {
 
   const trend = filteredRecent.map((o, i) => ({
     name: o.advertiser_name?.slice(0, 8) ?? `#${i + 1}`,
-    score: o.scale_score ?? Math.round(Math.random() * 100),
+    score: o.scale_score ?? 0,
     i,
   }));
 
