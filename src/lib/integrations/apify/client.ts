@@ -3,6 +3,12 @@
 const BASE = "https://api.apify.com/v2";
 const MAX_TIMEOUT_SEC = 120;
 
+// Normalize actor ID: Apify URLs require "username~actorName" (tilde), not slash.
+// Accept both formats so .env can use either.
+function normalizeActorId(id: string): string {
+  return id.replace(/\//, "~");
+}
+
 function getToken(): string {
   const token = process.env.APIFY_TOKEN;
   if (!token) throw new Error("APIFY_TOKEN não configurado.");
@@ -16,8 +22,9 @@ function maskToken(token: string): string {
 
 export async function runApifyActor(actorId: string, input: any) {
   const token = getToken();
-  console.log(`[apify] ▶ runApifyActor actor=${actorId}`);
-  const response = await fetch(`${BASE}/acts/${actorId}/runs?token=${encodeURIComponent(token)}`, {
+  const safeId = normalizeActorId(actorId);
+  console.log(`[apify] ▶ runApifyActor actor=${safeId}`);
+  const response = await fetch(`${BASE}/acts/${safeId}/runs?token=${encodeURIComponent(token)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -37,17 +44,17 @@ export async function runSyncGetDatasetItems<T = any>(
   timeoutSec = MAX_TIMEOUT_SEC,
 ): Promise<T[]> {
   const token = getToken();
+  const safeId = normalizeActorId(actorId);
 
   const url =
-    `${BASE}/acts/${actorId}/run-sync-get-dataset-items` +
+    `${BASE}/acts/${safeId}/run-sync-get-dataset-items` +
     `?token=${encodeURIComponent(token)}&timeout=${timeoutSec}`;
 
-  // Log for debugging — token masked, full URL visible
   const safeUrl =
-    `${BASE}/acts/${actorId}/run-sync-get-dataset-items` +
+    `${BASE}/acts/${safeId}/run-sync-get-dataset-items` +
     `?token=${maskToken(token)}&timeout=${timeoutSec}`;
 
-  console.log(`[apify] ▶ actor=${actorId}`);
+  console.log(`[apify] ▶ actor=${safeId}`);
   console.log(`[apify] ▶ url=${safeUrl}`);
   console.log(`[apify] ▶ payload=${JSON.stringify(input)}`);
 
@@ -69,10 +76,10 @@ export async function runSyncGetDatasetItems<T = any>(
       throw new Error(`Apify: token inválido ou expirado (401). Verifique APIFY_TOKEN no .env.`);
     }
     if (response.status === 403) {
-      throw new Error(`Apify: actor desativado ou sem permissão (403). Verifique o actor "${actorId}" no .env.`);
+      throw new Error(`Apify: actor desativado ou sem permissão (403). Verifique o actor "${safeId}" no .env.`);
     }
     if (response.status === 404) {
-      throw new Error(`Apify: actor "${actorId}" não encontrado (404). Verifique o nome no .env.`);
+      throw new Error(`Apify: actor "${safeId}" não encontrado (404). Verifique o nome no .env.`);
     }
     throw new Error(
       `Apify sync run failed (${response.status}) after ${elapsed}s: ${body.slice(0, 300)}`,
