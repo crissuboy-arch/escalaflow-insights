@@ -19,6 +19,7 @@ import {
   deletePageProjectFn,
 } from "@/lib/page-builder.functions";
 import { PAGE_SKILLS } from "@/page-builder/skills";
+import { AIStatusBar } from "@/components/dashboard/AIStatusBar";
 import { DESIGN_SYSTEMS } from "@/page-builder/design-systems";
 import { PAGE_TEMPLATES } from "@/page-builder/templates";
 import { downloadHtml, getSrcDoc, estimateWordCount } from "@/page-builder/render-engine/renderHtmlPreview";
@@ -271,6 +272,7 @@ export default function PaginaVendaPage() {
 
   return (
     <div className="flex flex-col h-full">
+      <AIStatusBar />
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/8 shrink-0">
         <div className="flex items-center gap-3">

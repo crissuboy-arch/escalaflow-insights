@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { ScoreBadge } from "@/components/dashboard/ScoreBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { AIStatusBar } from "@/components/dashboard/AIStatusBar";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -81,6 +82,8 @@ function Dashboard() {
           </Button>
         </div>
       </div>
+
+      <AIStatusBar />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {loading
