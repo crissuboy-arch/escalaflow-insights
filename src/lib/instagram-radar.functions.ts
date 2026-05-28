@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
+import { withTimeout } from "@/skills/types";
 import { generateAIJson } from "@/lib/aiService";
 
 // .env: APIFY_INSTAGRAM_ACTOR=apify~instagram-scraper
@@ -202,7 +203,19 @@ export const mineInstagramFn = createServerFn({ method: "POST" })
     console.log("[instagram-radar] actor=", actor);
     console.log("[instagram-radar] payload=", JSON.stringify(payload));
 
-    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actor, payload);
+    let raw: Record<string, unknown>[];
+    try {
+      raw = await withTimeout(
+        runSyncGetDatasetItems<Record<string, unknown>>(actor, payload),
+        100_000,
+        "instagram",
+      );
+    } catch (err: any) {
+      const msg: string = err?.message ?? "";
+      if (msg.includes("timeout")) throw new Error("A busca no Instagram demorou demais. Tente reduzir o limite ou use uma hashtag menor.");
+      if (msg.includes("401") || msg.includes("403")) throw new Error("Acesso negado ao Instagram. Verifique APIFY_TOKEN no .env.");
+      throw new Error(msg || "Erro ao buscar no Instagram.");
+    }
 
     console.log("[instagram-radar] response items=", raw.length);
     if (!raw.length) return { inserted: 0, skipped: 0 };

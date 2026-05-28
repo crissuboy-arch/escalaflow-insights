@@ -83,19 +83,8 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
       published_at: typeof r.published_at === 'string' ? r.published_at : null,
     }));
 
-    console.error("[youtube-debug]", JSON.stringify({
-      video_id: rows[0]?.id,
-      title: typeof rows[0]?.title,
-      description: typeof rows[0]?.description,
-      hashtags: typeof rows[0]?.hashtags,
-      hashtags_val: rows[0]?.hashtags,
-      thumbnail: typeof rows[0]?.thumbnailUrl,
-      thumbnail_val: rows[0]?.thumbnailUrl,
-      published: typeof rows[0]?.publishedAt,
-      published_val: rows[0]?.publishedAt,
-      views: typeof rows[0]?.viewCount,
-      likes: typeof rows[0]?.likeCount,
-    }, null, 2));
+    console.log("[youtube-debug] raw[0]:", JSON.stringify(result.data[0] ?? null, null, 2));
+    console.log("[youtube-debug] sanitized[0]:", JSON.stringify(sanitized[0] ?? null, null, 2));
 
     const { data: inserted, error } = await ytTable()
       .upsert(sanitized, { onConflict: "user_id,video_id", ignoreDuplicates: true })

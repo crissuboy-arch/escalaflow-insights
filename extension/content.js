@@ -6,8 +6,7 @@
   const TOAST_ID = "escala-toast";
   const FLOAT_ID = "escala-float";
   const CARD_ATTR = "data-escala-card";
-  const DEFAULT_ENDPOINT =
-    "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3e6.lovable.app";
+  const DEFAULT_ENDPOINT = "http://localhost:8082"; // produção: trocar para URL do deploy
   const DEBUG = true;
   const log = (...a) => DEBUG && console.log("[EscalaFlow]", ...a);
 
