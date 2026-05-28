@@ -9,7 +9,7 @@ import {
   LayoutTemplate, Sparkles, Loader2, Download, Save, Trash2,
   X, FolderOpen, Zap, ShoppingBag, Megaphone, FileText,
   ChevronDown, ChevronUp, Eye, EyeOff, Copy, Check,
-  RefreshCw, Globe, Palette,
+  RefreshCw, Globe, Palette, ExternalLink,
 } from "lucide-react";
 import {
   generatePageHtmlFn,
@@ -164,6 +164,8 @@ export default function PaginaVendaPage() {
   const [showImportModal, setShowImportModal] = useState<"produto" | "anuncio" | null>(null);
   const [copied, setCopied] = useState(false);
   const [previewScale, setPreviewScale] = useState(false);
+  const [metaPixelId, setMetaPixelId] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
@@ -270,6 +272,40 @@ export default function PaginaVendaPage() {
   const selectedSkill = PAGE_SKILLS.find((s) => s.id === form.skillId);
   const selectedDs = DESIGN_SYSTEMS.find((ds) => ds.id === form.designSystemId);
 
+  // Injeta pixel Meta e link de checkout no HTML antes de baixar / abrir
+  function buildFinalHtml(html: string): string {
+    let result = html;
+    if (checkoutUrl.trim()) {
+      result = result
+        .replace(/href=["']#["']/g, `href="${checkoutUrl}"`)
+        .replace(/href=["'](javascript:void\(0\)|javascript:;)["']/g, `href="${checkoutUrl}"`);
+    }
+    if (metaPixelId.trim()) {
+      const pixel = `<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '${metaPixelId}');
+fbq('track', 'PageView');
+<\/script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->`;
+      result = result.replace(/<\/head>/i, `${pixel}\n</head>`);
+    }
+    return result;
+  }
+
+  function openInNewTab() {
+    if (!generatedHtml) return;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(buildFinalHtml(generatedHtml)); w.document.close(); }
+  }
+
   return (
     <div className="flex flex-col h-full">
       <AIStatusBar />
@@ -293,7 +329,7 @@ export default function PaginaVendaPage() {
                 {copied ? <Check className="h-3 w-3 mr-1 text-green-400" /> : <Copy className="h-3 w-3 mr-1" />}
                 {copied ? "Copiado" : "Copiar HTML"}
               </Button>
-              <Button size="sm" variant="outline" className="h-8 text-xs border-white/10" onClick={() => downloadHtml(generatedHtml, `${saveTitle || "landing-page"}.html`)}>
+              <Button size="sm" variant="outline" className="h-8 text-xs border-white/10" onClick={() => downloadHtml(buildFinalHtml(generatedHtml), `${saveTitle || "landing-page"}.html`)}>
                 <Download className="h-3 w-3 mr-1" />Baixar HTML
               </Button>
               <Button size="sm" className="h-8 text-xs text-white" style={{ background: ACCENT }} onClick={() => setShowSaveModal(true)}>
@@ -532,6 +568,18 @@ export default function PaginaVendaPage() {
               />
             </div>
             <div>
+              <Label>Link do Checkout</Label>
+              <Input
+                value={checkoutUrl}
+                onChange={(e) => setCheckoutUrl(e.target.value)}
+                placeholder="ex: https://hotmart.com/produto/seu-produto"
+                className="bg-transparent border-white/10"
+              />
+              <p className="text-[10px] text-muted-foreground/50 mt-1">
+                Todos os botões CTA da página usarão este link ao baixar.
+              </p>
+            </div>
+            <div>
               <Label>Texto do Botão CTA</Label>
               <Input
                 value={form.callToAction}
@@ -563,6 +611,18 @@ export default function PaginaVendaPage() {
                 <option value="">Selecionar...</option>
                 {TRAFFIC_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
+            </div>
+            <div>
+              <Label>Pixel do Meta (Facebook)</Label>
+              <Input
+                value={metaPixelId}
+                onChange={(e) => setMetaPixelId(e.target.value.replace(/\D/g, ""))}
+                placeholder="ex: 123456789012345"
+                className="bg-transparent border-white/10"
+              />
+              <p className="text-[10px] text-muted-foreground/50 mt-1">
+                Injetado automaticamente no HTML antes do download.
+              </p>
             </div>
             <div>
               <Label>Contexto do Radar / Pesquisa de Mercado</Label>
@@ -608,13 +668,21 @@ export default function PaginaVendaPage() {
           <div className="flex items-center justify-between px-4 py-2 border-b border-white/8 shrink-0">
             <span className="text-xs text-muted-foreground font-medium">Preview</span>
             {generatedHtml && (
-              <button
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-                onClick={() => setPreviewScale((v) => !v)}
-              >
-                {previewScale ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                {previewScale ? "Tamanho real" : "Ajustar à tela"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  onClick={openInNewTab}
+                >
+                  <ExternalLink className="h-3 w-3" />Abrir em nova aba
+                </button>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  onClick={() => setPreviewScale((v) => !v)}
+                >
+                  {previewScale ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  {previewScale ? "Tamanho real" : "Ajustar à tela"}
+                </button>
+              </div>
             )}
           </div>
 
