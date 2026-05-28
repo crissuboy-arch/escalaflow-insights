@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -287,6 +287,8 @@ export default function GoogleRadarPage() {
   const [filterKw, setFilterKw] = useState<string | null>(null);
   const [mineResult, setMineResult] = useState<{ inserted: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const mineTrends = useServerFn(mineGoogleTrendsFn);
   const listTrends = useServerFn(listGoogleTrendsFn);
@@ -305,13 +307,34 @@ export default function GoogleRadarPage() {
 
   const handleMine = async () => {
     if (!keywords.trim()) return;
-    setMining(true); setError(null); setMineResult(null);
+    setMining(true); setError(null); setMineResult(null); setElapsed(0);
+
+    timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
+
+    // Mostrar cache existente imediatamente enquanto busca
+    const firstKw = keywords.trim().split(",")[0].trim();
+    try {
+      const cached = await listTrends({ data: { keyword: firstKw, limit: 200 } });
+      if ((cached as TrendRow[]).length > 0) setTrends(cached as TrendRow[]);
+    } catch { /* silencioso */ }
+
     try {
       const r = await mineTrends({ data: { keywords: keywords.trim(), geo, timeframe } });
       setMineResult(r);
       await loadTrends(filterKw ?? undefined);
-    } catch (e: any) { setError(e.message ?? "Erro ao minerar"); }
-    finally { setMining(false); }
+    } catch (e: any) {
+      const msg: string = e.message ?? "";
+      if (msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("demorou")) {
+        setError("A busca demorou demais. Tente outro termo ou país.");
+      } else if (msg.includes("404") || msg.includes("actor")) {
+        setError("Actor do Google Trends não encontrado. Verifique APIFY_GOOGLE_TRENDS_ACTOR no .env.");
+      } else {
+        setError(msg || "Erro ao buscar tendências.");
+      }
+    } finally {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setMining(false);
+    }
   };
 
   const handleAnalyze = async (id: string) => {
@@ -371,9 +394,16 @@ export default function GoogleRadarPage() {
           <Button onClick={handleMine} disabled={mining || !keywords.trim()} className="gap-2 text-white"
             style={{ background: ACCENT, boxShadow: mining ? "none" : "0 0 20px rgba(52,168,83,0.4)" }}>
             {mining ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart2 className="h-4 w-4" />}
-            {mining ? "Buscando..." : "Analisar"}
+            {mining ? `Buscando${elapsed > 5 ? ` (${elapsed}s)` : "..."}` : "Analisar"}
           </Button>
         </div>
+
+        {mining && elapsed > 15 && (
+          <p className="text-xs text-amber-400 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Google Trends pode demorar até 2 minutos — aguarde ou tente um termo mais curto.
+          </p>
+        )}
 
         {mineResult && (
           <p className="text-xs" style={{ color: ACCENT }}>
@@ -410,9 +440,14 @@ export default function GoogleRadarPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 flex items-start justify-between gap-3">
+          <div className="space-y-1">
+            <span className="block">{error}</span>
+            {trends.length > 0 && (
+              <span className="text-xs text-red-300/70">Mostrando resultados salvos anteriores.</span>
+            )}
+          </div>
+          <button onClick={() => setError(null)} className="shrink-0"><X className="h-4 w-4" /></button>
         </div>
       )}
 
@@ -424,10 +459,10 @@ export default function GoogleRadarPage() {
         </div>
       )}
 
-      {loading && (
+      {loading && !mining && (
         <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" style={{ color: ACCENT }} />
-          <span className="text-sm">Carregando tendências...</span>
+          <span className="text-sm">Carregando tendências salvas...</span>
         </div>
       )}
 

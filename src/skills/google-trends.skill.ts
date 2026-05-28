@@ -89,7 +89,7 @@ export async function runGoogleTrendsSkill(
   options: SkillOptions = {},
 ): Promise<SkillResult<TrendData>> {
   const start = Date.now();
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const timeoutMs = options.timeoutMs ?? 100_000;
 
   let actor: string;
   try {
