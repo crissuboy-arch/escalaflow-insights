@@ -1,4 +1,5 @@
 import { runSyncGetDatasetItems } from "../integrations/apify/client";
+import { APIFY_ACTORS } from "@/config/apify-actors";
 
 export interface TikTokResult {
   videoId: string;
@@ -16,7 +17,7 @@ export interface TikTokResult {
   createTime?: string;
 }
 
-const ACTOR_ID = "clockworks/tiktok-scraper";
+function getActorId() { return APIFY_ACTORS.tiktok(); }
 
 function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefined {
   for (const p of paths) {
@@ -55,7 +56,7 @@ function extractHashtags(obj: Record<string, unknown>): string[] {
 }
 
 export async function mineTikTok(query: string): Promise<TikTokResult[]> {
-  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
+  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(getActorId(), {
     searchQueries: [query],
     resultsLimit: 20,
   });

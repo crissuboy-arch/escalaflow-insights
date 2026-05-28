@@ -1,4 +1,5 @@
 import { runSyncGetDatasetItems } from "../integrations/apify/client";
+import { APIFY_ACTORS } from "@/config/apify-actors";
 
 export interface AdResult {
   advertiser: string;
@@ -18,8 +19,8 @@ export interface AdResult {
   videoUrl?: string;
 }
 
-// curious_coder/facebook-ads-library-scraper - Apify actor
-const ACTOR_ID = "XtaWFhbtfxyzqrFmd";
+// Actor loaded from APIFY_META_ADS_ACTOR in .env
+function getActorId() { return APIFY_ACTORS.facebook(); }
 
 function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefined {
   for (const p of paths) {
@@ -65,7 +66,8 @@ function getEngagement(_obj: Record<string, unknown>) {
 export async function mineMetaAds(query: string, country: string, language: string): Promise<AdResult[]> {
   const searchUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${encodeURIComponent(country)}&q=${encodeURIComponent(query)}&search_type=keyword_unordered`;
 
-  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
+  const actorId = getActorId();
+  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, {
     urls: [{ url: searchUrl }],
     count: 10,
     scrapeAdDetails: true,
@@ -181,7 +183,7 @@ export async function mineMetaAds(query: string, country: string, language: stri
   const withMedia = results.filter((r) => r.creativeUrl).length;
   const withCopy  = results.filter((r) => r.copy.length > 0).length;
   console.log(
-    `[meta] actor=${ACTOR_ID} | raw=${raw.length} ads` +
+    `[meta] actor=${actorId} | raw=${raw.length} ads` +
     ` | com_mídia=${withMedia} ❌sem:${raw.length - withMedia}` +
     ` | com_copy=${withCopy} ❌sem:${raw.length - withCopy}`
   );

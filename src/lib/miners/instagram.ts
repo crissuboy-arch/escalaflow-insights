@@ -1,4 +1,5 @@
 import { runSyncGetDatasetItems } from "../integrations/apify/client";
+import { APIFY_ACTORS } from "@/config/apify-actors";
 
 export interface InstagramResult {
   postId: string;
@@ -14,7 +15,7 @@ export interface InstagramResult {
   takenAt?: string;
 }
 
-const ACTOR_ID = "apify/instagram-scraper";
+function getActorId() { return APIFY_ACTORS.instagram(); }
 
 function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefined {
   for (const p of paths) {
@@ -53,7 +54,7 @@ function extractHashtags(item: Record<string, unknown>, caption: string): string
 }
 
 export async function mineInstagram(username: string): Promise<InstagramResult[]> {
-  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
+  const raw = await runSyncGetDatasetItems<Record<string, unknown>>(getActorId(), {
     directUrls: [`https://www.instagram.com/${username}/`],
     resultsLimit: 10,
   });
