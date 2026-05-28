@@ -87,9 +87,6 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
       viral_score: Math.round(Number(r.viral_score ?? 0)) || 0,
     }));
 
-    console.log("[youtube-debug] raw[0]:", JSON.stringify(result.data[0] ?? null, null, 2));
-    console.log("[youtube-debug] sanitized[0]:", JSON.stringify(sanitized[0] ?? null, null, 2));
-
     const { data: inserted, error } = await ytTable()
       .upsert(sanitized, { onConflict: "user_id,video_id", ignoreDuplicates: true })
       .select("id");
