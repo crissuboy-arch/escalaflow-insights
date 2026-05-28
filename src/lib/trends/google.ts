@@ -1,4 +1,5 @@
 import { runSyncGetDatasetItems } from "../integrations/apify/client";
+import { APIFY_ACTORS } from "@/config/apify-actors";
 
 export interface TrendResult {
   keyword: string;
@@ -8,8 +9,6 @@ export interface TrendResult {
   breakout?: boolean;
   timeRange?: string;
 }
-
-const ACTOR_ID = "apify/google-trends-scraper";
 
 function pickStr(obj: Record<string, unknown>, paths: string[]): string | undefined {
   for (const p of paths) {
@@ -43,7 +42,7 @@ export async function getGoogleTrends(keyword: string, country: string): Promise
   let raw: Record<string, unknown>[] = [];
 
   try {
-    raw = await runSyncGetDatasetItems<Record<string, unknown>>(ACTOR_ID, {
+    raw = await runSyncGetDatasetItems<Record<string, unknown>>(APIFY_ACTORS.googleTrends(), {
       searchTerms: [keyword],
       geo: country,
       time: "now 7-d",
