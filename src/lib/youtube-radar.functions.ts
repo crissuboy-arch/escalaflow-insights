@@ -75,8 +75,18 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
         viral_score: v.viralScore ?? 0,
       }));
 
+    const sanitized = rows.map(r => ({
+      ...r,
+      hashtags: Array.isArray(r.hashtags) ? r.hashtags : [],
+      thumbnail_url: typeof r.thumbnail_url === 'string' ? r.thumbnail_url : '',
+      description: typeof r.description === 'string' ? r.description : '',
+      published_at: typeof r.published_at === 'string' ? r.published_at : null,
+    }));
+
+    console.log("[youtube] primeiro item:", JSON.stringify(sanitized[0], null, 2));
+
     const { data: inserted, error } = await ytTable()
-      .upsert(rows, { onConflict: "user_id,video_id", ignoreDuplicates: true })
+      .upsert(sanitized, { onConflict: "user_id,video_id", ignoreDuplicates: true })
       .select("id");
 
     if (error) throw new Error(`Supabase error: ${error.message}`);
