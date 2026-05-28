@@ -81,6 +81,10 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
       thumbnail_url: typeof r.thumbnail_url === 'string' ? r.thumbnail_url : '',
       description: typeof r.description === 'string' ? r.description : '',
       published_at: typeof r.published_at === 'string' ? r.published_at : null,
+      views: Number(r.views ?? 0) || 0,
+      likes: Number(r.likes ?? 0) || 0,
+      comments: Number(r.comments ?? 0) || 0,
+      viral_score: Math.round(Number(r.viral_score ?? 0)) || 0,
     }));
 
     console.log("[youtube-debug] raw[0]:", JSON.stringify(result.data[0] ?? null, null, 2));
