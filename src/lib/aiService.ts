@@ -1,20 +1,33 @@
 import { z } from "zod";
 
-function resolveProvider(): { url: string; key: string; model: string } {
-  if (process.env.OPENAI_API_KEY) {
-    return {
-      url: "https://api.openai.com/v1/chat/completions",
-      key: process.env.OPENAI_API_KEY,
-      model: "gpt-4o-mini",
-    };
-  }
-  if (process.env.ANTHROPIC_API_KEY) {
-    return {
-      url: "https://api.anthropic.com/v1/messages",
-      key: process.env.ANTHROPIC_API_KEY,
-      model: "claude-haiku-4-5-20251001",
-    };
-  }
+export type AIProvider = "openai" | "anthropic";
+
+function resolveProvider(
+  preferred?: AIProvider,
+): { url: string; key: string; model: string } {
+  const openai = process.env.OPENAI_API_KEY
+    ? {
+        url: "https://api.openai.com/v1/chat/completions",
+        key: process.env.OPENAI_API_KEY,
+        model: "gpt-4o-mini",
+      }
+    : null;
+  const anthropic = process.env.ANTHROPIC_API_KEY
+    ? {
+        url: "https://api.anthropic.com/v1/messages",
+        key: process.env.ANTHROPIC_API_KEY,
+        model: "claude-haiku-4-5-20251001",
+      }
+    : null;
+
+  // Provider preferido: usa direto se a respectiva key existir, ignorando a ordem padrão.
+  if (preferred === "openai" && openai) return openai;
+  if (preferred === "anthropic" && anthropic) return anthropic;
+
+  // Comportamento padrão (sem preferred ou key ausente): OpenAI primeiro, depois Anthropic.
+  if (openai) return openai;
+  if (anthropic) return anthropic;
+
   throw new Error(
     "Nenhuma chave de IA configurada. Adicione OPENAI_API_KEY ou ANTHROPIC_API_KEY no arquivo .env",
   );
@@ -58,13 +71,23 @@ type OpenAITool = {
 // Normalize OpenAI tool_choice to Anthropic format
 function toAnthropicToolChoice(tc: unknown): Record<string, unknown> | undefined {
   if (!tc) return undefined;
-  if ((tc as Record<string, unknown>).type === "function") return { type: "auto" };
+  if (
+    typeof tc === "object" &&
+    tc !== null &&
+    (tc as Record<string, unknown>).type === "function"
+  ) {
+    const name = (tc as { function?: { name?: string } }).function?.name;
+    return name ? { type: "tool", name } : { type: "any" };
+  }
   if (typeof tc === "string" && tc === "required") return { type: "any" };
   return { type: "auto" };
 }
 
-export async function callGateway(body: Record<string, unknown>): Promise<unknown> {
-  const provider = resolveProvider();
+export async function callGateway(
+  body: Record<string, unknown>,
+  opts?: { preferredProvider?: AIProvider },
+): Promise<unknown> {
+  const provider = resolveProvider(opts?.preferredProvider);
   const delays = [0, 1200, 3000];
   let lastErr: unknown;
 

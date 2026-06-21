@@ -8,10 +8,13 @@
  * Designed to feed AI offer analysis pipelines.
  */
 
-// Dynamic import so Playwright never bundles into client-side code.
-async function getChromium() {
-  const { chromium } = await import("playwright");
-  return chromium;
+// Using new Function so NO bundler (Vite/Rollup/esbuild) can statically resolve
+// "playwright" or its sub-dependencies (chromium-bidi). Playwright is Node.js-only
+// and must never enter a Cloudflare Workers bundle.
+// eslint-disable-next-line no-new-func, @typescript-eslint/no-implied-eval
+async function getChromium(): Promise<any> {
+  const pw = await (new Function('return import("playwright")')() as Promise<any>);
+  return pw.chromium;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────

@@ -47,7 +47,20 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
       dateFilter: data.dateFilter as any,
     });
 
-    if (!result.ok) throw new Error(result.error ?? "YouTube skill failed");
+    if (!result.ok) {
+      // Return warning instead of throwing so the frontend keeps showing saved videos.
+      const actor = process.env.APIFY_YOUTUBE_ACTOR?.trim() ?? "streamers~youtube-scraper";
+      const raw = result.error ?? "YouTube skill failed";
+      const friendly = raw.includes("403")
+        ? `YouTube Radar: actor "${actor}" desativado ou sem permissão (403). Troque APIFY_YOUTUBE_ACTOR no .env.`
+        : raw.includes("404")
+        ? `YouTube Radar: actor "${actor}" não encontrado (404). Verifique APIFY_YOUTUBE_ACTOR no .env.`
+        : raw.includes("401")
+        ? `YouTube Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actor}`
+        : raw;
+      console.warn("[youtube-radar] mine failed:", friendly);
+      return { inserted: 0, skipped: 0, warning: friendly };
+    }
     if (!result.data.length) return { inserted: 0, skipped: 0 };
 
     const safe = (v: unknown, fallback = "") =>

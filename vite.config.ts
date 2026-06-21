@@ -16,22 +16,11 @@ export default defineConfig({
       port: 8082,
       strictPort: true,
     },
-    // Playwright + chromium-bidi are Node.js-only — exclude from Vite dep optimizer
+    // Prevent Vite's dep optimizer from pre-bundling playwright packages in dev.
+    // The actual playwright import uses new Function() so bundlers never see it,
+    // but optimizeDeps.exclude is a safety net to avoid optimizer warnings.
     optimizeDeps: {
-      exclude: [
-        "playwright",
-        "playwright-core",
-        "@playwright/test",
-        "chromium-bidi",
-      ],
-    },
-    ssr: {
-      external: [
-        "playwright",
-        "playwright-core",
-        "@playwright/test",
-        "chromium-bidi",
-      ],
+      exclude: ["playwright", "playwright-core", "@playwright/test", "chromium-bidi"],
     },
   },
 });

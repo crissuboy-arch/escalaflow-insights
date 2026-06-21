@@ -26,6 +26,7 @@ create unique index if not exists instagram_minerados_post_user_idx on public.in
 
 alter table public.instagram_minerados enable row level security;
 
+drop policy if exists "users own instagram_minerados" on public.instagram_minerados;
 create policy "users own instagram_minerados"
   on public.instagram_minerados
   for all

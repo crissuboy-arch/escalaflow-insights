@@ -26,6 +26,8 @@ import {
   BarChart2,
   Youtube,
   ShoppingBag,
+  Gauge,
+  Network,
 } from "lucide-react";
 import {
   Sidebar,
@@ -88,6 +90,8 @@ export function AppSidebar() {
     { to: "/pagina-venda", label: "Página de Venda", icon: LayoutTemplate },
     { to: "/checkout", label: "Checkout & Oferta", icon: ShoppingCart },
     { to: "/escala", label: "Escala do Produto", icon: Rocket },
+    { to: "/launch-analyzer", label: "Launch Analyzer", icon: Gauge },
+    { to: "/motor-afiliados-seo", label: "Motor Afiliados SEO", icon: Network },
     { to: "/strategic-ai", label: "Strategic AI", icon: BrainCircuit },
   ];
   const conta: Item[] = [

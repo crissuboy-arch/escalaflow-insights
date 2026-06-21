@@ -213,7 +213,9 @@ export const mineInstagramFn = createServerFn({ method: "POST" })
     } catch (err: any) {
       const msg: string = err?.message ?? "";
       if (msg.includes("timeout")) throw new Error("A busca no Instagram demorou demais. Tente reduzir o limite ou use uma hashtag menor.");
-      if (msg.includes("401") || msg.includes("403")) throw new Error("Acesso negado ao Instagram. Verifique APIFY_TOKEN no .env.");
+      if (msg.includes("403")) throw new Error(`Instagram Radar: actor "${actor}" desativado ou sem permissão (403). Troque APIFY_INSTAGRAM_ACTOR no .env.`);
+      if (msg.includes("401")) throw new Error(`Instagram Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actor}`);
+      if (msg.includes("404")) throw new Error(`Instagram Radar: actor "${actor}" não encontrado (404). Verifique APIFY_INSTAGRAM_ACTOR no .env.`);
       throw new Error(msg || "Erro ao buscar no Instagram.");
     }
 

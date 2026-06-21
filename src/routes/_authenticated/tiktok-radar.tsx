@@ -59,6 +59,7 @@ import {
   fetchThumbnailsOembedFn,
 } from "@/lib/tiktok-radar.functions";
 import type { TikTokAiAnalysis, TikTokPlaybook, EscalatePack } from "@/lib/tiktok-radar.functions";
+import { SkillButton } from "@/components/module-skills/SkillButton";
 
 export const Route = createFileRoute("/_authenticated/tiktok-radar")({
   component: TikTokRadarPage,
@@ -2131,6 +2132,10 @@ function TikTokRadarPage() {
             <div className="text-xs text-white/40">vídeos</div>
           </div>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <SkillButton moduleKey="tiktok_radar" />
       </div>
 
       {/* ── Tab Bar ── */}

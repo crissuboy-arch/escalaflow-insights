@@ -32,11 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(s?.user ?? null);
     });
     // 2) Then hydrate existing session
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar sessão:", err);
+        setSession(null);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
     return () => sub.subscription.unsubscribe();
   }, []);
 

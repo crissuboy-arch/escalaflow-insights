@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import StorybookHome from "@/components/StorybookHome";
 import { createStory, listStories } from "@/lib/storybook.functions";
+import { SkillButton } from "@/components/module-skills/SkillButton";
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
@@ -53,5 +54,12 @@ function StorybookPage() {
     navigate({ to: "/storybook/$id", params: { id } });
   }
 
-  return <StorybookHome rows={rows} onCreateStory={handleCreate} preset={preset} />;
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <SkillButton moduleKey="storybook_ia" />
+      </div>
+      <StorybookHome rows={rows} onCreateStory={handleCreate} preset={preset} />
+    </div>
+  );
 }

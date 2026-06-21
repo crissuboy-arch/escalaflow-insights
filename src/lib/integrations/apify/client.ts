@@ -4,9 +4,9 @@ const BASE = "https://api.apify.com/v2";
 const MAX_TIMEOUT_SEC = 120;
 
 // Normalize actor ID: Apify URLs require "username~actorName" (tilde), not slash.
-// Accept both formats so .env can use either.
+// Accept both formats so .env can use either. Use /g to replace ALL slashes.
 function normalizeActorId(id: string): string {
-  return id.replace(/\//, "~");
+  return id.replace(/\//g, "~");
 }
 
 function getToken(): string {
@@ -54,7 +54,7 @@ export async function runSyncGetDatasetItems<T = any>(
     `${BASE}/acts/${safeId}/run-sync-get-dataset-items` +
     `?token=${maskToken(token)}&timeout=${timeoutSec}`;
 
-  console.log(`[apify] ▶ actor=${safeId}`);
+  console.log(`[apify] ▶ actor_original=${actorId} actor_normalized=${safeId}`);
   console.log(`[apify] ▶ url=${safeUrl}`);
   console.log(`[apify] ▶ payload=${JSON.stringify(input)}`);
 

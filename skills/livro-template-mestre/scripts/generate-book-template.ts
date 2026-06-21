@@ -6,7 +6,6 @@
  * Requires one of these in your .env:
  *   ANTHROPIC_API_KEY
  *   OPENAI_API_KEY
- *   LOVABLE_API_KEY
  */
 
 import * as fs from "fs";
@@ -74,16 +73,8 @@ function resolveProvider() {
       isAnthropic: false,
     };
   }
-  if (process.env.LOVABLE_API_KEY) {
-    return {
-      url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-      key: process.env.LOVABLE_API_KEY,
-      model: "google/gemini-2.5-flash",
-      isAnthropic: false,
-    };
-  }
   throw new Error(
-    "Nenhuma chave de IA encontrada no .env. Configure ANTHROPIC_API_KEY, OPENAI_API_KEY ou LOVABLE_API_KEY.",
+    "Nenhuma chave de IA encontrada no .env. Configure ANTHROPIC_API_KEY ou OPENAI_API_KEY.",
   );
 }
 

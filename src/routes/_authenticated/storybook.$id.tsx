@@ -27,6 +27,13 @@ import {
   Download,
   Copy,
   Share2,
+  Upload,
+  Globe,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  X,
 } from "lucide-react";
 import {
   loadStory,
@@ -40,11 +47,19 @@ import {
   generateShareTokenFn,
 } from "@/lib/storybook.functions";
 import {
+  importPlaybookFn,
+  generatePageImagePromptFn,
+  updateChapterExtrasFn,
+  publishStorybookFn,
+} from "@/lib/storybook-enhancements.functions";
+import {
   COVER_STYLES,
   BADGES,
   VOICES,
   SOUNDTRACKS,
 } from "@/lib/storybook/catalog";
+import { ImportPlaybookModal } from "@/components/storybook/ImportPlaybookModal";
+import { PublishModal } from "@/components/storybook/PublishModal";
 
 export const Route = createFileRoute("/_authenticated/storybook/$id")({
   component: StorybookWorkspace,
@@ -87,6 +102,9 @@ function StorybookWorkspace() {
   const genShortsFn = useServerFn(generateShorts);
   const genAudio = useServerFn(generateAudiobookScript);
   const genShare = useServerFn(generateShareTokenFn);
+  const importFn = useServerFn(importPlaybookFn);
+  const genImagePromptFn = useServerFn(generatePageImagePromptFn);
+  const updateExtrasFn = useServerFn(updateChapterExtrasFn);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [story, setStory] = useState<any>(null);
@@ -100,6 +118,11 @@ function StorybookWorkspace() {
   const [soundtrack, setSoundtrack] = useState<string>("piano-melancolico");
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [readerMode, setReaderMode] = useState(false);
+  // — new modal state
+  const [importOpen, setImportOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  // — per-chapter enhancement panel
+  const [expandedExtra, setExpandedExtra] = useState<string | null>(null);
 
   const refresh = async () => {
     const { story: s } = await load({ data: { id } });
@@ -357,6 +380,12 @@ function StorybookWorkspace() {
           {planning?.subniche && <Badge variant="outline">{planning.subniche}</Badge>}
           <Badge variant="outline">{planning?.chapters} caps</Badge>
           <Badge variant="outline">{planning?.tone}</Badge>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="border-orange-500/30 text-orange-300 hover:border-orange-400/60 hover:text-orange-200">
+            <Upload className="mr-1.5 h-3.5 w-3.5" /> Importar Playbook
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setPublishOpen(true)} className="border-blue-500/30 text-blue-300 hover:border-blue-400/60 hover:text-blue-200">
+            <Globe className="mr-1.5 h-3.5 w-3.5" /> Publicar
+          </Button>
           {chapters.filter((c: { body: string }) => c.body).length > 0 && (
             <Button size="sm" variant="secondary" onClick={() => setReaderMode(true)}>
               <BookOpen className="mr-1.5 h-3.5 w-3.5" /> Ler livro
@@ -532,10 +561,154 @@ function StorybookWorkspace() {
                       setStory({ ...story, chapters: updated });
                     }}
                     onBlur={() => updChap({ data: { id, chapterId: activeCh.id, body: activeCh.body } }).catch(() => {})}
-                    rows={20}
+                    rows={14}
                     className="font-mono text-sm leading-relaxed"
                     placeholder="Texto do capítulo aparecerá aqui..."
                   />
+
+                  {/* ── Painel de Enriquecimento de Página ── */}
+                  <div className="rounded-xl border border-border/40 bg-muted/20">
+                    <button
+                      onClick={() => setExpandedExtra(expandedExtra === activeCh.id ? null : activeCh.id)}
+                      className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3.5 w-3.5 text-primary" />
+                        Enriquecer Página — imagem, animação, frase de destaque
+                      </span>
+                      {expandedExtra === activeCh.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    </button>
+
+                    {expandedExtra === activeCh.id && (
+                      <div className="space-y-3 border-t border-border/40 px-4 pb-4 pt-3">
+                        {/* Image URL */}
+                        <div className="space-y-1">
+                          <Label className="text-xs uppercase text-muted-foreground">URL da imagem desta página</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              value={(activeCh as any).imageUrl ?? ""}
+                              onChange={(e) => {
+                                const updated = chapters.map((c: any) =>
+                                  c.id === activeCh.id ? { ...c, imageUrl: e.target.value } : c,
+                                );
+                                setStory({ ...story, chapters: updated });
+                              }}
+                              onBlur={() => {
+                                updateExtrasFn({ data: { id, chapterId: activeCh.id, imageUrl: (activeCh as any).imageUrl ?? "" } }).catch(() => {});
+                              }}
+                              placeholder="https://... ou deixe em branco"
+                              className="text-sm"
+                            />
+                            {(activeCh as any).imageUrl && (
+                              <button
+                                onClick={() => {
+                                  const updated = chapters.map((c: any) =>
+                                    c.id === activeCh.id ? { ...c, imageUrl: "" } : c,
+                                  );
+                                  setStory({ ...story, chapters: updated });
+                                  updateExtrasFn({ data: { id, chapterId: activeCh.id, imageUrl: "" } }).catch(() => {});
+                                }}
+                                className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                          {(activeCh as any).imageUrl && (
+                            <img src={(activeCh as any).imageUrl} alt="" className="mt-2 h-24 rounded-md object-cover w-full" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                          )}
+                        </div>
+
+                        {/* Image Prompt */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs uppercase text-muted-foreground">Prompt de imagem</Label>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-2 text-[11px] text-primary"
+                              disabled={busy === `img-prompt-${activeCh.id}`}
+                              onClick={async () => {
+                                setBusy(`img-prompt-${activeCh.id}`);
+                                try {
+                                  const r = await genImagePromptFn({ data: { id, chapterId: activeCh.id } });
+                                  const updated = chapters.map((c: any) =>
+                                    c.id === activeCh.id ? { ...c, imagePrompt: r.imagePrompt, animationPrompt: r.animationPrompt } : c,
+                                  );
+                                  setStory({ ...story, chapters: updated });
+                                } catch (e) {
+                                  toast.error(e instanceof Error ? e.message : "Falha");
+                                } finally {
+                                  setBusy(null);
+                                }
+                              }}
+                            >
+                              {busy === `img-prompt-${activeCh.id}` ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Wand2 className="mr-1 h-3 w-3" />Gerar</>}
+                            </Button>
+                          </div>
+                          <Textarea
+                            value={(activeCh as any).imagePrompt ?? ""}
+                            onChange={(e) => {
+                              const updated = chapters.map((c: any) =>
+                                c.id === activeCh.id ? { ...c, imagePrompt: e.target.value } : c,
+                              );
+                              setStory({ ...story, chapters: updated });
+                            }}
+                            onBlur={() => {
+                              updateExtrasFn({ data: { id, chapterId: activeCh.id, imagePrompt: (activeCh as any).imagePrompt ?? "" } }).catch(() => {});
+                            }}
+                            rows={3}
+                            className="text-xs"
+                            placeholder="Prompt em inglês para gerar imagem desta página (no text, no logo, cinematic...)"
+                          />
+                          {(activeCh as any).imagePrompt && (
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => copy((activeCh as any).imagePrompt)}>
+                              <Copy className="mr-1 h-3 w-3" /> Copiar prompt
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Animation Prompt */}
+                        <div className="space-y-1">
+                          <Label className="text-xs uppercase text-muted-foreground">Prompt de animação</Label>
+                          <Textarea
+                            value={(activeCh as any).animationPrompt ?? ""}
+                            onChange={(e) => {
+                              const updated = chapters.map((c: any) =>
+                                c.id === activeCh.id ? { ...c, animationPrompt: e.target.value } : c,
+                              );
+                              setStory({ ...story, chapters: updated });
+                            }}
+                            onBlur={() => {
+                              updateExtrasFn({ data: { id, chapterId: activeCh.id, animationPrompt: (activeCh as any).animationPrompt ?? "" } }).catch(() => {});
+                            }}
+                            rows={2}
+                            className="text-xs"
+                            placeholder="ex: zoom lento, câmera deslizando da esquerda, luz dourada pulsando..."
+                          />
+                        </div>
+
+                        {/* Highlight phrase */}
+                        <div className="space-y-1">
+                          <Label className="text-xs uppercase text-muted-foreground">Frase de destaque</Label>
+                          <Input
+                            value={(activeCh as any).highlight ?? ""}
+                            onChange={(e) => {
+                              const updated = chapters.map((c: any) =>
+                                c.id === activeCh.id ? { ...c, highlight: e.target.value } : c,
+                              );
+                              setStory({ ...story, chapters: updated });
+                            }}
+                            onBlur={() => {
+                              updateExtrasFn({ data: { id, chapterId: activeCh.id, highlight: (activeCh as any).highlight ?? "" } }).catch(() => {});
+                            }}
+                            placeholder="A frase mais impactante desta página..."
+                            className="text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </CardContent>
@@ -702,6 +875,25 @@ function StorybookWorkspace() {
         </Card>
       )}
 
+      {/* PUBLICAR COM SLUG */}
+      {step === 8 && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4 text-blue-400" /> Publicar AnimaBook</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-xs text-muted-foreground">
+              Publique e receba um link <strong>/story/slug</strong> com visualização animada premium — funciona sem login.
+            </p>
+            <Button
+              onClick={() => setPublishOpen(true)}
+              className="border-blue-500/30 bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-300 hover:from-blue-600/30 hover:to-purple-600/30"
+              variant="outline"
+            >
+              <Globe className="mr-1.5 h-4 w-4" /> Publicar com Link Animado
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* LINK COMPARTILHÁVEL */}
       {step === 8 && (
         <Card>
@@ -742,6 +934,24 @@ function StorybookWorkspace() {
           </CardContent>
         </Card>
       )}
+      {/* ── Modais ── */}
+      <ImportPlaybookModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        projectId={id}
+        onImported={async (count) => {
+          await refresh();
+          setStep(4);
+          toast.success(`${count} capítulos importados! Acesse a aba Capítulos.`);
+        }}
+      />
+      <PublishModal
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        projectId={id}
+        story={story ?? {}}
+        projectTitle={planning?.title ?? ""}
+      />
     </div>
   );
 }

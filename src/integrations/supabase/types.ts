@@ -1301,6 +1301,9 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          wp_app_password: string | null
+          wp_url: string | null
+          wp_user: string | null
         }
         Insert: {
           briefing?: Json
@@ -1323,6 +1326,9 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id: string
+          wp_app_password?: string | null
+          wp_url?: string | null
+          wp_user?: string | null
         }
         Update: {
           briefing?: Json
@@ -1345,6 +1351,9 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          wp_app_password?: string | null
+          wp_url?: string | null
+          wp_user?: string | null
         }
         Relationships: []
       }

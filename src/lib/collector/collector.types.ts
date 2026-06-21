@@ -35,6 +35,10 @@ export interface CollectorAd {
   mechanism?: string;
   emotion?: string;
   scaleLevel?: "cold" | "warming" | "hot" | "scaled";
+  // Offer classification + provenance
+  offerType?: "anuncio" | "pagina-venda" | "vsl" | "checkout" | "ecommerce" | "conteudo";
+  sourceEngine?: string;
+  mediaStatus?: "found" | "not-found";
   // Pattern detection (filled by post-pass)
   isVsl?: boolean;
   vslScaling?: boolean;

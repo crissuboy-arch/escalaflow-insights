@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { motion, AnimatePresence } from "framer-motion";
 import { StrategicInputSchema, type StrategicInput } from "@/lib/strategic-ai-engine";
+import { SkillButton } from "@/components/module-skills/SkillButton";
 import { generateFullStrategy } from "@/lib/strategic-ai.functions";
 import { StrategicAiResults } from "@/components/project/StrategicAiResults";
 
@@ -64,13 +65,16 @@ function StrategicAI() {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-          {t("strategicAI.title", "Strategic AI Engine")}
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {t("strategicAI.subtitle", "Crie estratégias de alta conversão adaptadas para qualquer mercado.")}
-        </p>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
+            {t("strategicAI.title", "Strategic AI Engine")}
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            {t("strategicAI.subtitle", "Crie estratégias de alta conversão adaptadas para qualquer mercado.")}
+          </p>
+        </div>
+        <SkillButton moduleKey="workflow_builder" className="mt-1" />
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -207,9 +207,20 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
       shouldDownloadVideos: false,
     };
 
+    console.log("[tiktok-radar] actor=", actorId);
     console.log("[tiktok-radar] mining hashtag:", cleanHashtag, "limit:", limit);
 
-    const raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, payload);
+    let raw: Record<string, unknown>[];
+    try {
+      raw = await runSyncGetDatasetItems<Record<string, unknown>>(actorId, payload);
+    } catch (err: any) {
+      const msg: string = err?.message ?? "";
+      console.error("[tiktok-radar] Apify error:", msg);
+      if (msg.includes("403")) throw new Error(`TikTok Radar: actor "${actorId}" desativado ou sem permissão (403). Troque APIFY_TIKTOK_ACTOR no .env.`);
+      if (msg.includes("404")) throw new Error(`TikTok Radar: actor "${actorId}" não encontrado (404). Verifique APIFY_TIKTOK_ACTOR no .env.`);
+      if (msg.includes("401")) throw new Error(`TikTok Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actorId}`);
+      throw new Error(`TikTok Radar: ${msg}`);
+    }
 
     if (!raw.length) return { inserted: 0, skipped: 0 };
 

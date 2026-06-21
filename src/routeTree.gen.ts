@@ -13,7 +13,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StorybookShareTokenRouteImport } from './routes/storybook-share.$token'
+import { Route as StorySlugRouteImport } from './routes/story.$slug'
+import { Route as ApiScrapeOfferRouteImport } from './routes/api/scrape-offer'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiExecuteSkillRouteImport } from './routes/api/execute-skill'
 import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
 import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
 import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
@@ -24,9 +27,12 @@ import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenticated/pagina-venda'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
+import { Route as AuthenticatedMotorAfiliadosSeoRouteImport } from './routes/_authenticated/motor-afiliados-seo'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedMineradorPublicoRouteImport } from './routes/_authenticated/minerador-publico'
 import { Route as AuthenticatedLivroTemplateMestreRouteImport } from './routes/_authenticated/livro-template-mestre'
 import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
+import { Route as AuthenticatedLaunchAnalyzerRouteImport } from './routes/_authenticated/launch-analyzer'
 import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
@@ -42,11 +48,14 @@ import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authen
 import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated/checkout'
 import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
+import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
 import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
 import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
+import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
+import { Route as AuthenticatedLaunchAnalyzerIdRouteImport } from './routes/_authenticated/launch-analyzer.$id'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -67,9 +76,24 @@ const StorybookShareTokenRoute = StorybookShareTokenRouteImport.update({
   path: '/storybook-share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StorySlugRoute = StorySlugRouteImport.update({
+  id: '/story/$slug',
+  path: '/story/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiScrapeOfferRoute = ApiScrapeOfferRouteImport.update({
+  id: '/api/scrape-offer',
+  path: '/api/scrape-offer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExecuteSkillRoute = ApiExecuteSkillRouteImport.update({
+  id: '/api/execute-skill',
+  path: '/api/execute-skill',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedYoutubeRadarRoute =
@@ -129,11 +153,23 @@ const AuthenticatedOfertasEscaladasRoute =
     path: '/ofertas-escaladas',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedMotorAfiliadosSeoRoute =
+  AuthenticatedMotorAfiliadosSeoRouteImport.update({
+    id: '/motor-afiliados-seo',
+    path: '/motor-afiliados-seo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   id: '/minerar',
   path: '/minerar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMineradorPublicoRoute =
+  AuthenticatedMineradorPublicoRouteImport.update({
+    id: '/minerador-publico',
+    path: '/minerador-publico',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedLivroTemplateMestreRoute =
   AuthenticatedLivroTemplateMestreRouteImport.update({
     id: '/livro-template-mestre',
@@ -144,6 +180,12 @@ const AuthenticatedLinkExternoRoute =
   AuthenticatedLinkExternoRouteImport.update({
     id: '/link-externo',
     path: '/link-externo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedLaunchAnalyzerRoute =
+  AuthenticatedLaunchAnalyzerRouteImport.update({
+    id: '/launch-analyzer',
+    path: '/launch-analyzer',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedInstagramRadarRoute =
@@ -227,6 +269,11 @@ const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
   path: '/analise-ia',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiCronPublicarArtigosRoute = ApiCronPublicarArtigosRouteImport.update({
+  id: '/api/cron/publicar-artigos',
+  path: '/api/cron/publicar-artigos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   id: '/api/collector/run',
   path: '/api/collector/run',
@@ -254,6 +301,18 @@ const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
   path: '/oferta/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMotorAfiliadosSeoIdRoute =
+  AuthenticatedMotorAfiliadosSeoIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedMotorAfiliadosSeoRoute,
+  } as any)
+const AuthenticatedLaunchAnalyzerIdRoute =
+  AuthenticatedLaunchAnalyzerIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedLaunchAnalyzerRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -273,9 +332,12 @@ export interface FileRoutesByFullPath {
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
+  '/launch-analyzer': typeof AuthenticatedLaunchAnalyzerRouteWithChildren
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
+  '/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
@@ -286,13 +348,19 @@ export interface FileRoutesByFullPath {
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
+  '/api/execute-skill': typeof ApiExecuteSkillRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/scrape-offer': typeof ApiScrapeOfferRoute
+  '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
+  '/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -312,9 +380,12 @@ export interface FileRoutesByTo {
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
+  '/launch-analyzer': typeof AuthenticatedLaunchAnalyzerRouteWithChildren
   '/link-externo': typeof AuthenticatedLinkExternoRoute
   '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
+  '/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/pagina-venda': typeof AuthenticatedPaginaVendaRoute
@@ -325,13 +396,19 @@ export interface FileRoutesByTo {
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
+  '/api/execute-skill': typeof ApiExecuteSkillRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/scrape-offer': typeof ApiScrapeOfferRoute
+  '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
+  '/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -353,9 +430,12 @@ export interface FileRoutesById {
   '/_authenticated/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/instagram-radar': typeof AuthenticatedInstagramRadarRoute
+  '/_authenticated/launch-analyzer': typeof AuthenticatedLaunchAnalyzerRouteWithChildren
   '/_authenticated/link-externo': typeof AuthenticatedLinkExternoRoute
   '/_authenticated/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
+  '/_authenticated/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
+  '/_authenticated/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
   '/_authenticated/pagina-venda': typeof AuthenticatedPaginaVendaRoute
@@ -366,13 +446,19 @@ export interface FileRoutesById {
   '/_authenticated/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
   '/_authenticated/youtube-radar': typeof AuthenticatedYoutubeRadarRoute
+  '/api/execute-skill': typeof ApiExecuteSkillRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/scrape-offer': typeof ApiScrapeOfferRoute
+  '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/_authenticated/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
+  '/_authenticated/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
   '/_authenticated/produtos/ebook': typeof AuthenticatedProdutosEbookRoute
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -394,9 +480,12 @@ export interface FileRouteTypes {
     | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
+    | '/launch-analyzer'
     | '/link-externo'
     | '/livro-template-mestre'
+    | '/minerador-publico'
     | '/minerar'
+    | '/motor-afiliados-seo'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
     | '/pagina-venda'
@@ -407,13 +496,19 @@ export interface FileRouteTypes {
     | '/strategic-ai'
     | '/tiktok-radar'
     | '/youtube-radar'
+    | '/api/execute-skill'
     | '/api/ingest'
+    | '/api/scrape-offer'
+    | '/story/$slug'
     | '/storybook-share/$token'
+    | '/launch-analyzer/$id'
+    | '/motor-afiliados-seo/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/publicar-artigos'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -433,9 +528,12 @@ export interface FileRouteTypes {
     | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
+    | '/launch-analyzer'
     | '/link-externo'
     | '/livro-template-mestre'
+    | '/minerador-publico'
     | '/minerar'
+    | '/motor-afiliados-seo'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
     | '/pagina-venda'
@@ -446,13 +544,19 @@ export interface FileRouteTypes {
     | '/strategic-ai'
     | '/tiktok-radar'
     | '/youtube-radar'
+    | '/api/execute-skill'
     | '/api/ingest'
+    | '/api/scrape-offer'
+    | '/story/$slug'
     | '/storybook-share/$token'
+    | '/launch-analyzer/$id'
+    | '/motor-afiliados-seo/$id'
     | '/oferta/$id'
     | '/produtos/ebook'
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/publicar-artigos'
   id:
     | '__root__'
     | '/'
@@ -473,9 +577,12 @@ export interface FileRouteTypes {
     | '/_authenticated/google-radar'
     | '/_authenticated/importar-anuncio'
     | '/_authenticated/instagram-radar'
+    | '/_authenticated/launch-analyzer'
     | '/_authenticated/link-externo'
     | '/_authenticated/livro-template-mestre'
+    | '/_authenticated/minerador-publico'
     | '/_authenticated/minerar'
+    | '/_authenticated/motor-afiliados-seo'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
     | '/_authenticated/pagina-venda'
@@ -486,22 +593,32 @@ export interface FileRouteTypes {
     | '/_authenticated/strategic-ai'
     | '/_authenticated/tiktok-radar'
     | '/_authenticated/youtube-radar'
+    | '/api/execute-skill'
     | '/api/ingest'
+    | '/api/scrape-offer'
+    | '/story/$slug'
     | '/storybook-share/$token'
+    | '/_authenticated/launch-analyzer/$id'
+    | '/_authenticated/motor-afiliados-seo/$id'
     | '/_authenticated/oferta/$id'
     | '/_authenticated/produtos/ebook'
     | '/_authenticated/projetos/$id'
     | '/_authenticated/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/publicar-artigos'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  ApiExecuteSkillRoute: typeof ApiExecuteSkillRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiScrapeOfferRoute: typeof ApiScrapeOfferRoute
+  StorySlugRoute: typeof StorySlugRoute
   StorybookShareTokenRoute: typeof StorybookShareTokenRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
+  ApiCronPublicarArtigosRoute: typeof ApiCronPublicarArtigosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -534,11 +651,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StorybookShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/story/$slug': {
+      id: '/story/$slug'
+      path: '/story/$slug'
+      fullPath: '/story/$slug'
+      preLoaderRoute: typeof StorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/scrape-offer': {
+      id: '/api/scrape-offer'
+      path: '/api/scrape-offer'
+      fullPath: '/api/scrape-offer'
+      preLoaderRoute: typeof ApiScrapeOfferRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest': {
       id: '/api/ingest'
       path: '/api/ingest'
       fullPath: '/api/ingest'
       preLoaderRoute: typeof ApiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/execute-skill': {
+      id: '/api/execute-skill'
+      path: '/api/execute-skill'
+      fullPath: '/api/execute-skill'
+      preLoaderRoute: typeof ApiExecuteSkillRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/youtube-radar': {
@@ -611,11 +749,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfertasEscaladasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/motor-afiliados-seo': {
+      id: '/_authenticated/motor-afiliados-seo'
+      path: '/motor-afiliados-seo'
+      fullPath: '/motor-afiliados-seo'
+      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/minerar': {
       id: '/_authenticated/minerar'
       path: '/minerar'
       fullPath: '/minerar'
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/minerador-publico': {
+      id: '/_authenticated/minerador-publico'
+      path: '/minerador-publico'
+      fullPath: '/minerador-publico'
+      preLoaderRoute: typeof AuthenticatedMineradorPublicoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/livro-template-mestre': {
@@ -630,6 +782,13 @@ declare module '@tanstack/react-router' {
       path: '/link-externo'
       fullPath: '/link-externo'
       preLoaderRoute: typeof AuthenticatedLinkExternoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/launch-analyzer': {
+      id: '/_authenticated/launch-analyzer'
+      path: '/launch-analyzer'
+      fullPath: '/launch-analyzer'
+      preLoaderRoute: typeof AuthenticatedLaunchAnalyzerRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/instagram-radar': {
@@ -737,6 +896,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/cron/publicar-artigos': {
+      id: '/api/cron/publicar-artigos'
+      path: '/api/cron/publicar-artigos'
+      fullPath: '/api/cron/publicar-artigos'
+      preLoaderRoute: typeof ApiCronPublicarArtigosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/collector/run': {
       id: '/api/collector/run'
       path: '/api/collector/run'
@@ -772,8 +938,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/motor-afiliados-seo/$id': {
+      id: '/_authenticated/motor-afiliados-seo/$id'
+      path: '/$id'
+      fullPath: '/motor-afiliados-seo/$id'
+      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoIdRouteImport
+      parentRoute: typeof AuthenticatedMotorAfiliadosSeoRoute
+    }
+    '/_authenticated/launch-analyzer/$id': {
+      id: '/_authenticated/launch-analyzer/$id'
+      path: '/$id'
+      fullPath: '/launch-analyzer/$id'
+      preLoaderRoute: typeof AuthenticatedLaunchAnalyzerIdRouteImport
+      parentRoute: typeof AuthenticatedLaunchAnalyzerRoute
+    }
   }
 }
+
+interface AuthenticatedLaunchAnalyzerRouteChildren {
+  AuthenticatedLaunchAnalyzerIdRoute: typeof AuthenticatedLaunchAnalyzerIdRoute
+}
+
+const AuthenticatedLaunchAnalyzerRouteChildren: AuthenticatedLaunchAnalyzerRouteChildren =
+  {
+    AuthenticatedLaunchAnalyzerIdRoute: AuthenticatedLaunchAnalyzerIdRoute,
+  }
+
+const AuthenticatedLaunchAnalyzerRouteWithChildren =
+  AuthenticatedLaunchAnalyzerRoute._addFileChildren(
+    AuthenticatedLaunchAnalyzerRouteChildren,
+  )
+
+interface AuthenticatedMotorAfiliadosSeoRouteChildren {
+  AuthenticatedMotorAfiliadosSeoIdRoute: typeof AuthenticatedMotorAfiliadosSeoIdRoute
+}
+
+const AuthenticatedMotorAfiliadosSeoRouteChildren: AuthenticatedMotorAfiliadosSeoRouteChildren =
+  {
+    AuthenticatedMotorAfiliadosSeoIdRoute:
+      AuthenticatedMotorAfiliadosSeoIdRoute,
+  }
+
+const AuthenticatedMotorAfiliadosSeoRouteWithChildren =
+  AuthenticatedMotorAfiliadosSeoRoute._addFileChildren(
+    AuthenticatedMotorAfiliadosSeoRouteChildren,
+  )
 
 interface AuthenticatedProjetosRouteChildren {
   AuthenticatedProjetosIdRoute: typeof AuthenticatedProjetosIdRoute
@@ -818,9 +1027,12 @@ interface AuthenticatedRouteChildren {
   AuthenticatedGoogleRadarRoute: typeof AuthenticatedGoogleRadarRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedInstagramRadarRoute: typeof AuthenticatedInstagramRadarRoute
+  AuthenticatedLaunchAnalyzerRoute: typeof AuthenticatedLaunchAnalyzerRouteWithChildren
   AuthenticatedLinkExternoRoute: typeof AuthenticatedLinkExternoRoute
   AuthenticatedLivroTemplateMestreRoute: typeof AuthenticatedLivroTemplateMestreRoute
+  AuthenticatedMineradorPublicoRoute: typeof AuthenticatedMineradorPublicoRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
+  AuthenticatedMotorAfiliadosSeoRoute: typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
   AuthenticatedPaginaVendaRoute: typeof AuthenticatedPaginaVendaRoute
@@ -851,9 +1063,14 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedGoogleRadarRoute: AuthenticatedGoogleRadarRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedInstagramRadarRoute: AuthenticatedInstagramRadarRoute,
+  AuthenticatedLaunchAnalyzerRoute:
+    AuthenticatedLaunchAnalyzerRouteWithChildren,
   AuthenticatedLinkExternoRoute: AuthenticatedLinkExternoRoute,
   AuthenticatedLivroTemplateMestreRoute: AuthenticatedLivroTemplateMestreRoute,
+  AuthenticatedMineradorPublicoRoute: AuthenticatedMineradorPublicoRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
+  AuthenticatedMotorAfiliadosSeoRoute:
+    AuthenticatedMotorAfiliadosSeoRouteWithChildren,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
   AuthenticatedOfertasSalvasRoute: AuthenticatedOfertasSalvasRoute,
   AuthenticatedPaginaVendaRoute: AuthenticatedPaginaVendaRoute,
@@ -876,9 +1093,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  ApiExecuteSkillRoute: ApiExecuteSkillRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiScrapeOfferRoute: ApiScrapeOfferRoute,
+  StorySlugRoute: StorySlugRoute,
   StorybookShareTokenRoute: StorybookShareTokenRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
+  ApiCronPublicarArtigosRoute: ApiCronPublicarArtigosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -8,6 +8,7 @@ import {
   Search, Loader2, Trash2, Sparkles, BookOpen, X,
   Eye, ThumbsUp, MessageSquare, Clock, Youtube, Zap,
 } from "lucide-react";
+import { SkillButton } from "@/components/module-skills/SkillButton";
 import {
   mineYouTubeFn,
   listYouTubeMinedFn,
@@ -265,7 +266,7 @@ export default function YouTubeRadarPage() {
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set());
   const [filterQuery, setFilterQuery] = useState<string | null>(null);
-  const [mineResult, setMineResult] = useState<{ inserted: number } | null>(null);
+  const [mineResult, setMineResult] = useState<{ inserted: number; skipped?: number; warning?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const mineVideos = useServerFn(mineYouTubeFn);
@@ -329,13 +330,16 @@ export default function YouTubeRadarPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: ACCENT, textShadow: "0 0 24px rgba(255,64,64,0.5)" }}>
-          Radar YouTube
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Encontre vídeos virais, analise hooks e transforme tendências em produtos digitais.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: ACCENT, textShadow: "0 0 24px rgba(255,64,64,0.5)" }}>
+            Radar YouTube
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Encontre vídeos virais, analise hooks e transforme tendências em produtos digitais.
+          </p>
+        </div>
+        <SkillButton moduleKey="youtube_radar" />
       </div>
 
       {/* search panel */}
@@ -374,8 +378,10 @@ export default function YouTubeRadarPage() {
         </div>
 
         {mineResult && (
-          <p className="text-xs" style={{ color: ACCENT }}>
-            {mineResult.inserted} vídeo(s) salvo(s). {mineResult.skipped > 0 ? `${mineResult.skipped} já existiam.` : ""}
+          <p className="text-xs" style={{ color: mineResult.warning ? "#f87171" : ACCENT }}>
+            {mineResult.warning
+              ? `⚠ ${mineResult.warning}`
+              : `${mineResult.inserted} vídeo(s) salvo(s). ${(mineResult.skipped ?? 0) > 0 ? `${mineResult.skipped} já existiam.` : ""}`}
           </p>
         )}
 

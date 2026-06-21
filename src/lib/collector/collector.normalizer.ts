@@ -117,6 +117,12 @@ export function normalize(
     if (!item || typeof item !== "object") continue;
     const ad = item as Obj;
 
+    // Pre-normalized items from Playwright provider — pass through directly
+    if (ad.source === "collector" && ad.headline && ad.adUrl) {
+      out.push(item as CollectorAd);
+      continue;
+    }
+
     const advertiser =
       pickStr(ad, [
         "snapshot.page_name",
