@@ -5,8 +5,14 @@
 //     error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { nitro } from "nitro/vite";
+
+// Detect if building for Vercel (VERCEL env var is set during Vercel builds)
+const isVercel = process.env.VERCEL === "1";
 
 export default defineConfig({
+  // Disable Cloudflare plugin when building for Vercel
+  cloudflare: isVercel ? false : undefined,
   vite: {
     server: {
       port: 8082,
@@ -40,5 +46,9 @@ export default defineConfig({
         },
       },
     },
+    plugins: [
+      // Add Nitro plugin for Vercel deployment
+      ...(isVercel ? [nitro()] : []),
+    ],
   },
 });
