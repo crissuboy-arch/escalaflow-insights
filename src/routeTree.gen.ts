@@ -40,6 +40,7 @@ import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
 import { Route as AuthenticatedEbookStudioRouteImport } from './routes/_authenticated/ebook-studio'
 import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authenticated/ebook-forge'
+import { Route as AuthenticatedDinheiroRapidoRouteImport } from './routes/_authenticated/dinheiro-rapido'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
@@ -227,6 +228,12 @@ const AuthenticatedEbookForgeRoute = AuthenticatedEbookForgeRouteImport.update({
   path: '/ebook-forge',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedDinheiroRapidoRoute =
+  AuthenticatedDinheiroRapidoRouteImport.update({
+    id: '/dinheiro-rapido',
+    path: '/dinheiro-rapido',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
   id: '/database',
   path: '/database',
@@ -325,6 +332,7 @@ export interface FileRoutesByFullPath {
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/dinheiro-rapido': typeof AuthenticatedDinheiroRapidoRoute
   '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
@@ -373,6 +381,7 @@ export interface FileRoutesByTo {
   '/criativos': typeof AuthenticatedCriativosRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/dinheiro-rapido': typeof AuthenticatedDinheiroRapidoRoute
   '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
@@ -423,6 +432,7 @@ export interface FileRoutesById {
   '/_authenticated/criativos': typeof AuthenticatedCriativosRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
+  '/_authenticated/dinheiro-rapido': typeof AuthenticatedDinheiroRapidoRoute
   '/_authenticated/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/_authenticated/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
@@ -473,6 +483,7 @@ export interface FileRouteTypes {
     | '/criativos'
     | '/dashboard'
     | '/database'
+    | '/dinheiro-rapido'
     | '/ebook-forge'
     | '/ebook-studio'
     | '/escala'
@@ -521,6 +532,7 @@ export interface FileRouteTypes {
     | '/criativos'
     | '/dashboard'
     | '/database'
+    | '/dinheiro-rapido'
     | '/ebook-forge'
     | '/ebook-studio'
     | '/escala'
@@ -570,6 +582,7 @@ export interface FileRouteTypes {
     | '/_authenticated/criativos'
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
+    | '/_authenticated/dinheiro-rapido'
     | '/_authenticated/ebook-forge'
     | '/_authenticated/ebook-studio'
     | '/_authenticated/escala'
@@ -840,6 +853,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEbookForgeRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/dinheiro-rapido': {
+      id: '/_authenticated/dinheiro-rapido'
+      path: '/dinheiro-rapido'
+      fullPath: '/dinheiro-rapido'
+      preLoaderRoute: typeof AuthenticatedDinheiroRapidoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/database': {
       id: '/_authenticated/database'
       path: '/database'
@@ -1020,6 +1040,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCriativosRoute: typeof AuthenticatedCriativosRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
+  AuthenticatedDinheiroRapidoRoute: typeof AuthenticatedDinheiroRapidoRoute
   AuthenticatedEbookForgeRoute: typeof AuthenticatedEbookForgeRoute
   AuthenticatedEbookStudioRoute: typeof AuthenticatedEbookStudioRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
@@ -1056,6 +1077,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCriativosRoute: AuthenticatedCriativosRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
+  AuthenticatedDinheiroRapidoRoute: AuthenticatedDinheiroRapidoRoute,
   AuthenticatedEbookForgeRoute: AuthenticatedEbookForgeRoute,
   AuthenticatedEbookStudioRoute: AuthenticatedEbookStudioRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,

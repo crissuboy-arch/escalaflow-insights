@@ -3,7 +3,11 @@ import { dlog } from "./debug/log.server";
 import { AGENT_MEDIA_BUYER, withAgent } from "./agents";
 import { resolveAIProvider } from "@/lib/aiService";
 
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
+// Modelo válido no provedor atual (OpenAI). Antes era "google/gemini-2.5-flash",
+// rejeitado com HTTP 400 → spinner infinito na Escala. Barato por padrão; as
+// chamadas consultor-grade abaixo pedem gpt-4o explicitamente.
+const DEFAULT_MODEL = "gpt-4o-mini";
+const STRONG_MODEL = "gpt-4o";
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // server-side defensive cap
 
 function safeJSON(raw: unknown): unknown {
@@ -596,7 +600,7 @@ Se a plataforma não foi escolhida pelo usuário, ainda preencha as 3 seções (
   const content = await callGateway([
     { role: "system", content: PLAN_SYSTEM },
     { role: "user", content: userContent },
-  ], { tag: "scale.plan", timeoutMs: 110_000, retries: 2 });
+  ], { model: STRONG_MODEL, tag: "scale.plan", timeoutMs: 110_000, retries: 2 });
   return CampaignPlanSchema.parse(normalizeCampaignPlan(safeJSON(content)));
 }
 
@@ -925,7 +929,7 @@ ${histJson}`;
       { role: "system", content: DIAG_SYSTEM },
       { role: "user", content: prompt },
     ],
-    { tag: "scale.fullDiagnosis", timeoutMs: 110_000, retries: 2 },
+    { model: STRONG_MODEL, tag: "scale.fullDiagnosis", timeoutMs: 110_000, retries: 2 },
   );
   return FullDiagnosisSchema.parse(safeJSON(content));
 }

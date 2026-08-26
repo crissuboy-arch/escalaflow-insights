@@ -22,5 +22,23 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ["playwright", "playwright-core", "@playwright/test", "chromium-bidi"],
     },
+    build: {
+      // Sobe o limite de aviso (o app é grande) e descola as libs pesadas de
+      // PDF/export em chunks próprios — reduz o pico de memória do bundler no
+      // client e evita um único chunk gigante. Não tocamos na árvore React
+      // (o config da Lovable já cuida do dedupe), só libs-folha isoladas.
+      chunkSizeWarningLimit: 1200,
+      rollupOptions: {
+        output: {
+          manualChunks(id: string) {
+            if (!id.includes("node_modules")) return;
+            if (/[\\/](jspdf|html2canvas|canvg|pdfjs-dist|pdf-lib)[\\/]/.test(id)) return "vendor-pdf";
+            if (/[\\/](xlsx|exceljs|jszip)[\\/]/.test(id)) return "vendor-export";
+            if (/[\\/]epubjs?[\\/]/.test(id)) return "vendor-epub";
+            return;
+          },
+        },
+      },
+    },
   },
 });

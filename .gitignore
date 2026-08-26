@@ -16,14 +16,33 @@ dist-ssr
 .nitro
 *.local
 
-# Env / secrets
+# Env / secrets (NUNCA committe valores reais)
 .env
 .env.local
+.env.production
+.env.development
+.env.staging
+.env.*
+!.env.example
 .dev.vars
 
 # Wrangler / Cloudflare
 .wrangler/
-.dev.vars
+
+# Claude / AI configs locais
+.claude/settings.local.json
+
+# Supabase temp
+supabase/.temp/
+
+# Repositórios internos (possuem próprio .git)
+mkbook-repo/
+temp-sb/
+
+# Backups e arquivos temporários
+*.bak
+*.bak-*
+*.backup
 
 # Editor directories and files
 .vscode/*

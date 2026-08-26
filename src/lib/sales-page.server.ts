@@ -108,7 +108,8 @@ Devolva EXATAMENTE este JSON (sem nada antes ou depois):
 
 export async function aiGenerateSalesPage(ctx: PageContext): Promise<SalesPage> {
   const res = await aiChat({
-    model: "google/gemini-3-flash-preview",
+    // Antes "google/gemini-3-flash-preview" (rejeitado com HTTP 400 → spinner infinito).
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: SYSTEM },
       { role: "user", content: buildPrompt(ctx) },

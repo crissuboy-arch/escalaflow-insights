@@ -28,6 +28,7 @@ import {
   ShoppingBag,
   Gauge,
   Network,
+  Zap,
 } from "lucide-react";
 import {
   Sidebar,
@@ -82,6 +83,7 @@ export function AppSidebar() {
     { to: "/favoritos", label: t("nav.favorites"), icon: Heart, badge: favCount },
   ];
   const esteira: Item[] = [
+    { to: "/dinheiro-rapido", label: "Modo Dinheiro Rápido", icon: Zap },
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
     { to: "/storybook", label: "StoryBook IA", icon: BookText },

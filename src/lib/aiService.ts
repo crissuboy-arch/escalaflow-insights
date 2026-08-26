@@ -63,6 +63,27 @@ export function resolveAIProvider() {
   return resolveProvider();
 }
 
+/**
+ * Normaliza o nome do modelo para um VÁLIDO no provedor resolvido. Grande parte do
+ * código foi escrita para um gateway que aceitava nomes "google/gemini-*", mas o
+ * provedor atual (OpenAI/Anthropic, direto) rejeita esses nomes com HTTP 400 —
+ * causando "spinner infinito" no front. Aqui, qualquer modelo que não pertença ao
+ * provedor cai no modelo padrão dele (ex.: gpt-4o-mini). Modelos válidos passados
+ * explicitamente (gpt-4o, claude-*) são respeitados.
+ */
+export function normalizeModel(
+  model: unknown,
+  provider: { url: string; model: string },
+): string {
+  if (typeof model !== "string" || !model) return provider.model;
+  const m = model.toLowerCase();
+  if (provider.url.includes("anthropic.com")) {
+    return m.startsWith("claude") ? model : provider.model;
+  }
+  // OpenAI: aceita gpt-*, o1/o3/o4 e chatgpt-*; o resto (google/*, gemini…) → padrão.
+  return /^(gpt|o1|o3|o4|chatgpt)/.test(m) ? model : provider.model;
+}
+
 type OpenAITool = {
   type: string;
   function: { name: string; description?: string; parameters?: unknown };
@@ -116,7 +137,7 @@ export async function callGateway(
       }));
 
       reqBody = {
-        model: body.model ?? provider.model,
+        model: normalizeModel(body.model, provider),
         max_tokens: (body.max_tokens as number) ?? 4096,
         messages: userMessages,
         ...(system ? { system } : {}),
@@ -133,7 +154,7 @@ export async function callGateway(
         "Content-Type": "application/json",
       };
     } else {
-      reqBody = { ...body, model: body.model ?? provider.model };
+      reqBody = { ...body, model: normalizeModel(body.model, provider) };
       headers = {
         Authorization: `Bearer ${provider.key}`,
         "Content-Type": "application/json",
