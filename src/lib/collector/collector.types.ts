@@ -7,6 +7,9 @@ export interface CollectorRunInput {
   country?: string;
   niche?: string;
   limit?: number;
+  /** When "Facebook", query the real Facebook Ad Library (Apify) directly
+   *  instead of the Bing/Yahoo commercial-page search used by default. */
+  platform?: string;
 }
 
 export interface CollectorAd {

@@ -46,53 +46,81 @@ function pickNum(obj: Record<string, unknown>, paths: string[]): number {
   return 0;
 }
 
+// videoMeta.coverUrl (and any "covers" entry from shouldDownloadCovers) points to a
+// PRIVATE Apify key-value-store record (https://api.apify.com/v2/key-value-stores/...)
+// that returns 403 without the Apify token — unusable as a public <img src>. Confirmed
+// 2026-09-15 against a live dataset. Always prefer the direct TikTok CDN URL instead.
+function isPrivateApifyUrl(url: string): boolean {
+  return url.includes("api.apify.com/v2/key-value-stores/");
+}
+
+function firstValidUrl(candidates: (string | undefined)[]): string | undefined {
+  for (const c of candidates) {
+    if (c && c.startsWith("http") && !isPrivateApifyUrl(c)) return c;
+  }
+  return undefined;
+}
+
 // Extracts the best available thumbnail URL from any Apify TikTok actor output shape.
-// Priority: videoMeta.coverUrl > videoMeta.originalCoverUrl > covers[0] > flat fields > avatar fallback
+// Priority: videoMeta.originalCoverUrl (public TikTok CDN) > dynamicCoverUrl > covers[0] > flat fields > avatar fallback
 function extractThumbnailUrl(item: Record<string, unknown>): string {
   // 1. videoMeta object (clockworks~tiktok-scraper primary shape)
   const vm = getPath(item, "videoMeta");
   if (vm && typeof vm === "object") {
     const v = vm as Record<string, unknown>;
-    for (const k of ["coverUrl", "originalCoverUrl", "dynamicCoverUrl", "cover", "thumbnail"]) {
-      if (typeof v[k] === "string" && (v[k] as string).startsWith("http")) return v[k] as string;
-    }
+    const found = firstValidUrl(
+      ["originalCoverUrl", "dynamicCoverUrl", "coverUrl", "cover", "thumbnail"].map((k) =>
+        typeof v[k] === "string" ? (v[k] as string) : undefined,
+      ),
+    );
+    if (found) return found;
   }
 
   // 2. covers array — can be strings or objects
   const coversRaw = getPath(item, "covers");
   if (Array.isArray(coversRaw) && coversRaw.length > 0) {
     const first = coversRaw[0];
-    if (typeof first === "string" && first.startsWith("http")) return first;
+    if (typeof first === "string") {
+      const found = firstValidUrl([first]);
+      if (found) return found;
+    }
     if (first && typeof first === "object") {
       const c = first as Record<string, unknown>;
-      for (const k of ["url", "coverUrl", "cover", "urlList"]) {
-        if (typeof c[k] === "string" && (c[k] as string).startsWith("http")) return c[k] as string;
-      }
+      const found = firstValidUrl(
+        ["url", "coverUrl", "cover", "urlList"].map((k) => (typeof c[k] === "string" ? (c[k] as string) : undefined)),
+      );
+      if (found) return found;
       // urlList is sometimes an array
-      if (Array.isArray(c["urlList"]) && typeof c["urlList"][0] === "string") return c["urlList"][0];
+      if (Array.isArray(c["urlList"]) && typeof c["urlList"][0] === "string") {
+        const found2 = firstValidUrl([c["urlList"][0] as string]);
+        if (found2) return found2;
+      }
     }
   }
 
   // 3. shareCover — array of cover URLs used for sharing
   const shareCover = getPath(item, "shareCover");
-  if (Array.isArray(shareCover) && shareCover.length > 0 && typeof shareCover[0] === "string" && (shareCover[0] as string).startsWith("http")) {
-    return shareCover[0];
+  if (Array.isArray(shareCover) && shareCover.length > 0 && typeof shareCover[0] === "string") {
+    const found = firstValidUrl([shareCover[0] as string]);
+    if (found) return found;
   }
 
   // 4. Flat-field fallbacks (various actor versions)
-  const flat = pickStr(item, [
-    "cover",
-    "coverUrl",
-    "coverImageUrl",
-    "thumbnail",
-    "thumbnailUrl",
-    "dynamicCover",
-    "dynamicCoverUrl",
-    "originCover",
-    "originalCoverUrl",
-    "coverMediumUrl",
-    "image",
-    "imageUrl",
+  const flat = firstValidUrl([
+    pickStr(item, [
+      "originalCoverUrl",
+      "dynamicCover",
+      "dynamicCoverUrl",
+      "originCover",
+      "cover",
+      "coverUrl",
+      "coverImageUrl",
+      "thumbnail",
+      "thumbnailUrl",
+      "coverMediumUrl",
+      "image",
+      "imageUrl",
+    ]),
   ]);
   if (flat) return flat;
 
@@ -310,11 +338,12 @@ export const fetchThumbnailsOembedFn = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const userId = (context as any).userId as string;
 
-    // 1. Find rows missing thumbnail
+    // 1. Find rows missing a thumbnail OR stuck with a private (unrenderable)
+    //    Apify key-value-store URL saved before the extractor priority fix.
     const { data: rows, error } = await tiktokTable()
       .select("id, video_id, creator, video_url, thumbnail_url")
       .eq("user_id", userId)
-      .or("thumbnail_url.is.null,thumbnail_url.eq.");
+      .or("thumbnail_url.is.null,thumbnail_url.eq.,thumbnail_url.ilike.%api.apify.com%");
 
     if (error) throw new Error(error.message);
     if (!rows || rows.length === 0) return { updated: 0 };

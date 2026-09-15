@@ -54,3 +54,5 @@ temp-sb/
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

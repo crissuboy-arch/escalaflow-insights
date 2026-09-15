@@ -40,15 +40,22 @@ export interface GoogleTrendsInput {
 // ── normalizer ────────────────────────────────────────────────────────────────
 
 function normalize(item: Record<string, unknown>): TrendData {
-  const keyword = pickStr(item, ["keyword", "term", "query"]) ?? "";
+  // Real output of apify/google-trends-scraper uses "searchTerm" (confirmed
+  // 2026-09-15 against a live dataset) — keep the older aliases as fallback
+  // in case the actor is swapped for a differently-shaped one later.
+  const keyword = pickStr(item, ["searchTerm", "keyword", "term", "query", "inputUrlOrTerm"]) ?? "";
   const geo = pickStr(item, ["geo", "country", "region"]) ?? "BR";
   const timeframe = pickStr(item, ["timeframe", "time_frame"]) ?? "";
 
-  const rawPoints = (item["timelineData"] ?? item["points"] ?? []) as Record<string, unknown>[];
+  const rawPoints = (item["interestOverTime_timelineData"] ?? item["timelineData"] ?? item["points"] ?? []) as Record<
+    string,
+    unknown
+  >[];
   const points: TrendPoint[] = Array.isArray(rawPoints)
     ? rawPoints.map((p) => ({
         keyword,
-        value: pickNum(p as Record<string, unknown>, ["value", "values.0", "formattedValue"]),
+        // "value" comes back as an array (e.g. [70]), not a plain number.
+        value: pickNum(p as Record<string, unknown>, ["value.0", "value", "formattedValue.0"]),
         date: pickStr(p as Record<string, unknown>, ["formattedTime", "date", "time"]) ?? "",
       }))
     : [];
@@ -64,8 +71,14 @@ function normalize(item: Record<string, unknown>): TrendData {
   const trend: TrendData["trend"] =
     lastAvg > firstAvg * 1.1 ? "rising" : lastAvg < firstAvg * 0.9 ? "falling" : "stable";
 
-  const relatedQueries = extractStringArray(item, ["relatedQueries", "related_queries"]);
-  const relatedTopics = extractStringArray(item, ["relatedTopics", "related_topics"]);
+  const relatedQueries = [
+    ...extractStringArray(item, ["relatedQueries_top", "relatedQueries", "related_queries"]),
+    ...extractStringArray(item, ["relatedQueries_rising"]),
+  ];
+  const relatedTopics = [
+    ...extractStringArray(item, ["relatedTopics_top", "relatedTopics", "related_topics"]),
+    ...extractStringArray(item, ["relatedTopics_rising"]),
+  ];
 
   return { keyword, geo, timeframe, avgInterest, peakInterest, trend, relatedQueries, relatedTopics, points };
 }
@@ -89,7 +102,10 @@ export async function runGoogleTrendsSkill(
   options: SkillOptions = {},
 ): Promise<SkillResult<TrendData>> {
   const start = Date.now();
-  const timeoutMs = options.timeoutMs ?? 100_000;
+  // Google Trends actor is browser-based and notably slow (~24% of runs across
+  // all Apify users time out at 120s per the actor's own public stats) — give
+  // it more headroom than other (API-based) actors.
+  const timeoutMs = options.timeoutMs ?? 220_000;
 
   let actor: string;
   try {
@@ -111,7 +127,7 @@ export async function runGoogleTrendsSkill(
 
   try {
     const raw = await withTimeout(
-      runSyncGetDatasetItems<Record<string, unknown>>(actor, payload),
+      runSyncGetDatasetItems<Record<string, unknown>>(actor, payload, 210),
       timeoutMs,
       "google-trends",
     );

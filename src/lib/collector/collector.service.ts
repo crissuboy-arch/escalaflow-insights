@@ -8,8 +8,33 @@ import { normalize } from "./collector.normalizer";
 import type { CollectorRunInput, CollectorRunResult } from "./collector.types";
 
 export async function runCollector(input: CollectorRunInput): Promise<CollectorRunResult> {
-  const ctx = `keyword="${input.keyword}" country=${input.country} niche=${input.niche}`;
+  const ctx = `keyword="${input.keyword}" country=${input.country} niche=${input.niche} platform=${input.platform ?? "—"}`;
   console.log(`[collector] starting run: ${ctx}`);
+
+  // ── Facebook Ad Library requested explicitly: go straight to the real
+  //    Apify actor instead of the Bing/Yahoo commercial-page search, which
+  //    never returns actual ad creatives (no image/video by design). ──────
+  if (input.platform === "Facebook") {
+    if (!process.env.APIFY_TOKEN) {
+      return { ok: false, count: 0, ads: [], error: "Motor de Coleta do Facebook Ad Library não configurado (APIFY_TOKEN ausente)." };
+    }
+    try {
+      const apify = createApifyProvider();
+      const raw = await apify.run(input);
+      console.log(`[collector] facebook (apify direct) returned ${raw.length} items`);
+      if (!raw.length) return { ok: true, count: 0, ads: [], error: undefined };
+      const ads = normalize(raw, {
+        keyword: input.keyword,
+        country: input.country || "—",
+        niche: input.niche || "Geral",
+      });
+      return { ok: true, count: ads.length, ads };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      console.warn(`[collector] facebook (apify direct) failed: ${error}`);
+      return { ok: false, count: 0, ads: [], error };
+    }
+  }
 
   // ── 1. Try Playwright (open source, primary) ─────────────────────────────
   let raw: unknown[] = [];

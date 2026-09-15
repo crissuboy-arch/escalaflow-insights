@@ -76,8 +76,23 @@ export const Route = createFileRoute("/_authenticated/minerar")({
 
 function AdMedia({ imageUrl, videoUrl, headline }: { imageUrl: string | null; videoUrl: string | null; headline: string }) {
   const [imgError, setImgError] = useState(false);
-  if (videoUrl) {
-    return <video src={videoUrl} className="h-full w-full object-cover" muted loop playsInline controls />;
+  const [videoError, setVideoError] = useState(false);
+  // Facebook's CDN media URLs are signed with a short expiry (days/weeks) — once
+  // expired they 403, which otherwise renders as a blank "0:00" video player.
+  // Confirmed 2026-09-15: an older ad's video_url returned "URL signature expired".
+  if (videoUrl && !videoError) {
+    return (
+      <video
+        src={videoUrl}
+        poster={imageUrl ?? undefined}
+        className="h-full w-full object-cover"
+        muted
+        loop
+        playsInline
+        controls
+        onError={() => setVideoError(true)}
+      />
+    );
   }
   if (imageUrl && !imgError) {
     return (
@@ -93,7 +108,9 @@ function AdMedia({ imageUrl, videoUrl, headline }: { imageUrl: string | null; vi
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
       <ImageIcon className="h-8 w-8 opacity-40" />
-      <span className="text-sm font-medium">sem mídia capturada</span>
+      <span className="text-sm font-medium">
+        {videoError || imgError ? "mídia expirada — minere novamente" : "sem mídia capturada"}
+      </span>
     </div>
   );
 }
@@ -369,6 +386,7 @@ function MinePage() {
           country: country === "all" ? undefined : country,
           niche: niche === "all" ? undefined : niche,
           limit: quantity,
+          platform: platform === "all" ? undefined : platform,
         }),
       });
       const data = (await res.json()) as CollectorRunResult;

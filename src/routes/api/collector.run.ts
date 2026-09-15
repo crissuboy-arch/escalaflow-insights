@@ -31,6 +31,7 @@ export const Route = createFileRoute("/api/collector/run")({
           country: body.country ? String(body.country) : undefined,
           niche: body.niche ? String(body.niche) : undefined,
           limit: typeof body.limit === "number" ? body.limit : Number(body.limit) || 20,
+          platform: body.platform ? String(body.platform) : undefined,
         });
 
         // Persist real ads to Supabase (upsert by ad_library_id)
