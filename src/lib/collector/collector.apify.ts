@@ -4,14 +4,12 @@
 
 import type { CollectorProvider, CollectorRunInput } from "./collector.types";
 import { APIFY_ACTORS } from "@/config/apify-actors";
-
-const BASE = "https://api.apify.com/v2";
+import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
 
 export function createProvider(): CollectorProvider {
   return {
     async run(input: CollectorRunInput) {
-      const token = process.env.APIFY_TOKEN;
-      if (!token) throw new Error("Motor de Coleta não configurado.");
+      if (!process.env.APIFY_TOKEN) throw new Error("Motor de Coleta não configurado.");
       const actor = APIFY_ACTORS.facebook();
 
       const payload = {
@@ -22,33 +20,32 @@ export function createProvider(): CollectorProvider {
             }&q=${encodeURIComponent(input.keyword)}&search_type=keyword_unordered`,
           },
         ],
-        count: Math.min(Math.max(input.limit ?? 20, 1), 100),
+        // curious_coder/facebook-ads-library-scraper rejects "Maximum charged
+        // results" below 10 (confirmed 2026-09-15: input=5 -> actor error
+        // "\"Maximum charged results\" option must be atleast 10").
+        count: Math.min(Math.max(input.limit ?? 20, 10), 100),
         "scrapePageAds.activeStatus": "active",
         scrapeAdDetails: true,
         scrapeAdvertiserPage: false,
       };
 
-      const safeToken = token.slice(0, 8) + "…(masked)";
-      const url = `${BASE}/acts/${actor}/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&timeout=120`;
       console.log(`[collector] actor=${actor}`);
-      console.log(`[collector] url=${BASE}/acts/${actor}/run-sync-get-dataset-items?token=${safeToken}&timeout=120`);
       console.log(`[collector] payload=${JSON.stringify(payload)}`);
 
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error(`[collector] ✗ status=${res.status} body=${text.slice(0, 300)}`);
-        if (res.status === 401 || res.status === 403) {
-          throw new Error(`Acesso negado ao actor ${actor} (${res.status}). Verifique APIFY_TOKEN e APIFY_META_ADS_ACTOR no .env.`);
-        }
-        throw new Error(`Motor de Coleta indisponível (${res.status}): ${text.slice(0, 200)}`);
+      // Delegate to the shared client, which normalizes "owner/actor-name" ->
+      // "owner~actor-name" (Apify's REST API 404s on the raw slash form —
+      // confirmed 2026-09-15 in production: this file used to build the URL
+      // manually without normalizing, so every Facebook run 404'd).
+      const items = await runSyncGetDatasetItems<Record<string, unknown>>(actor, payload);
+
+      // On invalid input, this actor's sync endpoint returns HTTP 200 with a
+      // single dataset item that IS the error, e.g. {"error": "..."} — not an
+      // HTTP error and not an ad. Confirmed 2026-09-15. Surface it as a real
+      // failure instead of silently persisting it as a fake "Anunciante" ad.
+      if (items.length === 1 && typeof items[0] === "object" && items[0] !== null && "error" in items[0] && Object.keys(items[0]).length === 1) {
+        throw new Error(`Facebook Ad Library actor input inválido: ${String((items[0] as { error: unknown }).error)}`);
       }
-      const data = (await res.json()) as unknown;
-      const items = Array.isArray(data) ? data : [];
+
       console.log(`[collector] ✓ ${items.length} items`);
       return items;
     },

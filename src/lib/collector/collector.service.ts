@@ -14,7 +14,8 @@ export async function runCollector(input: CollectorRunInput): Promise<CollectorR
   // ── Facebook Ad Library requested explicitly: go straight to the real
   //    Apify actor instead of the Bing/Yahoo commercial-page search, which
   //    never returns actual ad creatives (no image/video by design). ──────
-  if (input.platform === "Facebook") {
+  const platformNormalized = input.platform?.trim().toLowerCase();
+  if (platformNormalized === "facebook" || platformNormalized === "meta") {
     if (!process.env.APIFY_TOKEN) {
       return { ok: false, count: 0, ads: [], error: "Motor de Coleta do Facebook Ad Library não configurado (APIFY_TOKEN ausente)." };
     }
