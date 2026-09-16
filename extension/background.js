@@ -1,6 +1,5 @@
-// EscalaFlow background — orchestrates ChatGPT automation.
-const DEFAULT_ENDPOINT =
-  "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3e6.lovable.app";
+// EscalaFlow background — orchestrates ChatGPT automation + real persistence.
+const DEFAULT_ENDPOINT = "https://escalaflow-insights.vercel.app";
 
 chrome.runtime.onInstalled.addListener(async () => {
   const { endpoint } = await chrome.storage.local.get(["endpoint"]);
@@ -9,6 +8,34 @@ chrome.runtime.onInstalled.addListener(async () => {
 
 // Receives requests from content.js to open ChatGPT and inject a prompt.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "ESCALA_INGEST") {
+    // Real persistence: POST straight to /api/ingest -> collected_ads (Supabase).
+    // Runs from the background service worker so it works even when the
+    // EscalaFlow app isn't open in any tab.
+    chrome.storage.local.get(["endpoint"], async ({ endpoint }) => {
+      const base = (endpoint || DEFAULT_ENDPOINT).replace(/\/$/, "");
+      try {
+        const res = await fetch(`${base}/api/ingest`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(msg.payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        sendResponse({ ok: res.ok, status: res.status, data });
+      } catch (e) {
+        sendResponse({ ok: false, error: String(e?.message || e) });
+      }
+    });
+    return true; // async
+  }
+  if (msg?.type === "ESCALA_DOWNLOAD") {
+    // "Baixar criativo" — only fires when a direct media URL was captured.
+    chrome.downloads.download(
+      { url: msg.url, filename: msg.filename || undefined, saveAs: false },
+      (downloadId) => sendResponse({ ok: !!downloadId, downloadId }),
+    );
+    return true; // async
+  }
   if (msg?.type === "ESCALA_OPEN_CHATGPT") {
     const id = "esc_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const payload = { id, prompt: msg.prompt, ad: msg.ad, createdAt: Date.now() };

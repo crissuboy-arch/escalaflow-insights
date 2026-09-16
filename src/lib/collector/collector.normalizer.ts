@@ -1,5 +1,6 @@
 import type { CollectorAd } from "./collector.types";
 import { inferTagsFromText, scaleLevelFromScore, KEYWORD_CATEGORIES } from "../mining/keywords";
+import { detectOfferNetwork } from "../offer-network";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -174,6 +175,15 @@ export function normalize(
       "call_to_action",
     ]);
 
+    const landingPageUrl = pickStr(ad, [
+      "snapshot.link_url",
+      "snapshot.cards.0.link_url",
+      "link_url",
+    ]);
+    const { network: offerNetwork, confidence: offerNetworkConfidence } = detectOfferNetwork(
+      landingPageUrl,
+    );
+
     // Media — priority order
     let imageUrl: string | undefined;
     let mediaSource: CollectorAd["mediaSource"] = "none";
@@ -328,6 +338,9 @@ export function normalize(
       mechanism: inferred.mechanism,
       emotion: inferred.emotion,
       scaleLevel: scaleLevelFromScore(score),
+      landingPageUrl,
+      offerNetwork,
+      offerNetworkConfidence,
       raw: ad,
     });
   }

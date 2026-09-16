@@ -6,7 +6,7 @@
   const TOAST_ID = "escala-toast";
   const FLOAT_ID = "escala-float";
   const CARD_ATTR = "data-escala-card";
-  const DEFAULT_ENDPOINT = "http://localhost:8082"; // produção: trocar para URL do deploy
+  const DEFAULT_ENDPOINT = "https://escalaflow-insights.vercel.app";
   const DEBUG = true;
   const log = (...a) => DEBUG && console.log("[EscalaFlow]", ...a);
 
@@ -68,6 +68,15 @@
       try { chrome.storage.local.get(["endpoint"], ({ endpoint }) =>
         resolve((endpoint || DEFAULT_ENDPOINT).replace(/\/$/, ""))); }
       catch { resolve(DEFAULT_ENDPOINT); }
+    });
+  }
+
+  // User-selected market overrides the country auto-detected from the page URL
+  // (useful because the Ads Library URL doesn't always carry ?country=XX).
+  function getMarket() {
+    return new Promise((resolve) => {
+      try { chrome.storage.local.get(["market"], ({ market }) => resolve(market || null)); }
+      catch { resolve(null); }
     });
   }
 
@@ -195,6 +204,22 @@
       if (m) cta = m[1];
     }
 
+    // Best-effort landing page / destination URL — any outbound link that
+    // isn't Meta's own domain or the ad-library permalink itself. Meta often
+    // wraps these in an l.facebook.com/l.php?u= redirect, which we unwrap.
+    let landingPageUrl = "";
+    const outboundLinks = Array.from(card.querySelectorAll('a[href]'))
+      .map((a) => a.href)
+      .filter((href) => href && !/facebook\.com|fb\.com|instagram\.com|messenger\.com/i.test(href));
+    if (outboundLinks[0]) {
+      try {
+        const u = new URL(outboundLinks[0]);
+        landingPageUrl = u.hostname.includes("l.facebook.com") && u.searchParams.get("u")
+          ? decodeURIComponent(u.searchParams.get("u"))
+          : outboundLinks[0];
+      } catch { landingPageUrl = outboundLinks[0]; }
+    }
+
     // Media capture — multi-strategy
     const imgEls = Array.from(card.querySelectorAll(
       'img[src*="scontent"], img[src*="fbcdn"], img[src^="https://"]:not([width="16"]):not([width="20"]):not([width="24"])'
@@ -253,7 +278,7 @@
       thumbnail: thumbnail || bgImage,
       carouselImages,
       adLibraryId, startDate, platforms, country, status,
-      creativeType, niche, score,
+      creativeType, niche, score, landingPageUrl,
       url, link: url, platform: "Facebook",
       createdAt: new Date().toISOString(),
     };
@@ -403,8 +428,51 @@ Resuma este anúncio em 5 bullets estratégicos e atribua nota 0-100.`,
   }
 
   // ---------------- send ----------------
+  function ingestPayload(ad, extra = {}) {
+    return {
+      headline: ad.headline,
+      copy: ad.copy,
+      description: ad.description,
+      adUrl: ad.url,
+      landingPageUrl: ad.landingPageUrl || undefined,
+      platform: ad.platform,
+      country: ad.country,
+      niche: ad.niche,
+      score: ad.score,
+      imageUrl: ad.imageUrl || ad.thumbnail || "",
+      videoUrl: ad.videoUrl || "",
+      creativeUrl: ad.imageUrl || ad.thumbnail || ad.videoUrl,
+      advertiser: ad.advertiser,
+      cta: ad.cta,
+      adLibraryId: ad.adLibraryId,
+      startDate: ad.startDate,
+      creativeType: ad.creativeType,
+      platforms: ad.platforms,
+      createdAt: ad.createdAt,
+      ...extra,
+    };
+  }
+
+  // Real persistence -> /api/ingest -> collected_ads (Supabase). Runs through
+  // the background service worker so it works even without the EscalaFlow
+  // app open in any tab. Returns {ok, ...} — never throws.
+  function persist(ad, extra = {}) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: "ESCALA_INGEST", payload: ingestPayload(ad, extra) },
+          (res) => resolve(res || { ok: false }),
+        );
+      } catch (e) {
+        resolve({ ok: false, error: String(e?.message || e) });
+      }
+    });
+  }
+
   async function send(card, analysisType) {
     const ad = capturarCardReal(card);
+    const market = await getMarket();
+    if (market) ad.country = market;
 
     // Screenshot fallback for thumbnail
     try {
@@ -418,51 +486,50 @@ Resuma este anúncio em 5 bullets estratégicos e atribua nota 0-100.`,
 
     const endpoint = await getEndpoint();
 
-    // Always send full payload to EscalaFlow via postMessage
-    try {
-      window.postMessage({
-        source: "escalaflow-extension",
-        type: "ingest",
-        payload: {
-          headline: ad.headline,
-          copy: ad.copy,
-          adUrl: ad.url,
-          platform: ad.platform,
-          country: ad.country,
-          niche: ad.niche,
-          score: ad.score,
-          analysisType,
-          creativeUrl: ad.imageUrl || ad.thumbnail || ad.videoUrl,
-          imageUrl: ad.imageUrl || ad.thumbnail || "",
-          videoUrl: ad.videoUrl || "",
-          advertiser: ad.advertiser,
-          cta: ad.cta,
-          description: ad.description,
-          adLibraryId: ad.adLibraryId,
-          startDate: ad.startDate,
-          creativeType: ad.creativeType,
-          platforms: ad.platforms,
-          carouselImages: ad.carouselImages,
-          createdAt: ad.createdAt,
-        },
-      }, "*");
-    } catch {}
-
-    if (analysisType === "save") {
-      // Salvar no Flow only — no ChatGPT, no new tab
-      toast("✅ Anúncio salvo na Central do EscalaFlow");
+    if (analysisType === "save" || analysisType === "favorite") {
+      const res = await persist(ad, analysisType === "favorite" ? { favorite: true } : {});
+      if (res.ok) {
+        toast(analysisType === "favorite" ? "⭐ Anúncio favoritado na Central" : "✅ Anúncio salvo na Central do EscalaFlow");
+      } else {
+        toast(`Falha ao salvar: ${res.error || res.data?.error || "verifique a URL do EscalaFlow no popup"}`, "error");
+      }
       return;
     }
 
+    if (analysisType === "open-app") {
+      const res = await persist(ad);
+      window.open(endpoint + "/minerar", "_blank", "noopener");
+      if (!res.ok) toast("Aberto no EscalaFlow, mas o salvamento automático falhou.", "error");
+      return;
+    }
+
+    if (analysisType === "download") {
+      const url = ad.videoUrl || ad.imageUrl || ad.thumbnail;
+      if (!url) { toast("Nenhuma mídia direta disponível para baixar.", "error"); return; }
+      chrome.runtime.sendMessage(
+        { type: "ESCALA_DOWNLOAD", url, filename: `escalaflow/${ad.adLibraryId || Date.now()}.${ad.videoUrl ? "mp4" : "jpg"}` },
+        (res) => toast(res?.ok ? "⬇️ Download iniciado" : "Falha ao iniciar o download", res?.ok ? "success" : "error"),
+      );
+      return;
+    }
+
+    if (analysisType === "transcribe" || analysisType === "translate") {
+      // No transcription/translation service is configured in this project yet
+      // (would require e.g. OpenAI Whisper, which has a per-use cost). Surfaced
+      // honestly instead of faking a result — see project notes for how to enable it.
+      toast("Recurso pendente: requer configurar um serviço de transcrição (custo por uso, não ativado ainda).", "error");
+      return;
+    }
+
+    // Persist alongside every AI-analysis action too, so opening the deep-dive
+    // in ChatGPT never skips saving the ad to the Central de Ofertas.
+    await persist(ad, { analysisType });
+
     if (analysisType === "strategy") {
-      // Open EscalaFlow app to model strategy
       const u = new URL(endpoint + "/minerar");
       window.open(u.toString(), "_blank", "noopener");
-    } else {
-      // Open ad on Facebook for reference
-      if (ad.adLibraryId) {
-        window.open(`https://www.facebook.com/ads/library/?id=${ad.adLibraryId}`, "_blank", "noopener");
-      }
+    } else if (ad.adLibraryId) {
+      window.open(`https://www.facebook.com/ads/library/?id=${ad.adLibraryId}`, "_blank", "noopener");
     }
 
     // Open ChatGPT with structured prompt
@@ -487,8 +554,26 @@ Resuma este anúncio em 5 bullets estratégicos e atribua nota 0-100.`,
     { emoji: "🎯", label: "Funil Completo",         type: "funnel",           sep: false },
     { emoji: "🧬", label: "Psicologia do Anúncio", type: "psychology",        sep: true  },
     { emoji: "🚀", label: "Modelar Estratégia",    type: "strategy",          sep: false },
-    { emoji: "⭐", label: "Salvar no Flow",         type: "save",             sep: false },
+    { emoji: "🎙️", label: "Transcrever vídeo",     type: "transcribe",       sep: true  },
+    { emoji: "🌍", label: "Traduzir para PT-BR",   type: "translate",        sep: false },
+    { emoji: "⬇️", label: "Baixar criativo",        type: "download",         sep: false },
+    { emoji: "🌐", label: "Abrir no EscalaFlow",   type: "open-app",         sep: false },
+    { emoji: "⭐", label: "Salvar no Flow",         type: "save",             sep: true  },
+    { emoji: "💛", label: "Favoritar",              type: "favorite",         sep: false },
   ];
+
+  function infoLine(label, value) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:space-between;gap:10px;padding:2px 14px;font-size:11px;color:#9aa6bd;";
+    const l = document.createElement("span");
+    l.textContent = label;
+    const v = document.createElement("span");
+    v.style.cssText = "color:#e6edf7;font-weight:600;text-align:right;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+    v.textContent = value;
+    row.appendChild(l);
+    row.appendChild(v);
+    return row;
+  }
 
   function ensureMenu() {
     let menu = document.getElementById(MENU_ID);
@@ -507,6 +592,19 @@ Resuma este anúncio em 5 bullets estratégicos e atribua nota 0-100.`,
     header.className = "menu-header";
     header.textContent = "⚡ EscalaFlow IA PRO";
     menu.appendChild(header);
+
+    // Quick intelligence panel — read-only snapshot of what was detected on
+    // this card, so the user sees it before deciding which action to run.
+    const ad = capturarCardReal(card);
+    menu.appendChild(infoLine("Score EscalaFlow", `${ad.score}/100`));
+    menu.appendChild(infoLine("Anunciante", ad.advertiser || "—"));
+    menu.appendChild(infoLine("Formato", ad.creativeType || "—"));
+    menu.appendChild(infoLine("CTA", ad.cta || "—"));
+    menu.appendChild(infoLine("País (URL)", ad.country || "—"));
+    if (ad.startDate) menu.appendChild(infoLine("Início detectado", ad.startDate));
+    const sep0 = document.createElement("div");
+    sep0.className = "sep";
+    menu.appendChild(sep0);
 
     ACTIONS.forEach(({ emoji, label, type, sep }) => {
       if (sep) {

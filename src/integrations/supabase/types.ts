@@ -326,17 +326,26 @@ export type Database = {
           creative_type: string | null
           cta: string | null
           favorite: boolean
+          first_seen_at: string | null
           headline: string
           id: string
           image_url: string | null
           keyword: string | null
+          landing_page_url: string | null
+          last_seen_at: string | null
           mining_run_id: string | null
           niche: string
+          offer_network: string | null
+          offer_network_confidence: string | null
           platform: string
           raw: Json | null
           score: number
           source: string
+          start_date: string | null
           status: string
+          transcript_language: string | null
+          transcript_original: string | null
+          transcript_translated_pt: string | null
           updated_at: string
           user_id: string | null
           video_url: string | null
@@ -351,17 +360,26 @@ export type Database = {
           creative_type?: string | null
           cta?: string | null
           favorite?: boolean
+          first_seen_at?: string | null
           headline?: string
           id?: string
           image_url?: string | null
           keyword?: string | null
+          landing_page_url?: string | null
+          last_seen_at?: string | null
           mining_run_id?: string | null
           niche?: string
+          offer_network?: string | null
+          offer_network_confidence?: string | null
           platform?: string
           raw?: Json | null
           score?: number
           source?: string
+          start_date?: string | null
           status?: string
+          transcript_language?: string | null
+          transcript_original?: string | null
+          transcript_translated_pt?: string | null
           updated_at?: string
           user_id?: string | null
           video_url?: string | null
@@ -376,17 +394,26 @@ export type Database = {
           creative_type?: string | null
           cta?: string | null
           favorite?: boolean
+          first_seen_at?: string | null
           headline?: string
           id?: string
           image_url?: string | null
           keyword?: string | null
+          landing_page_url?: string | null
+          last_seen_at?: string | null
           mining_run_id?: string | null
           niche?: string
+          offer_network?: string | null
+          offer_network_confidence?: string | null
           platform?: string
           raw?: Json | null
           score?: number
           source?: string
+          start_date?: string | null
           status?: string
+          transcript_language?: string | null
+          transcript_original?: string | null
+          transcript_translated_pt?: string | null
           updated_at?: string
           user_id?: string | null
           video_url?: string | null

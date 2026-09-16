@@ -1,4 +1,4 @@
-const DEFAULT_ENDPOINT = "https://id-preview--50293ad0-b4d2-4adf-8446-ff77f73ad3e6.lovable.app";
+const DEFAULT_ENDPOINT = "https://escalaflow-insights.vercel.app";
 
 const $ = (id) => document.getElementById(id);
 
@@ -8,10 +8,15 @@ function setStatus(msg, state = "idle") {
   dot.className = "dot" + (state === "active" ? " active" : state === "error" ? " error" : "");
 }
 
-// Load saved endpoint
-chrome.storage.local.get(["endpoint"], ({ endpoint }) => {
+// Load saved endpoint + market
+chrome.storage.local.get(["endpoint", "market"], ({ endpoint, market }) => {
   $("endpoint").value = endpoint || DEFAULT_ENDPOINT;
+  $("market").value = market || "BR";
   checkConnection(endpoint || DEFAULT_ENDPOINT);
+});
+
+$("market").addEventListener("change", () => {
+  chrome.storage.local.set({ market: $("market").value });
 });
 
 // Check if EscalaFlow app is reachable

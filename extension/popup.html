@@ -55,6 +55,11 @@
       transition: border-color .15s;
     }
     input:focus { border-color: rgba(124,58,237,.6); }
+    select {
+      width: 100%; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid #1f2a44; background: #0f1626;
+      color: #e6edf7; font-size: 12px; outline: none;
+    }
     .btn-row { display: flex; gap: 8px; margin-top: 12px; }
     button {
       flex: 1; padding: 9px 12px; border-radius: 8px; border: 0;
@@ -109,7 +114,17 @@
 
   <div class="body">
     <label for="endpoint">URL do EscalaFlow</label>
-    <input id="endpoint" type="url" placeholder="https://seu-app.lovable.app" />
+    <input id="endpoint" type="url" placeholder="https://escalaflow-insights.vercel.app" />
+
+    <label for="market">Mercado / país da busca</label>
+    <select id="market">
+      <option value="US">Estados Unidos</option>
+      <option value="BR" selected>Brasil</option>
+      <option value="PT">Portugal</option>
+      <option value="ES">Espanha</option>
+      <option value="GB">Reino Unido</option>
+      <option value="CA">Canadá</option>
+    </select>
 
     <div class="btn-row">
       <button class="btn-primary" id="capture">⚡ Minerar anúncio</button>

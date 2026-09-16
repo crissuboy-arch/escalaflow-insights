@@ -41,6 +41,9 @@ export interface CollectorAd {
   // Offer classification + provenance
   offerType?: "anuncio" | "pagina-venda" | "vsl" | "checkout" | "ecommerce" | "conteudo";
   sourceEngine?: string;
+  landingPageUrl?: string;
+  offerNetwork?: string;
+  offerNetworkConfidence?: string | null;
   mediaStatus?: "found" | "not-found";
   // Pattern detection (filled by post-pass)
   isVsl?: boolean;

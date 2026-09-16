@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runCollector } from "@/lib/collector/collector.service";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { upsertCollectedAd } from "@/lib/collector/persist";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -34,62 +34,54 @@ export const Route = createFileRoute("/api/collector/run")({
           platform: body.platform ? String(body.platform) : undefined,
         });
 
-        // Persist real ads to Supabase (upsert by ad_library_id)
+        // Persist real ads to Supabase — same shared upsert path as the
+        // extension's /api/ingest, so first_seen_at/last_seen_at longevity
+        // tracking and offer-network detection are consistent everywhere.
         let saved = 0;
         if (result.ok && result.ads.length) {
-          try {
-            const rows = result.ads.map((a) => ({
-              ad_library_id: a.adLibraryId ?? null,
-              ad_url: a.adUrl ?? null,
-              advertiser: a.advertiser,
-              headline: a.headline,
-              copy: a.copy,
-              cta: a.cta ?? null,
-              image_url: a.imageUrl ?? null,
-              video_url: a.videoUrl ?? null,
-              creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
-              platform: a.platform,
-              country: a.country,
-              niche: a.niche,
-              keyword,
-              score: a.score,
-              source: "collector",
-              raw: {
-                ...(a.raw && typeof a.raw === "object" ? (a.raw as Record<string, unknown>) : { original: a.raw ?? null }),
-                enriched: {
-                  tags: a.tags ?? [],
-                  subniche: a.subniche ?? null,
-                  promise: a.promise ?? null,
-                  mechanism: a.mechanism ?? null,
-                  emotion: a.emotion ?? null,
-                  scaleLevel: a.scaleLevel ?? null,
-                  isVsl: a.isVsl ?? false,
-                  vslScaling: a.vslScaling ?? false,
-                  hookRepeated: a.hookRepeated ?? false,
-                  viralStructure: a.viralStructure ?? false,
-                  copyPattern: a.copyPattern ?? false,
-                  hookText: a.hookText ?? null,
+          for (const a of result.ads) {
+            try {
+              const r = await upsertCollectedAd({
+                advertiser: a.advertiser,
+                headline: a.headline,
+                copy: a.copy,
+                cta: a.cta,
+                imageUrl: a.imageUrl,
+                videoUrl: a.videoUrl,
+                creativeType: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
+                platform: a.platform,
+                country: a.country,
+                niche: a.niche,
+                keyword,
+                score: a.score,
+                adUrl: a.adUrl,
+                adLibraryId: a.adLibraryId,
+                landingPageUrl: a.landingPageUrl,
+                startDate: a.startDate,
+                source: "collector",
+                raw: {
+                  ...(a.raw && typeof a.raw === "object" ? (a.raw as Record<string, unknown>) : { original: a.raw ?? null }),
+                  enriched: {
+                    tags: a.tags ?? [],
+                    subniche: a.subniche ?? null,
+                    promise: a.promise ?? null,
+                    mechanism: a.mechanism ?? null,
+                    emotion: a.emotion ?? null,
+                    scaleLevel: a.scaleLevel ?? null,
+                    isVsl: a.isVsl ?? false,
+                    vslScaling: a.vslScaling ?? false,
+                    hookRepeated: a.hookRepeated ?? false,
+                    viralStructure: a.viralStructure ?? false,
+                    copyPattern: a.copyPattern ?? false,
+                    hookText: a.hookText ?? null,
+                  },
                 },
-              } as never,
-            }));
-            const withId = rows.filter((r) => r.ad_library_id);
-            const withoutId = rows.filter((r) => !r.ad_library_id);
-            if (withId.length) {
-              const { error, count } = await supabaseAdmin
-                .from("collected_ads")
-                .upsert(withId, { onConflict: "ad_library_id", count: "exact" });
-              if (error) console.error("[collector] upsert error:", error.message);
-              else saved += count ?? withId.length;
+              });
+              if (r.error) console.error("[collector] persist error:", r.error);
+              else saved++;
+            } catch (e) {
+              console.error("[collector] persist failed:", e);
             }
-            if (withoutId.length) {
-              const { error, count } = await supabaseAdmin
-                .from("collected_ads")
-                .insert(withoutId, { count: "exact" });
-              if (error) console.error("[collector] insert error:", error.message);
-              else saved += count ?? withoutId.length;
-            }
-          } catch (e) {
-            console.error("[collector] persistence failed:", e);
           }
         }
 

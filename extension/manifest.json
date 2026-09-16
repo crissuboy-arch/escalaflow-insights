@@ -1,14 +1,17 @@
 {
   "manifest_version": 3,
   "name": "EscalaFlow Miner",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Minera anúncios da Meta Ads Library, salva no EscalaFlow e dispara análise automática no ChatGPT.",
-  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "permissions": ["activeTab", "storage", "tabs", "scripting", "downloads"],
   "host_permissions": [
     "https://www.facebook.com/*",
     "https://*.facebook.com/*",
     "https://chat.openai.com/*",
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://escalaflow-insights.vercel.app/*",
+    "https://*.vercel.app/*",
+    "http://localhost/*"
   ],
   "action": {
     "default_popup": "popup.html",

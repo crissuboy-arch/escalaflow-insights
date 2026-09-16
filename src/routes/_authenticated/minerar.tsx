@@ -58,6 +58,11 @@ type CollectedAd = {
   copyPattern?: boolean;
   offerType?: "anuncio" | "pagina-venda" | "vsl" | "checkout" | "ecommerce" | "conteudo" | null;
   source_engine?: string | null;
+  offer_network?: string | null;
+  offer_network_confidence?: string | null;
+  landing_page_url?: string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
 };
 
 const mineSearch = z.object({
@@ -146,6 +151,8 @@ function MinePage() {
   const [quantity, setQuantity] = useState(20);
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
   const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
+  const [networkFilter, setNetworkFilter] = useState<string>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [favIds, setFavIds] = useState<Set<string>>(new Set());
   const [aiOpen, setAiOpen] = useState(false);
@@ -169,6 +176,8 @@ function MinePage() {
 
   const filtered = visibleCollected.filter((a) => {
     if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
+    if (networkFilter !== "all" && (a.offer_network ?? "desconhecido") !== networkFilter) return false;
+    if (countryFilter !== "all" && a.country !== countryFilter) return false;
     if (tagFilters.size && !(a.tags ?? []).some((t) => tagFilters.has(t))) return false;
     if (categoryKeywordsLower) {
       const tagsLower = (a.tags ?? []).map((t) => t.toLowerCase());
@@ -380,6 +389,8 @@ function MinePage() {
     // returned nothing. Clear filters so this run's results are always visible.
     setTagFilters(new Set());
     setActiveCategory(null);
+    setNetworkFilter("all");
+    setCountryFilter("all");
     updateSearch({ scale: "all", page: 0 });
     const tick = setInterval(() => {
       setCollectorProgress((p) => (p < 88 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
@@ -611,7 +622,7 @@ function MinePage() {
             </Label>
             <Slider value={[quantity]} min={4} max={100} step={1} onValueChange={(v) => setQuantity(v[0])} className="mt-3" />
           </div>
-          <div className="md:col-span-2">
+          <div>
             <Label>Nível de escala</Label>
             <Select value={scaleFilter} onValueChange={(v) => setScaleFilter(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -621,6 +632,38 @@ function MinePage() {
                 <SelectItem value="warming">Warming</SelectItem>
                 <SelectItem value="hot">Hot</SelectItem>
                 <SelectItem value="scaled">Scaled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Rede da oferta</Label>
+            <Select value={networkFilter} onValueChange={setNetworkFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="hotmart">Hotmart</SelectItem>
+                <SelectItem value="kiwify">Kiwify</SelectItem>
+                <SelectItem value="clickbank">ClickBank</SelectItem>
+                <SelectItem value="digistore24">Digistore24</SelectItem>
+                <SelectItem value="shopify">Shopify</SelectItem>
+                <SelectItem value="braip">Braip</SelectItem>
+                <SelectItem value="checkout-proprio">Checkout próprio</SelectItem>
+                <SelectItem value="desconhecido">Não identificado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Mercado</Label>
+            <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="US">Estados Unidos</SelectItem>
+                <SelectItem value="BR">Brasil</SelectItem>
+                <SelectItem value="PT">Portugal</SelectItem>
+                <SelectItem value="ES">Espanha</SelectItem>
+                <SelectItem value="GB">Reino Unido</SelectItem>
+                <SelectItem value="CA">Canadá</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -736,7 +779,7 @@ function MinePage() {
             <div className="flex flex-col items-center gap-2 py-12 text-center">
               <Radar className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Nenhuma oferta com os filtros atuais.</p>
-              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); updateSearch({ scale: "all", page: 0 }); }}>
+              <Button size="sm" variant="outline" onClick={() => { setScaleFilter("all"); setTagFilters(new Set()); setActiveCategory(null); setNetworkFilter("all"); setCountryFilter("all"); updateSearch({ scale: "all", page: 0 }); }}>
                 Limpar filtros
               </Button>
             </div>
