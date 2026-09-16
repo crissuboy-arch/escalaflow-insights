@@ -233,6 +233,7 @@ function MinePage() {
       setCollected(enriched);
     } catch (e) {
       console.error("[minerar] collected_ads fetch failed", e);
+      toast.error("Falha ao carregar ofertas coletadas — os cards podem ficar desatualizados.");
     } finally {
       setCollectedLoading(false);
     }
@@ -374,6 +375,12 @@ function MinePage() {
     setCollecting(true);
     setCollectorProgress(8);
     setCollectorFound(null);
+    // A stale scale/tag/category filter from a previous session can hide every
+    // ad from a brand-new search, making a successful mine look like it
+    // returned nothing. Clear filters so this run's results are always visible.
+    setTagFilters(new Set());
+    setActiveCategory(null);
+    updateSearch({ scale: "all", page: 0 });
     const tick = setInterval(() => {
       setCollectorProgress((p) => (p < 88 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
     }, 350);
@@ -519,9 +526,9 @@ function MinePage() {
                   {Math.round(collected.reduce((s, a) => s + a.score, 0) / collected.length)}
                 </span>
               </div>
-              {collected[0]?.created_at && (
+              {(latestRunAds[0]?.created_at ?? collected[0]?.created_at) && (
                 <div className="ml-auto text-[11px] text-muted-foreground">
-                  Última coleta: {new Date(collected[0].created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  Última coleta: {new Date(latestRunAds[0]?.created_at ?? collected[0].created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </div>
               )}
             </div>
