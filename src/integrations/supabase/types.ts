@@ -655,6 +655,48 @@ export type Database = {
         }
         Relationships: []
       }
+      intelligence_handoffs: {
+        Row: {
+          attempts: number
+          created_at: string
+          handoff_id: string
+          id: string
+          last_error: string | null
+          sent_at: string | null
+          source_id: string
+          source_table: string
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          handoff_id: string
+          id?: string
+          last_error?: string | null
+          sent_at?: string | null
+          source_id: string
+          source_table: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          handoff_id?: string
+          id?: string
+          last_error?: string | null
+          sent_at?: string | null
+          source_id?: string
+          source_table?: string
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       instagram_minerados: {
         Row: {
           ai_analysis: Json | null

@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
 import { generateAIJson } from "@/lib/aiService";
+import { buildHandoffFromTikTokEscalate } from "@/lib/cris-os/contract";
+import { handoffToCrisOs } from "@/lib/cris-os/service";
 
 // .env: APIFY_TIKTOK_ACTOR=clockworks~tiktok-scraper
 function getTikTokActorId(): string {
@@ -570,10 +572,23 @@ export const escalateAnuncioFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
     const row = { ...data, user_id: userId, ai_analysis: data.ai_analysis as Json | null, playbook: data.playbook as Json | null };
-    const { error } = await supabaseAdmin
+    const { data: saved, error } = await supabaseAdmin
       .from("anuncios_escalados")
-      .upsert(row, { onConflict: "user_id,video_id", ignoreDuplicates: false });
+      .upsert(row, { onConflict: "user_id,video_id", ignoreDuplicates: false })
+      .select()
+      .single();
     if (error) throw new Error(error.message);
+
+    // Cris OS handoff — best-effort, never blocks or fails the escalate
+    // action itself. Config is opt-in (CRIS_OS_API_URL/CRIS_OS_INTEGRATION_TOKEN);
+    // when absent this just records NOT_SENT and returns immediately.
+    if (saved) {
+      const handoff = buildHandoffFromTikTokEscalate(saved as never);
+      handoffToCrisOs(handoff, "anuncios_escalados", saved.id as string, userId).catch((e) =>
+        console.error("[cris-os] handoff failed:", e),
+      );
+    }
+
     return { ok: true };
   });
 
