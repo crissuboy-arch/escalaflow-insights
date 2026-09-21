@@ -8,6 +8,13 @@ const VALID_HANDOFF: MarketIntelligenceHandoff = {
   source_system: "scalaflow",
   source_module: "tiktok_escalate",
   created_at: "2026-01-01T00:00:00.000Z",
+  title: "Ad title",
+  market: "UNKNOWN",
+  niche: "UNKNOWN",
+  platform: "TikTok",
+  price: null,
+  opportunity_score: 88,
+  confidence_score: null,
   opportunity: {
     opportunity_id: "tiktok:vid1",
     title: "Ad title",

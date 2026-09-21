@@ -140,6 +140,17 @@ describe("buildHandoffFromTikTokEscalate", () => {
     const serialized = JSON.stringify(h).toLowerCase();
     expect(serialized).not.toMatch(/token|bearer|secret|service_role/);
   });
+
+  it("espelha title/platform/opportunity_score no nível raiz do payload (campos que o Cris OS lê ali)", () => {
+    const h = buildHandoffFromTikTokEscalate(BASE_ROW);
+    expect(h.title).toBe(h.opportunity.title);
+    expect(h.platform).toBe("TikTok");
+    expect(h.opportunity_score).toBe(91);
+    expect(h.market).toBe(UNKNOWN);
+    expect(h.niche).toBe(h.opportunity.niche);
+    expect(h.price).toBeNull();
+    expect(h.confidence_score).toBeNull();
+  });
 });
 
 const COLLECTED_AD_ROW: CollectedAdRow = {
@@ -210,6 +221,77 @@ describe("buildHandoffFromCollectedAd", () => {
 
   it("nunca contém token/segredo no payload", () => {
     const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    const serialized = JSON.stringify(h).toLowerCase();
+    expect(serialized).not.toMatch(/token|bearer|secret|service_role/);
+  });
+});
+
+// Fixture real que reproduz o bug relatado: primeiro clique real em
+// "Transformar em Projeto" (Suitable, Facebook, score 99) chegou no Cris OS
+// com title/market/niche/platform/price/opportunity_score/confidence_score
+// nulos, mesmo com dado real disponível no ScalaFlow. evidence (lista) e a
+// persistência/autenticação funcionaram — só esses 7 campos, hoje aninhados
+// em opportunity/offer/scoring/confidence, não chegavam.
+const SUITABLE_ROW: CollectedAdRow = {
+  id: "suitable-ad-uuid",
+  ad_library_id: "999888777",
+  ad_url: "https://www.facebook.com/ads/library/?id=999888777",
+  advertiser: "Suitable",
+  headline: "Suitable — oferta real de alta pontuação",
+  copy: "Copy real da oferta Suitable capturada pelo coletor.",
+  cta: "Learn more",
+  image_url: "https://scontent.fna.fbcdn.net/suitable.jpg",
+  video_url: null,
+  platform: "Facebook",
+  country: "US",
+  niche: "Fitness",
+  score: 99,
+  created_at: "2026-09-21T18:00:00.000Z",
+  landing_page_url: "https://suitable.example.com/offer",
+  offer_network: null,
+  offer_network_confidence: null,
+  first_seen_at: "2026-09-21T18:00:00.000Z",
+  last_seen_at: "2026-09-21T19:20:00.000Z",
+  start_date: null,
+};
+
+describe("buildHandoffFromCollectedAd — regressão do bug real (Suitable, Facebook, score 99)", () => {
+  it("popula title/market/niche/platform/opportunity_score no NÍVEL RAIZ com dado real, não null", () => {
+    const h = buildHandoffFromCollectedAd(SUITABLE_ROW);
+    expect(h.title).toBe("Suitable — oferta real de alta pontuação");
+    expect(h.title).not.toBeNull();
+    expect(h.market).toBe("US");
+    expect(h.niche).toBe("Fitness");
+    expect(h.platform).toBe("Facebook");
+    expect(h.opportunity_score).toBe(99);
+  });
+
+  it("mantém price e confidence_score null quando não há dado real (nunca inventa)", () => {
+    const h = buildHandoffFromCollectedAd(SUITABLE_ROW);
+    expect(h.price).toBeNull();
+    expect(h.confidence_score).toBeNull();
+  });
+
+  it("mantém evidence como lista de objetos e a estrutura aninhada consistente com os campos raiz", () => {
+    const h = buildHandoffFromCollectedAd(SUITABLE_ROW);
+    expect(Array.isArray(h.evidence)).toBe(true);
+    expect(h.evidence[0].platform).toBe("Facebook");
+    expect(h.opportunity.title).toBe(h.title);
+    expect(h.opportunity.market).toBe(h.market);
+    expect(h.opportunity.niche).toBe(h.niche);
+    expect(h.offer.platform).toBe(h.platform);
+    expect(h.scoring.escalaflow_score).toBe(h.opportunity_score);
+  });
+
+  it("source_id/source_table corretos e idempotência preservada", () => {
+    const h1 = buildHandoffFromCollectedAd(SUITABLE_ROW);
+    const h2 = buildHandoffFromCollectedAd(SUITABLE_ROW);
+    expect(h1.handoff_id).toBe(h2.handoff_id);
+    expect(h1.opportunity.opportunity_id).toBe(`facebook:${SUITABLE_ROW.ad_library_id}`);
+  });
+
+  it("nenhum segredo no payload da Suitable", () => {
+    const h = buildHandoffFromCollectedAd(SUITABLE_ROW);
     const serialized = JSON.stringify(h).toLowerCase();
     expect(serialized).not.toMatch(/token|bearer|secret|service_role/);
   });

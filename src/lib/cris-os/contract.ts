@@ -26,6 +26,23 @@ export interface MarketIntelligenceHandoff {
   source_module: string;
   created_at: string;
 
+  // Root-level mirrors of opportunity.title/market/niche, offer.platform/price
+  // and scoring/confidence — added 2026-09-21 after the first real handoff
+  // (Suitable, Facebook, score 99) arrived at Cris OS with these seven
+  // fields null. `evidence` (root-level, strictly validated) came through
+  // correctly; everything nested under opportunity/offer/scoring did not.
+  // Cris OS's receiver reads these as flat root properties with these exact
+  // names, not the nested ones — confirmed by which fields failed vs. which
+  // (evidence) didn't. Purely additive: nothing nested is removed, so any
+  // other Cris OS consumer relying on the nested shape is unaffected.
+  title: string;
+  market: string;
+  niche: string;
+  platform: string;
+  price: number | null;
+  opportunity_score: number | null;
+  confidence_score: number | null;
+
   opportunity: {
     opportunity_id: string;
     title: string;
@@ -111,6 +128,9 @@ export interface TikTokEscalateRow {
 export function buildHandoffFromTikTokEscalate(row: TikTokEscalateRow): MarketIntelligenceHandoff {
   const opportunityId = `tiktok:${row.video_id || row.id}`;
   const ai = row.ai_analysis ?? {};
+  const tiktokTitle = (row.hook || row.description || "Anúncio TikTok").slice(0, 200);
+  const tiktokNiche = typeof ai.niche === "string" ? ai.niche : UNKNOWN;
+  const tiktokScore = row.enhanced_score || row.viral_score || null;
 
   return {
     handoff_id: computeHandoffId("tiktok_escalate", opportunityId),
@@ -119,11 +139,19 @@ export function buildHandoffFromTikTokEscalate(row: TikTokEscalateRow): MarketIn
     source_module: "tiktok_escalate",
     created_at: new Date().toISOString(),
 
+    title: tiktokTitle,
+    market: UNKNOWN,
+    niche: tiktokNiche,
+    platform: "TikTok",
+    price: null,
+    opportunity_score: tiktokScore,
+    confidence_score: null,
+
     opportunity: {
       opportunity_id: opportunityId,
-      title: (row.hook || row.description || "Anúncio TikTok").slice(0, 200),
+      title: tiktokTitle,
       market: UNKNOWN,
-      niche: typeof ai.niche === "string" ? ai.niche : UNKNOWN,
+      niche: tiktokNiche,
       subniche: UNKNOWN,
       country: UNKNOWN,
       language: UNKNOWN,
@@ -175,7 +203,7 @@ export function buildHandoffFromTikTokEscalate(row: TikTokEscalateRow): MarketIn
     ],
 
     confidence: null,
-    scoring: { escalaflow_score: row.enhanced_score || row.viral_score || null },
+    scoring: { escalaflow_score: tiktokScore },
     meta: {
       creator: row.creator || null,
       hashtags: row.hashtags ?? [],
@@ -220,6 +248,10 @@ export function buildHandoffFromCollectedAd(row: CollectedAdRow): MarketIntellig
   const opportunityId = `${platform.toLowerCase()}:${identity}`;
   const hasCountry = !!row.country && row.country !== "—";
   const hasNiche = !!row.niche && row.niche !== "Geral";
+  const title = (row.headline || row.advertiser || "Oportunidade").slice(0, 200);
+  const market = hasCountry ? row.country : UNKNOWN;
+  const niche = hasNiche ? row.niche : UNKNOWN;
+  const opportunityScore = row.score ?? null;
 
   return {
     handoff_id: computeHandoffId("collected_ad_transform", opportunityId),
@@ -228,13 +260,21 @@ export function buildHandoffFromCollectedAd(row: CollectedAdRow): MarketIntellig
     source_module: "collected_ad_transform",
     created_at: new Date().toISOString(),
 
+    title,
+    market,
+    niche,
+    platform,
+    price: null,
+    opportunity_score: opportunityScore,
+    confidence_score: null,
+
     opportunity: {
       opportunity_id: opportunityId,
-      title: (row.headline || row.advertiser || "Oportunidade").slice(0, 200),
-      market: hasCountry ? row.country : UNKNOWN,
-      niche: hasNiche ? row.niche : UNKNOWN,
+      title,
+      market,
+      niche,
       subniche: UNKNOWN,
-      country: hasCountry ? row.country : UNKNOWN,
+      country: market,
       language: UNKNOWN,
       description: row.copy || null,
     },
@@ -272,7 +312,7 @@ export function buildHandoffFromCollectedAd(row: CollectedAdRow): MarketIntellig
     ],
 
     confidence: null,
-    scoring: { escalaflow_score: row.score ?? null },
+    scoring: { escalaflow_score: opportunityScore },
     meta: {
       advertiser: row.advertiser || null,
       cta: row.cta || null,
