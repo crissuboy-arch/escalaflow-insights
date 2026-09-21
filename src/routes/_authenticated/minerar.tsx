@@ -471,6 +471,18 @@ function MinePage() {
       setCollectorProgress(100);
       setCollectorFound(optimistic.length || ingested.length);
       toast.success(`Mineração concluída: ${optimistic.length || ingested.length} anúncios`);
+      // The API may return ads that could not actually be saved (e.g. a
+      // stale database schema cache). Those still render this session, but
+      // won't survive a refresh — the user must be told instead of finding
+      // out by watching cards vanish later.
+      if (typeof data.saved === "number" && data.saved < optimistic.length) {
+        const missing = optimistic.length - data.saved;
+        toast.warning(
+          `Atenção: ${missing} de ${optimistic.length} anúncios não foram salvos e vão desaparecer se a página for atualizada.`,
+          { duration: 10000 },
+        );
+        console.error("[minerar] persistência parcial do lote de mineração:", data.persistError);
+      }
       await fetchCollected();
       updateSearch({ page: 0 });
     } catch (e) {

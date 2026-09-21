@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runCollector } from "@/lib/collector/collector.service";
-import { upsertCollectedAd } from "@/lib/collector/persist";
+import { upsertCollectedAd, summarizePersistResults, type PersistResult } from "@/lib/collector/persist";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/collector/run")({
         // Persist real ads to Supabase — same shared upsert path as the
         // extension's /api/ingest, so first_seen_at/last_seen_at longevity
         // tracking and offer-network detection are consistent everywhere.
-        let saved = 0;
+        const persistResults: PersistResult[] = [];
         if (result.ok && result.ads.length) {
           for (const a of result.ads) {
             try {
@@ -78,15 +78,21 @@ export const Route = createFileRoute("/api/collector/run")({
                 },
               });
               if (r.error) console.error("[collector] persist error:", r.error);
-              else saved++;
+              persistResults.push(r);
             } catch (e) {
               console.error("[collector] persist failed:", e);
+              persistResults.push({ inserted: false, updated: false, error: e instanceof Error ? e.message : String(e) });
             }
           }
         }
 
+        const { saved, failed, firstError } = summarizePersistResults(persistResults);
+        if (failed > 0) {
+          console.error(`[collector] ${failed}/${persistResults.length} ads returned to the UI were NOT persisted — they will not survive a reload. First error: ${firstError}`);
+        }
+
         return Response.json(
-          { ...result, saved },
+          { ...result, saved, persistFailed: failed, persistError: failed > 0 ? firstError : undefined },
           { status: result.ok ? 200 : 502, headers: cors },
         );
       },

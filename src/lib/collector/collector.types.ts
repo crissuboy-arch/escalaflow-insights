@@ -60,6 +60,13 @@ export interface CollectorRunResult {
   count: number;
   ads: CollectorAd[];
   error?: string;
+  /** How many of `ads` were actually persisted to collected_ads. When this
+   *  is lower than ads.length, some results shown in the UI will NOT
+   *  survive a reload — the caller must warn the user instead of silently
+   *  treating every returned ad as saved. */
+  saved?: number;
+  persistFailed?: number;
+  persistError?: string;
 }
 
 export interface CollectorProvider {

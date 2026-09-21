@@ -88,3 +88,23 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
   if (error) return { inserted: false, updated: false, error: error.message };
   return { inserted: true, updated: false };
 }
+
+/** Aggregates a batch of persist outcomes so callers can tell the user the
+ *  truth when some ads were shown but not actually saved (e.g. a stale
+ *  PostgREST schema cache rejecting a real, existing column). */
+export function summarizePersistResults(
+  results: PersistResult[],
+): { saved: number; failed: number; firstError: string | null } {
+  let saved = 0;
+  let failed = 0;
+  let firstError: string | null = null;
+  for (const r of results) {
+    if (r.error) {
+      failed++;
+      if (!firstError) firstError = r.error;
+    } else {
+      saved++;
+    }
+  }
+  return { saved, failed, firstError };
+}
