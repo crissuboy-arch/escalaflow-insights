@@ -27,6 +27,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { createProjectFromOffer } from "@/lib/project.functions";
 import { SkillButton } from "@/components/module-skills/SkillButton";
 import { GenerateOfferModal } from "@/components/minerar/GenerateOfferModal";
+import { TransformToProjectButton } from "@/components/TransformToProjectButton";
 
 type CollectedAd = {
   id: string;
@@ -928,6 +929,7 @@ function MinePage() {
                         >
                           <Rocket className="mr-1 h-3.5 w-3.5" /> {modeling === key ? "Modelando…" : "Modelar Estratégia"}
                         </Button>
+                        <TransformToProjectButton adLibraryId={a.ad_library_id} adUrl={a.ad_url} />
                         <Button size="sm" variant="outline" onClick={() => onFavoriteCollected(a)}>
                           <Star className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`} /> Favoritar
                         </Button>

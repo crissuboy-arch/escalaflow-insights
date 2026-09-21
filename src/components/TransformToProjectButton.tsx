@@ -57,7 +57,7 @@ export function TransformToProjectButton({
       const res = await transform({ data: identity });
       if (res.ok) {
         setState("sent");
-        toast.success("Oportunidade enviada com sucesso.");
+        toast.success("Projeto criado a partir desta oportunidade.");
       } else {
         setState("idle");
         toast.error(res.error || "Não foi possível enviar. Tente novamente.");
@@ -77,7 +77,7 @@ export function TransformToProjectButton({
         variant="ghost"
         onClick={onClick}
         disabled={disabled}
-        title={state === "sent" ? "Já enviado para execução" : "Transformar em Projeto"}
+        title={state === "sent" ? "Projeto já criado a partir desta oportunidade" : "Transformar em Projeto"}
       >
         {state === "sending" || state === "checking" ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
@@ -98,7 +98,7 @@ export function TransformToProjectButton({
       disabled={disabled}
       title={
         state === "sent"
-          ? "Já enviado para execução"
+          ? "Projeto já criado a partir desta oportunidade."
           : "Envie esta oportunidade para o seu fluxo de execução."
       }
     >
@@ -108,7 +108,7 @@ export function TransformToProjectButton({
         </>
       ) : state === "sent" ? (
         <>
-          <Check className="mr-1 h-3 w-3" /> Enviado para execução
+          <Check className="mr-1 h-3 w-3" /> Projeto já criado
         </>
       ) : (
         <>
