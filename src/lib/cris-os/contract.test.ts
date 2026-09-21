@@ -52,14 +52,22 @@ describe("computeHandoffId", () => {
 });
 
 describe("buildHandoffFromTikTokEscalate", () => {
+  it("envia evidence como lista de objetos (contrato real do Cris OS)", () => {
+    const h = buildHandoffFromTikTokEscalate(BASE_ROW);
+    expect(Array.isArray(h.evidence)).toBe(true);
+    expect(h.evidence.length).toBeGreaterThan(0);
+    h.evidence.forEach((item) => expect(typeof item).toBe("object"));
+  });
+
   it("preserva evidence/provenance reais (plataforma, módulo, URL original, data, métrica)", () => {
     const h = buildHandoffFromTikTokEscalate(BASE_ROW);
-    expect(h.evidence.platform).toBe("TikTok");
-    expect(h.evidence.module).toBe("tiktok_escalate");
-    expect(h.evidence.original_url).toBe(BASE_ROW.video_url);
-    expect(h.evidence.collected_at).toBe(BASE_ROW.scaled_at);
-    expect(h.evidence.original_reference).toBe(BASE_ROW.video_id);
-    expect(h.evidence.observed_metric).toMatchObject({
+    const [ev] = h.evidence;
+    expect(ev.platform).toBe("TikTok");
+    expect(ev.module).toBe("tiktok_escalate");
+    expect(ev.original_url).toBe(BASE_ROW.video_url);
+    expect(ev.collected_at).toBe(BASE_ROW.scaled_at);
+    expect(ev.original_reference).toBe(BASE_ROW.video_id);
+    expect(ev.observed_metric).toMatchObject({
       views: 150000,
       likes: 12000,
       comments: 340,
@@ -70,7 +78,7 @@ describe("buildHandoffFromTikTokEscalate", () => {
   it("nunca marca TikTok como outra plataforma", () => {
     const h = buildHandoffFromTikTokEscalate(BASE_ROW);
     expect(h.offer.platform).toBe("TikTok");
-    expect(h.evidence.platform).toBe("TikTok");
+    expect(h.evidence[0].platform).toBe("TikTok");
   });
 
   it("usa UNKNOWN para campos categóricos que o TikTok collector não captura", () => {

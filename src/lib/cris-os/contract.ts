@@ -10,6 +10,15 @@ export const SOURCE_SYSTEM = "scalaflow";
 
 export const UNKNOWN = "UNKNOWN" as const;
 
+export interface EvidenceItem {
+  platform: string;
+  module: string;
+  original_url: string | null;
+  collected_at: string;
+  observed_metric: Record<string, unknown> | null;
+  original_reference: string | null;
+}
+
 export interface MarketIntelligenceHandoff {
   handoff_id: string;
   schema_version: string;
@@ -49,14 +58,13 @@ export interface MarketIntelligenceHandoff {
 
   competition: Record<string, unknown> | null;
 
-  evidence: {
-    platform: string;
-    module: string;
-    original_url: string | null;
-    collected_at: string;
-    observed_metric: Record<string, unknown> | null;
-    original_reference: string | null;
-  };
+  // Cris OS's real receiver validates this as a LIST of evidence objects
+  // (confirmed 2026-09-21: a synthetic handoff sent with `evidence` as a
+  // single object was REJECTED with "evidence[0..N] deve ser um objeto/dict"
+  // for each top-level key — i.e. it iterated our object as if it were a
+  // list). ScalaFlow has exactly one piece of evidence per handoff today, so
+  // this is a one-item list — never invented, never split arbitrarily.
+  evidence: EvidenceItem[];
 
   confidence: number | null;
   scoring: { escalaflow_score: number | null };
@@ -150,19 +158,21 @@ export function buildHandoffFromTikTokEscalate(row: TikTokEscalateRow): MarketIn
 
     competition: null,
 
-    evidence: {
-      platform: "TikTok",
-      module: "tiktok_escalate",
-      original_url: row.video_url || null,
-      collected_at: row.scaled_at,
-      observed_metric: {
-        views: row.views ?? 0,
-        likes: row.likes ?? 0,
-        comments: row.comments ?? 0,
-        shares: row.shares ?? 0,
+    evidence: [
+      {
+        platform: "TikTok",
+        module: "tiktok_escalate",
+        original_url: row.video_url || null,
+        collected_at: row.scaled_at,
+        observed_metric: {
+          views: row.views ?? 0,
+          likes: row.likes ?? 0,
+          comments: row.comments ?? 0,
+          shares: row.shares ?? 0,
+        },
+        original_reference: row.video_id || null,
       },
-      original_reference: row.video_id || null,
-    },
+    ],
 
     confidence: null,
     scoring: { escalaflow_score: row.enhanced_score || row.viral_score || null },
