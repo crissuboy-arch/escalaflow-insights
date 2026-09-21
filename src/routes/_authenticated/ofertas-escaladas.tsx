@@ -27,6 +27,7 @@ import {
   type PersistedAd,
 } from "@/lib/queries";
 import { openAdLink } from "@/lib/external";
+import { TransformToProjectButton } from "@/components/TransformToProjectButton";
 
 type Row = {
   id: string;
@@ -366,6 +367,7 @@ function ScaledPage() {
                           >
                             <Rocket className="h-3.5 w-3.5 text-primary" />
                           </Button>
+                          <TransformToProjectButton adLibraryId={r.ad_library_id} adUrl={r.ad_url} variant="icon" />
                         </div>
                       </TableCell>
                     </TableRow>

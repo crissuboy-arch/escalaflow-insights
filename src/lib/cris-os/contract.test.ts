@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildHandoffFromTikTokEscalate,
+  buildHandoffFromCollectedAd,
   computeHandoffId,
   UNKNOWN,
   type TikTokEscalateRow,
+  type CollectedAdRow,
 } from "./contract";
 
 const BASE_ROW: TikTokEscalateRow = {
@@ -135,6 +137,79 @@ describe("buildHandoffFromTikTokEscalate", () => {
 
   it("payload nunca contém um token/segredo", () => {
     const h = buildHandoffFromTikTokEscalate(BASE_ROW);
+    const serialized = JSON.stringify(h).toLowerCase();
+    expect(serialized).not.toMatch(/token|bearer|secret|service_role/);
+  });
+});
+
+const COLLECTED_AD_ROW: CollectedAdRow = {
+  id: "ad-uuid-1",
+  ad_library_id: "123456789",
+  ad_url: "https://www.facebook.com/ads/library/?id=123456789",
+  advertiser: "Soldiers Nutrition",
+  headline: "Ômega 3 para saúde cardiovascular",
+  copy: "Descubra o poder do Ômega 3...",
+  cta: "Shop now",
+  image_url: "https://scontent.fna.fbcdn.net/img.jpg",
+  video_url: null,
+  platform: "Facebook",
+  country: "BR",
+  niche: "Saúde",
+  score: 84,
+  created_at: "2026-09-15T00:00:00.000Z",
+  landing_page_url: "https://soldiersnutrition.com.br/produto",
+  offer_network: "checkout-proprio",
+  offer_network_confidence: "baixa",
+  first_seen_at: "2026-09-10T00:00:00.000Z",
+  last_seen_at: "2026-09-15T00:00:00.000Z",
+  start_date: null,
+};
+
+describe("buildHandoffFromCollectedAd", () => {
+  it("envia evidence como lista de objetos, igual ao mapper do TikTok", () => {
+    const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    expect(Array.isArray(h.evidence)).toBe(true);
+    expect(h.evidence[0].platform).toBe("Facebook");
+  });
+
+  it("usa handoff_id determinístico e reutiliza o mesmo computeHandoffId", () => {
+    const h1 = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    const h2 = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    expect(h1.handoff_id).toBe(h2.handoff_id);
+    expect(h1.handoff_id).toBe(
+      computeHandoffId("collected_ad_transform", `facebook:${COLLECTED_AD_ROW.ad_library_id}`),
+    );
+  });
+
+  it("preserva país/nicho reais quando existem, sem inventar quando ausentes", () => {
+    const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    expect(h.opportunity.country).toBe("BR");
+    expect(h.opportunity.niche).toBe("Saúde");
+
+    const rowSemDados = { ...COLLECTED_AD_ROW, country: "—", niche: "Geral" };
+    const h2 = buildHandoffFromCollectedAd(rowSemDados);
+    expect(h2.opportunity.country).toBe(UNKNOWN);
+    expect(h2.opportunity.niche).toBe(UNKNOWN);
+  });
+
+  it("preserva a landing page real em offer.sales_page_url, sem inventar preço/moeda/comissão", () => {
+    const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    expect(h.offer.sales_page_url).toBe(COLLECTED_AD_ROW.landing_page_url);
+    expect(h.offer.price).toBeNull();
+    expect(h.offer.currency).toBeNull();
+    expect(h.offer.commission).toBeNull();
+  });
+
+  it("preserva evidence/provenance (URL do anúncio, referência original, first_seen_at)", () => {
+    const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
+    const [ev] = h.evidence;
+    expect(ev.original_url).toBe(COLLECTED_AD_ROW.ad_url);
+    expect(ev.original_reference).toBe(COLLECTED_AD_ROW.ad_library_id);
+    expect(ev.collected_at).toBe(COLLECTED_AD_ROW.first_seen_at);
+  });
+
+  it("nunca contém token/segredo no payload", () => {
+    const h = buildHandoffFromCollectedAd(COLLECTED_AD_ROW);
     const serialized = JSON.stringify(h).toLowerCase();
     expect(serialized).not.toMatch(/token|bearer|secret|service_role/);
   });

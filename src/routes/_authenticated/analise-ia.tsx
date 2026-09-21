@@ -8,6 +8,7 @@ import { getAnalyzedAdByKey, fetchSavedAds, fetchFavoriteAds, subscribeChange, t
 import { ArrowLeft, Sparkles, Target, Heart, Lightbulb, Users, Brain, Layers, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { openAdLink } from "@/lib/external";
+import { TransformToProjectButton } from "@/components/TransformToProjectButton";
 
 export const Route = createFileRoute("/_authenticated/analise-ia")({
   component: AIPage,
@@ -127,6 +128,7 @@ function AIPage() {
                       >
                         <ExternalLink className="mr-1 h-3 w-3" /> Abrir anúncio
                       </Button>
+                      <TransformToProjectButton adLibraryId={selected.ad_library_id} adUrl={selected.ad_url} />
                     </div>
                   </div>
                 </div>

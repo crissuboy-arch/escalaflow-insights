@@ -186,3 +186,103 @@ export function buildHandoffFromTikTokEscalate(row: TikTokEscalateRow): MarketIn
     },
   };
 }
+
+export interface CollectedAdRow {
+  id: string;
+  ad_library_id: string | null;
+  ad_url: string | null;
+  advertiser: string;
+  headline: string;
+  copy: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url: string | null;
+  platform: string;
+  country: string;
+  niche: string;
+  score: number;
+  created_at: string;
+  landing_page_url?: string | null;
+  offer_network?: string | null;
+  offer_network_confidence?: string | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  start_date?: string | null;
+}
+
+/** Maps a row from collected_ads (Facebook/collector pipeline — the data
+ *  behind "Análise IA" and "Ofertas Escaladas") into the same Cris OS
+ *  contract used by TikTok. Second producer, same transport/contract —
+ *  nothing in client.ts/service.ts/the schema changes for this. */
+export function buildHandoffFromCollectedAd(row: CollectedAdRow): MarketIntelligenceHandoff {
+  const identity = row.ad_library_id || row.ad_url || row.id;
+  const platform = row.platform || "Unknown";
+  const opportunityId = `${platform.toLowerCase()}:${identity}`;
+  const hasCountry = !!row.country && row.country !== "—";
+  const hasNiche = !!row.niche && row.niche !== "Geral";
+
+  return {
+    handoff_id: computeHandoffId("collected_ad_transform", opportunityId),
+    schema_version: SCHEMA_VERSION,
+    source_system: SOURCE_SYSTEM,
+    source_module: "collected_ad_transform",
+    created_at: new Date().toISOString(),
+
+    opportunity: {
+      opportunity_id: opportunityId,
+      title: (row.headline || row.advertiser || "Oportunidade").slice(0, 200),
+      market: hasCountry ? row.country : UNKNOWN,
+      niche: hasNiche ? row.niche : UNKNOWN,
+      subniche: UNKNOWN,
+      country: hasCountry ? row.country : UNKNOWN,
+      language: UNKNOWN,
+      description: row.copy || null,
+    },
+
+    signals: {
+      trend_signals: null,
+      demand_signals: null,
+      competition_signals: null,
+      ad_signals: null,
+      social_signals: null,
+      search_signals: null,
+    },
+
+    offer: {
+      product_name: null,
+      offer_type: null,
+      price: null,
+      currency: null,
+      commission: null,
+      platform,
+      sales_page_url: row.landing_page_url || null,
+    },
+
+    competition: null,
+
+    evidence: [
+      {
+        platform,
+        module: "collected_ad_transform",
+        original_url: row.ad_url || null,
+        collected_at: row.first_seen_at || row.created_at,
+        observed_metric: null,
+        original_reference: row.ad_library_id || row.id,
+      },
+    ],
+
+    confidence: null,
+    scoring: { escalaflow_score: row.score ?? null },
+    meta: {
+      advertiser: row.advertiser || null,
+      cta: row.cta || null,
+      image_url: row.image_url || null,
+      video_url: row.video_url || null,
+      offer_network: row.offer_network ?? null,
+      offer_network_confidence: row.offer_network_confidence ?? null,
+      first_seen_at: row.first_seen_at ?? null,
+      last_seen_at: row.last_seen_at ?? null,
+      start_date: row.start_date ?? null,
+    },
+  };
+}
