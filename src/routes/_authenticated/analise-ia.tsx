@@ -68,7 +68,7 @@ function AIPage() {
         </Button>
       </div>
 
-      {items.length === 0 ? (
+      {!selected || !analysis ? (
         <Card className="border-dashed border-border/60 bg-card/50 p-10 text-center">
           <p className="text-sm text-muted-foreground">Nenhum anúncio enviado para análise. Vá em Minerar e clique em <span className="font-semibold text-foreground">Analisar com IA</span>.</p>
           <Button asChild className="mt-4 text-primary-foreground" style={{ background: "var(--gradient-primary)" }}>
@@ -76,24 +76,25 @@ function AIPage() {
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <div className="space-y-2">
-            {items.map((it) => (
-              <button
-                key={it.key}
-                onClick={() => setSelected(it)}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  selected?.key === it.key ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
-                }`}
-              >
-                <p className="truncate text-sm font-medium">{it.advertiser}</p>
-                <p className="truncate text-xs text-muted-foreground">{it.headline}</p>
-              </button>
-            ))}
-          </div>
+        <div className={items.length > 0 ? "grid gap-4 lg:grid-cols-[300px_1fr]" : ""}>
+          {items.length > 0 && (
+            <div className="space-y-2">
+              {items.map((it) => (
+                <button
+                  key={it.key}
+                  onClick={() => setSelected(it)}
+                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                    selected?.key === it.key ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/40"
+                  }`}
+                >
+                  <p className="truncate text-sm font-medium">{it.advertiser}</p>
+                  <p className="truncate text-xs text-muted-foreground">{it.headline}</p>
+                </button>
+              ))}
+            </div>
+          )}
 
-          {selected && analysis && (
-            <motion.div key={selected.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          <motion.div key={selected.key} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <Card className="overflow-hidden border-border/60">
                 <div className="grid gap-4 p-6 md:grid-cols-[200px_1fr]" style={{ background: "var(--gradient-primary)" }}>
                   <div className="aspect-video overflow-hidden rounded-lg bg-background/20">
@@ -153,7 +154,6 @@ function AIPage() {
                 </InfoCard>
               </div>
             </motion.div>
-          )}
         </div>
       )}
     </div>
