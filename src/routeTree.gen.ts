@@ -57,6 +57,7 @@ import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authen
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
 import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
 import { Route as AuthenticatedLaunchAnalyzerIdRouteImport } from './routes/_authenticated/launch-analyzer.$id'
+import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -320,6 +321,12 @@ const AuthenticatedLaunchAnalyzerIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedLaunchAnalyzerRoute,
   } as any)
+const AuthenticatedProjetosHandoffHandoffIdRoute =
+  AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
+    id: '/handoff/$handoffId',
+    path: '/handoff/$handoffId',
+    getParentRoute: () => AuthenticatedProjetosRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -369,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -418,6 +426,7 @@ export interface FileRoutesByTo {
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -469,6 +478,7 @@ export interface FileRoutesById {
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/_authenticated/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -520,6 +530,7 @@ export interface FileRouteTypes {
     | '/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/projetos/handoff/$handoffId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/projetos/handoff/$handoffId'
   id:
     | '__root__'
     | '/'
@@ -619,6 +631,7 @@ export interface FileRouteTypes {
     | '/_authenticated/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/_authenticated/projetos/handoff/$handoffId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -972,6 +985,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLaunchAnalyzerIdRouteImport
       parentRoute: typeof AuthenticatedLaunchAnalyzerRoute
     }
+    '/_authenticated/projetos/handoff/$handoffId': {
+      id: '/_authenticated/projetos/handoff/$handoffId'
+      path: '/handoff/$handoffId'
+      fullPath: '/projetos/handoff/$handoffId'
+      preLoaderRoute: typeof AuthenticatedProjetosHandoffHandoffIdRouteImport
+      parentRoute: typeof AuthenticatedProjetosRoute
+    }
   }
 }
 
@@ -1006,10 +1026,13 @@ const AuthenticatedMotorAfiliadosSeoRouteWithChildren =
 
 interface AuthenticatedProjetosRouteChildren {
   AuthenticatedProjetosIdRoute: typeof AuthenticatedProjetosIdRoute
+  AuthenticatedProjetosHandoffHandoffIdRoute: typeof AuthenticatedProjetosHandoffHandoffIdRoute
 }
 
 const AuthenticatedProjetosRouteChildren: AuthenticatedProjetosRouteChildren = {
   AuthenticatedProjetosIdRoute: AuthenticatedProjetosIdRoute,
+  AuthenticatedProjetosHandoffHandoffIdRoute:
+    AuthenticatedProjetosHandoffHandoffIdRoute,
 }
 
 const AuthenticatedProjetosRouteWithChildren =

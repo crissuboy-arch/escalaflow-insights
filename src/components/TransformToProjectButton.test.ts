@@ -21,6 +21,18 @@ const MINERAR_SRC = readFileSync(
   join(__dirname, "../routes/_authenticated/minerar.tsx"),
   "utf-8",
 );
+const ANALISE_IA_SRC = readFileSync(
+  join(__dirname, "../routes/_authenticated/analise-ia.tsx"),
+  "utf-8",
+);
+const OFERTAS_ESCALADAS_SRC = readFileSync(
+  join(__dirname, "../routes/_authenticated/ofertas-escaladas.tsx"),
+  "utf-8",
+);
+const HANDOFF_VIEW_SRC = readFileSync(
+  join(__dirname, "../routes/_authenticated/projetos.handoff.$handoffId.tsx"),
+  "utf-8",
+);
 
 describe("TransformToProjectButton — texto de status verdadeiro", () => {
   it("nunca afirma 'execução' concluída no estado 'sent' (apenas o projeto foi criado)", () => {
@@ -35,6 +47,59 @@ describe("TransformToProjectButton — texto de status verdadeiro", () => {
     const importLines = BUTTON_SRC.match(/from "@\/lib\/cris-os\/transform\.functions"/g) ?? [];
     expect(importLines.length).toBe(1);
     expect(BUTTON_SRC).not.toMatch(/fetch\(|axios|new XMLHttpRequest/);
+  });
+});
+
+describe("Ver Projeto — navegação independente, sem reenviar handoff", () => {
+  it("renderiza 'Ver Projeto' apontando para a área Projetos existente (/projetos/handoff/$handoffId)", () => {
+    expect(BUTTON_SRC).toMatch(/Ver Projeto/);
+    expect(BUTTON_SRC).toMatch(/to="\/projetos\/handoff\/\$handoffId"/);
+  });
+
+  it("o clique em 'Ver Projeto' nunca chama transformToProjectFn nem dispara envio", () => {
+    // Isola o bloco de cada Link "Ver Projeto" e garante que ele não invoca
+    // a função de transformação nem o handler onClick usado pelo botão de
+    // envio (que chama transform()/transformToProjectFn).
+    const linkBlocks = BUTTON_SRC.match(/<Link[\s\S]*?<\/Link>/g) ?? [];
+    expect(linkBlocks.length).toBeGreaterThan(0);
+    for (const block of linkBlocks) {
+      expect(block).not.toMatch(/transform\(/);
+      expect(block).not.toMatch(/onClick=\{onClick\}/);
+      expect(block).toMatch(/stopPropagation/);
+    }
+  });
+
+  it("'Ver Projeto' usa o handoff_id real propagado pelo próprio componente (checkTransformStatusFn/transformToProjectFn), sem lógica duplicada no consumidor", () => {
+    expect(BUTTON_SRC).toMatch(/setHandoffId\(res\.handoffId\)/);
+    expect(BUTTON_SRC).toMatch(/params=\{\{ handoffId: handoffId! \}\}/);
+  });
+
+  it("só aparece quando o status já é 'sent' com handoffId disponível — nunca antes disso", () => {
+    expect(BUTTON_SRC).toMatch(/showViewProject = state === "sent" && !!handoffId/);
+  });
+});
+
+describe("Área Projetos existente reutilizada (não é uma segunda área de projetos)", () => {
+  it("a rota /projetos/handoff/$handoffId é read-only: não importa transformToProjectFn nem envia handoff", () => {
+    expect(HANDOFF_VIEW_SRC).not.toMatch(/transformToProjectFn/);
+    expect(HANDOFF_VIEW_SRC).toMatch(/loadHandoffProjectFn/);
+  });
+
+  it("usa statusLabelForHandoff (testado em view-project.test.ts) em vez de duplicar o texto de status", () => {
+    expect(HANDOFF_VIEW_SRC).toMatch(/statusLabelForHandoff/);
+  });
+
+  it("as etapas futuras (Aprovado, Em execução, Concluído) só existem como passos visuais não-ativos, nunca como afirmação de estado atual", () => {
+    // The only step allowed to render as "active" (variant=default) for a
+    // SENT handoff is "Projeto criado" — everything else in the pipeline
+    // must render muted, since none of it has actually happened yet.
+    expect(HANDOFF_VIEW_SRC).toMatch(/activeIndex = status === "SENT" \? 0 : -1/);
+    expect(HANDOFF_VIEW_SRC).toMatch(/PIPELINE_STEPS = \[\s*"Projeto criado"/);
+  });
+
+  it("trata estado de carregamento e 'não encontrado' sem inventar dados", () => {
+    expect(HANDOFF_VIEW_SRC).toMatch(/Referência não encontrada/);
+    expect(HANDOFF_VIEW_SRC).toMatch(/Loader2/);
   });
 });
 
@@ -56,5 +121,20 @@ describe("Wiring real: /minerar → card da oferta → TransformToProjectButton"
     expect(MINERAR_SRC).toMatch(/Gerar Oferta Parecida/);
     expect(MINERAR_SRC).toMatch(/Modelar Estratégia/);
     expect(MINERAR_SRC).toMatch(/Abrir anúncio/);
+  });
+});
+
+describe("Reuso confirmado em Análise IA e Ofertas Escaladas (nenhum componente duplicado)", () => {
+  it("Análise IA reutiliza o mesmo TransformToProjectButton", () => {
+    expect(ANALISE_IA_SRC).toMatch(
+      /import \{ TransformToProjectButton \} from "@\/components\/TransformToProjectButton";/,
+    );
+  });
+
+  it("Ofertas Escaladas reutiliza o mesmo TransformToProjectButton (variant icon)", () => {
+    expect(OFERTAS_ESCALADAS_SRC).toMatch(
+      /import \{ TransformToProjectButton \} from "@\/components\/TransformToProjectButton";/,
+    );
+    expect(OFERTAS_ESCALADAS_SRC).toMatch(/<TransformToProjectButton[\s\S]{0,80}variant="icon"/);
   });
 });
