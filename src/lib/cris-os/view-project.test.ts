@@ -30,6 +30,8 @@ const CARLA_AD: CollectedAdSummaryRow = {
   score: 88,
   niche: "Infoproduto",
   country: "BR",
+  image_url: "https://scontent.fna.fbcdn.net/carla-figurinhas-real.jpg",
+  video_url: null,
 };
 
 describe("buildHandoffProjectView — Carla Figurinhas (fixture SENT)", () => {
@@ -48,7 +50,7 @@ describe("buildHandoffProjectView — Carla Figurinhas (fixture SENT)", () => {
     expect(view).not.toHaveProperty("project_id");
   });
 
-  it("dados exibidos vêm do registro real/mockado (nome, plataforma, score, nicho, país)", () => {
+  it("dados exibidos vêm do registro real/mockado (nome, plataforma, score, nicho, país, mídia)", () => {
     const view = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
     expect(view.opportunity).toEqual({
       title: "Pack de figurinhas para Stories",
@@ -56,6 +58,8 @@ describe("buildHandoffProjectView — Carla Figurinhas (fixture SENT)", () => {
       score: 88,
       niche: "Infoproduto",
       country: "BR",
+      imageUrl: "https://scontent.fna.fbcdn.net/carla-figurinhas-real.jpg",
+      videoUrl: null,
     });
   });
 
@@ -98,6 +102,8 @@ const SUITABLE_AD: CollectedAdSummaryRow = {
   score: 99,
   niche: "Fitness",
   country: "US",
+  image_url: "https://scontent.fna.fbcdn.net/suitable-real.jpg",
+  video_url: null,
 };
 
 describe("Carla e Suitable nunca se misturam (dois handoffs distintos e reais)", () => {
@@ -133,6 +139,57 @@ describe("Carla e Suitable nunca se misturam (dois handoffs distintos e reais)",
     expect(list[0]).toMatchObject({ kind: "handoff", handoffId: CARLA_HANDOFF.handoff_id, title: "Pack de figurinhas para Stories", score: 88 });
     expect(list[1]).toMatchObject({ kind: "handoff", handoffId: SUITABLE_HANDOFF.handoff_id, title: "Suitable — oferta real de alta pontuação", score: 99 });
     expect(list[0].handoffId).not.toBe(list[1].handoffId);
+  });
+});
+
+describe("Mídia real do card handoff — resolvida por source_table + source_id, nunca por nome", () => {
+  it("Carla resolve a própria mídia real a partir do source (collected_ads.image_url)", () => {
+    const view = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    expect(view.opportunity?.imageUrl).toBe("https://scontent.fna.fbcdn.net/carla-figurinhas-real.jpg");
+  });
+
+  it("Suitable resolve a própria mídia real, distinta da Carla", () => {
+    const view = buildHandoffProjectView(SUITABLE_HANDOFF, SUITABLE_AD);
+    expect(view.opportunity?.imageUrl).toBe("https://scontent.fna.fbcdn.net/suitable-real.jpg");
+  });
+
+  it("Carla nunca recebe a mídia do Suitable e vice-versa (nenhum lookup por nome)", () => {
+    const carla = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    const suitable = buildHandoffProjectView(SUITABLE_HANDOFF, SUITABLE_AD);
+    expect(carla.opportunity?.imageUrl).not.toBe(suitable.opportunity?.imageUrl);
+    // Passar o ad ERRADO para o handoff da Carla (mesmo por engano) nunca
+    // deve produzir um resultado que pareça o do Suitable — a função é pura
+    // e só usa exatamente o `ad` que o chamador passou, resolvido por
+    // source_id no chamador (loadHandoffProjectFn/listSentHandoffProjectsFn),
+    // nunca por advertiser/título.
+    const carlaComAdErrado = buildHandoffProjectView(CARLA_HANDOFF, SUITABLE_AD);
+    expect(carlaComAdErrado.handoffId).toBe(CARLA_HANDOFF.handoff_id);
+    expect(carlaComAdErrado.opportunity?.imageUrl).toBe(SUITABLE_AD.image_url);
+    expect(carlaComAdErrado.handoffId).not.toBe(SUITABLE_HANDOFF.handoff_id);
+  });
+
+  it("a listagem 'Continuar onde parou' carrega imageUrl/videoUrl próprios de cada item", () => {
+    const carlaView = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    const suitableView = buildHandoffProjectView(SUITABLE_HANDOFF, SUITABLE_AD);
+    const [carlaItem, suitableItem] = [carlaView, suitableView].map(toHandoffProjectListItem);
+    expect(carlaItem.imageUrl).toBe("https://scontent.fna.fbcdn.net/carla-figurinhas-real.jpg");
+    expect(suitableItem.imageUrl).toBe("https://scontent.fna.fbcdn.net/suitable-real.jpg");
+  });
+
+  it("fallback visual (imageUrl/videoUrl nulos) só ocorre quando o source realmente não tem mídia", () => {
+    const semMidia: CollectedAdSummaryRow = { ...CARLA_AD, image_url: null, video_url: null };
+    const view = buildHandoffProjectView(CARLA_HANDOFF, semMidia);
+    expect(view.opportunity?.imageUrl).toBeNull();
+    expect(view.opportunity?.videoUrl).toBeNull();
+    // Nunca inventa uma URL de mídia quando não há uma real.
+    expect(view.opportunity?.imageUrl).not.toBe(CARLA_AD.image_url);
+  });
+
+  it("vídeo real é preservado quando é a única mídia disponível (mesma prioridade do card de /minerar)", () => {
+    const soVideo: CollectedAdSummaryRow = { ...CARLA_AD, image_url: null, video_url: "https://video.example.com/carla.mp4" };
+    const view = buildHandoffProjectView(CARLA_HANDOFF, soVideo);
+    expect(view.opportunity?.imageUrl).toBeNull();
+    expect(view.opportunity?.videoUrl).toBe("https://video.example.com/carla.mp4");
   });
 });
 

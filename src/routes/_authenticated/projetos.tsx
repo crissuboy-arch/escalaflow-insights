@@ -32,6 +32,7 @@ import {
   toHandoffProjectListItem,
   type HandoffProjectListItem,
 } from "@/lib/cris-os/transform.functions";
+import { OpportunityMedia } from "@/components/OpportunityMedia";
 
 export const Route = createFileRoute("/_authenticated/projetos")({
   beforeLoad: async () => {
@@ -526,6 +527,12 @@ function HandoffProjectCard({ item }: { item: HandoffProjectListItem }) {
     navigate({ to: "/projetos/handoff/$handoffId", params: { handoffId: item.handoffId } } as never);
   return (
     <Card className="overflow-hidden border-primary/30 cursor-pointer" onClick={open}>
+      {/* Same aspect-video wrapper the legacy card uses for r.cover_url —
+          real media resolved from source_table/source_id, never a name
+          lookup, never a placeholder when real media exists. */}
+      <div className="aspect-video w-full overflow-hidden bg-muted">
+        <OpportunityMedia imageUrl={item.imageUrl} videoUrl={item.videoUrl} title={item.title} />
+      </div>
       <CardContent className="space-y-2 p-4">
         <div className="min-w-0 flex-1">
           <p className="line-clamp-1 font-semibold">{item.title}</p>

@@ -70,6 +70,10 @@ export interface CollectedAdSummaryRow {
   score: number | null;
   niche: string | null;
   country: string | null;
+  // Same fields /minerar's card already reads (image_url first, then
+  // video_url) — reused here as-is, never a new/invented media source.
+  image_url: string | null;
+  video_url: string | null;
 }
 
 export interface HandoffProjectView {
@@ -87,6 +91,8 @@ export interface HandoffProjectView {
     score: number | null;
     niche: string | null;
     country: string | null;
+    imageUrl: string | null;
+    videoUrl: string | null;
   } | null;
 }
 
@@ -106,6 +112,8 @@ export function buildHandoffProjectView(
           score: ad.score ?? null,
           niche: ad.niche ?? null,
           country: ad.country ?? null,
+          imageUrl: ad.image_url ?? null,
+          videoUrl: ad.video_url ?? null,
         }
       : null;
 
@@ -131,10 +139,13 @@ export interface HandoffProjectListItem {
   niche: string | null;
   country: string | null;
   createdAt: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
 }
 
 /** Pure mapping for the "Continuar onde parou" grid — one list item per
- *  handoff, each carrying only ITS OWN handoff_id. There is no shared
+ *  handoff, each carrying only ITS OWN handoff_id (and its own media, from
+ *  the same source row — never resolved by title/name). There is no shared
  *  mutable state or "first match" lookup here, so two different handoffs
  *  (e.g. Carla Figurinhas and Suitable) can never bleed into each other. */
 export function toHandoffProjectListItem(view: HandoffProjectView): HandoffProjectListItem {
@@ -147,6 +158,8 @@ export function toHandoffProjectListItem(view: HandoffProjectView): HandoffProje
     niche: view.opportunity?.niche ?? null,
     country: view.opportunity?.country ?? null,
     createdAt: view.createdAt,
+    imageUrl: view.opportunity?.imageUrl ?? null,
+    videoUrl: view.opportunity?.videoUrl ?? null,
   };
 }
 
@@ -229,7 +242,7 @@ export const loadHandoffProjectFn = createServerFn({ method: "POST" })
     if (handoffRow.source_table === "collected_ads") {
       const { data: adRow } = await supabaseAdmin
         .from("collected_ads")
-        .select("headline, advertiser, platform, score, niche, country")
+        .select("headline, advertiser, platform, score, niche, country, image_url, video_url")
         .eq("id", handoffRow.source_id)
         .maybeSingle();
       ad = adRow ?? null;
@@ -260,7 +273,7 @@ export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
       if (h.source_table === "collected_ads") {
         const { data: adRow } = await supabaseAdmin
           .from("collected_ads")
-          .select("headline, advertiser, platform, score, niche, country")
+          .select("headline, advertiser, platform, score, niche, country, image_url, video_url")
           .eq("id", h.source_id)
           .maybeSingle();
         ad = adRow ?? null;

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { loadHandoffProjectFn, statusLabelForHandoff } from "@/lib/cris-os/transform.functions";
+import { OpportunityMedia } from "@/components/OpportunityMedia";
 
 export const Route = createFileRoute("/_authenticated/projetos/handoff/$handoffId")({
   beforeLoad: async () => {
@@ -126,7 +127,14 @@ function HandoffProjectView() {
         <h1 className="text-2xl font-bold tracking-tight">Projeto a partir de oportunidade</h1>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="aspect-video w-full overflow-hidden bg-muted">
+          <OpportunityMedia
+            imageUrl={opportunity?.imageUrl ?? null}
+            videoUrl={opportunity?.videoUrl ?? null}
+            title={opportunity?.title ?? "Oportunidade"}
+          />
+        </div>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />

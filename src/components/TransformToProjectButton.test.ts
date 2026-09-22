@@ -37,6 +37,10 @@ const PROJETOS_SRC = readFileSync(
   join(__dirname, "../routes/_authenticated/projetos.tsx"),
   "utf-8",
 );
+const OPPORTUNITY_MEDIA_SRC = readFileSync(
+  join(__dirname, "OpportunityMedia.tsx"),
+  "utf-8",
+);
 
 describe("TransformToProjectButton — texto de status verdadeiro", () => {
   it("nunca afirma 'execução' concluída no estado 'sent' (apenas o projeto foi criado)", () => {
@@ -162,6 +166,37 @@ describe("Listagem 'Continuar onde parou' — projetos de handoff separados dos 
     expect(beforeHandoffCard).toMatch(/Abrir estratégia/);
     expect(beforeHandoffCard).toMatch(/Duplicar/);
     expect(beforeHandoffCard).toMatch(/Excluir/);
+  });
+});
+
+describe("Mídia real no card handoff — mesmo padrão visual dos cards normais de Projetos", () => {
+  it("OpportunityMedia usa a mesma prioridade de campos do card de /minerar (imagem, depois vídeo, depois placeholder)", () => {
+    expect(OPPORTUNITY_MEDIA_SRC).toMatch(/if \(videoUrl && !videoError\)/);
+    expect(OPPORTUNITY_MEDIA_SRC).toMatch(/if \(imageUrl && !imgError\)/);
+    expect(OPPORTUNITY_MEDIA_SRC).toMatch(/sem mídia capturada/);
+  });
+
+  it("OpportunityMedia nunca busca mídia por nome/advertiser — só recebe imageUrl/videoUrl já resolvidos pelo chamador", () => {
+    expect(OPPORTUNITY_MEDIA_SRC).not.toMatch(/advertiser|fetch\(|supabase/i);
+  });
+
+  it("HandoffProjectCard envolve OpportunityMedia no mesmo wrapper aspect-video usado pelo card legado (r.cover_url)", () => {
+    const match = PROJETOS_SRC.match(/function HandoffProjectCard[\s\S]*$/);
+    const handoffCardBlock = match![0];
+    expect(handoffCardBlock).toMatch(/aspect-video w-full overflow-hidden bg-muted/);
+    expect(handoffCardBlock).toMatch(/<OpportunityMedia imageUrl=\{item\.imageUrl\} videoUrl=\{item\.videoUrl\}/);
+  });
+
+  it("o card legado continua com seu próprio wrapper aspect-video idêntico (mesmo padrão visual, comportamento inalterado)", () => {
+    const beforeHandoffCard = PROJETOS_SRC.split("function HandoffProjectCard")[0];
+    expect(beforeHandoffCard).toMatch(/aspect-video w-full overflow-hidden bg-muted/);
+    expect(beforeHandoffCard).toMatch(/img src=\{r\.cover_url\}/);
+  });
+
+  it("a rota /projetos/handoff/\\$handoffId mostra a mídia real no detalhe, resolvida do opportunity (não por nome)", () => {
+    expect(HANDOFF_VIEW_SRC).toMatch(
+      /<OpportunityMedia\s+imageUrl=\{opportunity\?\.imageUrl \?\? null\}\s+videoUrl=\{opportunity\?\.videoUrl \?\? null\}/,
+    );
   });
 });
 
