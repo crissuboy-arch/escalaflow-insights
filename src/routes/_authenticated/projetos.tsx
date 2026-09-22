@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Flame, BookOpen, Sparkles, Trash2, Copy, ArrowRight, Rocket } from "lucide-react";
+import { Loader2, Flame, BookOpen, Sparkles, Trash2, Copy, ArrowRight, Rocket, Eye, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   createProject,
@@ -27,6 +27,11 @@ import {
   updateProject,
   type ProjectMode,
 } from "@/lib/project.functions";
+import {
+  listSentHandoffProjectsFn,
+  toHandoffProjectListItem,
+  type HandoffProjectListItem,
+} from "@/lib/cris-os/transform.functions";
 
 export const Route = createFileRoute("/_authenticated/projetos")({
   beforeLoad: async () => {
@@ -130,11 +135,13 @@ function ProjectsHubPage() {
   const navigate = useNavigate();
   const search = Route.useSearch() as { novo?: 1; tab?: string };
   const list = useServerFn(listProjects);
+  const listHandoffProjects = useServerFn(listSentHandoffProjectsFn);
   const create = useServerFn(createProject);
   const remove = useServerFn(deleteProject);
   const dup = useServerFn(duplicateProject);
   const update = useServerFn(updateProject);
   const [rows, setRows] = useState<Row[]>([]);
+  const [handoffItems, setHandoffItems] = useState<HandoffProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [category, setCategory] = useState<string>("Amazon/KDP");
@@ -157,8 +164,20 @@ function ProjectsHubPage() {
       setLoading(false);
     }
   };
+  // Handoff-derived opportunities (Inteligência de Mercado) are a separate,
+  // read-only source — never mixed into the legacy `projects` fetch/update
+  // logic above, and never sent/re-sent from this listing.
+  const refreshHandoffProjects = async () => {
+    try {
+      const views = await listHandoffProjects();
+      setHandoffItems((views ?? []).map(toHandoffProjectListItem));
+    } catch (e) {
+      console.error(e);
+    }
+  };
   useEffect(() => {
     refresh();
+    refreshHandoffProjects();
   }, []);
 
   async function startScratch() {
@@ -400,10 +419,13 @@ function ProjectsHubPage() {
               </Card>
             ))}
           </div>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && handoffItems.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nenhum projeto ainda.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {handoffItems.map((item) => (
+              <HandoffProjectCard key={item.handoffId} item={item} />
+            ))}
             {rows.map((r) => {
               const scale = (r.meta?.scale ?? {}) as Record<string, unknown>;
               const hasStrategy = !!(scale.plan || scale.fullDiagnosis);
@@ -489,5 +511,50 @@ function ProjectsHubPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Handoff-derived "project" (Inteligência de Mercado) — deliberately a
+// separate, simpler card. It never renders the legacy status Select or the
+// "Continuar"/"Abrir estratégia" actions (those assume a real `projects`
+// row with ebook/playbook/scale state that a handoff does not have), and it
+// only ever navigates by THIS item's own handoff_id — never a shared or
+// first-match lookup, so two different handoffs can never bleed together.
+function HandoffProjectCard({ item }: { item: HandoffProjectListItem }) {
+  const navigate = useNavigate();
+  const open = () =>
+    navigate({ to: "/projetos/handoff/$handoffId", params: { handoffId: item.handoffId } } as never);
+  return (
+    <Card className="overflow-hidden border-primary/30 cursor-pointer" onClick={open}>
+      <CardContent className="space-y-2 p-4">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-1 font-semibold">{item.title}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">
+            {item.niche ?? "—"} {item.country ? `· ${item.country}` : ""} ·{" "}
+            {new Date(item.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge>Inteligência de Mercado</Badge>
+          {item.platform ? <Badge variant="secondary">{item.platform}</Badge> : null}
+          {typeof item.score === "number" ? (
+            <Badge variant="secondary">
+              <TrendingUp className="mr-1 h-3 w-3" /> Score {item.score}
+            </Badge>
+          ) : null}
+          <Badge variant="outline">Aguardando planejamento</Badge>
+        </div>
+        <Button
+          size="sm"
+          className="w-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            open();
+          }}
+        >
+          <Eye className="mr-1 h-3.5 w-3.5" /> Ver Projeto
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

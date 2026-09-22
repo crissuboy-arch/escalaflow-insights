@@ -122,6 +122,34 @@ export function buildHandoffProjectView(
   };
 }
 
+export interface HandoffProjectListItem {
+  kind: "handoff";
+  handoffId: string;
+  title: string;
+  platform: string | null;
+  score: number | null;
+  niche: string | null;
+  country: string | null;
+  createdAt: string;
+}
+
+/** Pure mapping for the "Continuar onde parou" grid — one list item per
+ *  handoff, each carrying only ITS OWN handoff_id. There is no shared
+ *  mutable state or "first match" lookup here, so two different handoffs
+ *  (e.g. Carla Figurinhas and Suitable) can never bleed into each other. */
+export function toHandoffProjectListItem(view: HandoffProjectView): HandoffProjectListItem {
+  return {
+    kind: "handoff",
+    handoffId: view.handoffId,
+    title: view.opportunity?.title ?? "Oportunidade",
+    platform: view.opportunity?.platform ?? null,
+    score: view.opportunity?.score ?? null,
+    niche: view.opportunity?.niche ?? null,
+    country: view.opportunity?.country ?? null,
+    createdAt: view.createdAt,
+  };
+}
+
 /** The only status label allowed for SENT today: a real project record
  *  exists in ScalaFlow, but no BusinessPlan/Approval/ExecutionPlan/Tasks
  *  have happened — those are future phases, never implied here. */
@@ -208,4 +236,36 @@ export const loadHandoffProjectFn = createServerFn({ method: "POST" })
     }
 
     return buildHandoffProjectView(handoffRow as HandoffRow, ad);
+  });
+
+/** Read-only list of every SENT handoff, for the "Continuar onde parou"
+ *  grid in the existing Projetos area — so a handoff-derived opportunity
+ *  (e.g. Carla Figurinhas, Suitable) shows up there too, clearly marked as
+ *  coming from Inteligência de Mercado instead of the legacy `projects`
+ *  pipeline. Never sends anything; reuses buildHandoffProjectView so this
+ *  list and the single-item "Ver Projeto" view can never disagree. */
+export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { data: handoffRows } = await supabaseAdmin
+      .from("intelligence_handoffs")
+      .select("handoff_id, source_table, source_id, status, created_at, sent_at, last_error")
+      .eq("status", "SENT")
+      .order("created_at", { ascending: false });
+    if (!handoffRows) return [];
+
+    const views: HandoffProjectView[] = [];
+    for (const h of handoffRows) {
+      let ad: CollectedAdSummaryRow | null = null;
+      if (h.source_table === "collected_ads") {
+        const { data: adRow } = await supabaseAdmin
+          .from("collected_ads")
+          .select("headline, advertiser, platform, score, niche, country")
+          .eq("id", h.source_id)
+          .maybeSingle();
+        ad = adRow ?? null;
+      }
+      views.push(buildHandoffProjectView(h as HandoffRow, ad));
+    }
+    return views;
   });

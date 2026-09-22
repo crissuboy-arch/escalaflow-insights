@@ -8,7 +8,7 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Loader2, Sparkles, TrendingUp, Clock, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, TrendingUp, Clock, AlertTriangle, ListChecks } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -172,6 +172,20 @@ function HandoffProjectView() {
             <div className="truncate">
               referência: {data.sourceTable} / {data.sourceId}
             </div>
+          </div>
+
+          {/* Deliberately disabled: connecting this to Decision/Approval →
+              Business Builder → BusinessPlan → Execution Engine →
+              ExecutionPlan → Tasks is a separate, not-yet-started phase of
+              work (cris-os repo). This button must never call BusinessPlan,
+              the Approval Router, or Cris OS until that phase begins. */}
+          <div className="border-t pt-3">
+            <Button size="sm" disabled title="Disponível após conexão da etapa de planejamento">
+              <ListChecks className="mr-1.5 h-3.5 w-3.5" /> Planejar Projeto
+            </Button>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Disponível após conexão da etapa de planejamento
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildHandoffProjectView,
   statusLabelForHandoff,
+  toHandoffProjectListItem,
   type HandoffRow,
   type CollectedAdSummaryRow,
 } from "./transform.functions";
@@ -74,6 +75,64 @@ describe("buildHandoffProjectView — Carla Figurinhas (fixture SENT)", () => {
     const a = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
     const b = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
     expect(a).toEqual(b);
+  });
+});
+
+// Second, distinct fixture (Suitable — Facebook, score 99, próprio
+// handoff_id de teste) usado para provar que Carla e Suitable NUNCA se
+// misturam: cada handoff/URL abre exatamente o seu próprio registro.
+const SUITABLE_HANDOFF: HandoffRow = {
+  handoff_id: "test-fixture-ho_suitable_sent",
+  source_table: "collected_ads",
+  source_id: "test-fixture-suitable-ad-id",
+  status: "SENT",
+  created_at: "2026-09-21T18:00:00.000Z",
+  sent_at: "2026-09-21T18:00:05.000Z",
+  last_error: null,
+};
+
+const SUITABLE_AD: CollectedAdSummaryRow = {
+  headline: "Suitable — oferta real de alta pontuação",
+  advertiser: "Suitable",
+  platform: "Facebook",
+  score: 99,
+  niche: "Fitness",
+  country: "US",
+};
+
+describe("Carla e Suitable nunca se misturam (dois handoffs distintos e reais)", () => {
+  it("cada handoff_id abre exatamente o próprio registro — Carla nunca cai no fallback do Suitable", () => {
+    const carla = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    const suitable = buildHandoffProjectView(SUITABLE_HANDOFF, SUITABLE_AD);
+
+    expect(carla.handoffId).toBe(CARLA_HANDOFF.handoff_id);
+    expect(carla.opportunity?.title).toBe("Pack de figurinhas para Stories");
+    expect(carla.opportunity?.score).toBe(88);
+
+    expect(suitable.handoffId).toBe(SUITABLE_HANDOFF.handoff_id);
+    expect(suitable.opportunity?.title).toBe("Suitable — oferta real de alta pontuação");
+    expect(suitable.opportunity?.score).toBe(99);
+
+    expect(carla.handoffId).not.toBe(suitable.handoffId);
+    expect(carla.opportunity?.title).not.toBe(suitable.opportunity?.title);
+  });
+
+  it("refresh (nova chamada pura com o mesmo handoffId) preserva a mesma Carla, sem deriva para outro registro", () => {
+    const first = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    const afterRefresh = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    expect(afterRefresh).toEqual(first);
+    expect(afterRefresh.handoffId).toBe(CARLA_HANDOFF.handoff_id);
+  });
+
+  it("a listagem 'Continuar onde parou' mapeia cada item com o seu próprio handoffId, sem contaminação cruzada", () => {
+    const carlaView = buildHandoffProjectView(CARLA_HANDOFF, CARLA_AD);
+    const suitableView = buildHandoffProjectView(SUITABLE_HANDOFF, SUITABLE_AD);
+    const list = [carlaView, suitableView].map(toHandoffProjectListItem);
+
+    expect(list).toHaveLength(2);
+    expect(list[0]).toMatchObject({ kind: "handoff", handoffId: CARLA_HANDOFF.handoff_id, title: "Pack de figurinhas para Stories", score: 88 });
+    expect(list[1]).toMatchObject({ kind: "handoff", handoffId: SUITABLE_HANDOFF.handoff_id, title: "Suitable — oferta real de alta pontuação", score: 99 });
+    expect(list[0].handoffId).not.toBe(list[1].handoffId);
   });
 });
 

@@ -33,6 +33,10 @@ const HANDOFF_VIEW_SRC = readFileSync(
   join(__dirname, "../routes/_authenticated/projetos.handoff.$handoffId.tsx"),
   "utf-8",
 );
+const PROJETOS_SRC = readFileSync(
+  join(__dirname, "../routes/_authenticated/projetos.tsx"),
+  "utf-8",
+);
 
 describe("TransformToProjectButton — texto de status verdadeiro", () => {
   it("nunca afirma 'execução' concluída no estado 'sent' (apenas o projeto foi criado)", () => {
@@ -100,6 +104,64 @@ describe("Área Projetos existente reutilizada (não é uma segunda área de pro
   it("trata estado de carregamento e 'não encontrado' sem inventar dados", () => {
     expect(HANDOFF_VIEW_SRC).toMatch(/Referência não encontrada/);
     expect(HANDOFF_VIEW_SRC).toMatch(/Loader2/);
+  });
+});
+
+describe("Planejar Projeto — desabilitado nesta tarefa, sem tocar BusinessPlan/Approval Router/Cris OS", () => {
+  it("botão existe, desabilitado, com o texto exato exigido", () => {
+    expect(HANDOFF_VIEW_SRC).toMatch(/Planejar Projeto/);
+    expect(HANDOFF_VIEW_SRC).toMatch(/Disponível após conexão da etapa de planejamento/);
+    expect(HANDOFF_VIEW_SRC).toMatch(/<Button size="sm" disabled/);
+  });
+
+  it("nunca importa nem chama BusinessPlan, Approval Router ou o cliente/serviço do Cris OS", () => {
+    expect(HANDOFF_VIEW_SRC).not.toMatch(/^import.*BusinessPlan|^import.*ApprovalRouter/m);
+    expect(HANDOFF_VIEW_SRC).not.toMatch(/cris-os\/client"|cris-os\/service"|sendIntelligence\(|handoffToCrisOs\(/);
+    // The disabled button must have no onClick at all — no risk of it
+    // silently doing something when clicked.
+    expect(HANDOFF_VIEW_SRC).toMatch(/<Button size="sm" disabled title="Disponível após conexão da etapa de planejamento">/);
+  });
+});
+
+describe("Listagem 'Continuar onde parou' — projetos de handoff separados dos legados", () => {
+  it("busca a lista de handoffs SENT via listSentHandoffProjectsFn (reuso, sem novo endpoint de envio)", () => {
+    expect(PROJETOS_SRC).toMatch(
+      /import \{\s*listSentHandoffProjectsFn,\s*toHandoffProjectListItem,/,
+    );
+    expect(PROJETOS_SRC).not.toMatch(/transformToProjectFn/);
+  });
+
+  it("HandoffProjectCard nunca renderiza os controles legados (Select de status, Continuar, Abrir estratégia)", () => {
+    const match = PROJETOS_SRC.match(/function HandoffProjectCard[\s\S]*$/);
+    expect(match).not.toBeNull();
+    const handoffCardBlock = match![0];
+    expect(handoffCardBlock).not.toMatch(/<Select/);
+    expect(handoffCardBlock).not.toMatch(/Continuar</);
+    expect(handoffCardBlock).not.toMatch(/Abrir estratégia/);
+    expect(handoffCardBlock).not.toMatch(/Rascunho/);
+    expect(handoffCardBlock).not.toMatch(/onDuplicate|onDelete/);
+  });
+
+  it("HandoffProjectCard mostra o badge 'Inteligência de Mercado' e o status 'Aguardando planejamento'", () => {
+    const match = PROJETOS_SRC.match(/function HandoffProjectCard[\s\S]*$/);
+    const handoffCardBlock = match![0];
+    expect(handoffCardBlock).toMatch(/Inteligência de Mercado/);
+    expect(handoffCardBlock).toMatch(/Aguardando planejamento/);
+  });
+
+  it("HandoffProjectCard navega usando o handoff_id do PRÓPRIO item (item.handoffId), nunca um valor fixo/compartilhado", () => {
+    const match = PROJETOS_SRC.match(/function HandoffProjectCard[\s\S]*$/);
+    const handoffCardBlock = match![0];
+    expect(handoffCardBlock).toMatch(/params: \{ handoffId: item\.handoffId \}/);
+  });
+
+  it("os cartões de projeto legado preservam exatamente os controles antigos (Select, Continuar, Abrir estratégia, Duplicar, Excluir)", () => {
+    const beforeHandoffCard = PROJETOS_SRC.split("function HandoffProjectCard")[0];
+    expect(beforeHandoffCard).toMatch(/<Select value=\{r\.status\}/);
+    expect(beforeHandoffCard).toMatch(/Continuar/);
+    expect(beforeHandoffCard).toMatch(/Abrir estratégia/);
+    expect(beforeHandoffCard).toMatch(/Duplicar/);
+    expect(beforeHandoffCard).toMatch(/Excluir/);
   });
 });
 
