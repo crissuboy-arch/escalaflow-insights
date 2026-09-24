@@ -133,7 +133,7 @@ const instagramTable = () => (supabaseAdmin as any).from("instagram_minerados");
 
 // ── input schemas ─────────────────────────────────────────────────────────────
 
-const MineInput = z.object({
+export const MineInput = z.object({
   search: z.string().min(1),
   searchType: z.enum(["hashtag", "user", "url", "place"]).default("hashtag"),
   resultsType: z.enum(["posts", "reels"]).default("posts"),
@@ -151,12 +151,15 @@ const SearchInput = z.object({ search: z.string() });
 
 // ── server functions ──────────────────────────────────────────────────────────
 
-export const mineInstagramFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const { search, searchType, resultsType, limit } = data;
-    const userId = (context as any).userId as string;
+// Core mining logic, extracted so it has exactly one implementation shared
+// by the normal (session-authenticated) server function below AND the
+// server-to-server bridge in src/routes/api/integrations/mining.run.ts —
+// no behavior change, just a name for what was already the handler body.
+export async function runInstagramMining(
+  data: z.infer<typeof MineInput>,
+  userId: string,
+): Promise<{ inserted: number; skipped: number }> {
+  const { search, searchType, resultsType, limit } = data;
 
     const actor = getInstagramActorId();
     const cleanSearch = search.replace(/^[#@]+/, "").trim();
@@ -232,11 +235,16 @@ export const mineInstagramFn = createServerFn({ method: "POST" })
       .select("id");
 
     if (error) throw new Error(`Supabase error: ${error.message}`);
-    return {
-      inserted: inserted?.length ?? 0,
-      skipped: rows.length - (inserted?.length ?? 0),
-    };
-  });
+  return {
+    inserted: inserted?.length ?? 0,
+    skipped: rows.length - (inserted?.length ?? 0),
+  };
+}
+
+export const mineInstagramFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
+  .handler(async ({ data, context }) => runInstagramMining(data, (context as any).userId as string));
 
 export const listInstagramMinedFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

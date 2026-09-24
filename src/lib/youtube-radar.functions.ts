@@ -17,7 +17,7 @@ function detectShort(duration: string, videoUrl: string): boolean {
 
 // ── input schemas ─────────────────────────────────────────────────────────────
 
-const MineInput = z.object({
+export const MineInput = z.object({
   query: z.string().min(1),
   maxResults: z.number().int().min(1).max(100).default(30),
   dateFilter: z
@@ -35,13 +35,15 @@ const QueryInput = z.object({ query: z.string() });
 
 // ── server functions ──────────────────────────────────────────────────────────
 
-export const mineYouTubeFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const userId = (context as any).userId as string;
-
-    const result = await runYouTubeRadarSkill({
+// Core mining logic, extracted so it has exactly one implementation shared
+// by the normal (session-authenticated) server function below AND the
+// server-to-server bridge in src/routes/api/integrations/mining.run.ts —
+// no behavior change, just a name for what was already the handler body.
+export async function runYouTubeMining(
+  data: z.infer<typeof MineInput>,
+  userId: string,
+): Promise<{ inserted: number; skipped: number; warning?: string }> {
+  const result = await runYouTubeRadarSkill({
       query: data.query,
       maxResults: data.maxResults,
       dateFilter: data.dateFilter as any,
@@ -105,11 +107,16 @@ export const mineYouTubeFn = createServerFn({ method: "POST" })
       .select("id");
 
     if (error) throw new Error(`Supabase error: ${error.message}`);
-    return {
-      inserted: inserted?.length ?? 0,
-      skipped: rows.length - (inserted?.length ?? 0),
-    };
-  });
+  return {
+    inserted: inserted?.length ?? 0,
+    skipped: rows.length - (inserted?.length ?? 0),
+  };
+}
+
+export const mineYouTubeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
+  .handler(async ({ data, context }) => runYouTubeMining(data, (context as any).userId as string));
 
 export const listYouTubeMinedFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

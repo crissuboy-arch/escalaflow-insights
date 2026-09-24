@@ -200,7 +200,7 @@ const tiktokTable = () => supabaseAdmin.from("tiktok_minerados");
 
 // ── input schemas ─────────────────────────────────────────────────────────────
 
-const MineInput = z.object({
+export const MineInput = z.object({
   hashtag: z.string().min(1),
   limit: z.number().int().min(1).max(50).default(20),
 });
@@ -216,14 +216,17 @@ const HashtagInput = z.object({ hashtag: z.string() });
 
 // ── server functions ──────────────────────────────────────────────────────────
 
-export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const { hashtag, limit } = data;
-    const userId = (context as any).userId as string;
+// Core mining logic, extracted so it has exactly one implementation shared
+// by the normal (session-authenticated) server function below AND the
+// server-to-server bridge in src/routes/api/integrations/mining.run.ts —
+// no behavior change, just a name for what was already the handler body.
+export async function runTikTokHashtagMining(
+  data: z.infer<typeof MineInput>,
+  userId: string,
+): Promise<{ inserted: number; skipped: number }> {
+  const { hashtag, limit } = data;
 
-    const cleanHashtag = hashtag.replace(/^#+/, "").trim();
+  const cleanHashtag = hashtag.replace(/^#+/, "").trim();
     const actorId = getTikTokActorId();
 
     const payload = {
@@ -312,8 +315,13 @@ export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
     }
 
     console.log("[tiktok-radar] inserted:", insertedCount, "thumb_patches:", thumbUpdates.length, "skipped:", rows.length - insertedCount - thumbUpdates.length);
-    return { inserted: insertedCount, skipped: rows.length - insertedCount };
-  });
+  return { inserted: insertedCount, skipped: rows.length - insertedCount };
+}
+
+export const mineTikTokHashtagFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
+  .handler(async ({ data, context }) => runTikTokHashtagMining(data, (context as any).userId as string));
 
 export const listTikTokMinedFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

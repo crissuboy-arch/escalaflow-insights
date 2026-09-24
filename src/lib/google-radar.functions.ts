@@ -15,7 +15,7 @@ const trendsTable = () => (supabaseAdmin as any).from("google_trends_minerados")
 
 // ── input schemas ─────────────────────────────────────────────────────────────
 
-const MineInput = z.object({
+export const MineInput = z.object({
   keywords: z.string().min(1),
   geo: z.string().default("BR"),
   timeframe: z
@@ -33,12 +33,15 @@ const KeywordInput = z.object({ keyword: z.string() });
 
 // ── server functions ──────────────────────────────────────────────────────────
 
-export const mineGoogleTrendsFn = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
-  .handler(async ({ data, context }) => {
-    const userId = (context as any).userId as string;
-    const { geo, timeframe } = data;
+// Core mining logic, extracted so it has exactly one implementation shared
+// by the normal (session-authenticated) server function below AND the
+// server-to-server bridge in src/routes/api/integrations/mining.run.ts —
+// no behavior change, just a name for what was already the handler body.
+export async function runGoogleTrendsMining(
+  data: z.infer<typeof MineInput>,
+  userId: string,
+): Promise<{ inserted: number; skipped: number }> {
+  const { geo, timeframe } = data;
 
     // Parse comma-separated keywords into individual search tasks
     const keywords = data.keywords
@@ -88,8 +91,13 @@ export const mineGoogleTrendsFn = createServerFn({ method: "POST" })
       .select("id");
 
     if (error) throw new Error(`Supabase error: ${error.message}`);
-    return { inserted: inserted?.length ?? 0, skipped: 0 };
-  });
+  return { inserted: inserted?.length ?? 0, skipped: 0 };
+}
+
+export const mineGoogleTrendsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof MineInput>) => MineInput.parse(d))
+  .handler(async ({ data, context }) => runGoogleTrendsMining(data, (context as any).userId as string));
 
 export const listGoogleTrendsFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
