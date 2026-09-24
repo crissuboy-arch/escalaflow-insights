@@ -6,10 +6,17 @@
 // themselves (runTikTokHashtagMining, runInstagramMining, etc.): one real
 // implementation, reused, not duplicated.
 import { z } from "zod";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runTikTokHashtagMining, MineInput as TikTokMineInput } from "@/lib/tiktok-radar.functions";
-import { runInstagramMining, MineInput as InstagramMineInput } from "@/lib/instagram-radar.functions";
+import {
+  runInstagramMining,
+  MineInput as InstagramMineInput,
+} from "@/lib/instagram-radar.functions";
 import { runYouTubeMining, MineInput as YouTubeMineInput } from "@/lib/youtube-radar.functions";
-import { runGoogleTrendsMining, MineInput as GoogleTrendsMineInput } from "@/lib/google-radar.functions";
+import {
+  runGoogleTrendsMining,
+  MineInput as GoogleTrendsMineInput,
+} from "@/lib/google-radar.functions";
 
 export const MINING_BRIDGE_SOURCES = ["tiktok", "instagram", "youtube", "google_trends"] as const;
 export type MiningBridgeSource = (typeof MINING_BRIDGE_SOURCES)[number];
@@ -44,48 +51,55 @@ export function isAuthorized(authHeader: string | null, secret: string | undefin
 }
 
 // ── Rate limiting ────────────────────────────────────────────────────────
-// Simple, in-memory, per-source guard against abusive/repeated triggering
-// of a real, cost-incurring external call. Not a new architecture/table —
-// state resets on a cold start, which is an accepted tradeoff: the goal is
-// to stop rapid-fire bursts within a warm instance, not to implement
-// distributed rate limiting.
-const MIN_INTERVAL_MS = 60_000; // at most 1 call per source per minute
-const MAX_CALLS_PER_HOUR = 10; // per source
-const lastCallAt = new Map<MiningBridgeSource, number>();
-const callsInWindow = new Map<MiningBridgeSource, number[]>();
+// Persistent, atomic guard against abusive/repeated triggering of a real,
+// cost-incurring external call for the SAME (source, term) pair. The
+// in-memory version previously here did not work across Vercel serverless
+// invocations (each request can land on a different, memory-isolated
+// instance). This reuses the already-existing public.mining_runs table
+// (user_id/type/query/started_at — present since 20260520100000, unused by
+// any other code path) via a Postgres function
+// (try_acquire_mining_bridge_lock, see
+// supabase/migrations/20260924000000_mining_bridge_rate_limit.sql) that
+// makes the check-and-record atomic with a transaction-scoped advisory
+// lock, so two concurrent calls for the same key can never both pass.
+const RATE_LIMIT_WINDOW_SECONDS = 300; // 5 minutes per exact (source, term)
 
 export interface RateLimitCheck {
   allowed: boolean;
   reason?: string;
 }
 
-export function checkRateLimit(source: MiningBridgeSource, now: number = Date.now()): RateLimitCheck {
-  const last = lastCallAt.get(source);
-  if (last !== undefined && now - last < MIN_INTERVAL_MS) {
-    const waitSec = Math.ceil((MIN_INTERVAL_MS - (now - last)) / 1000);
-    return { allowed: false, reason: `Muito frequente para "${source}" — aguarde ${waitSec}s.` };
+/** Atomically checks AND records in one round-trip: if this returns
+ *  allowed=true, the call has already been recorded — the caller must not
+ *  call it again for the same attempt. If allowed=false, nothing was
+ *  recorded and the caller must not proceed to the miner/Apify. */
+export async function acquireMiningBridgeLock(
+  source: MiningBridgeSource,
+  term: string,
+  userId: string,
+): Promise<RateLimitCheck> {
+  // Supabase types don't include this function yet (see migration
+  // 20260924000000_mining_bridge_rate_limit.sql).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabaseAdmin as any).rpc("try_acquire_mining_bridge_lock", {
+    p_user_id: userId,
+    p_type: source,
+    p_query: term,
+    p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+  });
+  if (error) {
+    // Fail closed: if the lock primitive itself is unavailable (e.g. the
+    // migration hasn't been applied yet), never let a real, cost-incurring
+    // call through unchecked.
+    return { allowed: false, reason: `Rate limit indisponível: ${error.message}` };
   }
-  const windowStart = now - 60 * 60 * 1000;
-  const recent = (callsInWindow.get(source) ?? []).filter((t) => t > windowStart);
-  if (recent.length >= MAX_CALLS_PER_HOUR) {
-    return { allowed: false, reason: `Limite de ${MAX_CALLS_PER_HOUR} chamadas/hora atingido para "${source}".` };
+  if (!data) {
+    return {
+      allowed: false,
+      reason: `"${source}"/"${term}" já executado nos últimos ${RATE_LIMIT_WINDOW_SECONDS}s — aguarde antes de repetir.`,
+    };
   }
   return { allowed: true };
-}
-
-export function recordCall(source: MiningBridgeSource, now: number = Date.now()): void {
-  lastCallAt.set(source, now);
-  const windowStart = now - 60 * 60 * 1000;
-  const recent = (callsInWindow.get(source) ?? []).filter((t) => t > windowStart);
-  recent.push(now);
-  callsInWindow.set(source, recent);
-}
-
-/** Test-only: clears in-memory rate-limit state between test cases so one
- *  test's calls never leak into another's. Never called from production code. */
-export function __resetMiningBridgeRateLimitForTests(): void {
-  lastCallAt.clear();
-  callsInWindow.clear();
 }
 
 /** Dispatches to the one real implementation for each source — never a

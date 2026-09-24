@@ -17,8 +17,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   MiningBridgeBody,
   isAuthorized,
-  checkRateLimit,
-  recordCall,
+  acquireMiningBridgeLock,
   runMiningBridge,
 } from "@/lib/integrations/mining-bridge";
 
@@ -26,7 +25,9 @@ export const Route = createFileRoute("/api/integrations/mining/run")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!isAuthorized(request.headers.get("authorization"), process.env.CRIS_OS_MINING_SECRET)) {
+        if (
+          !isAuthorized(request.headers.get("authorization"), process.env.CRIS_OS_MINING_SECRET)
+        ) {
           return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
@@ -53,13 +54,15 @@ export const Route = createFileRoute("/api/integrations/mining/run")({
           );
         }
 
-        const rateLimit = checkRateLimit(parsed.data.source);
-        if (!rateLimit.allowed) {
-          return Response.json({ ok: false, error: rateLimit.reason }, { status: 429 });
+        // Atomic check-and-record — the SAME (source, term) pair cannot pass
+        // this twice within the window, even across concurrent serverless
+        // invocations. Must happen BEFORE any call to the miner/Apify.
+        const lock = await acquireMiningBridgeLock(parsed.data.source, parsed.data.term, userId);
+        if (!lock.allowed) {
+          return Response.json({ ok: false, error: lock.reason }, { status: 429 });
         }
 
         try {
-          recordCall(parsed.data.source);
           const result = await runMiningBridge(parsed.data, userId);
           return Response.json({
             ok: true,

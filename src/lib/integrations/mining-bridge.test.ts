@@ -13,7 +13,10 @@ vi.mock("@/lib/tiktok-radar.functions", async () => {
   const actual = await vi.importActual<typeof import("@/lib/tiktok-radar.functions")>(
     "@/lib/tiktok-radar.functions",
   );
-  return { ...actual, runTikTokHashtagMining: (...args: unknown[]) => runTikTokHashtagMiningMock(...args) };
+  return {
+    ...actual,
+    runTikTokHashtagMining: (...args: unknown[]) => runTikTokHashtagMiningMock(...args),
+  };
 });
 vi.mock("@/lib/instagram-radar.functions", async () => {
   const actual = await vi.importActual<typeof import("@/lib/instagram-radar.functions")>(
@@ -31,23 +34,68 @@ vi.mock("@/lib/google-radar.functions", async () => {
   const actual = await vi.importActual<typeof import("@/lib/google-radar.functions")>(
     "@/lib/google-radar.functions",
   );
-  return { ...actual, runGoogleTrendsMining: (...args: unknown[]) => runGoogleTrendsMiningMock(...args) };
+  return {
+    ...actual,
+    runGoogleTrendsMining: (...args: unknown[]) => runGoogleTrendsMiningMock(...args),
+  };
 });
 
-const {
-  isAuthorized,
-  checkRateLimit,
-  recordCall,
-  runMiningBridge,
-  __resetMiningBridgeRateLimitForTests,
-} = await import("./mining-bridge");
+// Fake, in-memory stand-in for the REAL atomic Postgres primitive
+// (try_acquire_mining_bridge_lock — see
+// supabase/migrations/20260924000000_mining_bridge_rate_limit.sql). This
+// fake only proves that mining-bridge.ts calls the RPC correctly and acts
+// correctly on its boolean result. True cross-instance atomicity is a
+// property of Postgres's pg_advisory_xact_lock in that SQL function, which
+// cannot be exercised by a JS unit test — it is guaranteed by the database
+// engine, not by this application code.
+interface FakeRun {
+  userId: string;
+  type: string;
+  query: string;
+  at: number;
+}
+let fakeRuns: FakeRun[] = [];
+let fakeNow = 0;
+
+interface LockArgs {
+  p_user_id: string;
+  p_type: string;
+  p_query: string;
+  p_window_seconds: number;
+}
+
+const rpcMock = vi.fn(async (fnName: string, rawArgs: Record<string, unknown>) => {
+  const args = rawArgs as unknown as LockArgs;
+  if (fnName !== "try_acquire_mining_bridge_lock") {
+    return { data: null, error: { message: `unexpected rpc ${fnName}` } };
+  }
+  const windowStart = fakeNow - args.p_window_seconds * 1000;
+  const exists = fakeRuns.some(
+    (r) =>
+      r.userId === args.p_user_id &&
+      r.type === args.p_type &&
+      r.query === args.p_query &&
+      r.at > windowStart,
+  );
+  if (exists) return { data: false, error: null };
+  fakeRuns.push({ userId: args.p_user_id, type: args.p_type, query: args.p_query, at: fakeNow });
+  return { data: true, error: null };
+});
+
+vi.mock("@/integrations/supabase/client.server", () => ({
+  supabaseAdmin: { rpc: (...args: [string, Record<string, unknown>]) => rpcMock(...args) },
+}));
+
+const { isAuthorized, acquireMiningBridgeLock, runMiningBridge } = await import("./mining-bridge");
 
 beforeEach(() => {
   runTikTokHashtagMiningMock.mockReset().mockResolvedValue({ inserted: 1, skipped: 0 });
   runInstagramMiningMock.mockReset().mockResolvedValue({ inserted: 1, skipped: 0 });
   runYouTubeMiningMock.mockReset().mockResolvedValue({ inserted: 1, skipped: 0 });
   runGoogleTrendsMiningMock.mockReset().mockResolvedValue({ inserted: 1, skipped: 0 });
-  __resetMiningBridgeRateLimitForTests();
+  rpcMock.mockClear();
+  fakeRuns = [];
+  fakeNow = 1_000_000_000; // fixed base "now" in ms, advanced per test as needed
 });
 
 describe("isAuthorized — secret dedicado, nunca sessão do app", () => {
@@ -76,7 +124,10 @@ describe("runMiningBridge — reutiliza o minerador real de cada fonte, sem segu
   it("tiktok chama runTikTokHashtagMining com {hashtag, limit} e o userId dado", async () => {
     await runMiningBridge({ source: "tiktok", term: "N8N", limit: 10 }, "user-1");
     expect(runTikTokHashtagMiningMock).toHaveBeenCalledTimes(1);
-    expect(runTikTokHashtagMiningMock).toHaveBeenCalledWith({ hashtag: "N8N", limit: 10 }, "user-1");
+    expect(runTikTokHashtagMiningMock).toHaveBeenCalledWith(
+      { hashtag: "N8N", limit: 10 },
+      "user-1",
+    );
     expect(runInstagramMiningMock).not.toHaveBeenCalled();
     expect(runYouTubeMiningMock).not.toHaveBeenCalled();
     expect(runGoogleTrendsMiningMock).not.toHaveBeenCalled();
@@ -84,7 +135,13 @@ describe("runMiningBridge — reutiliza o minerador real de cada fonte, sem segu
 
   it("instagram chama runInstagramMining com {search, searchType, resultsType, limit}", async () => {
     await runMiningBridge(
-      { source: "instagram", term: "automacao", searchType: "hashtag", resultsType: "reels", limit: 25 },
+      {
+        source: "instagram",
+        term: "automacao",
+        searchType: "hashtag",
+        resultsType: "reels",
+        limit: 25,
+      },
       "user-1",
     );
     expect(runInstagramMiningMock).toHaveBeenCalledWith(
@@ -111,8 +168,6 @@ describe("runMiningBridge — reutiliza o minerador real de cada fonte, sem segu
   });
 
   it("nenhuma chamada real é feita nestes testes — tudo mockado", () => {
-    expect(runTikTokHashtagMiningMock.getMockName()).toBeTruthy();
-    // Confirms these are vi.fn() mocks, not the real network-calling implementations.
     expect(vi.isMockFunction(runTikTokHashtagMiningMock)).toBe(true);
     expect(vi.isMockFunction(runInstagramMiningMock)).toBe(true);
     expect(vi.isMockFunction(runYouTubeMiningMock)).toBe(true);
@@ -120,41 +175,63 @@ describe("runMiningBridge — reutiliza o minerador real de cada fonte, sem segu
   });
 });
 
-describe("checkRateLimit / recordCall — proteção contra disparos abusivos/repetidos", () => {
-  it("permite a primeira chamada de uma fonte", () => {
-    expect(checkRateLimit("tiktok", 1_000_000).allowed).toBe(true);
-  });
-
-  it("bloqueia uma segunda chamada da MESMA fonte dentro do intervalo mínimo", () => {
-    const t0 = 1_000_000;
-    recordCall("tiktok", t0);
-    const check = checkRateLimit("tiktok", t0 + 5_000); // 5s depois
-    expect(check.allowed).toBe(false);
-    expect(check.reason).toMatch(/aguarde/i);
-  });
-
-  it("permite novamente após o intervalo mínimo passar", () => {
-    const t0 = 1_000_000;
-    recordCall("tiktok", t0);
-    const check = checkRateLimit("tiktok", t0 + 61_000); // 61s depois
+describe("acquireMiningBridgeLock — persistente e atômico (via RPC), não em memória", () => {
+  it("permite a primeira chamada de uma combinação (source, term)", async () => {
+    const check = await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
     expect(check.allowed).toBe(true);
+    expect(rpcMock).toHaveBeenCalledWith(
+      "try_acquire_mining_bridge_lock",
+      expect.objectContaining({ p_type: "tiktok", p_query: "N8N", p_user_id: "user-1" }),
+    );
   });
 
-  it("uma fonte diferente não é afetada pelo limite de outra (rate limit é por fonte)", () => {
-    recordCall("tiktok", 1_000_000);
-    expect(checkRateLimit("instagram", 1_000_001).allowed).toBe(true);
+  it("bloqueia uma repetição da MESMA combinação (source, term) dentro da janela", async () => {
+    await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    const second = await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    expect(second.allowed).toBe(false);
+    expect(second.reason).toMatch(/aguarde|janela|últimos/i);
   });
 
-  it("bloqueia após atingir o limite de chamadas por hora, mesmo respeitando o intervalo mínimo", () => {
-    const base = 1_000_000;
-    for (let i = 0; i < 10; i++) {
-      const t = base + i * 61_000; // respects the 60s min interval each time
-      expect(checkRateLimit("youtube", t).allowed).toBe(true);
-      recordCall("youtube", t);
-    }
-    const eleventh = base + 10 * 61_000;
-    const check = checkRateLimit("youtube", eleventh);
+  it("uma chamada bloqueada nunca chega ao minerador (verificado no nível da rota, aqui via runMiningBridge não invocado)", async () => {
+    await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    const second = await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    expect(second.allowed).toBe(false);
+    // A rota real só chama runMiningBridge quando allowed === true; aqui
+    // provamos que a segunda tentativa nunca teria permissão para prosseguir.
+    expect(runTikTokHashtagMiningMock).not.toHaveBeenCalled();
+  });
+
+  it("uma FONTE diferente para o mesmo termo é permitida (chave é source+term, não só term)", async () => {
+    await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    const other = await acquireMiningBridgeLock("instagram", "N8N", "user-1");
+    expect(other.allowed).toBe(true);
+  });
+
+  it("um TERMO diferente na mesma fonte é permitido (chave é source+term, não só source)", async () => {
+    await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    const other = await acquireMiningBridgeLock("tiktok", "automação", "user-1");
+    expect(other.allowed).toBe(true);
+  });
+
+  it("permite novamente a mesma combinação após a janela expirar", async () => {
+    await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    fakeNow += 301_000; // just past the 300s window
+    const later = await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
+    expect(later.allowed).toBe(true);
+  });
+
+  it("falha fechada (bloqueia) quando a própria checagem falha, em vez de deixar passar sem controle", async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: { message: "function does not exist" } });
+    const check = await acquireMiningBridgeLock("tiktok", "N8N", "user-1");
     expect(check.allowed).toBe(false);
-    expect(check.reason).toMatch(/limite/i);
+  });
+
+  it("concorrência: de duas tentativas 'simultâneas' para a mesma (source, term), apenas uma é permitida", async () => {
+    const [a, b] = await Promise.all([
+      acquireMiningBridgeLock("youtube", "N8N", "user-1"),
+      acquireMiningBridgeLock("youtube", "N8N", "user-1"),
+    ]);
+    const allowedCount = [a, b].filter((r) => r.allowed).length;
+    expect(allowedCount).toBe(1);
   });
 });
