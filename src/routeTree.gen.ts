@@ -58,6 +58,7 @@ import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
 import { Route as AuthenticatedLaunchAnalyzerIdRouteImport } from './routes/_authenticated/launch-analyzer.$id'
 import { Route as ApiIntegrationsMiningRunRouteImport } from './routes/api/integrations.mining.run'
+import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
 import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
 
 const LoginRoute = LoginRouteImport.update({
@@ -328,6 +329,12 @@ const ApiIntegrationsMiningRunRoute =
     path: '/api/integrations/mining/run',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsIntelligenceRunRoute =
+  ApiIntegrationsIntelligenceRunRouteImport.update({
+    id: '/api/integrations/intelligence/run',
+    path: '/api/integrations/intelligence/run',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedProjetosHandoffHandoffIdRoute =
   AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
     id: '/handoff/$handoffId',
@@ -384,6 +391,7 @@ export interface FileRoutesByFullPath {
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
+  '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
 }
 export interface FileRoutesByTo {
@@ -435,6 +443,7 @@ export interface FileRoutesByTo {
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
+  '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
 }
 export interface FileRoutesById {
@@ -488,6 +497,7 @@ export interface FileRoutesById {
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/_authenticated/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
+  '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
 }
 export interface FileRouteTypes {
@@ -541,6 +551,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
     | '/projetos/handoff/$handoffId'
+    | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -592,6 +603,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
     | '/projetos/handoff/$handoffId'
+    | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
   id:
     | '__root__'
@@ -644,6 +656,7 @@ export interface FileRouteTypes {
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
     | '/_authenticated/projetos/handoff/$handoffId'
+    | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
   fileRoutesById: FileRoutesById
 }
@@ -658,6 +671,7 @@ export interface RootRouteChildren {
   StorybookShareTokenRoute: typeof StorybookShareTokenRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
   ApiCronPublicarArtigosRoute: typeof ApiCronPublicarArtigosRoute
+  ApiIntegrationsIntelligenceRunRoute: typeof ApiIntegrationsIntelligenceRunRoute
   ApiIntegrationsMiningRunRoute: typeof ApiIntegrationsMiningRunRoute
 }
 
@@ -1006,6 +1020,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsMiningRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/intelligence/run': {
+      id: '/api/integrations/intelligence/run'
+      path: '/api/integrations/intelligence/run'
+      fullPath: '/api/integrations/intelligence/run'
+      preLoaderRoute: typeof ApiIntegrationsIntelligenceRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/projetos/handoff/$handoffId': {
       id: '/_authenticated/projetos/handoff/$handoffId'
       path: '/handoff/$handoffId'
@@ -1166,6 +1187,7 @@ const rootRouteChildren: RootRouteChildren = {
   StorybookShareTokenRoute: StorybookShareTokenRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
   ApiCronPublicarArtigosRoute: ApiCronPublicarArtigosRoute,
+  ApiIntegrationsIntelligenceRunRoute: ApiIntegrationsIntelligenceRunRoute,
   ApiIntegrationsMiningRunRoute: ApiIntegrationsMiningRunRoute,
 }
 export const routeTree = rootRouteImport

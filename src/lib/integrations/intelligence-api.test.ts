@@ -8,6 +8,10 @@ import { createHash } from "node:crypto";
 // fixture rows simply already carry a nested `collected_ads` key).
 type Row = Record<string, unknown>;
 let FIXTURES: Record<string, Row[]> = {};
+// Simulates a table that doesn't exist yet (e.g. private_api_clients
+// before the migration has been run in production) — PostgREST returns an
+// error, never silently empty/success data.
+let FAILING_TABLES = new Set<string>();
 
 function matchIlike(value: unknown, pattern: string): boolean {
   const needle = pattern.replace(/%/g, "").toLowerCase();
@@ -33,11 +37,16 @@ function makeQuery(table: string) {
       rows = rows.slice(0, n);
       return builder;
     },
-    maybeSingle: async () => ({ data: rows[0] ?? null, error: null }),
+    maybeSingle: async () =>
+      FAILING_TABLES.has(table)
+        ? { data: null, error: { message: `relation "public.${table}" does not exist` } }
+        : { data: rows[0] ?? null, error: null },
     // supabase-js query builders are thenable — `await query` works
     // without an explicit terminal call.
-    then: (resolve: (v: { data: Row[]; error: null }) => void) =>
-      resolve({ data: rows, error: null }),
+    then: (resolve: (v: { data: Row[] | null; error: unknown }) => void) =>
+      FAILING_TABLES.has(table)
+        ? resolve({ data: null, error: { message: `relation "public.${table}" does not exist` } })
+        : resolve({ data: rows, error: null }),
   };
   return builder;
 }
@@ -182,6 +191,15 @@ beforeEach(() => {
     user_ad_actions: [SAVED_ACTION_A, SAVED_ACTION_B],
   };
   __clearIntelligenceSearchCacheForTests();
+  FAILING_TABLES = new Set();
+});
+
+describe("authenticatePrivateApiClient — falha de forma segura antes da migration/configuração existir", () => {
+  it("se a tabela private_api_clients ainda não existir (migration não aplicada), nunca autentica — nunca lança, nunca expõe dado", async () => {
+    FAILING_TABLES = new Set(["private_api_clients"]);
+    const client = await authenticatePrivateApiClient("Bearer secret-a");
+    expect(client).toBeNull();
+  });
 });
 
 describe("authenticatePrivateApiClient — identidade resolvida só pelo secret, nunca por um id enviado pelo cliente", () => {
