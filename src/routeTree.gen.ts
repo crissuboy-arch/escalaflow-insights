@@ -9,263 +9,75 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as StorybookShareTokenRouteImport } from './routes/storybook-share.$token'
-import { Route as StorySlugRouteImport } from './routes/story.$slug'
-import { Route as ApiScrapeOfferRouteImport } from './routes/api/scrape-offer'
-import { Route as ApiIngestRouteImport } from './routes/api/ingest'
-import { Route as ApiExecuteSkillRouteImport } from './routes/api/execute-skill'
-import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
-import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
-import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
-import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
-import { Route as AuthenticatedRadarProdutosRouteImport } from './routes/_authenticated/radar-produtos'
-import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
-import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
-import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenticated/pagina-venda'
-import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
-import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
-import { Route as AuthenticatedMotorAfiliadosSeoRouteImport } from './routes/_authenticated/motor-afiliados-seo'
-import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
-import { Route as AuthenticatedMineradorPublicoRouteImport } from './routes/_authenticated/minerador-publico'
-import { Route as AuthenticatedLivroTemplateMestreRouteImport } from './routes/_authenticated/livro-template-mestre'
-import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
-import { Route as AuthenticatedLaunchAnalyzerRouteImport } from './routes/_authenticated/launch-analyzer'
-import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
-import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
-import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
-import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
-import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
-import { Route as AuthenticatedEbookStudioRouteImport } from './routes/_authenticated/ebook-studio'
-import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authenticated/ebook-forge'
-import { Route as AuthenticatedDinheiroRapidoRouteImport } from './routes/_authenticated/dinheiro-rapido'
-import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
-import { Route as AuthenticatedCopyRouteImport } from './routes/_authenticated/copy'
-import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
-import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated/checkout'
-import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedAnaliseIaRouteImport } from './routes/_authenticated/analise-ia'
-import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
-import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
-import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
-import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
-import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
-import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
-import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
+import { Route as AuthenticatedCentralMineracaoRouteImport } from './routes/_authenticated/central-mineracao'
+import { Route as AuthenticatedCheckoutRouteImport } from './routes/_authenticated/checkout'
+import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
+import { Route as AuthenticatedCopyRouteImport } from './routes/_authenticated/copy'
+import { Route as AuthenticatedCriativosRouteImport } from './routes/_authenticated/criativos'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
+import { Route as AuthenticatedDinheiroRapidoRouteImport } from './routes/_authenticated/dinheiro-rapido'
+import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authenticated/ebook-forge'
+import { Route as AuthenticatedEbookStudioRouteImport } from './routes/_authenticated/ebook-studio'
+import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
+import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
+import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
+import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
+import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
+import { Route as AuthenticatedLaunchAnalyzerRouteImport } from './routes/_authenticated/launch-analyzer'
+import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenticated/link-externo'
+import { Route as AuthenticatedLivroTemplateMestreRouteImport } from './routes/_authenticated/livro-template-mestre'
+import { Route as AuthenticatedMineradorPublicoRouteImport } from './routes/_authenticated/minerador-publico'
+import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedMotorAfiliadosSeoRouteImport } from './routes/_authenticated/motor-afiliados-seo'
+import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
+import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
+import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenticated/pagina-venda'
+import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
+import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
+import { Route as AuthenticatedRadarProdutosRouteImport } from './routes/_authenticated/radar-produtos'
+import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
+import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
+import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
+import { Route as AuthenticatedYoutubeRadarRouteImport } from './routes/_authenticated/youtube-radar'
+import { Route as ApiExecuteSkillRouteImport } from './routes/api/execute-skill'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiScrapeOfferRouteImport } from './routes/api/scrape-offer'
+import { Route as StorySlugRouteImport } from './routes/story.$slug'
+import { Route as StorybookShareTokenRouteImport } from './routes/storybook-share.$token'
 import { Route as AuthenticatedLaunchAnalyzerIdRouteImport } from './routes/_authenticated/launch-analyzer.$id'
-import { Route as ApiIntegrationsMiningRunRouteImport } from './routes/api/integrations.mining.run'
-import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
+import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
+import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
+import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authenticated/produtos.ebook'
+import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
+import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
+import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
 import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
+import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
+import { Route as ApiIntegrationsMiningRunRouteImport } from './routes/api/integrations.mining.run'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StorybookShareTokenRoute = StorybookShareTokenRouteImport.update({
-  id: '/storybook-share/$token',
-  path: '/storybook-share/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const StorySlugRoute = StorySlugRouteImport.update({
-  id: '/story/$slug',
-  path: '/story/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiScrapeOfferRoute = ApiScrapeOfferRouteImport.update({
-  id: '/api/scrape-offer',
-  path: '/api/scrape-offer',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiIngestRoute = ApiIngestRouteImport.update({
-  id: '/api/ingest',
-  path: '/api/ingest',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiExecuteSkillRoute = ApiExecuteSkillRouteImport.update({
-  id: '/api/execute-skill',
-  path: '/api/execute-skill',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedYoutubeRadarRoute =
-  AuthenticatedYoutubeRadarRouteImport.update({
-    id: '/youtube-radar',
-    path: '/youtube-radar',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedTiktokRadarRoute =
-  AuthenticatedTiktokRadarRouteImport.update({
-    id: '/tiktok-radar',
-    path: '/tiktok-radar',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedStrategicAiRoute =
-  AuthenticatedStrategicAiRouteImport.update({
-    id: '/strategic-ai',
-    path: '/strategic-ai',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
-  id: '/storybook',
-  path: '/storybook',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedRadarProdutosRoute =
-  AuthenticatedRadarProdutosRouteImport.update({
-    id: '/radar-produtos',
-    path: '/radar-produtos',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
-  id: '/radar',
-  path: '/radar',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedProjetosRoute = AuthenticatedProjetosRouteImport.update({
-  id: '/projetos',
-  path: '/projetos',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedPaginaVendaRoute =
-  AuthenticatedPaginaVendaRouteImport.update({
-    id: '/pagina-venda',
-    path: '/pagina-venda',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedOfertasSalvasRoute =
-  AuthenticatedOfertasSalvasRouteImport.update({
-    id: '/ofertas-salvas',
-    path: '/ofertas-salvas',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedOfertasEscaladasRoute =
-  AuthenticatedOfertasEscaladasRouteImport.update({
-    id: '/ofertas-escaladas',
-    path: '/ofertas-escaladas',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMotorAfiliadosSeoRoute =
-  AuthenticatedMotorAfiliadosSeoRouteImport.update({
-    id: '/motor-afiliados-seo',
-    path: '/motor-afiliados-seo',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
-  id: '/minerar',
-  path: '/minerar',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedMineradorPublicoRoute =
-  AuthenticatedMineradorPublicoRouteImport.update({
-    id: '/minerador-publico',
-    path: '/minerador-publico',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedLivroTemplateMestreRoute =
-  AuthenticatedLivroTemplateMestreRouteImport.update({
-    id: '/livro-template-mestre',
-    path: '/livro-template-mestre',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedLinkExternoRoute =
-  AuthenticatedLinkExternoRouteImport.update({
-    id: '/link-externo',
-    path: '/link-externo',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedLaunchAnalyzerRoute =
-  AuthenticatedLaunchAnalyzerRouteImport.update({
-    id: '/launch-analyzer',
-    path: '/launch-analyzer',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedInstagramRadarRoute =
-  AuthenticatedInstagramRadarRouteImport.update({
-    id: '/instagram-radar',
-    path: '/instagram-radar',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedImportarAnuncioRoute =
-  AuthenticatedImportarAnuncioRouteImport.update({
-    id: '/importar-anuncio',
-    path: '/importar-anuncio',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedGoogleRadarRoute =
-  AuthenticatedGoogleRadarRouteImport.update({
-    id: '/google-radar',
-    path: '/google-radar',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
-  id: '/favoritos',
-  path: '/favoritos',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
-  id: '/escala',
-  path: '/escala',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedEbookStudioRoute =
-  AuthenticatedEbookStudioRouteImport.update({
-    id: '/ebook-studio',
-    path: '/ebook-studio',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedEbookForgeRoute = AuthenticatedEbookForgeRouteImport.update({
-  id: '/ebook-forge',
-  path: '/ebook-forge',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDinheiroRapidoRoute =
-  AuthenticatedDinheiroRapidoRouteImport.update({
-    id: '/dinheiro-rapido',
-    path: '/dinheiro-rapido',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
-  id: '/database',
-  path: '/database',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCriativosRoute = AuthenticatedCriativosRouteImport.update({
-  id: '/criativos',
-  path: '/criativos',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedCopyRoute = AuthenticatedCopyRouteImport.update({
-  id: '/copy',
-  path: '/copy',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedConfiguracoesRoute =
-  AuthenticatedConfiguracoesRouteImport.update({
-    id: '/configuracoes',
-    path: '/configuracoes',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
-  id: '/checkout',
-  path: '/checkout',
+const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
+  id: '/analise-ia',
+  path: '/analise-ia',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedCentralMineracaoRoute =
@@ -274,31 +86,215 @@ const AuthenticatedCentralMineracaoRoute =
     path: '/central-mineracao',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAnaliseIaRoute = AuthenticatedAnaliseIaRouteImport.update({
-  id: '/analise-ia',
-  path: '/analise-ia',
+const AuthenticatedCheckoutRoute = AuthenticatedCheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const ApiCronPublicarArtigosRoute = ApiCronPublicarArtigosRouteImport.update({
-  id: '/api/cron/publicar-artigos',
-  path: '/api/cron/publicar-artigos',
+const AuthenticatedConfiguracoesRoute =
+  AuthenticatedConfiguracoesRouteImport.update({
+    id: '/configuracoes',
+    path: '/configuracoes',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedCopyRoute = AuthenticatedCopyRouteImport.update({
+  id: '/copy',
+  path: '/copy',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedCriativosRoute = AuthenticatedCriativosRouteImport.update({
+  id: '/criativos',
+  path: '/criativos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
+  id: '/database',
+  path: '/database',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedDinheiroRapidoRoute =
+  AuthenticatedDinheiroRapidoRouteImport.update({
+    id: '/dinheiro-rapido',
+    path: '/dinheiro-rapido',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEbookForgeRoute = AuthenticatedEbookForgeRouteImport.update({
+  id: '/ebook-forge',
+  path: '/ebook-forge',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedEbookStudioRoute =
+  AuthenticatedEbookStudioRouteImport.update({
+    id: '/ebook-studio',
+    path: '/ebook-studio',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
+  id: '/escala',
+  path: '/escala',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
+  id: '/favoritos',
+  path: '/favoritos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedGoogleRadarRoute =
+  AuthenticatedGoogleRadarRouteImport.update({
+    id: '/google-radar',
+    path: '/google-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedImportarAnuncioRoute =
+  AuthenticatedImportarAnuncioRouteImport.update({
+    id: '/importar-anuncio',
+    path: '/importar-anuncio',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedInstagramRadarRoute =
+  AuthenticatedInstagramRadarRouteImport.update({
+    id: '/instagram-radar',
+    path: '/instagram-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedLaunchAnalyzerRoute =
+  AuthenticatedLaunchAnalyzerRouteImport.update({
+    id: '/launch-analyzer',
+    path: '/launch-analyzer',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedLinkExternoRoute =
+  AuthenticatedLinkExternoRouteImport.update({
+    id: '/link-externo',
+    path: '/link-externo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedLivroTemplateMestreRoute =
+  AuthenticatedLivroTemplateMestreRouteImport.update({
+    id: '/livro-template-mestre',
+    path: '/livro-template-mestre',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMineradorPublicoRoute =
+  AuthenticatedMineradorPublicoRouteImport.update({
+    id: '/minerador-publico',
+    path: '/minerador-publico',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
+  id: '/minerar',
+  path: '/minerar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMotorAfiliadosSeoRoute =
+  AuthenticatedMotorAfiliadosSeoRouteImport.update({
+    id: '/motor-afiliados-seo',
+    path: '/motor-afiliados-seo',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOfertasEscaladasRoute =
+  AuthenticatedOfertasEscaladasRouteImport.update({
+    id: '/ofertas-escaladas',
+    path: '/ofertas-escaladas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOfertasSalvasRoute =
+  AuthenticatedOfertasSalvasRouteImport.update({
+    id: '/ofertas-salvas',
+    path: '/ofertas-salvas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedPaginaVendaRoute =
+  AuthenticatedPaginaVendaRouteImport.update({
+    id: '/pagina-venda',
+    path: '/pagina-venda',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedProjetosRoute = AuthenticatedProjetosRouteImport.update({
+  id: '/projetos',
+  path: '/projetos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRadarRoute = AuthenticatedRadarRouteImport.update({
+  id: '/radar',
+  path: '/radar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRadarProdutosRoute =
+  AuthenticatedRadarProdutosRouteImport.update({
+    id: '/radar-produtos',
+    path: '/radar-produtos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
+  id: '/storybook',
+  path: '/storybook',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedStrategicAiRoute =
+  AuthenticatedStrategicAiRouteImport.update({
+    id: '/strategic-ai',
+    path: '/strategic-ai',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTiktokRadarRoute =
+  AuthenticatedTiktokRadarRouteImport.update({
+    id: '/tiktok-radar',
+    path: '/tiktok-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedYoutubeRadarRoute =
+  AuthenticatedYoutubeRadarRouteImport.update({
+    id: '/youtube-radar',
+    path: '/youtube-radar',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const ApiExecuteSkillRoute = ApiExecuteSkillRouteImport.update({
+  id: '/api/execute-skill',
+  path: '/api/execute-skill',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
-  id: '/api/collector/run',
-  path: '/api/collector/run',
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedStorybookIdRoute =
-  AuthenticatedStorybookIdRouteImport.update({
+const ApiScrapeOfferRoute = ApiScrapeOfferRouteImport.update({
+  id: '/api/scrape-offer',
+  path: '/api/scrape-offer',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StorySlugRoute = StorySlugRouteImport.update({
+  id: '/story/$slug',
+  path: '/story/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StorybookShareTokenRoute = StorybookShareTokenRouteImport.update({
+  id: '/storybook-share/$token',
+  path: '/storybook-share/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedLaunchAnalyzerIdRoute =
+  AuthenticatedLaunchAnalyzerIdRouteImport.update({
     id: '/$id',
     path: '/$id',
-    getParentRoute: () => AuthenticatedStorybookRoute,
+    getParentRoute: () => AuthenticatedLaunchAnalyzerRoute,
   } as any)
-const AuthenticatedProjetosIdRoute = AuthenticatedProjetosIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedProjetosRoute,
+const AuthenticatedMotorAfiliadosSeoIdRoute =
+  AuthenticatedMotorAfiliadosSeoIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedMotorAfiliadosSeoRoute,
+  } as any)
+const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
+  id: '/oferta/$id',
+  path: '/oferta/$id',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProdutosEbookRoute =
   AuthenticatedProdutosEbookRouteImport.update({
@@ -306,28 +302,32 @@ const AuthenticatedProdutosEbookRoute =
     path: '/produtos/ebook',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedOfertaIdRoute = AuthenticatedOfertaIdRouteImport.update({
-  id: '/oferta/$id',
-  path: '/oferta/$id',
-  getParentRoute: () => AuthenticatedRoute,
+const AuthenticatedProjetosIdRoute = AuthenticatedProjetosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedProjetosRoute,
 } as any)
-const AuthenticatedMotorAfiliadosSeoIdRoute =
-  AuthenticatedMotorAfiliadosSeoIdRouteImport.update({
+const AuthenticatedStorybookIdRoute =
+  AuthenticatedStorybookIdRouteImport.update({
     id: '/$id',
     path: '/$id',
-    getParentRoute: () => AuthenticatedMotorAfiliadosSeoRoute,
+    getParentRoute: () => AuthenticatedStorybookRoute,
   } as any)
-const AuthenticatedLaunchAnalyzerIdRoute =
-  AuthenticatedLaunchAnalyzerIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => AuthenticatedLaunchAnalyzerRoute,
-  } as any)
-const ApiIntegrationsMiningRunRoute =
-  ApiIntegrationsMiningRunRouteImport.update({
-    id: '/api/integrations/mining/run',
-    path: '/api/integrations/mining/run',
-    getParentRoute: () => rootRouteImport,
+const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
+  id: '/api/collector/run',
+  path: '/api/collector/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronPublicarArtigosRoute = ApiCronPublicarArtigosRouteImport.update({
+  id: '/api/cron/publicar-artigos',
+  path: '/api/cron/publicar-artigos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedProjetosHandoffHandoffIdRoute =
+  AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
+    id: '/handoff/$handoffId',
+    path: '/handoff/$handoffId',
+    getParentRoute: () => AuthenticatedProjetosRoute,
   } as any)
 const ApiIntegrationsIntelligenceRunRoute =
   ApiIntegrationsIntelligenceRunRouteImport.update({
@@ -335,11 +335,11 @@ const ApiIntegrationsIntelligenceRunRoute =
     path: '/api/integrations/intelligence/run',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedProjetosHandoffHandoffIdRoute =
-  AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
-    id: '/handoff/$handoffId',
-    path: '/handoff/$handoffId',
-    getParentRoute: () => AuthenticatedProjetosRoute,
+const ApiIntegrationsMiningRunRoute =
+  ApiIntegrationsMiningRunRouteImport.update({
+    id: '/api/integrations/mining/run',
+    path: '/api/integrations/mining/run',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -677,11 +677,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -691,256 +691,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/storybook-share/$token': {
-      id: '/storybook-share/$token'
-      path: '/storybook-share/$token'
-      fullPath: '/storybook-share/$token'
-      preLoaderRoute: typeof StorybookShareTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/story/$slug': {
-      id: '/story/$slug'
-      path: '/story/$slug'
-      fullPath: '/story/$slug'
-      preLoaderRoute: typeof StorySlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/scrape-offer': {
-      id: '/api/scrape-offer'
-      path: '/api/scrape-offer'
-      fullPath: '/api/scrape-offer'
-      preLoaderRoute: typeof ApiScrapeOfferRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/ingest': {
-      id: '/api/ingest'
-      path: '/api/ingest'
-      fullPath: '/api/ingest'
-      preLoaderRoute: typeof ApiIngestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/execute-skill': {
-      id: '/api/execute-skill'
-      path: '/api/execute-skill'
-      fullPath: '/api/execute-skill'
-      preLoaderRoute: typeof ApiExecuteSkillRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/youtube-radar': {
-      id: '/_authenticated/youtube-radar'
-      path: '/youtube-radar'
-      fullPath: '/youtube-radar'
-      preLoaderRoute: typeof AuthenticatedYoutubeRadarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/tiktok-radar': {
-      id: '/_authenticated/tiktok-radar'
-      path: '/tiktok-radar'
-      fullPath: '/tiktok-radar'
-      preLoaderRoute: typeof AuthenticatedTiktokRadarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/strategic-ai': {
-      id: '/_authenticated/strategic-ai'
-      path: '/strategic-ai'
-      fullPath: '/strategic-ai'
-      preLoaderRoute: typeof AuthenticatedStrategicAiRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/storybook': {
-      id: '/_authenticated/storybook'
-      path: '/storybook'
-      fullPath: '/storybook'
-      preLoaderRoute: typeof AuthenticatedStorybookRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/radar-produtos': {
-      id: '/_authenticated/radar-produtos'
-      path: '/radar-produtos'
-      fullPath: '/radar-produtos'
-      preLoaderRoute: typeof AuthenticatedRadarProdutosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/radar': {
-      id: '/_authenticated/radar'
-      path: '/radar'
-      fullPath: '/radar'
-      preLoaderRoute: typeof AuthenticatedRadarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/projetos': {
-      id: '/_authenticated/projetos'
-      path: '/projetos'
-      fullPath: '/projetos'
-      preLoaderRoute: typeof AuthenticatedProjetosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/pagina-venda': {
-      id: '/_authenticated/pagina-venda'
-      path: '/pagina-venda'
-      fullPath: '/pagina-venda'
-      preLoaderRoute: typeof AuthenticatedPaginaVendaRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ofertas-salvas': {
-      id: '/_authenticated/ofertas-salvas'
-      path: '/ofertas-salvas'
-      fullPath: '/ofertas-salvas'
-      preLoaderRoute: typeof AuthenticatedOfertasSalvasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ofertas-escaladas': {
-      id: '/_authenticated/ofertas-escaladas'
-      path: '/ofertas-escaladas'
-      fullPath: '/ofertas-escaladas'
-      preLoaderRoute: typeof AuthenticatedOfertasEscaladasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/motor-afiliados-seo': {
-      id: '/_authenticated/motor-afiliados-seo'
-      path: '/motor-afiliados-seo'
-      fullPath: '/motor-afiliados-seo'
-      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/minerar': {
-      id: '/_authenticated/minerar'
-      path: '/minerar'
-      fullPath: '/minerar'
-      preLoaderRoute: typeof AuthenticatedMinerarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/minerador-publico': {
-      id: '/_authenticated/minerador-publico'
-      path: '/minerador-publico'
-      fullPath: '/minerador-publico'
-      preLoaderRoute: typeof AuthenticatedMineradorPublicoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/livro-template-mestre': {
-      id: '/_authenticated/livro-template-mestre'
-      path: '/livro-template-mestre'
-      fullPath: '/livro-template-mestre'
-      preLoaderRoute: typeof AuthenticatedLivroTemplateMestreRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/link-externo': {
-      id: '/_authenticated/link-externo'
-      path: '/link-externo'
-      fullPath: '/link-externo'
-      preLoaderRoute: typeof AuthenticatedLinkExternoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/launch-analyzer': {
-      id: '/_authenticated/launch-analyzer'
-      path: '/launch-analyzer'
-      fullPath: '/launch-analyzer'
-      preLoaderRoute: typeof AuthenticatedLaunchAnalyzerRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/instagram-radar': {
-      id: '/_authenticated/instagram-radar'
-      path: '/instagram-radar'
-      fullPath: '/instagram-radar'
-      preLoaderRoute: typeof AuthenticatedInstagramRadarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/importar-anuncio': {
-      id: '/_authenticated/importar-anuncio'
-      path: '/importar-anuncio'
-      fullPath: '/importar-anuncio'
-      preLoaderRoute: typeof AuthenticatedImportarAnuncioRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/google-radar': {
-      id: '/_authenticated/google-radar'
-      path: '/google-radar'
-      fullPath: '/google-radar'
-      preLoaderRoute: typeof AuthenticatedGoogleRadarRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/favoritos': {
-      id: '/_authenticated/favoritos'
-      path: '/favoritos'
-      fullPath: '/favoritos'
-      preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/escala': {
-      id: '/_authenticated/escala'
-      path: '/escala'
-      fullPath: '/escala'
-      preLoaderRoute: typeof AuthenticatedEscalaRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ebook-studio': {
-      id: '/_authenticated/ebook-studio'
-      path: '/ebook-studio'
-      fullPath: '/ebook-studio'
-      preLoaderRoute: typeof AuthenticatedEbookStudioRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/ebook-forge': {
-      id: '/_authenticated/ebook-forge'
-      path: '/ebook-forge'
-      fullPath: '/ebook-forge'
-      preLoaderRoute: typeof AuthenticatedEbookForgeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dinheiro-rapido': {
-      id: '/_authenticated/dinheiro-rapido'
-      path: '/dinheiro-rapido'
-      fullPath: '/dinheiro-rapido'
-      preLoaderRoute: typeof AuthenticatedDinheiroRapidoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/database': {
-      id: '/_authenticated/database'
-      path: '/database'
-      fullPath: '/database'
-      preLoaderRoute: typeof AuthenticatedDatabaseRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/criativos': {
-      id: '/_authenticated/criativos'
-      path: '/criativos'
-      fullPath: '/criativos'
-      preLoaderRoute: typeof AuthenticatedCriativosRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/copy': {
-      id: '/_authenticated/copy'
-      path: '/copy'
-      fullPath: '/copy'
-      preLoaderRoute: typeof AuthenticatedCopyRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/configuracoes': {
-      id: '/_authenticated/configuracoes'
-      path: '/configuracoes'
-      fullPath: '/configuracoes'
-      preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/checkout': {
-      id: '/_authenticated/checkout'
-      path: '/checkout'
-      fullPath: '/checkout'
-      preLoaderRoute: typeof AuthenticatedCheckoutRouteImport
+    '/_authenticated/analise-ia': {
+      id: '/_authenticated/analise-ia'
+      path: '/analise-ia'
+      fullPath: '/analise-ia'
+      preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/central-mineracao': {
@@ -950,61 +712,250 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCentralMineracaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/analise-ia': {
-      id: '/_authenticated/analise-ia'
-      path: '/analise-ia'
-      fullPath: '/analise-ia'
-      preLoaderRoute: typeof AuthenticatedAnaliseIaRouteImport
+    '/_authenticated/checkout': {
+      id: '/_authenticated/checkout'
+      path: '/checkout'
+      fullPath: '/checkout'
+      preLoaderRoute: typeof AuthenticatedCheckoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/api/cron/publicar-artigos': {
-      id: '/api/cron/publicar-artigos'
-      path: '/api/cron/publicar-artigos'
-      fullPath: '/api/cron/publicar-artigos'
-      preLoaderRoute: typeof ApiCronPublicarArtigosRouteImport
+    '/_authenticated/configuracoes': {
+      id: '/_authenticated/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof AuthenticatedConfiguracoesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/copy': {
+      id: '/_authenticated/copy'
+      path: '/copy'
+      fullPath: '/copy'
+      preLoaderRoute: typeof AuthenticatedCopyRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/criativos': {
+      id: '/_authenticated/criativos'
+      path: '/criativos'
+      fullPath: '/criativos'
+      preLoaderRoute: typeof AuthenticatedCriativosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/database': {
+      id: '/_authenticated/database'
+      path: '/database'
+      fullPath: '/database'
+      preLoaderRoute: typeof AuthenticatedDatabaseRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/dinheiro-rapido': {
+      id: '/_authenticated/dinheiro-rapido'
+      path: '/dinheiro-rapido'
+      fullPath: '/dinheiro-rapido'
+      preLoaderRoute: typeof AuthenticatedDinheiroRapidoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ebook-forge': {
+      id: '/_authenticated/ebook-forge'
+      path: '/ebook-forge'
+      fullPath: '/ebook-forge'
+      preLoaderRoute: typeof AuthenticatedEbookForgeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ebook-studio': {
+      id: '/_authenticated/ebook-studio'
+      path: '/ebook-studio'
+      fullPath: '/ebook-studio'
+      preLoaderRoute: typeof AuthenticatedEbookStudioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/escala': {
+      id: '/_authenticated/escala'
+      path: '/escala'
+      fullPath: '/escala'
+      preLoaderRoute: typeof AuthenticatedEscalaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/favoritos': {
+      id: '/_authenticated/favoritos'
+      path: '/favoritos'
+      fullPath: '/favoritos'
+      preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/google-radar': {
+      id: '/_authenticated/google-radar'
+      path: '/google-radar'
+      fullPath: '/google-radar'
+      preLoaderRoute: typeof AuthenticatedGoogleRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/importar-anuncio': {
+      id: '/_authenticated/importar-anuncio'
+      path: '/importar-anuncio'
+      fullPath: '/importar-anuncio'
+      preLoaderRoute: typeof AuthenticatedImportarAnuncioRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/instagram-radar': {
+      id: '/_authenticated/instagram-radar'
+      path: '/instagram-radar'
+      fullPath: '/instagram-radar'
+      preLoaderRoute: typeof AuthenticatedInstagramRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/launch-analyzer': {
+      id: '/_authenticated/launch-analyzer'
+      path: '/launch-analyzer'
+      fullPath: '/launch-analyzer'
+      preLoaderRoute: typeof AuthenticatedLaunchAnalyzerRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/link-externo': {
+      id: '/_authenticated/link-externo'
+      path: '/link-externo'
+      fullPath: '/link-externo'
+      preLoaderRoute: typeof AuthenticatedLinkExternoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/livro-template-mestre': {
+      id: '/_authenticated/livro-template-mestre'
+      path: '/livro-template-mestre'
+      fullPath: '/livro-template-mestre'
+      preLoaderRoute: typeof AuthenticatedLivroTemplateMestreRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/minerador-publico': {
+      id: '/_authenticated/minerador-publico'
+      path: '/minerador-publico'
+      fullPath: '/minerador-publico'
+      preLoaderRoute: typeof AuthenticatedMineradorPublicoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/minerar': {
+      id: '/_authenticated/minerar'
+      path: '/minerar'
+      fullPath: '/minerar'
+      preLoaderRoute: typeof AuthenticatedMinerarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/motor-afiliados-seo': {
+      id: '/_authenticated/motor-afiliados-seo'
+      path: '/motor-afiliados-seo'
+      fullPath: '/motor-afiliados-seo'
+      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ofertas-escaladas': {
+      id: '/_authenticated/ofertas-escaladas'
+      path: '/ofertas-escaladas'
+      fullPath: '/ofertas-escaladas'
+      preLoaderRoute: typeof AuthenticatedOfertasEscaladasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ofertas-salvas': {
+      id: '/_authenticated/ofertas-salvas'
+      path: '/ofertas-salvas'
+      fullPath: '/ofertas-salvas'
+      preLoaderRoute: typeof AuthenticatedOfertasSalvasRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/pagina-venda': {
+      id: '/_authenticated/pagina-venda'
+      path: '/pagina-venda'
+      fullPath: '/pagina-venda'
+      preLoaderRoute: typeof AuthenticatedPaginaVendaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/projetos': {
+      id: '/_authenticated/projetos'
+      path: '/projetos'
+      fullPath: '/projetos'
+      preLoaderRoute: typeof AuthenticatedProjetosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/radar': {
+      id: '/_authenticated/radar'
+      path: '/radar'
+      fullPath: '/radar'
+      preLoaderRoute: typeof AuthenticatedRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/radar-produtos': {
+      id: '/_authenticated/radar-produtos'
+      path: '/radar-produtos'
+      fullPath: '/radar-produtos'
+      preLoaderRoute: typeof AuthenticatedRadarProdutosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/storybook': {
+      id: '/_authenticated/storybook'
+      path: '/storybook'
+      fullPath: '/storybook'
+      preLoaderRoute: typeof AuthenticatedStorybookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/strategic-ai': {
+      id: '/_authenticated/strategic-ai'
+      path: '/strategic-ai'
+      fullPath: '/strategic-ai'
+      preLoaderRoute: typeof AuthenticatedStrategicAiRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tiktok-radar': {
+      id: '/_authenticated/tiktok-radar'
+      path: '/tiktok-radar'
+      fullPath: '/tiktok-radar'
+      preLoaderRoute: typeof AuthenticatedTiktokRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/youtube-radar': {
+      id: '/_authenticated/youtube-radar'
+      path: '/youtube-radar'
+      fullPath: '/youtube-radar'
+      preLoaderRoute: typeof AuthenticatedYoutubeRadarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/api/execute-skill': {
+      id: '/api/execute-skill'
+      path: '/api/execute-skill'
+      fullPath: '/api/execute-skill'
+      preLoaderRoute: typeof ApiExecuteSkillRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/collector/run': {
-      id: '/api/collector/run'
-      path: '/api/collector/run'
-      fullPath: '/api/collector/run'
-      preLoaderRoute: typeof ApiCollectorRunRouteImport
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/storybook/$id': {
-      id: '/_authenticated/storybook/$id'
-      path: '/$id'
-      fullPath: '/storybook/$id'
-      preLoaderRoute: typeof AuthenticatedStorybookIdRouteImport
-      parentRoute: typeof AuthenticatedStorybookRoute
+    '/api/scrape-offer': {
+      id: '/api/scrape-offer'
+      path: '/api/scrape-offer'
+      fullPath: '/api/scrape-offer'
+      preLoaderRoute: typeof ApiScrapeOfferRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/projetos/$id': {
-      id: '/_authenticated/projetos/$id'
-      path: '/$id'
-      fullPath: '/projetos/$id'
-      preLoaderRoute: typeof AuthenticatedProjetosIdRouteImport
-      parentRoute: typeof AuthenticatedProjetosRoute
+    '/story/$slug': {
+      id: '/story/$slug'
+      path: '/story/$slug'
+      fullPath: '/story/$slug'
+      preLoaderRoute: typeof StorySlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/produtos/ebook': {
-      id: '/_authenticated/produtos/ebook'
-      path: '/produtos/ebook'
-      fullPath: '/produtos/ebook'
-      preLoaderRoute: typeof AuthenticatedProdutosEbookRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/oferta/$id': {
-      id: '/_authenticated/oferta/$id'
-      path: '/oferta/$id'
-      fullPath: '/oferta/$id'
-      preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/motor-afiliados-seo/$id': {
-      id: '/_authenticated/motor-afiliados-seo/$id'
-      path: '/$id'
-      fullPath: '/motor-afiliados-seo/$id'
-      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoIdRouteImport
-      parentRoute: typeof AuthenticatedMotorAfiliadosSeoRoute
+    '/storybook-share/$token': {
+      id: '/storybook-share/$token'
+      path: '/storybook-share/$token'
+      fullPath: '/storybook-share/$token'
+      preLoaderRoute: typeof StorybookShareTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/launch-analyzer/$id': {
       id: '/_authenticated/launch-analyzer/$id'
@@ -1013,18 +964,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLaunchAnalyzerIdRouteImport
       parentRoute: typeof AuthenticatedLaunchAnalyzerRoute
     }
-    '/api/integrations/mining/run': {
-      id: '/api/integrations/mining/run'
-      path: '/api/integrations/mining/run'
-      fullPath: '/api/integrations/mining/run'
-      preLoaderRoute: typeof ApiIntegrationsMiningRunRouteImport
+    '/_authenticated/motor-afiliados-seo/$id': {
+      id: '/_authenticated/motor-afiliados-seo/$id'
+      path: '/$id'
+      fullPath: '/motor-afiliados-seo/$id'
+      preLoaderRoute: typeof AuthenticatedMotorAfiliadosSeoIdRouteImport
+      parentRoute: typeof AuthenticatedMotorAfiliadosSeoRoute
+    }
+    '/_authenticated/oferta/$id': {
+      id: '/_authenticated/oferta/$id'
+      path: '/oferta/$id'
+      fullPath: '/oferta/$id'
+      preLoaderRoute: typeof AuthenticatedOfertaIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/produtos/ebook': {
+      id: '/_authenticated/produtos/ebook'
+      path: '/produtos/ebook'
+      fullPath: '/produtos/ebook'
+      preLoaderRoute: typeof AuthenticatedProdutosEbookRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/projetos/$id': {
+      id: '/_authenticated/projetos/$id'
+      path: '/$id'
+      fullPath: '/projetos/$id'
+      preLoaderRoute: typeof AuthenticatedProjetosIdRouteImport
+      parentRoute: typeof AuthenticatedProjetosRoute
+    }
+    '/_authenticated/storybook/$id': {
+      id: '/_authenticated/storybook/$id'
+      path: '/$id'
+      fullPath: '/storybook/$id'
+      preLoaderRoute: typeof AuthenticatedStorybookIdRouteImport
+      parentRoute: typeof AuthenticatedStorybookRoute
+    }
+    '/api/collector/run': {
+      id: '/api/collector/run'
+      path: '/api/collector/run'
+      fullPath: '/api/collector/run'
+      preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/integrations/intelligence/run': {
-      id: '/api/integrations/intelligence/run'
-      path: '/api/integrations/intelligence/run'
-      fullPath: '/api/integrations/intelligence/run'
-      preLoaderRoute: typeof ApiIntegrationsIntelligenceRunRouteImport
+    '/api/cron/publicar-artigos': {
+      id: '/api/cron/publicar-artigos'
+      path: '/api/cron/publicar-artigos'
+      fullPath: '/api/cron/publicar-artigos'
+      preLoaderRoute: typeof ApiCronPublicarArtigosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/projetos/handoff/$handoffId': {
@@ -1033,6 +1019,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/projetos/handoff/$handoffId'
       preLoaderRoute: typeof AuthenticatedProjetosHandoffHandoffIdRouteImport
       parentRoute: typeof AuthenticatedProjetosRoute
+    }
+    '/api/integrations/intelligence/run': {
+      id: '/api/integrations/intelligence/run'
+      path: '/api/integrations/intelligence/run'
+      fullPath: '/api/integrations/intelligence/run'
+      preLoaderRoute: typeof ApiIntegrationsIntelligenceRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/mining/run': {
+      id: '/api/integrations/mining/run'
+      path: '/api/integrations/mining/run'
+      fullPath: '/api/integrations/mining/run'
+      preLoaderRoute: typeof ApiIntegrationsMiningRunRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

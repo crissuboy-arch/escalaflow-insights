@@ -18,7 +18,9 @@ import { openAdLink } from "@/lib/external";
 export const Route = createFileRoute("/_authenticated/radar")({
   component: RadarPage,
   errorComponent: ({ error }) => (
-    <div className="p-8 text-sm text-muted-foreground">Falha ao carregar Radar: {error.message}</div>
+    <div className="p-8 text-sm text-muted-foreground">
+      Falha ao carregar Radar: {error instanceof Error ? error.message : String(error)}
+    </div>
   ),
   notFoundComponent: () => <div className="p-8 text-sm">Página não encontrada</div>,
 });
