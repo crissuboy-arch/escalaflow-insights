@@ -50,6 +50,7 @@ Resposta `200` (exemplo):
   },
   "mining": { "runs_total": 45, "completed_total": 43 },
   "campaigns": { "total": 12 },
+  "db_status": { "ok": true, "error_code": null, "failed_tables": [] },
   "subscriptions": null,
   "ai_usage": null,
   "unavailable": ["subscriptions", "ai_usage"],
@@ -75,6 +76,13 @@ Regras dos dados:
   (não existem tabelas correspondentes — nunca inventados).
 - **Zero PII**: nenhum id de usuário, email, nome de anunciante,
   conteúdo de análise ou segredo sai neste payload.
+- **`db_status`**: `{ "ok": bool, "error_code": code|null, "failed_tables": [...] }`.
+  Quando `ok` é `false`, os indicadores `null` **não** são dados válidos —
+  o banco falhou. Códigos seguros (sem detalhes internos):
+  `missing_env`, `dns_error`, `timeout`, `connection_error`,
+  `auth_failed`, `table_missing`, `permission_denied`, `unknown`.
+  Cada consulta tem teto de 8s (`ATHENA_QUERY_TIMEOUT_MS`) para o endpoint
+  degradar rápido em vez de travar ~40s.
 
 Erros:
 
@@ -88,8 +96,8 @@ Erros:
 
 | Arquivo | Papel |
 | ------- | ----- |
-| `src/lib/integrations/athena.ts` | Lógica pura: auth timing-safe + coleta de agregados (testável) |
-| `src/lib/integrations/athena.test.ts` | 13 testes (vitest): auth, contagens, demos, falhas, PII |
+| `src/lib/integrations/athena.ts` | Lógica pura: auth timing-safe + agregados + diagnóstico seguro do banco (testável) |
+| `src/lib/integrations/athena.test.ts` | 19 testes (vitest): auth, contagens, demos, falhas, PII, códigos de erro, timeout, db_status |
 | `src/routes/api/integrations.health.ts` | Rota `GET /api/integrations/health` (adaptador fino) |
 | `src/routes/api/integrations.stats.ts` | Rota `GET /api/integrations/stats` (adaptador fino) |
 | `src/routeTree.gen.ts` | Regenerado pelo plugin TanStack (commit incluído) |

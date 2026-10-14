@@ -14,6 +14,9 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 type Row = Record<string, unknown>;
 let FIXTURES: Record<string, Row[]> = {};
 let FAILING_TABLES = new Set<string>();
+// Tables whose query builder never settles — used to prove the per-query
+// timeout fires instead of hanging the endpoint.
+let HANGING_TABLES = new Set<string>();
 
 function makeQuery(table: string) {
   let rows = [...(FIXTURES[table] ?? [])];
@@ -24,10 +27,12 @@ function makeQuery(table: string) {
       rows = rows.filter((r) => r[col] === val);
       return builder;
     },
-    then: (resolve: (v: { data: Row[] | null; error: unknown; count: number | null }) => void) =>
-      FAILING_TABLES.has(table)
+    then: (resolve: (v: { data: Row[] | null; error: unknown; count: number | null }) => void) => {
+      if (HANGING_TABLES.has(table)) return; // never settles
+      return FAILING_TABLES.has(table)
         ? resolve({ data: null, error: { message: `relation "public.${table}" does not exist` }, count: null })
-        : resolve({ data: rows, error: null, count: rows.length }),
+        : resolve({ data: rows, error: null, count: rows.length });
+    },
   };
   return builder;
 }
@@ -39,6 +44,8 @@ vi.mock("@/integrations/supabase/client.server", () => ({
 const {
   bearerMatchesAthena,
   collectAthenaStats,
+  classifyDbError,
+  runCountQuery,
   ATHENA_PLATFORM,
   ATHENA_CONTRACT_VERSION,
   ATHENA_API_KEY_ENV,
@@ -71,6 +78,7 @@ function seed() {
     project_campaigns: [{ id: "c1", status: "draft" }],
   };
   FAILING_TABLES = new Set<string>();
+  HANGING_TABLES = new Set<string>();
 }
 
 beforeEach(seed);
@@ -164,5 +172,76 @@ describe("collectAthenaStats", () => {
     ]) {
       expect(payload).not.toContain(leak);
     }
+  });
+
+  it("db_status.ok é true quando todas as consultas funcionam", async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const stats = await collectAthenaStats(supabaseAdmin);
+    expect(stats.db_status.ok).toBe(true);
+    expect(stats.db_status.error_code).toBeNull();
+    expect(stats.db_status.failed_tables).toEqual([]);
+  });
+
+  it("db_status denuncia falha do banco em vez de mascarar nulls como dados", async () => {
+    FAILING_TABLES.add("analyses");
+    FAILING_TABLES.add("mined_offers");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const stats = await collectAthenaStats(supabaseAdmin);
+    expect(stats.db_status.ok).toBe(false);
+    expect(stats.db_status.error_code).toBe("table_missing");
+    expect(stats.db_status.failed_tables).toContain("analyses");
+    expect(stats.db_status.failed_tables).toContain("mined_offers");
+    expect(stats.analyses.total).toBeNull();
+    // tabelas saudáveis continuam a contar
+    expect(stats.offers.collected_total).toBe(3);
+  });
+});
+
+describe("classifyDbError", () => {
+  it("mapeia cada categoria para um código seguro", () => {
+    expect(classifyDbError(new Error("Missing Supabase environment variable(s): SUPABASE_URL"))).toBe("missing_env");
+    expect(classifyDbError(Object.assign(new Error("x"), { code: "ENOTFOUND" }))).toBe("dns_error");
+    expect(classifyDbError(Object.assign(new Error("x"), { code: "ECONNREFUSED" }))).toBe("connection_error");
+    expect(classifyDbError(Object.assign(new Error("query exceeded 8000ms"), { code: "QUERY_TIMEOUT" }))).toBe("timeout");
+    expect(classifyDbError(new Error("fetch failed"))).toBe("unknown");
+    expect(
+      classifyDbError(Object.assign(new Error("fetch failed"), { cause: { code: "ENOTFOUND" } })),
+    ).toBe("dns_error");
+    expect(classifyDbError({ message: "Invalid API key", code: "401" })).toBe("auth_failed");
+    expect(classifyDbError({ message: 'relation "public.offers" does not exist', code: "42P01" })).toBe(
+      "table_missing",
+    );
+    expect(classifyDbError({ message: "permission denied for table offers", code: "42501" })).toBe(
+      "permission_denied",
+    );
+    expect(classifyDbError(new Error("algo totalmente inesperado"))).toBe("unknown");
+    expect(classifyDbError(null)).toBe("unknown");
+  });
+
+  it("nunca devolve a mensagem original — só o código", () => {
+    const code = classifyDbError(new Error("connect https://xyz.supabase.co: secret leak"));
+    expect(typeof code).toBe("string");
+    expect(code).not.toContain("xyz.supabase.co");
+    expect(code).not.toContain("secret");
+  });
+});
+
+describe("runCountQuery", () => {
+  it("aplica timeout curto em vez de esperar a consulta travada", async () => {
+    HANGING_TABLES.add("offers");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const start = Date.now();
+    const res = await runCountQuery(supabaseAdmin, "offers", [], 50);
+    const elapsed = Date.now() - start;
+    expect(res.count).toBeNull();
+    expect(res.errorCode).toBe("timeout");
+    expect(elapsed).toBeLessThan(2000);
+  });
+
+  it("conta normalmente quando a consulta responde", async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const res = await runCountQuery(supabaseAdmin, "offers");
+    expect(res.count).toBe(3);
+    expect(res.errorCode).toBeNull();
   });
 });
