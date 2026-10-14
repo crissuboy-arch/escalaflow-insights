@@ -57,6 +57,8 @@ import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authentic
 import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
+import { Route as ApiIntegrationsHealthRouteImport } from './routes/api/integrations.health'
+import { Route as ApiIntegrationsStatsRouteImport } from './routes/api/integrations.stats'
 import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
 import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
 import { Route as ApiIntegrationsMiningRunRouteImport } from './routes/api/integrations.mining.run'
@@ -323,6 +325,16 @@ const ApiCronPublicarArtigosRoute = ApiCronPublicarArtigosRouteImport.update({
   path: '/api/cron/publicar-artigos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIntegrationsHealthRoute = ApiIntegrationsHealthRouteImport.update({
+  id: '/api/integrations/health',
+  path: '/api/integrations/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIntegrationsStatsRoute = ApiIntegrationsStatsRouteImport.update({
+  id: '/api/integrations/stats',
+  path: '/api/integrations/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedProjetosHandoffHandoffIdRoute =
   AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
     id: '/handoff/$handoffId',
@@ -390,6 +402,8 @@ export interface FileRoutesByFullPath {
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/api/integrations/health': typeof ApiIntegrationsHealthRoute
+  '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -442,6 +456,8 @@ export interface FileRoutesByTo {
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/api/integrations/health': typeof ApiIntegrationsHealthRoute
+  '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -496,6 +512,8 @@ export interface FileRoutesById {
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
+  '/api/integrations/health': typeof ApiIntegrationsHealthRoute
+  '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
   '/_authenticated/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -550,6 +568,8 @@ export interface FileRouteTypes {
     | '/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/api/integrations/health'
+    | '/api/integrations/stats'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -602,6 +622,8 @@ export interface FileRouteTypes {
     | '/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/api/integrations/health'
+    | '/api/integrations/stats'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -655,6 +677,8 @@ export interface FileRouteTypes {
     | '/_authenticated/storybook/$id'
     | '/api/collector/run'
     | '/api/cron/publicar-artigos'
+    | '/api/integrations/health'
+    | '/api/integrations/stats'
     | '/_authenticated/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -671,6 +695,8 @@ export interface RootRouteChildren {
   StorybookShareTokenRoute: typeof StorybookShareTokenRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
   ApiCronPublicarArtigosRoute: typeof ApiCronPublicarArtigosRoute
+  ApiIntegrationsHealthRoute: typeof ApiIntegrationsHealthRoute
+  ApiIntegrationsStatsRoute: typeof ApiIntegrationsStatsRoute
   ApiIntegrationsIntelligenceRunRoute: typeof ApiIntegrationsIntelligenceRunRoute
   ApiIntegrationsMiningRunRoute: typeof ApiIntegrationsMiningRunRoute
 }
@@ -1013,6 +1039,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronPublicarArtigosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/health': {
+      id: '/api/integrations/health'
+      path: '/api/integrations/health'
+      fullPath: '/api/integrations/health'
+      preLoaderRoute: typeof ApiIntegrationsHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/stats': {
+      id: '/api/integrations/stats'
+      path: '/api/integrations/stats'
+      fullPath: '/api/integrations/stats'
+      preLoaderRoute: typeof ApiIntegrationsStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/projetos/handoff/$handoffId': {
       id: '/_authenticated/projetos/handoff/$handoffId'
       path: '/handoff/$handoffId'
@@ -1187,6 +1227,8 @@ const rootRouteChildren: RootRouteChildren = {
   StorybookShareTokenRoute: StorybookShareTokenRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
   ApiCronPublicarArtigosRoute: ApiCronPublicarArtigosRoute,
+  ApiIntegrationsHealthRoute: ApiIntegrationsHealthRoute,
+  ApiIntegrationsStatsRoute: ApiIntegrationsStatsRoute,
   ApiIntegrationsIntelligenceRunRoute: ApiIntegrationsIntelligenceRunRoute,
   ApiIntegrationsMiningRunRoute: ApiIntegrationsMiningRunRoute,
 }
