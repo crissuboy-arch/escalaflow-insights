@@ -1854,7 +1854,7 @@ function TikTokRadarPage() {
   const loadVideos = useCallback(async (htag?: string) => {
     setLoading(true); setError(null);
     try {
-      const rows = await listMined({ data: { hashtag: htag, limit: 200 } });
+      const rows = await listMined({ data: { hashtag: htag, limit: 200, sortBy: "score" } });
       setVideos(rows as TikTokRow[]);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Erro ao carregar vídeos");

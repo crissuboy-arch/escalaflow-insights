@@ -28,6 +28,10 @@ export const MineInput = z.object({
 const ListInput = z.object({
   query: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(100),
+  // Default unchanged (score) — "recent" surfaces freshly mined videos
+  // that haven't accumulated views/likes yet, instead of them being
+  // invisible below the fixed row cap once a query has >200 total rows.
+  sortBy: z.enum(["score", "recent"]).default("score"),
 });
 
 const IdInput = z.object({ id: z.string().uuid() });
@@ -123,10 +127,11 @@ export const listYouTubeMinedFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof ListInput>) => ListInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
+    const orderColumn = data.sortBy === "recent" ? "created_at" : "viral_score";
     let query = ytTable()
       .select("*")
       .eq("user_id", userId)
-      .order("viral_score", { ascending: false })
+      .order(orderColumn, { ascending: false })
       .limit(data.limit);
 
     if (data.query) query = query.eq("query", data.query);

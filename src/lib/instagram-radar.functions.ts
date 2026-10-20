@@ -66,7 +66,10 @@ function extractMentions(obj: Record<string, unknown>): string[] {
   return [...caption.matchAll(/@(\w+)/g)].map((m) => m[1]);
 }
 
-function normalizeItem(
+// Exported so the real-video-URL extraction (the fix for the "Instagram
+// never plays a video" bug) is directly unit-testable without mocking
+// Apify/Supabase.
+export function normalizeItem(
   item: Record<string, unknown>,
   search: string,
   searchType: string,
@@ -98,6 +101,12 @@ function normalizeItem(
   const displayUrl =
     pickStr(item, ["displayUrl", "display_url", "imageUrl", "thumbnailUrl", "thumbnail_url"]) ??
     "";
+  // Apify's instagram-scraper returns a real, playable video URL for
+  // Reels/video posts (videoUrl) — this was always discarded before,
+  // leaving only the static thumbnail. Null (not invented) when the post
+  // genuinely isn't a video.
+  const videoUrl = pickStr(item, ["videoUrl", "video_url"]) ?? null;
+  const isVideo = !!videoUrl || !!item["isVideo"] || !!item["is_video"];
 
   const engagementScore = Math.min(
     100,
@@ -122,6 +131,8 @@ function normalizeItem(
     owner_username: ownerUsername,
     owner_full_name: ownerFullName,
     display_url: displayUrl,
+    video_url: videoUrl,
+    is_video: isVideo,
     engagement_score: engagementScore,
     raw: item,
   };
@@ -143,6 +154,10 @@ export const MineInput = z.object({
 const ListInput = z.object({
   search: z.string().optional(),
   limit: z.number().int().min(1).max(200).default(100),
+  // Default unchanged (score) — "recent" lets the UI show freshly mined
+  // posts that haven't accumulated engagement yet, instead of them being
+  // invisible below the fixed row cap once a search has >200 total rows.
+  sortBy: z.enum(["score", "recent"]).default("score"),
 });
 
 const IdInput = z.object({ id: z.string().uuid() });
@@ -251,10 +266,11 @@ export const listInstagramMinedFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof ListInput>) => ListInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as any).userId as string;
+    const orderColumn = data.sortBy === "recent" ? "created_at" : "engagement_score";
     let query = instagramTable()
       .select("*")
       .eq("user_id", userId)
-      .order("engagement_score", { ascending: false })
+      .order(orderColumn, { ascending: false })
       .limit(data.limit);
 
     if (data.search) query = query.eq("search", data.search);

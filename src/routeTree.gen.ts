@@ -40,6 +40,7 @@ import { Route as AuthenticatedPaginaVendaRouteImport } from './routes/_authenti
 import { Route as AuthenticatedProjetosRouteImport } from './routes/_authenticated/projetos'
 import { Route as AuthenticatedRadarRouteImport } from './routes/_authenticated/radar'
 import { Route as AuthenticatedRadarProdutosRouteImport } from './routes/_authenticated/radar-produtos'
+import { Route as AuthenticatedRadarVideosRouteImport } from './routes/_authenticated/radar-videos'
 import { Route as AuthenticatedStorybookRouteImport } from './routes/_authenticated/storybook'
 import { Route as AuthenticatedStrategicAiRouteImport } from './routes/_authenticated/strategic-ai'
 import { Route as AuthenticatedTiktokRadarRouteImport } from './routes/_authenticated/tiktok-radar'
@@ -231,6 +232,12 @@ const AuthenticatedRadarProdutosRoute =
     path: '/radar-produtos',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedRadarVideosRoute =
+  AuthenticatedRadarVideosRouteImport.update({
+    id: '/radar-videos',
+    path: '/radar-videos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedStorybookRoute = AuthenticatedStorybookRouteImport.update({
   id: '/storybook',
   path: '/storybook',
@@ -373,6 +380,7 @@ export interface FileRoutesByFullPath {
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/radar-produtos': typeof AuthenticatedRadarProdutosRoute
+  '/radar-videos': typeof AuthenticatedRadarVideosRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
@@ -425,6 +433,7 @@ export interface FileRoutesByTo {
   '/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/radar': typeof AuthenticatedRadarRoute
   '/radar-produtos': typeof AuthenticatedRadarProdutosRoute
+  '/radar-videos': typeof AuthenticatedRadarVideosRoute
   '/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
@@ -479,6 +488,7 @@ export interface FileRoutesById {
   '/_authenticated/projetos': typeof AuthenticatedProjetosRouteWithChildren
   '/_authenticated/radar': typeof AuthenticatedRadarRoute
   '/_authenticated/radar-produtos': typeof AuthenticatedRadarProdutosRoute
+  '/_authenticated/radar-videos': typeof AuthenticatedRadarVideosRoute
   '/_authenticated/storybook': typeof AuthenticatedStorybookRouteWithChildren
   '/_authenticated/strategic-ai': typeof AuthenticatedStrategicAiRoute
   '/_authenticated/tiktok-radar': typeof AuthenticatedTiktokRadarRoute
@@ -533,6 +543,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/radar'
     | '/radar-produtos'
+    | '/radar-videos'
     | '/storybook'
     | '/strategic-ai'
     | '/tiktok-radar'
@@ -585,6 +596,7 @@ export interface FileRouteTypes {
     | '/projetos'
     | '/radar'
     | '/radar-produtos'
+    | '/radar-videos'
     | '/storybook'
     | '/strategic-ai'
     | '/tiktok-radar'
@@ -638,6 +650,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projetos'
     | '/_authenticated/radar'
     | '/_authenticated/radar-produtos'
+    | '/_authenticated/radar-videos'
     | '/_authenticated/storybook'
     | '/_authenticated/strategic-ai'
     | '/_authenticated/tiktok-radar'
@@ -894,6 +907,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRadarProdutosRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/radar-videos': {
+      id: '/_authenticated/radar-videos'
+      path: '/radar-videos'
+      fullPath: '/radar-videos'
+      preLoaderRoute: typeof AuthenticatedRadarVideosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/storybook': {
       id: '/_authenticated/storybook'
       path: '/storybook'
@@ -1125,6 +1145,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProjetosRoute: typeof AuthenticatedProjetosRouteWithChildren
   AuthenticatedRadarRoute: typeof AuthenticatedRadarRoute
   AuthenticatedRadarProdutosRoute: typeof AuthenticatedRadarProdutosRoute
+  AuthenticatedRadarVideosRoute: typeof AuthenticatedRadarVideosRoute
   AuthenticatedStorybookRoute: typeof AuthenticatedStorybookRouteWithChildren
   AuthenticatedStrategicAiRoute: typeof AuthenticatedStrategicAiRoute
   AuthenticatedTiktokRadarRoute: typeof AuthenticatedTiktokRadarRoute
@@ -1164,6 +1185,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProjetosRoute: AuthenticatedProjetosRouteWithChildren,
   AuthenticatedRadarRoute: AuthenticatedRadarRoute,
   AuthenticatedRadarProdutosRoute: AuthenticatedRadarProdutosRoute,
+  AuthenticatedRadarVideosRoute: AuthenticatedRadarVideosRoute,
   AuthenticatedStorybookRoute: AuthenticatedStorybookRouteWithChildren,
   AuthenticatedStrategicAiRoute: AuthenticatedStrategicAiRoute,
   AuthenticatedTiktokRadarRoute: AuthenticatedTiktokRadarRoute,

@@ -29,6 +29,7 @@ import {
   Gauge,
   Network,
   Zap,
+  Film,
 } from "lucide-react";
 import {
   Sidebar,
@@ -70,6 +71,7 @@ export function AppSidebar() {
   const mineracao: Item[] = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
+    { to: "/radar-videos", label: "Radar de Vídeos", icon: Film },
     { to: "/radar", label: "Radar", icon: Radar },
     { to: "/tiktok-radar", label: "Radar TikTok", icon: Play },
     { to: "/instagram-radar", label: "Radar Instagram", icon: Camera },
@@ -141,7 +143,9 @@ export function AppSidebar() {
                       className="relative transition-all duration-200 hover:bg-primary/5 hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-foreground data-[active=true]:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent),0_0_18px_-4px_color-mix(in_oklab,var(--primary)_50%,transparent)] data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary data-[active=true]:before:shadow-[0_0_8px_var(--primary)]"
                     >
                       <Link to={it.to} className="flex items-center gap-3">
-                        <it.icon className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`} />
+                        <it.icon
+                          className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`}
+                        />
                         <span className="flex-1">{it.label}</span>
                         {it.badge ? (
                           <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary shadow-[0_0_12px_-2px_var(--primary)] group-data-[collapsible=icon]:hidden">

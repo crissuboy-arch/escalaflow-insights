@@ -1,12 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Search, Loader2, Trash2, Sparkles, BookOpen, X,
-  Eye, ThumbsUp, MessageSquare, Clock, Youtube, Zap,
+  Eye, ThumbsUp, MessageSquare, Clock, Youtube, Zap, Play, ExternalLink,
 } from "lucide-react";
 import { SkillButton } from "@/components/module-skills/SkillButton";
 import {
@@ -61,6 +61,67 @@ function fmt(n: number): string {
   return String(n);
 }
 
+// Real, embeddable YouTube watch URL already stored in video_url — this
+// just plays it in place instead of only linking out. No new data needed.
+function YouTubePlayerModal({ row, onClose }: { row: VideoRow; onClose: () => void }) {
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="w-full max-w-2xl rounded-2xl border border-white/10 bg-background overflow-hidden"
+      >
+        <div className="flex items-center justify-between gap-2 p-3 border-b border-white/10">
+          <p className="text-sm font-medium truncate">{row.title}</p>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="aspect-video bg-black">
+          <iframe
+            src={`https://www.youtube.com/embed/${row.video_id}?autoplay=1`}
+            title={row.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="h-full w-full"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
+          <span>{row.channel_name}</span>
+          <a
+            href={row.video_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 hover:text-foreground"
+          >
+            <ExternalLink className="h-3 w-3" /> Abrir no YouTube
+          </a>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function ViralBadge({ score }: { score: number }) {
   const color = score >= 80 ? "#FF4040" : score >= 50 ? "#F97316" : "#94A3B8";
   return (
@@ -85,6 +146,7 @@ function VideoCard({
   const navigate = useNavigate();
   const [imgError, setImgError] = useState(false);
   const [showAi, setShowAi] = useState(!!row.ai_analysis);
+  const [showPlayer, setShowPlayer] = useState(false);
 
   return (
     <motion.div
@@ -96,8 +158,12 @@ function VideoCard({
       style={{ boxShadow: "0 2px 24px 0 rgba(255,64,64,0.06)" }}
     >
       <div className="flex gap-3 p-4">
-        {/* thumbnail */}
-        <a href={row.video_url} target="_blank" rel="noopener noreferrer" className="shrink-0 relative">
+        {/* thumbnail — click plays the real video in place instead of only linking out */}
+        <button
+          type="button"
+          onClick={() => row.video_id && setShowPlayer(true)}
+          className="shrink-0 relative group"
+        >
           {!imgError && row.thumbnail_url ? (
             <img
               src={row.thumbnail_url}
@@ -113,6 +179,11 @@ function VideoCard({
               <Youtube className="h-6 w-6" style={{ color: ACCENT }} />
             </div>
           )}
+          {row.video_id && (
+            <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/0 transition-colors group-hover:bg-black/30">
+              <Play className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100" fill="currentColor" />
+            </span>
+          )}
           {row.is_short && (
             <span
               className="absolute -top-1.5 -right-1.5 text-[9px] font-black rounded-full px-1.5 py-0.5"
@@ -121,7 +192,10 @@ function VideoCard({
               SHORT
             </span>
           )}
-        </a>
+        </button>
+        <AnimatePresence>
+          {showPlayer && <YouTubePlayerModal row={row} onClose={() => setShowPlayer(false)} />}
+        </AnimatePresence>
 
         {/* content */}
         <div className="flex-1 min-w-0 space-y-2">
@@ -278,7 +352,7 @@ export default function YouTubeRadarPage() {
   const loadVideos = useCallback(async (q?: string) => {
     setLoading(true); setError(null);
     try {
-      const rows = await listVideos({ data: { query: q, limit: 200 } });
+      const rows = await listVideos({ data: { query: q, limit: 200, sortBy: "score" } });
       setVideos(rows as VideoRow[]);
     } catch (e: any) { setError(e.message ?? "Erro ao carregar"); }
     finally { setLoading(false); }
