@@ -80,7 +80,18 @@ function fmt(n: number | null): string {
   return String(n);
 }
 
+// Causa real da "tela preta": os iframes (TikTok/YouTube) não tinham
+// allow="encrypted-media" (necessário para o player interno renderizar) e
+// nenhum estado de carregamento/erro — enquanto o embed carrega (ou falha
+// silenciosamente, ex.: vídeo com embed bloqueado pelo autor), o usuário
+// via só a cor de fundo preta do contêiner, sem nenhuma explicação. Agora:
+// skeleton até o iframe disparar onLoad, onError no <video> nativo
+// (Instagram/Facebook — URLs assinadas podem expirar), e "Abrir original"
+// sempre visível, nunca escondido atrás de um player quebrado.
 function PlayerModal({ card, onClose }: { card: VideoRadarCard; onClose: () => void }) {
+  const [frameLoaded, setFrameLoaded] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -92,6 +103,11 @@ function PlayerModal({ card, onClose }: { card: VideoRadarCard; onClose: () => v
       document.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
+
+  const hasEmbed =
+    (card.playerKind === "tiktok_embed" || card.playerKind === "youtube_embed") && !!card.embedUrl;
+  const hasNativeVideo =
+    card.playerKind === "native_video" && !!card.directVideoUrl && !videoFailed;
 
   return (
     <motion.div
@@ -117,12 +133,21 @@ function PlayerModal({ card, onClose }: { card: VideoRadarCard; onClose: () => v
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="bg-black">
+        <div className="relative bg-black">
+          {hasEmbed && !frameLoaded && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black">
+              <Loader2 className="h-6 w-6 animate-spin text-white/60" />
+              <span className="text-xs text-white/50">Carregando vídeo...</span>
+            </div>
+          )}
           {card.playerKind === "tiktok_embed" && card.embedUrl ? (
             <iframe
               src={card.embedUrl}
               title={card.title}
+              allow="encrypted-media; autoplay"
               allowFullScreen
+              onLoad={() => setFrameLoaded(true)}
+              style={{ opacity: frameLoaded ? 1 : 0, transition: "opacity 0.3s ease" }}
               className="h-[70vh] w-full"
             />
           ) : card.playerKind === "youtube_embed" && card.embedUrl ? (
@@ -132,28 +157,40 @@ function PlayerModal({ card, onClose }: { card: VideoRadarCard; onClose: () => v
                 title={card.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                onLoad={() => setFrameLoaded(true)}
+                style={{ opacity: frameLoaded ? 1 : 0, transition: "opacity 0.3s ease" }}
                 className="h-full w-full"
               />
             </div>
-          ) : card.playerKind === "native_video" && card.directVideoUrl ? (
-            <video src={card.directVideoUrl} controls autoPlay className="max-h-[70vh] w-full" />
+          ) : hasNativeVideo ? (
+            <video
+              src={card.directVideoUrl!}
+              controls
+              autoPlay
+              onError={() => setVideoFailed(true)}
+              className="max-h-[70vh] w-full"
+            />
           ) : (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              Reprodução não disponível para este item — abra o original.
+              {videoFailed
+                ? "Este vídeo não pôde ser reproduzido — o link pode ter expirado. Abra o original abaixo."
+                : "Reprodução não disponível para este item — abra o original abaixo."}
             </div>
           )}
         </div>
         <div className="flex items-center justify-between gap-2 p-3 text-xs text-muted-foreground">
           <span>{card.authorOrAdvertiser ?? "—"}</span>
-          {card.originalUrl && (
+          {card.originalUrl ? (
             <a
               href={card.originalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-foreground"
+              className="flex items-center gap-1 font-medium text-foreground hover:underline"
             >
               <ExternalLink className="h-3 w-3" /> Abrir original
             </a>
+          ) : (
+            <span className="italic">Sem link original disponível.</span>
           )}
         </div>
       </motion.div>

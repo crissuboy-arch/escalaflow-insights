@@ -71,14 +71,24 @@ export function AppSidebar() {
   const mineracao: Item[] = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
+  ];
+  // Radar de Vídeos e Radar TikTok ficam imediatamente um abaixo do outro,
+  // de propósito — são os dois módulos de vídeo mais usados juntos. O
+  // Radar "geral" (Facebook Ads agregado) vai ao final do grupo, por ser
+  // um módulo de análise distinto dos radares de conteúdo por plataforma.
+  const radares: Item[] = [
     { to: "/radar-videos", label: "Radar de Vídeos", icon: Film },
-    { to: "/radar", label: "Radar", icon: Radar },
     { to: "/tiktok-radar", label: "Radar TikTok", icon: Play },
     { to: "/instagram-radar", label: "Radar Instagram", icon: Camera },
-    { to: "/google-radar", label: "Radar Google", icon: BarChart2 },
     { to: "/youtube-radar", label: "Radar YouTube", icon: Youtube },
+    { to: "/google-radar", label: "Radar Google", icon: BarChart2 },
     { to: "/radar-produtos", label: "Radar Produtos", icon: ShoppingBag },
+    { to: "/radar", label: "Radar", icon: Radar },
+  ];
+  const centralMineracao: Item[] = [
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
+  ];
+  const inteligencia: Item[] = [
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
@@ -104,6 +114,9 @@ export function AppSidebar() {
   ];
   const groups: { label: string; items: Item[] }[] = [
     { label: "Mineração", items: mineracao },
+    { label: "Radares", items: radares },
+    { label: "Central de Mineração", items: centralMineracao },
+    { label: "Inteligência", items: inteligencia },
     { label: "Esteira do Produto", items: esteira },
     { label: "Conta", items: conta },
   ];

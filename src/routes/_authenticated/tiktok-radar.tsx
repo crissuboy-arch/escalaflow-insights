@@ -44,6 +44,7 @@ import {
   ListPlus,
   Tag,
   Loader,
+  ExternalLink,
 } from "lucide-react";
 import {
   mineTikTokHashtagFn,
@@ -1487,6 +1488,14 @@ function VideoCard({
               {(row.creator || "?").replace(/^@/, "").slice(0, 2).toUpperCase()}
             </div>
             <Play className="h-4 w-4 text-white/50" />
+            {/* Distingue "nunca capturamos miniatura" de "tínhamos uma
+                miniatura real e o link assinado expirou" — mesma causa das
+                mídias do Facebook (CDN com validade curta). Não é bug de
+                extração: originalCoverUrl já é priorizado; o link em si
+                fica inválido com o tempo. */}
+            <span className="px-2 text-center text-[9px] leading-tight text-white/40">
+              {imgError ? "miniatura expirada" : "sem miniatura"}
+            </span>
           </div>
         )}
 
@@ -1509,11 +1518,25 @@ function VideoCard({
           )}
         </div>
 
-        {/* Delete */}
-        <button onClick={e => { e.stopPropagation(); onDelete(row.id); }}
-          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 text-white/40 hover:text-red-400 hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100">
-          <Trash2 className="h-3 w-3" />
-        </button>
+        {/* Abrir no TikTok — ação direta no card, sem precisar abrir o
+            modal de análise. Mesma referência real (video_url/video_id)
+            já usada dentro do modal, só exposta também aqui. */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+          {(row.video_url || row.video_id) && (
+            <a href={row.video_url || `https://www.tiktok.com/@${row.creator}/video/${row.video_id}`}
+              target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              title="Abrir no TikTok"
+              className="p-1.5 rounded-full bg-black/50 text-white/60 hover:text-[#ff0050] hover:bg-black/70 transition-all">
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          <button onClick={e => { e.stopPropagation(); onDelete(row.id); }}
+            title="Remover"
+            className="p-1.5 rounded-full bg-black/50 text-white/40 hover:text-red-400 hover:bg-black/70 transition-all">
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
 
         {/* Saved indicator */}
         {isSaved && !isEscalated && (
