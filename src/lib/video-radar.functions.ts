@@ -98,7 +98,10 @@ function wantsPlatform(
   return !platforms || platforms.length === 0 || platforms.includes(p);
 }
 
-async function fetchTikTok(
+// Exported so dashboard.functions.ts can reuse the exact same real
+// per-platform queries for its "recently mined" panel, instead of a
+// second, parallel normalization of the same tables.
+export async function fetchTikTok(
   userId: string,
   filters: VideoRadarFilters,
   notes: string[],
@@ -154,7 +157,7 @@ async function fetchTikTok(
   });
 }
 
-async function fetchInstagram(
+export async function fetchInstagram(
   userId: string,
   filters: VideoRadarFilters,
   notes: string[],
@@ -215,7 +218,7 @@ async function fetchInstagram(
   });
 }
 
-async function fetchYouTube(
+export async function fetchYouTube(
   userId: string,
   filters: VideoRadarFilters,
   notes: string[],

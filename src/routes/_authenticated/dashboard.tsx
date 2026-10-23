@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Bookmark, Sparkles, Flame, Globe, Filter } from "lucide-react";
-import { fetchOffers, fetchSavedIds, fetchAnalyses } from "@/lib/queries";
+import { fetchSavedIds } from "@/lib/queries";
+import { getDashboardStats, getRecentMinedItems, type RecentMinedItem } from "@/lib/dashboard.functions";
 import { useAuth } from "@/providers/AuthProvider";
-import { StatusBadge } from "@/components/StatusBadge";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { motion } from "framer-motion";
 import { SkeletonCard, SkeletonList, SkeletonChart } from "@/components/dashboard/SkeletonCard";
@@ -22,8 +23,10 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const getStats = useServerFn(getDashboardStats);
+  const getRecent = useServerFn(getRecentMinedItems);
   const [stats, setStats] = useState({ mined: 0, saved: 0, analyses: 0, hot: 0 });
-  const [recent, setRecent] = useState<any[]>([]);
+  const [recent, setRecent] = useState<RecentMinedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
@@ -32,18 +35,19 @@ function Dashboard() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const offers = await fetchOffers();
-      const hot = offers.filter((o) => o.status === "quente" || o.status === "escalando").length;
-      const analyses = (await fetchAnalyses()).length;
-      const saved = user ? (await fetchSavedIds(user.id)).size : 0;
-      setStats({ mined: offers.length, saved, analyses, hot });
-      setRecent(offers.filter((o) => o.status === "escalando" || o.status === "quente").slice(0, 5));
+      const [serverStats, recentItems, saved] = await Promise.all([
+        getStats(),
+        getRecent(),
+        user ? fetchSavedIds(user.id) : Promise.resolve(new Set<string>()),
+      ]);
+      setStats({ mined: serverStats.mined, saved: saved.size, analyses: serverStats.analyses, hot: serverStats.hot });
+      setRecent(recentItems);
     } catch (e: any) {
       setError(e?.message ?? "Falha ao carregar dados");
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, getStats, getRecent]);
 
   useEffect(() => {
     loadData();
@@ -52,12 +56,15 @@ function Dashboard() {
   }, [loadData]);
 
   const filteredRecent = recent.filter(
-    (o) => !filter || o.advertiser_name?.toLowerCase().includes(filter.toLowerCase()) || o.niche?.toLowerCase().includes(filter.toLowerCase())
+    (item) =>
+      !filter ||
+      item.title.toLowerCase().includes(filter.toLowerCase()) ||
+      item.authorOrAdvertiser?.toLowerCase().includes(filter.toLowerCase()),
   );
 
-  const trend = filteredRecent.map((o, i) => ({
-    name: o.advertiser_name?.slice(0, 8) ?? `#${i + 1}`,
-    score: o.scale_score ?? 0,
+  const trend = filteredRecent.map((item, i) => ({
+    name: item.authorOrAdvertiser?.slice(0, 8) ?? `#${i + 1}`,
+    score: item.score ?? 0,
     i,
   }));
 
@@ -107,10 +114,6 @@ function Dashboard() {
         <Card className="card-premium lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{t("dashboard.scoreTrend")}</CardTitle>
-            <div className="flex gap-3">
-              <ScoreBadge type="viral" value={78} />
-              <ScoreBadge type="emotional" value={92} />
-            </div>
           </CardHeader>
           <CardContent className="h-72">
             {error ? (
@@ -147,23 +150,24 @@ function Dashboard() {
               <SkeletonList count={5} />
             ) : filteredRecent.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground">
-                {t(filter ? "dashboard.noFilterResults" : "dashboard.noOffers", filter ? "Nenhum resultado para o filtro" : "Nenhuma oferta em escala ainda")}
+                {t(filter ? "dashboard.noFilterResults" : "dashboard.noOffers", filter ? "Nenhum resultado para o filtro" : "Nenhum item minerado ainda — use um dos Radares")}
               </div>
             ) : (
-              filteredRecent.map((o) => (
+              filteredRecent.map((item) => (
                 <motion.div
-                  key={o.id}
+                  key={item.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   className="flex items-center justify-between gap-2 rounded-lg border border-primary/15 bg-background/40 p-3 transition-all duration-200 hover:border-primary/40 hover:shadow-[0_0_12px_rgba(59,130,246,0.15)]"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{o.advertiser_name}</p>
-                    <p className="text-xs text-muted-foreground">{o.niche}</p>
+                    <p className="truncate text-sm font-medium">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.authorOrAdvertiser ?? item.platform}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {o.scale_score && <ScoreBadge type="scale" value={o.scale_score} />}
-                    <StatusBadge status={o.status} />
+                    {item.score != null && <ScoreBadge type="scale" value={item.score} />}
                   </div>
                 </motion.div>
               ))
