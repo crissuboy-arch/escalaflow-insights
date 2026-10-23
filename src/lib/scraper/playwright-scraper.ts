@@ -6,6 +6,11 @@
  * or any private/gated content.
  *
  * Designed to feed AI offer analysis pipelines.
+ *
+ * SSRF: the initial URL AND every redirect hop are checked — a hostname
+ * that is blocked by literal string, or whose DNS resolution lands on a
+ * private/reserved IP, is rejected before Chromium ever connects to it.
+ * See src/lib/net/ssrf-guard.ts for the resolution/classification logic.
  */
 
 // Using new Function so NO bundler (Vite/Rollup/esbuild) can statically resolve
@@ -66,18 +71,20 @@ export type ScrapeResponse = ScrapeResult | ScrapeError;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+import { isBlockedHostnameLiteral, resolvesToPrivateIp } from "@/lib/net/ssrf-guard";
+
 const PRICE_RE = /(?:R\$|USD|\$|€|£|BRL)\s*\d[\d.,]*/gi;
 const GUARANTEE_RE = /garantia|money.back|refund|devolv|reembolso/i;
 const COUNTDOWN_SELECTORS = [
   "[class*=countdown]", "[class*=timer]", "[id*=countdown]",
   "[data-countdown]", ".oferta-timer",
 ];
-const BLOCKED_HOSTS = [
-  "localhost", "127.0.0.1", "::1",
-  "169.254.", "10.", "192.168.", "172.16.",
-];
 
-function validateUrl(raw: string): { valid: boolean; reason?: string } {
+/** Validates scheme + hostname, including a DNS resolution check so a
+ *  public-looking hostname that resolves to a private/reserved IP (DNS
+ *  rebinding) is rejected too — not just literal "localhost"-style
+ *  strings. */
+async function validateUrl(raw: string): Promise<{ valid: boolean; reason?: string }> {
   let u: URL;
   try {
     u = new URL(raw.trim());
@@ -87,10 +94,8 @@ function validateUrl(raw: string): { valid: boolean; reason?: string } {
   if (u.protocol !== "http:" && u.protocol !== "https:") {
     return { valid: false, reason: "Somente HTTP/HTTPS permitido" };
   }
-  for (const blocked of BLOCKED_HOSTS) {
-    if (u.hostname === blocked || u.hostname.startsWith(blocked)) {
-      return { valid: false, reason: "Acesso a endereços locais/privados não permitido" };
-    }
+  if (await resolvesToPrivateIp(u.hostname)) {
+    return { valid: false, reason: "Acesso a endereços locais/privados não permitido" };
   }
   return { valid: true };
 }
@@ -121,7 +126,7 @@ export async function scrapeOfferPage(
   rawUrl: string,
   timeoutMs = 30_000,
 ): Promise<ScrapeResponse> {
-  const validation = validateUrl(rawUrl);
+  const validation = await validateUrl(rawUrl);
   if (!validation.valid) {
     return { ok: false, url: rawUrl, error: validation.reason!, code: "INVALID_URL" };
   }
@@ -140,14 +145,44 @@ export async function scrapeOfferPage(
       storageState: undefined,
     });
 
-    // Block resource types that slow loading and are not needed for text extraction
-    await context.route("**/*", (route) => {
-      const type = route.request().resourceType();
+    // Block resource types that slow loading and are not needed for text
+    // extraction. Every navigation request (the initial load AND every
+    // redirect hop Chromium follows) is re-validated here too — a 3xx
+    // response could otherwise send the browser to a private/reserved IP
+    // after the original URL already passed validateUrl() above.
+    const checkedHosts = new Map<string, boolean>(); // hostname -> isPrivate, avoids repeat DNS lookups
+    let ssrfBlocked = false;
+    await context.route("**/*", async (route) => {
+      const request = route.request();
+      const type = request.resourceType();
       if (["font", "media", "websocket", "manifest"].includes(type)) {
-        route.abort();
-      } else {
-        route.continue();
+        return route.abort();
       }
+
+      if (request.isNavigationRequest()) {
+        let hostname: string;
+        try {
+          hostname = new URL(request.url()).hostname;
+        } catch {
+          ssrfBlocked = true;
+          return route.abort();
+        }
+        if (isBlockedHostnameLiteral(hostname)) {
+          ssrfBlocked = true;
+          return route.abort();
+        }
+        let isPrivate = checkedHosts.get(hostname);
+        if (isPrivate === undefined) {
+          isPrivate = await resolvesToPrivateIp(hostname);
+          checkedHosts.set(hostname, isPrivate);
+        }
+        if (isPrivate) {
+          ssrfBlocked = true;
+          return route.abort();
+        }
+      }
+
+      return route.continue();
     });
 
     const page = await context.newPage();
@@ -158,6 +193,7 @@ export async function scrapeOfferPage(
       timeout: timeoutMs,
     }).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err);
+      if (ssrfBlocked) throw Object.assign(new Error("Redirecionamento para endereço local/privado bloqueado"), { code: "BLOCKED" });
       if (msg.includes("timeout")) throw Object.assign(new Error(msg), { code: "TIMEOUT" });
       if (msg.includes("net::ERR")) throw Object.assign(new Error(msg), { code: "LOAD_FAILED" });
       throw err;
@@ -292,6 +328,9 @@ export async function scrapeOfferPage(
     }
     if (code === "PRIVATE_PAGE") {
       return { ok: false, url, error: msg, code: "PRIVATE_PAGE" };
+    }
+    if (code === "BLOCKED") {
+      return { ok: false, url, error: msg, code: "BLOCKED" };
     }
     return { ok: false, url, error: `Falha ao carregar página: ${msg.slice(0, 200)}`, code: "LOAD_FAILED" };
 
