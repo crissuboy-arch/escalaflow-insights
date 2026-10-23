@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Database as DatabaseIcon, RefreshCw, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { isAdmin } from "@/lib/auth/is-admin";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,9 +14,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listTables, fetchTableRows, ALLOWED_TABLES } from "@/lib/db-browser.functions";
 
 export const Route = createFileRoute("/_authenticated/database")({
+  // Esta checagem é só UX (redirecionamento imediato, sem flash de
+  // conteúdo) — a proteção real está em listTables/fetchTableRows
+  // (db-browser.functions.ts), que roda server-side e não pode ser
+  // contornada pelo cliente.
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/login" });
+    if (!(await isAdmin(supabase, data.user.id))) throw redirect({ to: "/dashboard" });
   },
   component: DatabasePage,
 });

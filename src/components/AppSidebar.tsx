@@ -49,6 +49,8 @@ import {
   initAdActionsCache,
   subscribeChange,
 } from "@/lib/queries";
+import { supabase } from "@/integrations/supabase/client";
+import { isAdmin } from "@/lib/auth/is-admin";
 import logoHorizontal from "@/assets/brand/logo-horizontal.png";
 import logoMark from "@/assets/brand/logo-mark.png";
 
@@ -58,6 +60,7 @@ export function AppSidebar() {
   const [favCount, setFavCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [scaledCount, setScaledCount] = useState(0);
+  const [showDatabase, setShowDatabase] = useState(false);
   useEffect(() => {
     const sync = () => {
       setFavCount(getFavCount());
@@ -66,6 +69,9 @@ export function AppSidebar() {
     };
     initAdActionsCache().finally(sync);
     return subscribeChange(sync);
+  }, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => isAdmin(supabase, data.user?.id)).then(setShowDatabase);
   }, []);
   type Item = { to: string; label: string; icon: typeof LayoutDashboard; badge?: number };
   const mineracao: Item[] = [
@@ -109,7 +115,9 @@ export function AppSidebar() {
     { to: "/strategic-ai", label: "Strategic AI", icon: BrainCircuit },
   ];
   const conta: Item[] = [
-    { to: "/database", label: "Database", icon: Database },
+    // Ferramenta interna de navegação direta nas tabelas — visível só
+    // para quem tem role "admin" em user_roles (ver src/lib/auth/is-admin.ts).
+    ...(showDatabase ? [{ to: "/database", label: "Database", icon: Database }] : []),
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ];
   const groups: { label: string; items: Item[] }[] = [
