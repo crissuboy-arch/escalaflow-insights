@@ -120,12 +120,18 @@ export function AppSidebar() {
     ...(showDatabase ? [{ to: "/database", label: "Database", icon: Database }] : []),
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ];
+  // Navegação unificada (arquitetura ScalaFlow 2.0): mineração, radares,
+  // central de mineração e inteligência de ofertas eram 4 grupos
+  // separados que, na prática, são a mesma coisa — "fazer e usar
+  // inteligência de mercado". Consolidados num único cabeçalho. "Esteira
+  // do Produto" passa a se chamar "Criação", o pilar de produção de
+  // conteúdo da proposta de arquitetura. Os pilares "Comercial" (NEXORA)
+  // e "Automação" (Central de Missões Athena) NÃO foram adicionados aqui
+  // porque nenhum dos dois tem módulo real implementado ainda — um grupo
+  // de menu sem nenhuma tela por trás seria um link morto em produção.
   const groups: { label: string; items: Item[] }[] = [
-    { label: "Mineração", items: mineracao },
-    { label: "Radares", items: radares },
-    { label: "Central de Mineração", items: centralMineracao },
-    { label: "Inteligência", items: inteligencia },
-    { label: "Esteira do Produto", items: esteira },
+    { label: "Inteligência", items: [...mineracao, ...radares, ...centralMineracao, ...inteligencia] },
+    { label: "Criação", items: esteira },
     { label: "Conta", items: conta },
   ];
   return (
