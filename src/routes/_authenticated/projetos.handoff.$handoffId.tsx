@@ -38,7 +38,29 @@ const PIPELINE_STEPS = [
   "Concluído",
 ] as const;
 
-function StatusPipeline({ status }: { status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED" }) {
+function StatusPipeline({
+  status,
+  remoteStatus,
+}: {
+  status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
+  remoteStatus?: string | null;
+}) {
+  if (remoteStatus === "NEEDS_REVIEW") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-amber-700">
+        <AlertTriangle className="h-4 w-4" />
+        Cris OS recebeu os dados e pediu revisão humana. Ainda não há projeto confirmado.
+      </div>
+    );
+  }
+  if (remoteStatus === "REJECTED") {
+    return (
+      <div className="flex items-center gap-2 text-sm text-destructive">
+        <AlertTriangle className="h-4 w-4" />
+        Cris OS rejeitou o handoff. Revise os avisos antes de tentar novamente.
+      </div>
+    );
+  }
   if (status === "FAILED") {
     return (
       <div className="flex items-center gap-2 text-sm text-destructive">
@@ -46,7 +68,8 @@ function StatusPipeline({ status }: { status: "NOT_SENT" | "SENDING" | "SENT" | 
       </div>
     );
   }
-  const activeIndex = status === "SENT" ? 0 : -1;
+  const activeIndex =
+    status === "SENT" && (remoteStatus === "PERSISTED" || remoteStatus === "DUPLICATE") ? 0 : -1;
   return (
     <div className="flex flex-wrap items-center gap-2">
       {PIPELINE_STEPS.map((step, i) => (
@@ -116,7 +139,13 @@ function HandoffProjectView() {
   }
 
   const { opportunity } = data;
-  const statusLabel = statusLabelForHandoff(data.status);
+  const statusLabel = statusLabelForHandoff(data.status, data.remoteStatus);
+  const remoteErrors = Array.isArray(data.remoteResponse?.errors)
+    ? data.remoteResponse.errors.map(String)
+    : [];
+  const remoteWarnings = Array.isArray(data.remoteResponse?.warnings)
+    ? data.remoteResponse.warnings.map(String)
+    : [];
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -158,9 +187,19 @@ function HandoffProjectView() {
               Status
             </p>
             <p className="mb-2 text-sm font-medium">{statusLabel}</p>
-            <StatusPipeline status={data.status} />
+            <StatusPipeline status={data.status} remoteStatus={data.remoteStatus} />
           </div>
 
+          {remoteErrors.map((error, index) => (
+            <p key={`remote-error-${index}`} className="text-xs text-destructive">
+              Cris OS: {error}
+            </p>
+          ))}
+          {remoteWarnings.map((warning, index) => (
+            <p key={`remote-warning-${index}`} className="text-xs text-amber-700">
+              Aviso: {warning}
+            </p>
+          ))}
           {data.lastError ? (
             <p className="text-xs text-destructive">Último erro: {data.lastError}</p>
           ) : null}
@@ -175,6 +214,9 @@ function HandoffProjectView() {
                 <Clock className="h-3.5 w-3.5" /> Enviado em{" "}
                 {new Date(data.sentAt).toLocaleString("pt-BR")}
               </div>
+            ) : null}
+            {data.remoteProjectId ? (
+              <div className="truncate">project_id Cris OS: {data.remoteProjectId}</div>
             ) : null}
             <div className="truncate">handoff_id: {data.handoffId}</div>
             <div className="truncate">

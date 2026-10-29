@@ -14,6 +14,17 @@ const RETRY_DELAY_MS = [400, 1200]; // delay before attempt 2 and attempt 3
 
 export type HandoffStatus = "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
 
+export type CrisOsReceiveStatus = "PERSISTED" | "DUPLICATE" | "NEEDS_REVIEW" | "REJECTED" | "UNKNOWN";
+
+export interface CrisOsReceiveResponse {
+  status?: CrisOsReceiveStatus;
+  handoff_id?: string;
+  project_id?: string | null;
+  errors?: string[];
+  warnings?: string[];
+  [key: string]: unknown;
+}
+
 export interface SendIntelligenceResult {
   ok: boolean;
   status: HandoffStatus;
@@ -21,14 +32,15 @@ export interface SendIntelligenceResult {
   error?: string;
   retryable: boolean;
   attempts: number;
+  remoteResponse?: CrisOsReceiveResponse;
 }
 
 function getConfig(): { baseUrl: string | null; token: string | null } {
   return {
     baseUrl: process.env.CRIS_OS_API_URL?.trim() || null,
     // CRIS_OS_API_URL is expected to be the full handoff endpoint URL
-    // (e.g. https://cris-os.example.com/api/intelligence/handoff) — ScalaFlow
-    // never guesses or appends a path Cris OS hasn't published.
+    // (e.g. https://cris-os.example.com/integrations/scalaflow/intelligence).
+    // The status path is appended to this exact receiver URL.
     token: process.env.CRIS_OS_INTEGRATION_TOKEN?.trim() || null,
   };
 }
@@ -45,8 +57,8 @@ export function validateBeforeSend(handoff: MarketIntelligenceHandoff): string |
   if (!handoff.schema_version) return "schema_version ausente";
   if (!handoff.source_system || !handoff.source_module)
     return "source_system/source_module ausente";
-  if (!handoff.opportunity?.opportunity_id) return "opportunity.opportunity_id ausente";
-  if (!handoff.opportunity?.title) return "opportunity.title ausente";
+  if (!handoff.opportunity_id) return "opportunity_id ausente";
+  if (!handoff.title) return "title ausente";
   return null;
 }
 
@@ -60,7 +72,7 @@ async function attemptOnce(
   token: string,
   handoff: MarketIntelligenceHandoff,
   timeoutMs: number,
-): Promise<{ httpStatus?: number; error?: string; ok: boolean }> {
+): Promise<{ httpStatus?: number; error?: string; ok: boolean; remoteResponse?: CrisOsReceiveResponse }> {
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -71,9 +83,24 @@ async function attemptOnce(
       body: JSON.stringify(handoff),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.ok) return { ok: true, httpStatus: res.status };
     const body = await res.text().catch(() => "");
-    return { ok: false, httpStatus: res.status, error: body.slice(0, 300) || `HTTP ${res.status}` };
+    let remoteResponse: CrisOsReceiveResponse | undefined;
+    try {
+      const parsed: unknown = body ? JSON.parse(body) : undefined;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        remoteResponse = parsed as CrisOsReceiveResponse;
+      }
+    } catch {
+      // Non-JSON error bodies are kept as a short transport error below.
+    }
+    if (res.ok) {
+      return { ok: true, httpStatus: res.status, remoteResponse };
+    }
+    const detail =
+      (remoteResponse as Record<string, unknown> | undefined)?.detail ??
+      (remoteResponse as Record<string, unknown> | undefined)?.message;
+    const error = typeof detail === "string" ? detail : body.slice(0, 300) || `HTTP ${res.status}`;
+    return { ok: false, httpStatus: res.status, error, remoteResponse };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
@@ -124,6 +151,7 @@ export async function sendIntelligence(
   const timeoutMs = opts.timeoutMs ?? 8000;
   let lastError: string | undefined;
   let lastStatus: number | undefined;
+  let lastRemoteResponse: CrisOsReceiveResponse | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await attemptOnce(baseUrl, token, handoff, timeoutMs);
@@ -134,11 +162,13 @@ export async function sendIntelligence(
         httpStatus: result.httpStatus,
         retryable: false,
         attempts: attempt,
+        remoteResponse: result.remoteResponse,
       };
     }
 
     lastError = result.error;
     lastStatus = result.httpStatus;
+    lastRemoteResponse = result.remoteResponse;
 
     const isTransient =
       result.httpStatus === undefined // network error / timeout
@@ -153,6 +183,7 @@ export async function sendIntelligence(
         error: lastError,
         retryable: isTransient, // caller can offer "tentar novamente" when true
         attempts: attempt,
+        remoteResponse: result.remoteResponse,
       };
     }
 
@@ -160,7 +191,14 @@ export async function sendIntelligence(
   }
 
   // Unreachable, but keeps TypeScript happy.
-  return { ok: false, status: "FAILED", error: lastError, retryable: true, attempts: MAX_ATTEMPTS };
+  return {
+    ok: false,
+    status: "FAILED",
+    error: lastError,
+    retryable: true,
+    attempts: MAX_ATTEMPTS,
+    remoteResponse: lastRemoteResponse,
+  };
 }
 
 /** Best-effort reachability probe. Any HTTP response (even 4xx) counts as
@@ -179,5 +217,31 @@ export async function healthCheck(timeoutMs = 5000): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+
+/** Read-only snapshot from Cris OS for a previously accepted handoff. */
+export async function getIntelligenceStatus(
+  handoffId: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<CrisOsReceiveResponse | null> {
+  const { baseUrl, token } = getConfig();
+  if (!baseUrl || !token) return null;
+  const statusUrl = `${baseUrl.replace(/\/$/, "")}/${encodeURIComponent(handoffId)}/status`;
+  try {
+    const res = await fetch(statusUrl, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const value: unknown = await res.json();
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as CrisOsReceiveResponse)
+      : null;
+  } catch {
+    return null;
   }
 }
