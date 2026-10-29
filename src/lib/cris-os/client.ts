@@ -39,8 +39,7 @@ function getConfig(): { baseUrl: string | null; token: string | null } {
   return {
     baseUrl: process.env.CRIS_OS_API_URL?.trim() || null,
     // CRIS_OS_API_URL is expected to be the full handoff endpoint URL
-    // (e.g. https://cris-os.example.com/api/intelligence/handoff) — ScalaFlow
-    // never guesses or appends a path Cris OS hasn't published.
+    // (e.g. https://cris-os.example.com/integrations/scalaflow/intelligence) — // the status path is appended to this exact receiver URL.
     token: process.env.CRIS_OS_INTEGRATION_TOKEN?.trim() || null,
   };
 }
@@ -57,8 +56,8 @@ export function validateBeforeSend(handoff: MarketIntelligenceHandoff): string |
   if (!handoff.schema_version) return "schema_version ausente";
   if (!handoff.source_system || !handoff.source_module)
     return "source_system/source_module ausente";
-  if (!handoff.opportunity?.opportunity_id) return "opportunity.opportunity_id ausente";
-  if (!handoff.opportunity?.title) return "opportunity.title ausente";
+  if (!handoff.opportunity_id) return "opportunity_id ausente";
+  if (!handoff.title) return "title ausente";
   return null;
 }
 
@@ -218,7 +217,7 @@ export async function getIntelligenceStatus(
 ): Promise<CrisOsReceiveResponse | null> {
   const { baseUrl, token } = getConfig();
   if (!baseUrl || !token) return null;
-  const statusUrl = `${baseUrl.replace(/\\/$/, "")}/${encodeURIComponent(handoffId)}/status`;
+  const statusUrl = `${baseUrl.replace(/\/$/, "")}/${encodeURIComponent(handoffId)}/status`;
   try {
     const res = await fetch(statusUrl, {
       method: "GET",
