@@ -39,7 +39,8 @@ function getConfig(): { baseUrl: string | null; token: string | null } {
   return {
     baseUrl: process.env.CRIS_OS_API_URL?.trim() || null,
     // CRIS_OS_API_URL is expected to be the full handoff endpoint URL
-    // (e.g. https://cris-os.example.com/integrations/scalaflow/intelligence) — // the status path is appended to this exact receiver URL.
+    // (e.g. https://cris-os.example.com/integrations/scalaflow/intelligence).
+    // The status path is appended to this exact receiver URL.
     token: process.env.CRIS_OS_INTEGRATION_TOKEN?.trim() || null,
   };
 }
@@ -150,6 +151,7 @@ export async function sendIntelligence(
   const timeoutMs = opts.timeoutMs ?? 8000;
   let lastError: string | undefined;
   let lastStatus: number | undefined;
+  let lastRemoteResponse: CrisOsReceiveResponse | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await attemptOnce(baseUrl, token, handoff, timeoutMs);
@@ -166,6 +168,7 @@ export async function sendIntelligence(
 
     lastError = result.error;
     lastStatus = result.httpStatus;
+    lastRemoteResponse = result.remoteResponse;
 
     const isTransient =
       result.httpStatus === undefined // network error / timeout
@@ -180,6 +183,7 @@ export async function sendIntelligence(
         error: lastError,
         retryable: isTransient, // caller can offer "tentar novamente" when true
         attempts: attempt,
+        remoteResponse: result.remoteResponse,
       };
     }
 
@@ -187,7 +191,14 @@ export async function sendIntelligence(
   }
 
   // Unreachable, but keeps TypeScript happy.
-  return { ok: false, status: "FAILED", error: lastError, retryable: true, attempts: MAX_ATTEMPTS };
+  return {
+    ok: false,
+    status: "FAILED",
+    error: lastError,
+    retryable: true,
+    attempts: MAX_ATTEMPTS,
+    remoteResponse: lastRemoteResponse,
+  };
 }
 
 /** Best-effort reachability probe. Any HTTP response (even 4xx) counts as
