@@ -172,9 +172,8 @@ export function toHandoffProjectListItem(view: HandoffProjectView): HandoffProje
   };
 }
 
-/** The only status label allowed for SENT today: a real project record
- *  exists in ScalaFlow, but no BusinessPlan/Approval/ExecutionPlan/Tasks
- *  have happened — those are future phases, never implied here. */
+/** SENT is only the local transport state. The remote status determines
+ *  whether Cris OS persisted the handoff or needs human review. */
 export function statusLabelForHandoff(
   status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED",
   remoteStatus?: string | null,
@@ -189,7 +188,7 @@ export function statusLabelForHandoff(
     return "Pedido enviado — a confirmação do Cris OS ainda não foi recebida";
   switch (status) {
     case "SENT":
-      return "Projeto criado — aguardando planejamento";
+      return "Pedido enviado — confirmação do Cris OS pendente";
     case "SENDING":
       return "Enviando…";
     case "FAILED":
@@ -232,6 +231,7 @@ export const transformToProjectFn = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof IdentifyInput>) => IdentifyInput.parse(d))
   .handler(async ({ data, context }) => {
     const userId = (context as { userId?: string }).userId ?? null;
+    if (!userId) return { ok: false, error: "Sessão do utilizador não identificada." };
     const row = await findCollectedAd(data);
     if (!row) return { ok: false, error: "Oportunidade não encontrada." };
 
