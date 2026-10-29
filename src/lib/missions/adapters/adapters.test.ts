@@ -235,11 +235,12 @@ describe("pink-logic adapter — allowlist de módulos + health público", () =>
       if (url.endsWith("/api/integrations/health")) return jsonResponse({ ok: true });
       expect(url).toBe("https://pink.example.com/api/generate");
       expect(init?.headers).toMatchObject({ authorization: "Bearer k" });
-      expect(JSON.parse(String(init.body)).module).toBe("carousel");
+      expect(JSON.parse(String(init?.body)).module).toBe("carousel");
       return jsonResponse({ posts: [] });
     });
     expect(await pinkLogicHealth()).toEqual({ configured: true, ok: true, data: { ok: true } });
-    expect((await pinkLogicGenerate({ module: "carousel", params: {} })).ok).toBe(true);
+    const generated = await pinkLogicGenerate({ module: "carousel", params: {} });
+    expect(generated.configured && generated.ok).toBe(true);
   });
 });
 
@@ -269,13 +270,15 @@ describe("pageforge adapter — allowlist de stages + stats com Bearer", () => {
       expect(url).toBe("https://pf.example.com/api/generate");
       return new Response("NDJSON", { status: 200 });
     });
-    expect((await pageForgeHealth()).ok).toBe(true);
+    const health = await pageForgeHealth();
+    expect(health.configured && health.ok).toBe(true);
     expect(await pageForgeGenerate({ stage: "full", brief: { title: "x" } })).toEqual({
       configured: true,
       ok: true,
       data: "NDJSON",
     });
-    expect((await pageForgeStats()).ok).toBe(true);
+    const stats = await pageForgeStats();
+    expect(stats.configured && stats.ok).toBe(true);
   });
 });
 

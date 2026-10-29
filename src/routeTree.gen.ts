@@ -25,6 +25,7 @@ import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authentic
 import { Route as AuthenticatedEbookStudioRouteImport } from './routes/_authenticated/ebook-studio'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
+import { Route as AuthenticatedFerramentasRouteImport } from './routes/_authenticated/ferramentas'
 import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
 import { Route as AuthenticatedInstagramRadarRouteImport } from './routes/_authenticated/instagram-radar'
@@ -146,6 +147,12 @@ const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
   path: '/favoritos',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFerramentasRoute =
+  AuthenticatedFerramentasRouteImport.update({
+    id: '/ferramentas',
+    path: '/ferramentas',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedGoogleRadarRoute =
   AuthenticatedGoogleRadarRouteImport.update({
     id: '/google-radar',
@@ -370,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/ferramentas': typeof AuthenticatedFerramentasRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
@@ -424,6 +432,7 @@ export interface FileRoutesByTo {
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
   '/favoritos': typeof AuthenticatedFavoritosRoute
+  '/ferramentas': typeof AuthenticatedFerramentasRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/instagram-radar': typeof AuthenticatedInstagramRadarRoute
@@ -480,6 +489,7 @@ export interface FileRoutesById {
   '/_authenticated/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
+  '/_authenticated/ferramentas': typeof AuthenticatedFerramentasRoute
   '/_authenticated/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
   '/_authenticated/instagram-radar': typeof AuthenticatedInstagramRadarRoute
@@ -536,6 +546,7 @@ export interface FileRouteTypes {
     | '/ebook-studio'
     | '/escala'
     | '/favoritos'
+    | '/ferramentas'
     | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
@@ -590,6 +601,7 @@ export interface FileRouteTypes {
     | '/ebook-studio'
     | '/escala'
     | '/favoritos'
+    | '/ferramentas'
     | '/google-radar'
     | '/importar-anuncio'
     | '/instagram-radar'
@@ -645,6 +657,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ebook-studio'
     | '/_authenticated/escala'
     | '/_authenticated/favoritos'
+    | '/_authenticated/ferramentas'
     | '/_authenticated/google-radar'
     | '/_authenticated/importar-anuncio'
     | '/_authenticated/instagram-radar'
@@ -813,6 +826,13 @@ declare module '@tanstack/react-router' {
       path: '/favoritos'
       fullPath: '/favoritos'
       preLoaderRoute: typeof AuthenticatedFavoritosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/ferramentas': {
+      id: '/_authenticated/ferramentas'
+      path: '/ferramentas'
+      fullPath: '/ferramentas'
+      preLoaderRoute: typeof AuthenticatedFerramentasRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/google-radar': {
@@ -1150,6 +1170,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEbookStudioRoute: typeof AuthenticatedEbookStudioRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
+  AuthenticatedFerramentasRoute: typeof AuthenticatedFerramentasRoute
   AuthenticatedGoogleRadarRoute: typeof AuthenticatedGoogleRadarRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
   AuthenticatedInstagramRadarRoute: typeof AuthenticatedInstagramRadarRoute
@@ -1187,6 +1208,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEbookStudioRoute: AuthenticatedEbookStudioRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
+  AuthenticatedFerramentasRoute: AuthenticatedFerramentasRoute,
   AuthenticatedGoogleRadarRoute: AuthenticatedGoogleRadarRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
   AuthenticatedInstagramRadarRoute: AuthenticatedInstagramRadarRoute,

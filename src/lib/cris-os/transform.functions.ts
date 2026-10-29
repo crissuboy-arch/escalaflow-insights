@@ -368,6 +368,42 @@ export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
   });
 
 /**
+ * Full handoff history for the Ferramentas panel (Fase 2): EVERY handoff
+ * of the authenticated user, any status, newest first — the source of the
+ * panel's Tarefas / Resultados / Histórico / Erros sections. Unlike the
+ * legacy SENT-only grid above, NEEDS_REVIEW and FAILED rows appear here
+ * with their honest labels, and remote refs only when actually returned.
+ * READ-ONLY, user-scoped (same Fase 1 rule as the other reads). */
+export const listHandoffProjectsFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }: { context: { userId?: string } }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    let query = supabaseAdmin
+      .from("intelligence_handoffs")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (userId) query = query.eq("user_id", userId);
+    const { data: handoffRowsRaw } = await query;
+    if (!handoffRowsRaw) return [];
+
+    const views: HandoffProjectView[] = [];
+    for (const h of handoffRowsRaw) {
+      const handoffRow = toHandoffRow(h as Record<string, unknown>);
+      let ad: CollectedAdSummaryRow | null = null;
+      if (handoffRow.source_table === "collected_ads") {
+        const { data: adRow } = await supabaseAdmin
+          .from("collected_ads")
+          .select("headline, advertiser, platform, score, niche, country, image_url, video_url")
+          .eq("id", handoffRow.source_id)
+          .maybeSingle();
+        ad = adRow ?? null;
+      }
+      views.push(buildHandoffProjectView(handoffRow, ad));
+    }
+    return views;
+  });
+
+/**
  * Authenticated status query for one handoff — the Fase 1 polling hook,
  * aligned in Fase 3 with the real Cris OS status endpoint
  * (GET {base}/{handoff_id}/status, audited in cris-os

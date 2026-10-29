@@ -29,6 +29,7 @@ import {
   Gauge,
   Network,
   Zap,
+  Wrench,
 } from "lucide-react";
 import {
   Sidebar,
@@ -85,6 +86,7 @@ export function AppSidebar() {
   const esteira: Item[] = [
     { to: "/dinheiro-rapido", label: "Modo Dinheiro Rápido", icon: Zap },
     { to: "/projetos", label: "Projetos", icon: FolderKanban },
+    { to: "/ferramentas", label: "Ferramentas", icon: Wrench },
     { to: "/produtos/ebook", label: "Criar Ebook", icon: BookOpen },
     { to: "/storybook", label: "StoryBook IA", icon: BookText },
     { to: "/copy", label: "Copy de Vendas", icon: PenLine },
