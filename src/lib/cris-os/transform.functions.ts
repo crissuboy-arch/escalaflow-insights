@@ -185,6 +185,8 @@ export function statusLabelForHandoff(
     return "Oportunidade registada no Cris OS — planeamento ainda não iniciado";
   if (remoteStatus === "REJECTED")
     return "Cris OS rejeitou os dados — consulte os avisos";
+  if (status === "SENT" && (!remoteStatus || remoteStatus === "UNKNOWN"))
+    return "Pedido enviado — a confirmação do Cris OS ainda não foi recebida";
   switch (status) {
     case "SENT":
       return "Projeto criado — aguardando planejamento";
