@@ -14,6 +14,17 @@ const RETRY_DELAY_MS = [400, 1200]; // delay before attempt 2 and attempt 3
 
 export type HandoffStatus = "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
 
+export type CrisOsReceiveStatus = "PERSISTED" | "DUPLICATE" | "NEEDS_REVIEW" | "REJECTED" | "UNKNOWN";
+
+export interface CrisOsReceiveResponse {
+  status?: CrisOsReceiveStatus;
+  handoff_id?: string;
+  project_id?: string | null;
+  errors?: string[];
+  warnings?: string[];
+  [key: string]: unknown;
+}
+
 export interface SendIntelligenceResult {
   ok: boolean;
   status: HandoffStatus;
@@ -21,6 +32,7 @@ export interface SendIntelligenceResult {
   error?: string;
   retryable: boolean;
   attempts: number;
+  remoteResponse?: CrisOsReceiveResponse;
 }
 
 function getConfig(): { baseUrl: string | null; token: string | null } {
@@ -60,7 +72,7 @@ async function attemptOnce(
   token: string,
   handoff: MarketIntelligenceHandoff,
   timeoutMs: number,
-): Promise<{ httpStatus?: number; error?: string; ok: boolean }> {
+): Promise<{ httpStatus?: number; error?: string; ok: boolean; remoteResponse?: CrisOsReceiveResponse }> {
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -71,9 +83,24 @@ async function attemptOnce(
       body: JSON.stringify(handoff),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.ok) return { ok: true, httpStatus: res.status };
     const body = await res.text().catch(() => "");
-    return { ok: false, httpStatus: res.status, error: body.slice(0, 300) || `HTTP ${res.status}` };
+    let remoteResponse: CrisOsReceiveResponse | undefined;
+    try {
+      const parsed: unknown = body ? JSON.parse(body) : undefined;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        remoteResponse = parsed as CrisOsReceiveResponse;
+      }
+    } catch {
+      // Non-JSON error bodies are kept as a short transport error below.
+    }
+    if (res.ok) {
+      return { ok: true, httpStatus: res.status, remoteResponse };
+    }
+    const detail =
+      (remoteResponse as Record<string, unknown> | undefined)?.detail ??
+      (remoteResponse as Record<string, unknown> | undefined)?.message;
+    const error = typeof detail === "string" ? detail : body.slice(0, 300) || `HTTP ${res.status}`;
+    return { ok: false, httpStatus: res.status, error, remoteResponse };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
@@ -134,6 +161,7 @@ export async function sendIntelligence(
         httpStatus: result.httpStatus,
         retryable: false,
         attempts: attempt,
+        remoteResponse: result.remoteResponse,
       };
     }
 
@@ -179,5 +207,31 @@ export async function healthCheck(timeoutMs = 5000): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+
+/** Read-only snapshot from Cris OS for a previously accepted handoff. */
+export async function getIntelligenceStatus(
+  handoffId: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<CrisOsReceiveResponse | null> {
+  const { baseUrl, token } = getConfig();
+  if (!baseUrl || !token) return null;
+  const statusUrl = `${baseUrl.replace(/\\/$/, "")}/${encodeURIComponent(handoffId)}/status`;
+  try {
+    const res = await fetch(statusUrl, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const value: unknown = await res.json();
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as CrisOsReceiveResponse)
+      : null;
+  } catch {
+    return null;
   }
 }
