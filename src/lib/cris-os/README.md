@@ -63,9 +63,11 @@ conectar uma delas sem tocar na mineração:
 ScalaFlow nunca inventa nem completa um path). `CRIS_OS_INTEGRATION_TOKEN`
 — enviado como `Authorization: Bearer <token>`. Ambas em `.env.example`
 sem valor real; sem elas o handoff fica `NOT_SENT` e nenhuma chamada de
-rede é feita. `CRIS_OS_STATUS_URL` (opcional) — base do endpoint de
-estado publicado pelo Cris OS para polling autenticado; sem ela, a
-consulta de estado devolve só o registo local. `SCALAFLOW_ORGANIZATION_ID`
+rede é feita. `CRIS_OS_STATUS_URL` (opcional) — base da coleção de estado
+do Cris OS (`.../api/integrations/scalaflow/intelligence`); a consulta faz
+GET `{base}/{handoff_id}/status` (path real auditado). Sem ela, a base é
+derivada da origem de `CRIS_OS_API_URL`; sem nenhuma das duas, a consulta
+devolve só o registo local. `SCALAFLOW_ORGANIZATION_ID`
 (opcional) — âmbito org registado no mission record; ausente =
 single-tenant, multi-org é fase futura. `CRIS_OS_MINING_SECRET` e
 `CRIS_OS_MINING_USER_ID` — auth da rota `/api/integrations/mining/run`.

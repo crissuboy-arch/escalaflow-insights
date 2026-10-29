@@ -20,6 +20,7 @@ import {
   statusLabelForMission,
   type MissionStatus,
 } from "@/lib/cris-os/mission";
+import { getCrisOsMissionStatus } from "@/lib/missions/adapters/cris-os";
 
 const IdentifyInput = z.object({
   adLibraryId: z.string().optional(),
@@ -367,18 +368,19 @@ export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
   });
 
 /**
- * Authenticated status query for one handoff — the Fase 1 polling hook.
- * READ-ONLY: it never rewrites the local record.
+ * Authenticated status query for one handoff — the Fase 1 polling hook,
+ * aligned in Fase 3 with the real Cris OS status endpoint
+ * (GET {base}/{handoff_id}/status, audited in cris-os
+ * web/backend/routes/market_intelligence.py). READ-ONLY: it never rewrites
+ * the local record.
  *
- * - Without CRIS_OS_STATUS_URL configured, it returns the local record
- *   with source "local" (the only truth ScalaFlow has today).
- * - With CRIS_OS_STATUS_URL configured (base URL of a status endpoint
- *   published by Cris OS — NOT invented here, NOT a default), it GETs
- *   `{base}/{handoff_id}` with the integration Bearer token and returns
- *   the live snapshot alongside the local one. Remote statuses are
- *   surfaced verbatim; an unknown remote status is NEVER remapped to a
- *   local concluded state. Persisting polled state is a Fase 3 item that
- *   waits on the published status contract (see handoff to Cláudio).
+ * - Without CRIS_OS_STATUS_URL configured and without a derivable base
+ *   from CRIS_OS_API_URL, it returns the local record with source "local"
+ *   (the only truth ScalaFlow has today).
+ * - With a base, it returns the live Cris OS snapshot alongside the local
+ *   one (project status, business plan, approval, execution plan, tasks,
+ *   work orders + output refs). Remote statuses are surfaced verbatim;
+ *   an unknown remote status is NEVER remapped to a local concluded state.
  */
 export const getHandoffExecutionStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -392,50 +394,27 @@ export const getHandoffExecutionStatusFn = createServerFn({ method: "POST" })
     const handoffRow = toHandoffRow(handoffRowRaw as Record<string, unknown>);
     const local = buildHandoffProjectView(handoffRow, null);
 
-    const statusBase = process.env.CRIS_OS_STATUS_URL?.trim() || null;
-    const token = process.env.CRIS_OS_INTEGRATION_TOKEN?.trim() || null;
-    if (!statusBase || !token) {
+    const remote = await getCrisOsMissionStatus(data.handoffId);
+    if (!remote.configured) {
       return { found: true as const, source: "local" as const, local, remote: null };
     }
-
-    try {
-      const res = await fetch(`${statusBase.replace(/\/$/, "")}/${encodeURIComponent(data.handoffId)}`, {
-        headers: { authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (!res.ok) {
-        return {
-          found: true as const,
-          source: "local" as const,
-          local,
-          remote: null,
-          remoteError: `HTTP ${res.status}`,
-        };
-      }
-      const body: unknown = await res.json().catch(() => null);
-      const rec =
-        body !== null && typeof body === "object" && !Array.isArray(body)
-          ? (body as Record<string, unknown>)
-          : null;
-      const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
-      return {
-        found: true as const,
-        source: "remote" as const,
-        local,
-        remote: {
-          status: rec ? str(rec.status) : null,
-          missionId: rec ? str(rec.mission_id) : null,
-          executionId: rec ? str(rec.execution_id) : null,
-          reviewUrl: rec ? str(rec.review_url) : null,
-        },
-      };
-    } catch (err) {
+    if (!remote.ok) {
       return {
         found: true as const,
         source: "local" as const,
         local,
         remote: null,
-        remoteError: err instanceof Error ? err.message : String(err),
+        remoteError: remote.error,
       };
     }
+    if (!remote.found || !remote.snapshot) {
+      return {
+        found: true as const,
+        source: "local" as const,
+        local,
+        remote: null,
+        remoteError: "handoff desconhecido no Cris OS (404)",
+      };
+    }
+    return { found: true as const, source: "remote" as const, local, remote: remote.snapshot };
   });
