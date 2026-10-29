@@ -77,6 +77,23 @@ export interface HandoffRow {
   remote_refs?: unknown;
 }
 
+/** Minimal shape of a Supabase query builder, enough for user scoping. */
+export interface UserScopable<T> {
+  eq(column: string, value: string): T;
+}
+
+/**
+ * The Fase 1 user-scope rule, in one testable place: with an authenticated
+ * userId, the query is restricted to that user's rows; without one (a
+ * service context), it is returned unchanged. Every handoff read in this
+ * file goes through this helper, so one user can never read another's
+ * handoffs by a forgotten filter — the guarantee is structural, and it is
+ * unit-tested with a fake chain in mission-flow.test.ts (case 9).
+ */
+export function withUserScope<T extends UserScopable<T>>(query: T, userId: string | null): T {
+  return userId ? query.eq("user_id", userId) : query;
+}
+
 /** Defensive mapping from a stored row (select("*")) to HandoffRow — works
  *  both before and after migration 20261029000000, since new columns read
  *  as undefined pre-migration instead of failing the whole query. */
@@ -244,7 +261,7 @@ export const checkTransformStatusFn = createServerFn({ method: "POST" })
       .from("intelligence_handoffs")
       .select("*")
       .eq("handoff_id", handoffId);
-    if (userId) query = query.eq("user_id", userId);
+    query = withUserScope(query, userId);
     const { data: statusRow } = await query.maybeSingle();
     if (!statusRow) return { sent: false, needsReview: false };
     const stored = toHandoffRow(statusRow as Record<string, unknown>);
@@ -308,7 +325,7 @@ export const loadHandoffProjectFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: z.infer<typeof HandoffIdInput>; context: { userId?: string } }) => {
     const userId = (context as { userId?: string }).userId ?? null;
     let query = supabaseAdmin.from("intelligence_handoffs").select("*").eq("handoff_id", data.handoffId);
-    if (userId) query = query.eq("user_id", userId);
+    query = withUserScope(query, userId);
     const { data: handoffRowRaw } = await query.maybeSingle();
     if (!handoffRowRaw) return { found: false as const };
     const handoffRow = toHandoffRow(handoffRowRaw as Record<string, unknown>);
@@ -346,7 +363,7 @@ export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
       .select("*")
       .eq("status", "SENT")
       .order("created_at", { ascending: false });
-    if (userId) query = query.eq("user_id", userId);
+    query = withUserScope(query, userId);
     const { data: handoffRowsRaw } = await query;
     if (!handoffRowsRaw) return [];
 
@@ -382,7 +399,7 @@ export const listHandoffProjectsFn = createServerFn({ method: "GET" })
       .from("intelligence_handoffs")
       .select("*")
       .order("created_at", { ascending: false });
-    if (userId) query = query.eq("user_id", userId);
+    query = withUserScope(query, userId);
     const { data: handoffRowsRaw } = await query;
     if (!handoffRowsRaw) return [];
 
@@ -424,7 +441,7 @@ export const getHandoffExecutionStatusFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }: { data: z.infer<typeof HandoffIdInput>; context: { userId?: string } }) => {
     const userId = (context as { userId?: string }).userId ?? null;
     let query = supabaseAdmin.from("intelligence_handoffs").select("*").eq("handoff_id", data.handoffId);
-    if (userId) query = query.eq("user_id", userId);
+    query = withUserScope(query, userId);
     const { data: handoffRowRaw } = await query.maybeSingle();
     if (!handoffRowRaw) return { found: false as const };
     const handoffRow = toHandoffRow(handoffRowRaw as Record<string, unknown>);
