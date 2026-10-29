@@ -105,7 +105,7 @@ export async function refreshCrisOsStatus(
   try {
     await handoffsTable()
       .update({
-        remote_status: remote.status ?? null,
+        remote_status: remote.status ?? (remote.project_id ? "PERSISTED" : null),
         remote_project_id: remote.project_id ?? null,
         remote_response: remote,
         updated_at: new Date().toISOString(),
