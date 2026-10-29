@@ -1,4 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// PRE-EXISTING SETUP FIX (provado idêntico na main): importar
+// transform.functions.ts avalia as definições createServerFn, mas o
+// createServerFn real do @tanstack/react-start, no ambiente node do
+// vitest, não tem `.inputValidator` após `.middleware` — a suite nem
+// carregava (0 testes corriam). Este stub só permite carregar o módulo
+// para testar as funções puras; não altera nenhuma asserção nem o
+// comportamento das server functions em produção.
+vi.mock("@tanstack/react-start", () => ({
+  createServerFn: () => ({
+    middleware: () => ({
+      inputValidator: () => ({ handler: (fn: unknown) => fn }),
+      handler: (fn: unknown) => fn,
+    }),
+  }),
+  // auth-middleware.ts chains createMiddleware(...).client(...).server(...)
+  // at import time; the stub only needs to survive module evaluation.
+  createMiddleware: () => ({
+    client: () => ({ server: () => ({}) }),
+  }),
+}));
+
 import {
   buildHandoffProjectView,
   statusLabelForHandoff,

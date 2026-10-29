@@ -1,5 +1,6 @@
 // Read-only view of a real intelligence_handoffs record, reached via the
-// "Ver Projeto" action on TransformToProjectButton once a handoff is SENT.
+// "Ver Projeto" action on TransformToProjectButton once a handoff is SENT
+// or NEEDS_REVIEW.
 // Lives inside the existing Projetos area (same route group as
 // projetos.tsx / projetos.$id.tsx) — this is NOT a second projects area.
 // ScalaFlow has no project_id linking a handoff to a row in `projects`
@@ -38,11 +39,35 @@ const PIPELINE_STEPS = [
   "Concluído",
 ] as const;
 
-function StatusPipeline({ status }: { status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED" }) {
+function StatusPipeline({ status }: { status: "NOT_SENT" | "SENDING" | "SENT" | "NEEDS_REVIEW" | "FAILED" }) {
   if (status === "FAILED") {
     return (
       <div className="flex items-center gap-2 text-sm text-destructive">
         <AlertTriangle className="h-4 w-4" /> Erro no envio — nenhum projeto foi criado.
+      </div>
+    );
+  }
+  if (status === "NEEDS_REVIEW") {
+    // HARD RULE: NEEDS_REVIEW is pending human review, never concluded
+    // work. The banner says so explicitly, and the pipeline marks
+    // "Aguardando aprovação" as the CURRENT pending step — not as done.
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Clock className="h-4 w-4" /> Aguardando revisão — o recetor aceitou o envio e pediu
+          revisão humana. Isto não é trabalho concluído.
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {PIPELINE_STEPS.map((step, i) => (
+            <Badge
+              key={step}
+              variant={i === 2 ? "default" : "outline"}
+              className={i === 2 ? "" : "text-muted-foreground opacity-60"}
+            >
+              {step}
+            </Badge>
+          ))}
+        </div>
       </div>
     );
   }
@@ -163,6 +188,40 @@ function HandoffProjectView() {
 
           {data.lastError ? (
             <p className="text-xs text-destructive">Último erro: {data.lastError}</p>
+          ) : null}
+
+          {/* Remote refs — only ever shown when the receiver actually
+              returned them. Absent means "not returned", never invented. */}
+          {data.missionId || data.executionId || data.remoteStatus || data.reviewUrl || data.resultFiles.length > 0 ? (
+            <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
+              <p className="font-semibold uppercase tracking-wider">
+                Referências remotas (devolvidas pelo recetor)
+              </p>
+              {data.missionId ? <div className="truncate">mission_id: {data.missionId}</div> : null}
+              {data.executionId ? <div className="truncate">execution_id: {data.executionId}</div> : null}
+              {data.remoteStatus ? <div className="truncate">estado remoto: {data.remoteStatus}</div> : null}
+              {data.reviewUrl ? (
+                <div className="truncate">
+                  revisão:{" "}
+                  <a
+                    href={data.reviewUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline"
+                  >
+                    {data.reviewUrl}
+                  </a>
+                </div>
+              ) : null}
+              {data.resultFiles.map((f: { name: string | null; url: string }) => (
+                <div key={f.url} className="truncate">
+                  ficheiro:{" "}
+                  <a href={f.url} target="_blank" rel="noreferrer" className="underline">
+                    {f.name ?? f.url}
+                  </a>
+                </div>
+              ))}
+            </div>
           ) : null}
 
           <div className="grid gap-2 border-t pt-3 text-xs text-muted-foreground sm:grid-cols-2">

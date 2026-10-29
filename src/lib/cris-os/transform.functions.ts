@@ -15,6 +15,11 @@ import {
   type CollectedAdRow,
 } from "@/lib/cris-os/contract";
 import { handoffToCrisOs } from "@/lib/cris-os/service";
+import {
+  parseRemoteRefs,
+  statusLabelForMission,
+  type MissionStatus,
+} from "@/lib/cris-os/mission";
 
 const IdentifyInput = z.object({
   adLibraryId: z.string().optional(),
@@ -57,10 +62,40 @@ export interface HandoffRow {
   handoff_id: string;
   source_table: string;
   source_id: string;
-  status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
+  status: MissionStatus;
   created_at: string;
   sent_at: string | null;
   last_error: string | null;
+  /** Attempts recorded by the service (0 when the row predates tracking). */
+  attempts?: number | null;
+  /** Remote refs — only present when the receiver returned them AND
+   *  migration 20261029000000 has been applied; otherwise null. */
+  mission_id?: string | null;
+  execution_id?: string | null;
+  remote_status?: string | null;
+  remote_refs?: unknown;
+}
+
+/** Defensive mapping from a stored row (select("*")) to HandoffRow — works
+ *  both before and after migration 20261029000000, since new columns read
+ *  as undefined pre-migration instead of failing the whole query. */
+function toHandoffRow(row: Record<string, unknown>): HandoffRow {
+  const asStr = (v: unknown): string | null =>
+    typeof v === "string" && v ? v : null;
+  return {
+    handoff_id: String(row.handoff_id ?? ""),
+    source_table: String(row.source_table ?? ""),
+    source_id: String(row.source_id ?? ""),
+    status: (row.status as MissionStatus) ?? "NOT_SENT",
+    created_at: String(row.created_at ?? ""),
+    sent_at: asStr(row.sent_at),
+    last_error: asStr(row.last_error),
+    attempts: typeof row.attempts === "number" ? row.attempts : null,
+    mission_id: asStr(row.mission_id),
+    execution_id: asStr(row.execution_id),
+    remote_status: asStr(row.remote_status),
+    remote_refs: row.remote_refs ?? null,
+  };
 }
 
 export interface CollectedAdSummaryRow {
@@ -81,10 +116,17 @@ export interface HandoffProjectView {
   handoffId: string;
   sourceTable: string;
   sourceId: string;
-  status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
+  status: MissionStatus;
   createdAt: string;
   sentAt: string | null;
   lastError: string | null;
+  attempts: number | null;
+  /** Remote refs, only when actually returned by the receiver. */
+  missionId: string | null;
+  executionId: string | null;
+  remoteStatus: string | null;
+  reviewUrl: string | null;
+  resultFiles: { name: string | null; url: string }[];
   opportunity: {
     title: string | null;
     platform: string | null;
@@ -117,6 +159,8 @@ export function buildHandoffProjectView(
         }
       : null;
 
+  const remoteRefs = parseRemoteRefs(handoffRow.remote_refs ?? null);
+
   return {
     found: true,
     handoffId: handoffRow.handoff_id,
@@ -126,6 +170,12 @@ export function buildHandoffProjectView(
     createdAt: handoffRow.created_at,
     sentAt: handoffRow.sent_at,
     lastError: handoffRow.last_error,
+    attempts: handoffRow.attempts ?? null,
+    missionId: handoffRow.mission_id ?? null,
+    executionId: handoffRow.execution_id ?? null,
+    remoteStatus: handoffRow.remote_status ?? null,
+    reviewUrl: remoteRefs.review_url,
+    resultFiles: remoteRefs.result_files,
     opportunity,
   };
 }
@@ -165,50 +215,63 @@ export function toHandoffProjectListItem(view: HandoffProjectView): HandoffProje
 
 /** The only status label allowed for SENT today: a real project record
  *  exists in ScalaFlow, but no BusinessPlan/Approval/ExecutionPlan/Tasks
- *  have happened — those are future phases, never implied here. */
-export function statusLabelForHandoff(status: "NOT_SENT" | "SENDING" | "SENT" | "FAILED"): string {
-  switch (status) {
-    case "SENT":
-      return "Projeto criado — aguardando planejamento";
-    case "SENDING":
-      return "Enviando…";
-    case "FAILED":
-      return "Falha ao enviar";
-    default:
-      return "Ainda não enviado";
-  }
+ *  have happened — those are future phases, never implied here.
+ *  NEEDS_REVIEW maps to "Aguardando revisão" and must never render as a
+ *  concluded state (see mission.ts). */
+export function statusLabelForHandoff(status: MissionStatus): string {
+  return statusLabelForMission(status);
 }
 
 /** Lets the UI show "✓ Já enviado" instead of re-sending on every render.
  *  When already SENT, also hands back the real identifiers the UI needs to
  *  open the project view (handoff_id / source_table / source_id) — the
  *  button propagates these itself so consumers never recompute or
- *  duplicate this lookup. */
+ *  duplicate this lookup.
+ *  USER-SCOPED (Fase 1): rows are filtered by the authenticated user_id —
+ *  the old code read through service-role with no user filter, so one user
+ *  could see another's handoffs. NEEDS_REVIEW is reported separately from
+ *  `sent`: it must never render as a concluded project. */
 export const checkTransformStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof IdentifyInput>) => IdentifyInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }: { data: z.infer<typeof IdentifyInput>; context: { userId?: string } }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
     const row = await findCollectedAd(data);
-    if (!row) return { sent: false };
+    if (!row) return { sent: false, needsReview: false };
     const handoffId = computeHandoffId("collected_ad_transform", opportunityIdFor(row));
-    const { data: statusRow } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("intelligence_handoffs")
-      .select("status, source_table, source_id")
-      .eq("handoff_id", handoffId)
-      .maybeSingle();
-    if (statusRow?.status !== "SENT") return { sent: false };
-    return {
-      sent: true,
-      handoffId,
-      sourceTable: statusRow.source_table as string,
-      sourceId: statusRow.source_id as string,
-    };
+      .select("*")
+      .eq("handoff_id", handoffId);
+    if (userId) query = query.eq("user_id", userId);
+    const { data: statusRow } = await query.maybeSingle();
+    if (!statusRow) return { sent: false, needsReview: false };
+    const stored = toHandoffRow(statusRow as Record<string, unknown>);
+    if (stored.status === "SENT") {
+      return {
+        sent: true,
+        needsReview: false,
+        handoffId,
+        sourceTable: stored.source_table,
+        sourceId: stored.source_id,
+      };
+    }
+    if (stored.status === "NEEDS_REVIEW") {
+      return {
+        sent: false,
+        needsReview: true,
+        handoffId,
+        sourceTable: stored.source_table,
+        sourceId: stored.source_id,
+      };
+    }
+    return { sent: false, needsReview: false };
   });
 
 export const transformToProjectFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof IdentifyInput>) => IdentifyInput.parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }: { data: z.infer<typeof IdentifyInput>; context: { userId?: string } }) => {
     const userId = (context as { userId?: string }).userId ?? null;
     const row = await findCollectedAd(data);
     if (!row) return { ok: false, error: "Oportunidade não encontrada." };
@@ -217,6 +280,16 @@ export const transformToProjectFn = createServerFn({ method: "POST" })
     const outcome = await handoffToCrisOs(handoff, "collected_ads", row.id, userId);
 
     if (outcome.status === "SENT") return { ok: true as const, handoffId: handoff.handoff_id };
+    if (outcome.status === "NEEDS_REVIEW")
+      return {
+        ok: true as const,
+        needsReview: true as const,
+        handoffId: handoff.handoff_id,
+        missionId: outcome.remote?.mission_id ?? null,
+        executionId: outcome.remote?.execution_id ?? null,
+      };
+    if (outcome.status === "SENDING")
+      return { ok: false as const, error: "Envio já em curso. Tente novamente em instantes." };
     if (outcome.status === "NOT_SENT")
       return { ok: false as const, error: "Envio para execução não está disponível no momento." };
     return { ok: false as const, error: "Não foi possível enviar. Tente novamente." };
@@ -226,17 +299,18 @@ export const transformToProjectFn = createServerFn({ method: "POST" })
  *  Projeto" navigation. Never touches Cris OS, never re-sends anything —
  *  purely reads what ScalaFlow already persisted. Returns only fields that
  *  are genuinely stored; a project_id would go here once Cris OS starts
- *  returning/persisting one (it does not today). */
+ *  returning/persisting one (it does not today).
+ *  USER-SCOPED (Fase 1): a user can only open their own handoff rows. */
 export const loadHandoffProjectFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof HandoffIdInput>) => HandoffIdInput.parse(d))
-  .handler(async ({ data }) => {
-    const { data: handoffRow } = await supabaseAdmin
-      .from("intelligence_handoffs")
-      .select("handoff_id, source_table, source_id, status, created_at, sent_at, last_error")
-      .eq("handoff_id", data.handoffId)
-      .maybeSingle();
-    if (!handoffRow) return { found: false as const };
+  .handler(async ({ data, context }: { data: z.infer<typeof HandoffIdInput>; context: { userId?: string } }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    let query = supabaseAdmin.from("intelligence_handoffs").select("*").eq("handoff_id", data.handoffId);
+    if (userId) query = query.eq("user_id", userId);
+    const { data: handoffRowRaw } = await query.maybeSingle();
+    if (!handoffRowRaw) return { found: false as const };
+    const handoffRow = toHandoffRow(handoffRowRaw as Record<string, unknown>);
 
     let ad: CollectedAdSummaryRow | null = null;
     if (handoffRow.source_table === "collected_ads") {
@@ -248,37 +322,120 @@ export const loadHandoffProjectFn = createServerFn({ method: "POST" })
       ad = adRow ?? null;
     }
 
-    return buildHandoffProjectView(handoffRow as HandoffRow, ad);
+    return buildHandoffProjectView(handoffRow, ad);
   });
 
-/** Read-only list of every SENT handoff, for the "Continuar onde parou"
- *  grid in the existing Projetos area — so a handoff-derived opportunity
- *  (e.g. Carla Figurinhas, Suitable) shows up there too, clearly marked as
- *  coming from Inteligência de Mercado instead of the legacy `projects`
- *  pipeline. Never sends anything; reuses buildHandoffProjectView so this
- *  list and the single-item "Ver Projeto" view can never disagree. */
+/** Read-only list of the authenticated user's SENT handoffs, for the
+ *  "Continuar onde parou" grid in the existing Projetos area — so a
+ *  handoff-derived opportunity (e.g. Carla Figurinhas, Suitable) shows up
+ *  there too, clearly marked as coming from Inteligência de Mercado
+ *  instead of the legacy `projects` pipeline. Never sends anything;
+ *  reuses buildHandoffProjectView so this list and the single-item "Ver
+ *  Projeto" view can never disagree.
+ *  USER-SCOPED (Fase 1): the old code listed every SENT row in the base.
+ *  NEEDS_REVIEW rows are intentionally NOT in this legacy grid — they
+ *  surface in the Ferramentas panel (Fase 2) and in the handoff view, so
+ *  "awaiting review" is never mistaken for a created project here. */
 export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { data: handoffRows } = await supabaseAdmin
+  .handler(async ({ context }: { context: { userId?: string } }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    let query = supabaseAdmin
       .from("intelligence_handoffs")
-      .select("handoff_id, source_table, source_id, status, created_at, sent_at, last_error")
+      .select("*")
       .eq("status", "SENT")
       .order("created_at", { ascending: false });
-    if (!handoffRows) return [];
+    if (userId) query = query.eq("user_id", userId);
+    const { data: handoffRowsRaw } = await query;
+    if (!handoffRowsRaw) return [];
 
     const views: HandoffProjectView[] = [];
-    for (const h of handoffRows) {
+    for (const h of handoffRowsRaw) {
+      const handoffRow = toHandoffRow(h as Record<string, unknown>);
       let ad: CollectedAdSummaryRow | null = null;
-      if (h.source_table === "collected_ads") {
+      if (handoffRow.source_table === "collected_ads") {
         const { data: adRow } = await supabaseAdmin
           .from("collected_ads")
           .select("headline, advertiser, platform, score, niche, country, image_url, video_url")
-          .eq("id", h.source_id)
+          .eq("id", handoffRow.source_id)
           .maybeSingle();
         ad = adRow ?? null;
       }
-      views.push(buildHandoffProjectView(h as HandoffRow, ad));
+      views.push(buildHandoffProjectView(handoffRow, ad));
     }
     return views;
+  });
+
+/**
+ * Authenticated status query for one handoff — the Fase 1 polling hook.
+ * READ-ONLY: it never rewrites the local record.
+ *
+ * - Without CRIS_OS_STATUS_URL configured, it returns the local record
+ *   with source "local" (the only truth ScalaFlow has today).
+ * - With CRIS_OS_STATUS_URL configured (base URL of a status endpoint
+ *   published by Cris OS — NOT invented here, NOT a default), it GETs
+ *   `{base}/{handoff_id}` with the integration Bearer token and returns
+ *   the live snapshot alongside the local one. Remote statuses are
+ *   surfaced verbatim; an unknown remote status is NEVER remapped to a
+ *   local concluded state. Persisting polled state is a Fase 3 item that
+ *   waits on the published status contract (see handoff to Cláudio).
+ */
+export const getHandoffExecutionStatusFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.infer<typeof HandoffIdInput>) => HandoffIdInput.parse(d))
+  .handler(async ({ data, context }: { data: z.infer<typeof HandoffIdInput>; context: { userId?: string } }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    let query = supabaseAdmin.from("intelligence_handoffs").select("*").eq("handoff_id", data.handoffId);
+    if (userId) query = query.eq("user_id", userId);
+    const { data: handoffRowRaw } = await query.maybeSingle();
+    if (!handoffRowRaw) return { found: false as const };
+    const handoffRow = toHandoffRow(handoffRowRaw as Record<string, unknown>);
+    const local = buildHandoffProjectView(handoffRow, null);
+
+    const statusBase = process.env.CRIS_OS_STATUS_URL?.trim() || null;
+    const token = process.env.CRIS_OS_INTEGRATION_TOKEN?.trim() || null;
+    if (!statusBase || !token) {
+      return { found: true as const, source: "local" as const, local, remote: null };
+    }
+
+    try {
+      const res = await fetch(`${statusBase.replace(/\/$/, "")}/${encodeURIComponent(data.handoffId)}`, {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) {
+        return {
+          found: true as const,
+          source: "local" as const,
+          local,
+          remote: null,
+          remoteError: `HTTP ${res.status}`,
+        };
+      }
+      const body: unknown = await res.json().catch(() => null);
+      const rec =
+        body !== null && typeof body === "object" && !Array.isArray(body)
+          ? (body as Record<string, unknown>)
+          : null;
+      const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
+      return {
+        found: true as const,
+        source: "remote" as const,
+        local,
+        remote: {
+          status: rec ? str(rec.status) : null,
+          missionId: rec ? str(rec.mission_id) : null,
+          executionId: rec ? str(rec.execution_id) : null,
+          reviewUrl: rec ? str(rec.review_url) : null,
+        },
+      };
+    } catch (err) {
+      return {
+        found: true as const,
+        source: "local" as const,
+        local,
+        remote: null,
+        remoteError: err instanceof Error ? err.message : String(err),
+      };
+    }
   });

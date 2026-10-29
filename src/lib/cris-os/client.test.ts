@@ -135,13 +135,23 @@ describe("sendIntelligence — sucesso e autenticação", () => {
 
     const result = await sendIntelligence(VALID_HANDOFF);
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: true,
       status: "SENT",
       httpStatus: 200,
       retryable: false,
       attempts: 1,
     });
+    // Fase 1: o corpo de sucesso é lido (antes era descartado). Corpo "ok"
+    // não é JSON → sem referências remotas, mas o campo existe sempre.
+    expect(result.remote).toMatchObject({
+      mission_id: null,
+      execution_id: null,
+      remote_status: null,
+      review_url: null,
+      result_files: [],
+    });
+    expect(typeof result.remote?.received_at).toBe("string");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe("https://cris-os.example.com/api/intelligence/handoff");

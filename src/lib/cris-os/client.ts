@@ -7,17 +7,25 @@
 // No business logic from Cris OS lives here: this module only knows how to
 // validate, send, retry-safely and report success/failure of one payload.
 import type { MarketIntelligenceHandoff } from "./contract";
+import {
+  mapRemoteOutcome,
+  type MissionStatus,
+  type RemoteMissionRef,
+} from "./mission";
 
 const TRANSIENT_HTTP_STATUS = new Set([408, 429, 502, 503, 504]);
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAY_MS = [400, 1200]; // delay before attempt 2 and attempt 3
 
-export type HandoffStatus = "NOT_SENT" | "SENDING" | "SENT" | "FAILED";
+export type HandoffStatus = MissionStatus;
 
 export interface SendIntelligenceResult {
   ok: boolean;
   status: HandoffStatus;
   httpStatus?: number;
+  /** Remote refs parsed from the receiver's success body, if any — never
+   *  invented. Present only when the send succeeded. */
+  remote?: RemoteMissionRef;
   error?: string;
   retryable: boolean;
   attempts: number;
@@ -54,24 +62,43 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** One HTTP attempt. Never throws — always resolves with a result object. */
+/** One HTTP attempt. Never throws — always resolves with a result object.
+ *  On success the body is parsed tolerantly (JSON when possible, otherwise
+ *  null): it is the receiver's only chance to hand back a mission id, a
+ *  NEEDS_REVIEW state, or result files — discarding it (the old behavior)
+ *  made every 2xx, including 202, look like a concluded send. */
 async function attemptOnce(
   url: string,
   token: string,
   handoff: MarketIntelligenceHandoff,
   timeoutMs: number,
-): Promise<{ httpStatus?: number; error?: string; ok: boolean }> {
+): Promise<{ httpStatus?: number; error?: string; ok: boolean; body?: unknown }> {
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${token}`,
+        // The receiver dedupes on handoff_id; sending it as the standard
+        // idempotency header too costs nothing and lets a conforming
+        // receiver dedupe even before reading the body.
+        "Idempotency-Key": handoff.handoff_id,
       },
       body: JSON.stringify(handoff),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.ok) return { ok: true, httpStatus: res.status };
+    if (res.ok) {
+      const text = await res.text().catch(() => "");
+      let body: unknown = null;
+      if (text) {
+        try {
+          body = JSON.parse(text);
+        } catch {
+          body = null;
+        }
+      }
+      return { ok: true, httpStatus: res.status, body };
+    }
     const body = await res.text().catch(() => "");
     return { ok: false, httpStatus: res.status, error: body.slice(0, 300) || `HTTP ${res.status}` };
   } catch (err) {
@@ -128,10 +155,15 @@ export async function sendIntelligence(
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await attemptOnce(baseUrl, token, handoff, timeoutMs);
     if (result.ok) {
+      // HARD RULE: 202 / NEEDS_REVIEW maps to NEEDS_REVIEW, never SENT.
+      // Callers must branch on `status`, not on `ok` (ok only means the
+      // HTTP send itself succeeded).
+      const mapped = mapRemoteOutcome(result.httpStatus, result.body);
       return {
         ok: true,
-        status: "SENT",
+        status: mapped.status,
         httpStatus: result.httpStatus,
+        remote: mapped.remote,
         retryable: false,
         attempts: attempt,
       };

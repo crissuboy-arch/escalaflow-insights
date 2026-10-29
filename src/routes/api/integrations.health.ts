@@ -11,7 +11,12 @@ export const Route = createFileRoute("/api/integrations/health")({
           platform: ATHENA_PLATFORM,
           status: "operational",
           contract: ATHENA_CONTRACT_VERSION,
-          endpoints: ["/api/integrations/health", "/api/integrations/stats"],
+          endpoints: [
+            "/api/integrations/health",
+            "/api/integrations/stats",
+            "/api/integrations/mining/run",
+            "/api/integrations/intelligence/run",
+          ],
         });
       },
     },

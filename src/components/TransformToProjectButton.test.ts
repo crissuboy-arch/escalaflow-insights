@@ -82,8 +82,11 @@ describe("Ver Projeto — navegação independente, sem reenviar handoff", () =>
     expect(BUTTON_SRC).toMatch(/params=\{\{ handoffId: handoffId! \}\}/);
   });
 
-  it("só aparece quando o status já é 'sent' com handoffId disponível — nunca antes disso", () => {
-    expect(BUTTON_SRC).toMatch(/showViewProject = state === "sent" && !!handoffId/);
+  it("só aparece quando o status já é 'sent' ou 'needsReview' com handoffId disponível — nunca antes disso (Fase 1: NEEDS_REVIEW é visível, nunca concluído)", () => {
+    expect(BUTTON_SRC).toMatch(
+      /showViewProject = \(state === "sent" \|\| state === "needsReview"\) && !!handoffId/,
+    );
+    expect(BUTTON_SRC).not.toMatch(/showViewProject = state === "idle"/);
   });
 });
 
