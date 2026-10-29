@@ -140,6 +140,12 @@ function HandoffProjectView() {
 
   const { opportunity } = data;
   const statusLabel = statusLabelForHandoff(data.status, data.remoteStatus);
+  const remoteErrors = Array.isArray(data.remoteResponse?.errors)
+    ? data.remoteResponse.errors.map(String)
+    : [];
+  const remoteWarnings = Array.isArray(data.remoteResponse?.warnings)
+    ? data.remoteResponse.warnings.map(String)
+    : [];
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
@@ -184,6 +190,16 @@ function HandoffProjectView() {
             <StatusPipeline status={data.status} remoteStatus={data.remoteStatus} />
           </div>
 
+          {remoteErrors.map((error, index) => (
+            <p key={`remote-error-${index}`} className="text-xs text-destructive">
+              Cris OS: {error}
+            </p>
+          ))}
+          {remoteWarnings.map((warning, index) => (
+            <p key={`remote-warning-${index}`} className="text-xs text-amber-700">
+              Aviso: {warning}
+            </p>
+          ))}
           {data.lastError ? (
             <p className="text-xs text-destructive">Último erro: {data.lastError}</p>
           ) : null}
