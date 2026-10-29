@@ -207,14 +207,16 @@ export function statusLabelForHandoff(
 export const checkTransformStatusFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof IdentifyInput>) => IdentifyInput.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
     const row = await findCollectedAd(data);
-    if (!row) return { sent: false };
+    if (!row || !userId) return { sent: false };
     const handoffId = computeHandoffId("collected_ad_transform", opportunityIdFor(row));
     const { data: statusRow } = await supabaseAdmin
       .from("intelligence_handoffs")
       .select("status, source_table, source_id")
       .eq("handoff_id", handoffId)
+      .eq("user_id", userId)
       .maybeSingle();
     if (statusRow?.status !== "SENT") return { sent: false };
     return {
@@ -247,7 +249,13 @@ export const transformToProjectFn = createServerFn({ method: "POST" })
       };
     if (outcome.status === "NOT_SENT")
       return { ok: false as const, error: "Envio para execução não está disponível no momento." };
-    return { ok: false as const, error: "Não foi possível enviar. Tente novamente." };
+    return {
+      ok: false as const,
+      error: outcome.error ?? "Não foi possível enviar. Tente novamente.",
+      remoteStatus: outcome.remoteResponse?.status ?? "UNKNOWN",
+      remoteErrors: outcome.remoteResponse?.errors ?? [],
+      remoteWarnings: outcome.remoteResponse?.warnings ?? [],
+    };
   });
 
 /** Read-only summary of a real intelligence_handoffs row, for the "Ver
@@ -258,15 +266,20 @@ export const transformToProjectFn = createServerFn({ method: "POST" })
 export const loadHandoffProjectFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.infer<typeof HandoffIdInput>) => HandoffIdInput.parse(d))
-  .handler(async ({ data }) => {
-    // Cris OS status is read-only. If it is temporarily unavailable, keep
-    // and display the last response persisted by the send operation.
-    await refreshCrisOsStatus(data.handoffId);
-    const { data: handoffRow } = await supabaseAdmin
+  .handler(async ({ data, context }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    if (!userId) return { found: false as const };
+    const query = () => supabaseAdmin
       .from("intelligence_handoffs")
       .select("handoff_id, source_table, source_id, status, created_at, sent_at, last_error, remote_status, remote_project_id, remote_response")
       .eq("handoff_id", data.handoffId)
-      .maybeSingle();
+      .eq("user_id", userId);
+    const { data: initialRow } = await query().maybeSingle();
+    if (!initialRow) return { found: false as const };
+    // Cris OS status is read-only. If it is temporarily unavailable, keep
+    // and display the last response persisted by the send operation.
+    await refreshCrisOsStatus(data.handoffId);
+    const { data: handoffRow } = await query().maybeSingle();
     if (!handoffRow) return { found: false as const };
 
     let ad: CollectedAdSummaryRow | null = null;
@@ -290,10 +303,13 @@ export const loadHandoffProjectFn = createServerFn({ method: "POST" })
  *  list and the single-item "Ver Projeto" view can never disagree. */
 export const listSentHandoffProjectsFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    const userId = (context as { userId?: string }).userId ?? null;
+    if (!userId) return [];
     const { data: handoffRows } = await supabaseAdmin
       .from("intelligence_handoffs")
       .select("handoff_id, source_table, source_id, status, created_at, sent_at, last_error, remote_status, remote_project_id, remote_response")
+      .eq("user_id", userId)
       .eq("status", "SENT")
       .order("created_at", { ascending: false });
     if (!handoffRows) return [];
