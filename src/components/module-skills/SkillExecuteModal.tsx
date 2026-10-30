@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Zap, Copy, Download, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 export type InputField = {
   key: string;
@@ -50,7 +51,7 @@ export function SkillExecuteModal({ open, onClose, skill }: Props) {
     setResult(null);
     setResultHtml("");
     try {
-      const res = await fetch("/api/execute-skill", {
+      const res = await authedFetch("/api/execute-skill", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ module_key: skill.module_key, inputs: values }),

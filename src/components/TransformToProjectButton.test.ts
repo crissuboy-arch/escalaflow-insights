@@ -104,7 +104,9 @@ describe("Área Projetos existente reutilizada (não é uma segunda área de pro
     // The only step allowed to render as "active" (variant=default) for a
     // SENT handoff is "Projeto criado" — everything else in the pipeline
     // must render muted, since none of it has actually happened yet.
-    expect(HANDOFF_VIEW_SRC).toMatch(/activeIndex = status === "SENT" \? 0 : -1/);
+    expect(HANDOFF_VIEW_SRC).toMatch(
+      /activeIndex\s*=\s*status === "SENT" && \(!remoteStatus \|\| remoteStatus === "PERSISTED" \|\| remoteStatus === "DUPLICATE"\)\s*\?\s*0\s*:\s*-1/,
+    );
     expect(HANDOFF_VIEW_SRC).toMatch(/PIPELINE_STEPS = \[\s*"Projeto criado"/);
   });
 

@@ -350,12 +350,12 @@ describe("getAdDetails / getAdCreatives / getAdEvidence — isolamento e evidên
     expect(creatives).toEqual({ imageUrl: AD_A1.image_url, videoUrl: AD_A1.video_url });
   });
 
-  it("get_ad_evidence para facebook reutiliza a mesma evidência do contrato Cris OS (original_url/collected_at/original_reference)", async () => {
+  it("get_ad_evidence para facebook reutiliza a mesma evidência do contrato Cris OS (source_url/captured_at/raw_reference)", async () => {
     const clientA = await authenticatePrivateApiClient("Bearer secret-a");
     const evidence = await getAdEvidence("ad-a1", "facebook", clientA!);
-    expect(evidence?.original_url).toBe(AD_A1.ad_url);
-    expect(evidence?.original_reference).toBe(AD_A1.ad_library_id);
-    expect(evidence?.collected_at).toBe(AD_A1.first_seen_at);
+    expect(evidence?.source_url).toBe(AD_A1.ad_url);
+    expect(evidence?.raw_reference).toBe(AD_A1.ad_library_id);
+    expect(evidence?.captured_at).toBe(AD_A1.first_seen_at);
   });
 
   it("get_ad_evidence nunca inclui receita/ROAS/lucratividade", async () => {

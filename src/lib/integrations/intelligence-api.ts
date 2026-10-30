@@ -465,13 +465,20 @@ export async function getAdEvidence(
   }
   const details = await getAdDetails(id, source, client);
   if (!details) return null;
+  const metrics = details.observedMetrics ?? {};
+  const metricName = "views" in metrics ? "views" : Object.keys(metrics)[0] ?? null;
+  const metricValue = metricName !== null ? metrics[metricName] : null;
   return {
-    platform: details.platform ?? source,
-    module: `private_api:${source}`,
-    original_url: details.originalUrl,
-    collected_at: details.collectedAt ?? new Date().toISOString(),
-    observed_metric: details.observedMetrics,
-    original_reference: details.identifier,
+    source_type: source.toUpperCase(),
+    source_name: details.platform ?? source,
+    source_url: details.originalUrl,
+    captured_at: details.collectedAt ?? new Date().toISOString(),
+    raw_reference: details.identifier,
+    metric_name: metricName,
+    metric_value: metricValue !== null && metricValue !== undefined ? String(metricValue) : null,
+    metric_unit: metricName ? "count" : null,
+    evidence_type: "OBSERVED",
+    confidence_level: "UNKNOWN",
   };
 }
 

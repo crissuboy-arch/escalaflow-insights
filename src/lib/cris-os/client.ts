@@ -19,6 +19,17 @@ const RETRY_DELAY_MS = [400, 1200]; // delay before attempt 2 and attempt 3
 
 export type HandoffStatus = MissionStatus;
 
+export type CrisOsReceiveStatus = "PERSISTED" | "DUPLICATE" | "NEEDS_REVIEW" | "REJECTED" | "UNKNOWN";
+
+export interface CrisOsReceiveResponse {
+  status?: CrisOsReceiveStatus;
+  handoff_id?: string;
+  project_id?: string | null;
+  errors?: string[];
+  warnings?: string[];
+  [key: string]: unknown;
+}
+
 export interface SendIntelligenceResult {
   ok: boolean;
   status: HandoffStatus;
@@ -29,6 +40,10 @@ export interface SendIntelligenceResult {
   error?: string;
   retryable: boolean;
   attempts: number;
+  /** Second, Cris-OS-specific projection of the same receiver body (status /
+   *  project_id / warnings / errors) that `remote` is derived from. Neither
+   *  invents a field the receiver didn't actually return. */
+  remoteResponse?: CrisOsReceiveResponse;
 }
 
 function getConfig(): { baseUrl: string | null; token: string | null } {
@@ -53,8 +68,8 @@ export function validateBeforeSend(handoff: MarketIntelligenceHandoff): string |
   if (!handoff.schema_version) return "schema_version ausente";
   if (!handoff.source_system || !handoff.source_module)
     return "source_system/source_module ausente";
-  if (!handoff.opportunity?.opportunity_id) return "opportunity.opportunity_id ausente";
-  if (!handoff.opportunity?.title) return "opportunity.title ausente";
+  if (!handoff.opportunity_id) return "opportunity_id ausente";
+  if (!handoff.title) return "title ausente";
   return null;
 }
 
@@ -62,11 +77,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function toReceiveResponse(body: unknown): CrisOsReceiveResponse | undefined {
+  return body !== null && typeof body === "object" && !Array.isArray(body)
+    ? (body as CrisOsReceiveResponse)
+    : undefined;
+}
+
 /** One HTTP attempt. Never throws — always resolves with a result object.
- *  On success the body is parsed tolerantly (JSON when possible, otherwise
- *  null): it is the receiver's only chance to hand back a mission id, a
- *  NEEDS_REVIEW state, or result files — discarding it (the old behavior)
- *  made every 2xx, including 202, look like a concluded send. */
+ *  The body is parsed tolerantly (JSON when possible, otherwise null) on
+ *  both success and failure: it is the receiver's only chance to hand back
+ *  a mission id, a NEEDS_REVIEW state, result files, or a human-readable
+ *  error detail — discarding it (the old behavior) made every 2xx,
+ *  including 202, look like a concluded send, and every error opaque. */
 async function attemptOnce(
   url: string,
   token: string,
@@ -87,20 +109,22 @@ async function attemptOnce(
       body: JSON.stringify(handoff),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    if (res.ok) {
-      const text = await res.text().catch(() => "");
-      let body: unknown = null;
-      if (text) {
-        try {
-          body = JSON.parse(text);
-        } catch {
-          body = null;
-        }
+    const text = await res.text().catch(() => "");
+    let body: unknown = null;
+    if (text) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = null;
       }
+    }
+    if (res.ok) {
       return { ok: true, httpStatus: res.status, body };
     }
-    const body = await res.text().catch(() => "");
-    return { ok: false, httpStatus: res.status, error: body.slice(0, 300) || `HTTP ${res.status}` };
+    const rec = toReceiveResponse(body);
+    const detail = (rec as Record<string, unknown> | undefined)?.detail ?? (rec as Record<string, unknown> | undefined)?.message;
+    const error = typeof detail === "string" ? detail : text.slice(0, 300) || `HTTP ${res.status}`;
+    return { ok: false, httpStatus: res.status, error, body };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: message };
@@ -151,9 +175,11 @@ export async function sendIntelligence(
   const timeoutMs = opts.timeoutMs ?? 8000;
   let lastError: string | undefined;
   let lastStatus: number | undefined;
+  let lastRemoteResponse: CrisOsReceiveResponse | undefined;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const result = await attemptOnce(baseUrl, token, handoff, timeoutMs);
+    const remoteResponse = toReceiveResponse(result.body);
     if (result.ok) {
       // HARD RULE: 202 / NEEDS_REVIEW maps to NEEDS_REVIEW, never SENT.
       // Callers must branch on `status`, not on `ok` (ok only means the
@@ -164,6 +190,7 @@ export async function sendIntelligence(
         status: mapped.status,
         httpStatus: result.httpStatus,
         remote: mapped.remote,
+        remoteResponse,
         retryable: false,
         attempts: attempt,
       };
@@ -171,6 +198,7 @@ export async function sendIntelligence(
 
     lastError = result.error;
     lastStatus = result.httpStatus;
+    lastRemoteResponse = remoteResponse;
 
     const isTransient =
       result.httpStatus === undefined // network error / timeout
@@ -185,6 +213,7 @@ export async function sendIntelligence(
         error: lastError,
         retryable: isTransient, // caller can offer "tentar novamente" when true
         attempts: attempt,
+        remoteResponse,
       };
     }
 
@@ -192,7 +221,14 @@ export async function sendIntelligence(
   }
 
   // Unreachable, but keeps TypeScript happy.
-  return { ok: false, status: "FAILED", error: lastError, retryable: true, attempts: MAX_ATTEMPTS };
+  return {
+    ok: false,
+    status: "FAILED",
+    error: lastError,
+    retryable: true,
+    attempts: MAX_ATTEMPTS,
+    remoteResponse: lastRemoteResponse,
+  };
 }
 
 /** Best-effort reachability probe. Any HTTP response (even 4xx) counts as
@@ -211,5 +247,30 @@ export async function healthCheck(timeoutMs = 5000): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Read-only snapshot from Cris OS for a previously accepted handoff. */
+export async function getIntelligenceStatus(
+  handoffId: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<CrisOsReceiveResponse | null> {
+  const { baseUrl, token } = getConfig();
+  if (!baseUrl || !token) return null;
+  const statusUrl = `${baseUrl.replace(/\/$/, "")}/${encodeURIComponent(handoffId)}/status`;
+  try {
+    const res = await fetch(statusUrl, {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 5000),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const value: unknown = await res.json();
+    return value && typeof value === "object" && !Array.isArray(value)
+      ? (value as CrisOsReceiveResponse)
+      : null;
+  } catch {
+    return null;
   }
 }

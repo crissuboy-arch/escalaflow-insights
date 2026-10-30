@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import { SkillExecuteModal, type ModuleSkill } from "./SkillExecuteModal";
 
 type Props = {
@@ -14,7 +15,7 @@ export function SkillButton({ moduleKey, className }: Props) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/execute-skill?module_key=${encodeURIComponent(moduleKey)}`)
+    authedFetch(`/api/execute-skill?module_key=${encodeURIComponent(moduleKey)}`)
       .then((r) => r.json())
       .then((d: { ok: boolean; skill?: ModuleSkill }) => {
         if (d.ok && d.skill) setSkill(d.skill);

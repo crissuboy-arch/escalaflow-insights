@@ -30,6 +30,7 @@ import {
   Network,
   Zap,
   Wrench,
+  Film,
 } from "lucide-react";
 import {
   Sidebar,
@@ -49,6 +50,8 @@ import {
   initAdActionsCache,
   subscribeChange,
 } from "@/lib/queries";
+import { supabase } from "@/integrations/supabase/client";
+import { isAdmin } from "@/lib/auth/is-admin";
 import logoHorizontal from "@/assets/brand/logo-horizontal.png";
 import logoMark from "@/assets/brand/logo-mark.png";
 
@@ -58,6 +61,7 @@ export function AppSidebar() {
   const [favCount, setFavCount] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
   const [scaledCount, setScaledCount] = useState(0);
+  const [showDatabase, setShowDatabase] = useState(false);
   useEffect(() => {
     const sync = () => {
       setFavCount(getFavCount());
@@ -67,17 +71,31 @@ export function AppSidebar() {
     initAdActionsCache().finally(sync);
     return subscribeChange(sync);
   }, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => isAdmin(supabase, data.user?.id)).then(setShowDatabase);
+  }, []);
   type Item = { to: string; label: string; icon: typeof LayoutDashboard; badge?: number };
   const mineracao: Item[] = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
-    { to: "/radar", label: "Radar", icon: Radar },
+  ];
+  // Radar de Vídeos e Radar TikTok ficam imediatamente um abaixo do outro,
+  // de propósito — são os dois módulos de vídeo mais usados juntos. O
+  // Radar "geral" (Facebook Ads agregado) vai ao final do grupo, por ser
+  // um módulo de análise distinto dos radares de conteúdo por plataforma.
+  const radares: Item[] = [
+    { to: "/radar-videos", label: "Radar de Vídeos", icon: Film },
     { to: "/tiktok-radar", label: "Radar TikTok", icon: Play },
     { to: "/instagram-radar", label: "Radar Instagram", icon: Camera },
-    { to: "/google-radar", label: "Radar Google", icon: BarChart2 },
     { to: "/youtube-radar", label: "Radar YouTube", icon: Youtube },
+    { to: "/google-radar", label: "Radar Google", icon: BarChart2 },
     { to: "/radar-produtos", label: "Radar Produtos", icon: ShoppingBag },
+    { to: "/radar", label: "Radar", icon: Radar },
+  ];
+  const centralMineracao: Item[] = [
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
+  ];
+  const inteligencia: Item[] = [
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
     { to: "/ofertas-escaladas", label: t("nav.scaled"), icon: TrendingUp, badge: scaledCount },
     { to: "/analise-ia", label: t("nav.ai"), icon: Sparkles },
@@ -99,12 +117,23 @@ export function AppSidebar() {
     { to: "/strategic-ai", label: "Strategic AI", icon: BrainCircuit },
   ];
   const conta: Item[] = [
-    { to: "/database", label: "Database", icon: Database },
+    // Ferramenta interna de navegação direta nas tabelas — visível só
+    // para quem tem role "admin" em user_roles (ver src/lib/auth/is-admin.ts).
+    ...(showDatabase ? [{ to: "/database", label: "Database", icon: Database }] : []),
     { to: "/configuracoes", label: t("nav.settings"), icon: Settings },
   ];
+  // Navegação unificada (arquitetura ScalaFlow 2.0): mineração, radares,
+  // central de mineração e inteligência de ofertas eram 4 grupos
+  // separados que, na prática, são a mesma coisa — "fazer e usar
+  // inteligência de mercado". Consolidados num único cabeçalho. "Esteira
+  // do Produto" passa a se chamar "Criação", o pilar de produção de
+  // conteúdo da proposta de arquitetura. Os pilares "Comercial" (NEXORA)
+  // e "Automação" (Central de Missões Athena) NÃO foram adicionados aqui
+  // porque nenhum dos dois tem módulo real implementado ainda — um grupo
+  // de menu sem nenhuma tela por trás seria um link morto em produção.
   const groups: { label: string; items: Item[] }[] = [
-    { label: "Mineração", items: mineracao },
-    { label: "Esteira do Produto", items: esteira },
+    { label: "Inteligência", items: [...mineracao, ...radares, ...centralMineracao, ...inteligencia] },
+    { label: "Criação", items: esteira },
     { label: "Conta", items: conta },
   ];
   return (
@@ -143,7 +172,9 @@ export function AppSidebar() {
                       className="relative transition-all duration-200 hover:bg-primary/5 hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-foreground data-[active=true]:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent),0_0_18px_-4px_color-mix(in_oklab,var(--primary)_50%,transparent)] data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary data-[active=true]:before:shadow-[0_0_8px_var(--primary)]"
                     >
                       <Link to={it.to} className="flex items-center gap-3">
-                        <it.icon className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`} />
+                        <it.icon
+                          className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`}
+                        />
                         <span className="flex-1">{it.label}</span>
                         {it.badge ? (
                           <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary shadow-[0_0_12px_-2px_var(--primary)] group-data-[collapsible=icon]:hidden">

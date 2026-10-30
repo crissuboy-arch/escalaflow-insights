@@ -16,7 +16,7 @@
 //   the base upsert uses only columns that exist since 2026-09-20.
 // - NEEDS_REVIEW is persisted as its own status, never collapsed to SENT.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { isCrisOsConfigured, sendIntelligence } from "./client";
+import { getIntelligenceStatus, isCrisOsConfigured, sendIntelligence, type CrisOsReceiveResponse } from "./client";
 import type { MarketIntelligenceHandoff } from "./contract";
 import {
   EMPTY_REMOTE_REF,
@@ -35,6 +35,7 @@ export interface HandoffOutcome {
    *  is replayed by the pre-send check). Absent means "none returned". */
   remote?: RemoteMissionRef;
   error?: string;
+  remoteResponse?: CrisOsReceiveResponse;
 }
 
 interface StoredHandoffRow {
@@ -138,8 +139,9 @@ export async function handoffToCrisOs(
       result.error ?? null,
       status === "SENT" ? new Date().toISOString() : null,
       remote,
+      result.remoteResponse ?? null,
     );
-    return { attempted: true, status, remote, error: result.error };
+    return { attempted: true, status, remote, error: result.error, remoteResponse: result.remoteResponse };
   } catch (err) {
     // sendIntelligence() is designed to never throw, but this is the last
     // line of defense — a Cris OS problem must never propagate to the caller.
@@ -159,6 +161,7 @@ async function upsertStatus(
   lastError: string | null,
   sentAt: string | null = null,
   remote: RemoteMissionRef | null = null,
+  remoteResponse: CrisOsReceiveResponse | null = null,
 ) {
   try {
     await handoffsTable().upsert(
@@ -171,6 +174,9 @@ async function upsertStatus(
         attempts,
         last_error: lastError,
         sent_at: sentAt,
+        remote_status: remoteResponse?.status ?? null,
+        remote_project_id: remoteResponse?.project_id ?? null,
+        remote_response: remoteResponse ?? null,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "handoff_id" },
@@ -215,4 +221,26 @@ async function upsertStatus(
       console.error("[cris-os] failed to persist handoff remote refs (migration pending?):", e);
     }
   }
+}
+
+
+/** Refresh the read-only project snapshot; never advances planning or execution. */
+export async function refreshCrisOsStatus(
+  handoffId: string,
+): Promise<CrisOsReceiveResponse | null> {
+  const remote = await getIntelligenceStatus(handoffId);
+  if (!remote) return null;
+  try {
+    await handoffsTable()
+      .update({
+        remote_status: remote.status ?? (remote.project_id ? "PERSISTED" : null),
+        remote_project_id: remote.project_id ?? null,
+        remote_response: remote,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("handoff_id", handoffId);
+  } catch (e) {
+    console.error("[cris-os] failed to refresh remote handoff status:", e);
+  }
+  return remote;
 }

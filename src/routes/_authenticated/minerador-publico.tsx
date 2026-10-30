@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { prepareScrapeForAI } from "@/lib/scraper/offer-types";
 import type { PublicOfferData } from "@/lib/scraper/offer-types";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 
 export const Route = createFileRoute("/_authenticated/minerador-publico")({
   beforeLoad: async () => {
@@ -109,7 +110,7 @@ function MineradorPublicoPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/scrape-offer", {
+      const res = await authedFetch("/api/scrape-offer", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url: trimmed, timeout: 30000 }),

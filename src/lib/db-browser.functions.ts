@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isAdmin } from "@/lib/auth/is-admin";
 
 export const ALLOWED_TABLES = [
   "profiles",
@@ -26,7 +27,10 @@ export type AllowedTable = (typeof ALLOWED_TABLES)[number];
 
 export const listTables = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    if (!(await isAdmin(context.supabase, context.userId))) {
+      throw new Error("Apenas administradores podem acessar esta ferramenta.");
+    }
     return { tables: ALLOWED_TABLES as readonly string[] };
   });
 
@@ -40,6 +44,9 @@ export const fetchTableRows = createServerFn({ method: "POST" })
   .inputValidator((d: z.infer<typeof FetchInput>) => FetchInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    if (!(await isAdmin(supabase, context.userId))) {
+      throw new Error("Apenas administradores podem acessar esta ferramenta.");
+    }
     const table = data.table as AllowedTable;
     const { data: rows, error, count } = await supabase
       .from(table as never)

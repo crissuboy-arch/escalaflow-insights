@@ -662,6 +662,9 @@ export type Database = {
           handoff_id: string
           id: string
           last_error: string | null
+          remote_project_id: string | null
+          remote_response: Json | null
+          remote_status: string | null
           sent_at: string | null
           source_id: string
           source_table: string
@@ -675,6 +678,9 @@ export type Database = {
           handoff_id: string
           id?: string
           last_error?: string | null
+          remote_project_id?: string | null
+          remote_response?: Json | null
+          remote_status?: string | null
           sent_at?: string | null
           source_id: string
           source_table: string
@@ -688,6 +694,9 @@ export type Database = {
           handoff_id?: string
           id?: string
           last_error?: string | null
+          remote_project_id?: string | null
+          remote_response?: Json | null
+          remote_status?: string | null
           sent_at?: string | null
           source_id?: string
           source_table?: string
