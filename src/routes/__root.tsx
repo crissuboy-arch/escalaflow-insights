@@ -1,4 +1,6 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
@@ -36,10 +38,18 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Flow — AI Mission Control para escalar produtos" },
-      { name: "description", content: "Flow é a central de inteligência artificial para minerar, criar e escalar produtos digitais — mineração de ofertas, copy, criativos, página de venda e escala em um único fluxo." },
+      {
+        name: "description",
+        content:
+          "Flow é a central de inteligência artificial para minerar, criar e escalar produtos digitais — mineração de ofertas, copy, criativos, página de venda e escala em um único fluxo.",
+      },
       { name: "author", content: "Flow" },
       { property: "og:title", content: "Flow — AI Mission Control para escalar produtos" },
-      { property: "og:description", content: "Minere. Crie. Escale. A central de IA para operar sua máquina de produtos digitais." },
+      {
+        property: "og:description",
+        content:
+          "Minere. Crie. Escale. A central de IA para operar sua máquina de produtos digitais.",
+      },
       { property: "og:type", content: "website" },
       { property: "og:image", content: ogImageUrl },
       { name: "twitter:card", content: "summary_large_image" },
@@ -68,18 +78,24 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
+  // useState (not a module-level singleton) so SSR gives each request its
+  // own QueryClient — a shared instance across requests would leak cached
+  // data between users.
+  const [queryClient] = useState(() => new QueryClient());
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body className="antialiased">
-        <ThemeProvider>
-          <AuthProvider>
-            {children}
-            <Toaster richColors position="top-right" />
-          </AuthProvider>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider>
+            <AuthProvider>
+              {children}
+              <Toaster richColors position="top-right" />
+            </AuthProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
         <Scripts />
       </body>
     </html>
