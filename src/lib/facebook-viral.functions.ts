@@ -37,6 +37,12 @@ export interface ViralPageRow {
   followers: number | null;
   notes: string | null;
   affiliate_product_id: string | null;
+  // Colunas aditivas da Fase 3 (migration facebook_viral_mining) — opcionais
+  // até a migration ser aplicada no ambiente real.
+  verified_name?: string | null;
+  last_mined_at?: string | null;
+  name_source?: "manual" | "apify";
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -235,6 +241,14 @@ export interface ViralReelRow {
   affiliate_link: string | null;
   affiliate_product_id: string | null;
   notes: string | null;
+  // Colunas aditivas da Fase 3 (migration facebook_viral_mining).
+  comments_count?: number | null;
+  shares_count?: number | null;
+  caption?: string | null;
+  thumbnail_url?: string | null;
+  collected_at?: string | null;
+  data_source?: "manual" | "apify";
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -367,10 +381,12 @@ const SaveAffiliateProductInput = z.object({
   network: z.enum(["clickbank", "digistore24", "other"]).default("other"),
   productName: z.string().min(1),
   commission: z.string().optional(),
+  currency: z.string().optional(),
   affiliateLink: z.string().min(1),
   salesPageUrl: z.string().optional(),
   niche: z.string().optional(),
   targetAudience: z.string().optional(),
+  approvalStatus: z.enum(["pending", "approved", "rejected"]).default("pending"),
 });
 
 export interface AffiliateProductRow {
@@ -382,6 +398,10 @@ export interface AffiliateProductRow {
   sales_page_url: string | null;
   niche: string | null;
   target_audience: string | null;
+  // Colunas aditivas da Fase 3 (migration facebook_viral_mining).
+  currency?: string | null;
+  approval_status?: "pending" | "approved" | "rejected";
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -403,10 +423,12 @@ export const saveAffiliateProduct = createServerFn({ method: "POST" })
           network: data.network,
           product_name: data.productName.trim(),
           commission: data.commission?.trim() || null,
+          currency: data.currency?.trim() || null,
           affiliate_link: data.affiliateLink.trim(),
           sales_page_url: data.salesPageUrl?.trim() || null,
           niche: data.niche?.trim() || null,
           target_audience: data.targetAudience?.trim() || null,
+          approval_status: data.approvalStatus,
         })
         .select()
         .single();
@@ -414,6 +436,30 @@ export const saveAffiliateProduct = createServerFn({ method: "POST" })
       return { ok: true, product: row as AffiliateProductRow };
     },
   );
+
+const UpdateAffiliateProductInput = z.object({
+  id: z.string().uuid(),
+  currency: z.string().optional(),
+  approvalStatus: z.enum(["pending", "approved", "rejected"]).optional(),
+});
+
+/** So far only currency/approvalStatus are editable after creation — the
+ *  other fields (link, commission, etc.) are stable identifiers of the deal
+ *  and editing them isn't requested yet. */
+export const updateAffiliateProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => UpdateAffiliateProductInput.parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: boolean; error?: string }> => {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.currency !== undefined) patch.currency = data.currency.trim() || null;
+    if (data.approvalStatus !== undefined) patch.approval_status = data.approvalStatus;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { error } = await sb.from("affiliate_products").update(patch).eq("id", data.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  });
 
 export const listAffiliateProducts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

@@ -8,7 +8,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Facebook, Film, Plus, Trash2, ExternalLink, Loader2, Pencil } from "lucide-react";
+import { Facebook, Film, Plus, Trash2, ExternalLink, Loader2, Pencil, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,12 +38,18 @@ import {
   deleteViralPage,
   deleteViralReel,
   saveAffiliateProduct,
+  updateAffiliateProduct,
   listAffiliateProducts,
   deleteAffiliateProduct,
   type ViralPageRow,
   type ViralReelRow,
   type AffiliateProductRow,
 } from "@/lib/facebook-viral.functions";
+import {
+  estimateMiningCostFn,
+  runFacebookMining,
+  type RunMiningResult,
+} from "@/lib/facebook-viral-mining.functions";
 
 export const Route = createFileRoute("/_authenticated/facebook-viral")({
   beforeLoad: async () => {
@@ -74,7 +80,8 @@ function FacebookViralPage() {
           <TabsTrigger value="afiliados">Produtos de Afiliado</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="importar">
+        <TabsContent value="importar" className="space-y-4">
+          <MineFacebookPageCard />
           <ImportForm />
         </TabsContent>
         <TabsContent value="paginas">
@@ -88,6 +95,143 @@ function FacebookViralPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// ── Minerar Página (Apify, gasto real — precisa de confirmação explícita) ──
+
+function MineFacebookPageCard() {
+  const estimateCost = useServerFn(estimateMiningCostFn);
+  const runMining = useServerFn(runFacebookMining);
+  const queryClient = useQueryClient();
+
+  const [pageUrl, setPageUrl] = useState("");
+  const [periodDays, setPeriodDays] = useState<7 | 30 | 90>(30);
+  const [limit, setLimit] = useState<10 | 20 | 30>(10);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [mining, setMining] = useState(false);
+
+  const urlCheck = pageUrl.trim() ? checkFacebookUrl(pageUrl) : null;
+
+  const costQ = useQuery({
+    queryKey: ["facebook-viral", "mining-cost", limit],
+    queryFn: () => estimateCost({ data: { limit } }),
+  });
+
+  async function handleConfirmMining() {
+    setMining(true);
+    try {
+      const result: RunMiningResult = await runMining({
+        data: { pageUrl, periodDays, limit },
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const nameNote = result.verifiedName ? ` Nome confirmado: "${result.verifiedName}".` : "";
+      toast.success(
+        `Mineração concluída: ${result.insertedReels} Reel(s) novo(s), ${result.skippedDuplicates} já existiam.${nameNote}`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["facebook-viral"] });
+    } finally {
+      setMining(false);
+      setConfirmOpen(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Search className="h-4 w-4" /> Minerar Página (Apify)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          Busca a página e os Reels reais via Apify — confirma a identidade da página (nome real,
+          não o que foi digitado) e traz métricas que o Facebook não mostra a visitantes anónimos.{" "}
+          <strong>Isto gasta créditos Apify reais</strong> — mostra o custo estimado antes de
+          confirmar, e nunca executa sem confirmação explícita.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5 sm:col-span-3">
+            <label className="text-xs font-medium text-muted-foreground">
+              URL real da página Facebook
+            </label>
+            <Input
+              value={pageUrl}
+              onChange={(e) => setPageUrl(e.target.value)}
+              placeholder="facebook.com/tysonreed"
+            />
+            {urlCheck && !urlCheck.valid ? (
+              <p className="text-xs text-destructive">{urlCheck.error}</p>
+            ) : null}
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Período</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={periodDays}
+              onChange={(e) => setPeriodDays(Number(e.target.value) as 7 | 30 | 90)}
+            >
+              <option value={7}>7 dias</option>
+              <option value={30}>30 dias</option>
+              <option value={90}>90 dias</option>
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Limite de Reels</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={limit}
+              onChange={(e) => setLimit(Number(e.target.value) as 10 | 20 | 30)}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={30}>30</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={!urlCheck?.valid || mining}
+              onClick={() => setConfirmOpen(true)}
+            >
+              {mining ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="mr-2 h-4 w-4" />
+              )}
+              Minerar Página
+            </Button>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Custo estimado para {limit} Reel(s): {costQ.data?.breakdown ?? "calculando…"}
+        </p>
+      </CardContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar gasto de créditos Apify?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isto vai gastar aproximadamente{" "}
+              <strong>US${costQ.data?.totalUSD.toFixed(4) ?? "?"}</strong> em créditos Apify reais
+              para minerar a página e até {limit} Reel(s) dos últimos {periodDays} dias. Reels já
+              guardados não são duplicados nem sobrescritos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmMining} disabled={mining}>
+              {mining ? "Minerando…" : "Confirmar e gastar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }
 
@@ -340,7 +484,7 @@ function PagesList() {
                 <CardContent className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-medium">{p.page_name || p.page_url}</p>
+                      <p className="font-medium">{p.verified_name || p.page_name || p.page_url}</p>
                       <a
                         href={p.page_url}
                         target="_blank"
@@ -360,6 +504,11 @@ function PagesList() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
+                    {p.verified_name ? (
+                      <Badge variant="default">Identidade verificada (Apify)</Badge>
+                    ) : (
+                      <Badge variant="outline">Nome não verificado</Badge>
+                    )}
                     {p.niche ? <Badge variant="secondary">{p.niche}</Badge> : null}
                     {p.country ? <Badge variant="secondary">{p.country}</Badge> : null}
                     {p.folder ? <Badge variant="outline">{p.folder}</Badge> : null}
@@ -524,13 +673,24 @@ function EditPageDialog({
 
 // ── Reels ────────────────────────────────────────────────────────────────
 
+const VIEW_TIERS = [
+  { value: "0", label: "Todas as visualizações" },
+  { value: "100000", label: "≥ 100k" },
+  { value: "500000", label: "≥ 500k" },
+  { value: "1000000", label: "≥ 1M" },
+] as const;
+
 function ReelsList() {
   const listReels = useServerFn(listViralReels);
   const removeReel = useServerFn(deleteViralReel);
   const listProducts = useServerFn(listAffiliateProducts);
+  const listPagesForFilter = useServerFn(listViralPages);
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<ViralReelRow | null>(null);
   const [deleting, setDeleting] = useState<ViralReelRow | null>(null);
+  const [minViews, setMinViews] = useState("0");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "manual" | "apify">("all");
+  const [pageFilter, setPageFilter] = useState("");
 
   const reelsQ = useQuery({
     queryKey: ["facebook-viral", "reels"],
@@ -540,9 +700,19 @@ function ReelsList() {
     queryKey: ["facebook-viral", "affiliate-products"],
     queryFn: () => listProducts(),
   });
+  const pagesQ = useQuery({
+    queryKey: ["facebook-viral", "pages-for-reel-filter"],
+    queryFn: () => listPagesForFilter({ data: { orderBy: "created_at" } }),
+  });
 
-  const reels = (reelsQ.data ?? []) as ViralReelRow[];
   const products = (productsQ.data ?? []) as AffiliateProductRow[];
+  const pages = (pagesQ.data ?? []) as ViralPageRow[];
+  const reels = ((reelsQ.data ?? []) as ViralReelRow[]).filter((r) => {
+    if (Number(minViews) > 0 && (r.views ?? 0) < Number(minViews)) return false;
+    if (sourceFilter !== "all" && (r.data_source ?? "manual") !== sourceFilter) return false;
+    if (pageFilter && r.viral_page_id !== pageFilter) return false;
+    return true;
+  });
 
   async function handleDelete(id: string) {
     const result = await removeReel({ data: { id } });
@@ -557,10 +727,44 @@ function ReelsList() {
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <select
+          className="flex h-9 rounded-md border border-input bg-background px-3 text-xs"
+          value={minViews}
+          onChange={(e) => setMinViews(e.target.value)}
+        >
+          {VIEW_TIERS.map((tier) => (
+            <option key={tier.value} value={tier.value}>
+              {tier.label}
+            </option>
+          ))}
+        </select>
+        <select
+          className="flex h-9 rounded-md border border-input bg-background px-3 text-xs"
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value as "all" | "manual" | "apify")}
+        >
+          <option value="all">Manual + Apify</option>
+          <option value="manual">Só manual</option>
+          <option value="apify">Só Apify</option>
+        </select>
+        <select
+          className="flex h-9 rounded-md border border-input bg-background px-3 text-xs"
+          value={pageFilter}
+          onChange={(e) => setPageFilter(e.target.value)}
+        >
+          <option value="">Todas as páginas</option>
+          {pages.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.verified_name || p.page_name || p.page_url}
+            </option>
+          ))}
+        </select>
+      </div>
       {reelsQ.isLoading ? (
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       ) : reels.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nenhum Reel guardado ainda.</p>
+        <p className="text-sm text-muted-foreground">Nenhum Reel guardado com estes filtros.</p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {reels.map((r) => {
@@ -596,8 +800,28 @@ function ReelsList() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="outline">{r.link_type}</Badge>
+                    <Badge variant={r.data_source === "apify" ? "default" : "outline"}>
+                      {r.data_source === "apify" ? "Apify" : "Manual"}
+                    </Badge>
                     {typeof r.views === "number" ? (
-                      <Badge variant="secondary">{r.views.toLocaleString()} visualizações</Badge>
+                      <Badge variant="secondary">
+                        {r.views.toLocaleString()} visualizações
+                        {r.views >= 1_000_000
+                          ? " · 1M+"
+                          : r.views >= 500_000
+                            ? " · 500k+"
+                            : r.views >= 100_000
+                              ? " · 100k+"
+                              : ""}
+                      </Badge>
+                    ) : null}
+                    {typeof r.comments_count === "number" ? (
+                      <Badge variant="secondary">
+                        {r.comments_count.toLocaleString()} comentários
+                      </Badge>
+                    ) : null}
+                    {typeof r.shares_count === "number" ? (
+                      <Badge variant="secondary">{r.shares_count.toLocaleString()} partilhas</Badge>
                     ) : null}
                     {r.published_at ? (
                       <Badge variant="secondary">
@@ -608,6 +832,7 @@ function ReelsList() {
                       <Badge variant="outline">Produto: {linkedProduct.product_name}</Badge>
                     ) : null}
                   </div>
+                  {r.caption ? <p className="text-xs text-muted-foreground">{r.caption}</p> : null}
                   {r.notes ? <p className="text-xs text-muted-foreground">{r.notes}</p> : null}
                 </CardContent>
               </Card>
@@ -758,9 +983,12 @@ function AffiliateProductsPanel() {
   const queryClient = useQueryClient();
   const [deleting, setDeleting] = useState<AffiliateProductRow | null>(null);
 
+  const update = useServerFn(updateAffiliateProduct);
+
   const [network, setNetwork] = useState<"clickbank" | "digistore24" | "other">("other");
   const [productName, setProductName] = useState("");
   const [commission, setCommission] = useState("");
+  const [currency, setCurrency] = useState("");
   const [affiliateLink, setAffiliateLink] = useState("");
   const [salesPageUrl, setSalesPageUrl] = useState("");
   const [productNiche, setProductNiche] = useState("");
@@ -773,6 +1001,32 @@ function AffiliateProductsPanel() {
   });
   const products = (productsQ.data ?? []) as AffiliateProductRow[];
 
+  const listPagesForProducts = useServerFn(listViralPages);
+  const listReelsForProducts = useServerFn(listViralReels);
+  const pagesQ = useQuery({
+    queryKey: ["facebook-viral", "pages-for-products"],
+    queryFn: () => listPagesForProducts({ data: { orderBy: "created_at" } }),
+  });
+  const reelsQ = useQuery({
+    queryKey: ["facebook-viral", "reels-for-products"],
+    queryFn: () => listReelsForProducts({ data: { orderBy: "created_at" } }),
+  });
+  const pages = (pagesQ.data ?? []) as ViralPageRow[];
+  const reels = (reelsQ.data ?? []) as ViralReelRow[];
+
+  async function handleApprovalChange(
+    productId: string,
+    approvalStatus: "pending" | "approved" | "rejected",
+  ) {
+    const result = await update({ data: { id: productId, approvalStatus } });
+    if (!result.ok) {
+      toast.error(result.error ?? "Não foi possível atualizar o estado de aprovação.");
+      return;
+    }
+    toast.success("Estado de aprovação atualizado.");
+    queryClient.invalidateQueries({ queryKey: ["facebook-viral", "affiliate-products"] });
+  }
+
   async function handleSubmit() {
     if (!productName.trim() || !affiliateLink.trim()) return;
     setSubmitting(true);
@@ -782,6 +1036,7 @@ function AffiliateProductsPanel() {
           network,
           productName,
           commission: commission || undefined,
+          currency: currency || undefined,
           affiliateLink,
           salesPageUrl: salesPageUrl || undefined,
           niche: productNiche || undefined,
@@ -795,6 +1050,7 @@ function AffiliateProductsPanel() {
       toast.success("Produto de afiliado guardado.");
       setProductName("");
       setCommission("");
+      setCurrency("");
       setAffiliateLink("");
       setSalesPageUrl("");
       setProductNiche("");
@@ -837,6 +1093,7 @@ function AffiliateProductsPanel() {
           </div>
           <Field label="Nome do produto" value={productName} onChange={setProductName} />
           <Field label="Comissão" value={commission} onChange={setCommission} />
+          <Field label="Moeda (ex.: USD, BRL)" value={currency} onChange={setCurrency} />
           <Field label="Link de afiliado" value={affiliateLink} onChange={setAffiliateLink} />
           <Field label="Página de vendas" value={salesPageUrl} onChange={setSalesPageUrl} />
           <Field label="Nicho" value={productNiche} onChange={setProductNiche} />
@@ -854,23 +1111,55 @@ function AffiliateProductsPanel() {
 
       {products.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          {products.map((p) => (
-            <Card key={p.id}>
-              <CardContent className="space-y-1 p-4">
-                <div className="flex items-start justify-between">
-                  <p className="font-medium">{p.product_name}</p>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleting(p)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge variant="outline">{p.network}</Badge>
-                  {p.commission ? <Badge variant="secondary">{p.commission}</Badge> : null}
-                  {p.niche ? <Badge variant="secondary">{p.niche}</Badge> : null}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {products.map((p) => {
+            const pageCount = pages.filter((pg) => pg.affiliate_product_id === p.id).length;
+            const reelCount = reels.filter((r) => r.affiliate_product_id === p.id).length;
+            const approval = p.approval_status ?? "pending";
+            return (
+              <Card key={p.id}>
+                <CardContent className="space-y-2 p-4">
+                  <div className="flex items-start justify-between">
+                    <p className="font-medium">{p.product_name}</p>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleting(p)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant="outline">{p.network}</Badge>
+                    {p.commission ? (
+                      <Badge variant="secondary">
+                        {p.commission}
+                        {p.currency ? ` ${p.currency}` : ""}
+                      </Badge>
+                    ) : null}
+                    {p.niche ? <Badge variant="secondary">{p.niche}</Badge> : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {pageCount} página(s) · {reelCount} Reel(s) associado(s)
+                  </p>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      Estado de aprovação (declarado por ti)
+                    </label>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                      value={approval}
+                      onChange={(e) =>
+                        handleApprovalChange(
+                          p.id,
+                          e.target.value as "pending" | "approved" | "rejected",
+                        )
+                      }
+                    >
+                      <option value="pending">Pendente</option>
+                      <option value="approved">Aprovado</option>
+                      <option value="rejected">Rejeitado</option>
+                    </select>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : null}
 
