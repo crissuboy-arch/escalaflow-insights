@@ -140,6 +140,66 @@ export const findOrCreateViralPage = createServerFn({ method: "POST" })
     },
   );
 
+const UpdateViralPageInput = z.object({
+  id: z.string().uuid(),
+  pageUrl: z.string().min(1).optional(),
+  pageName: z.string().optional(),
+  country: z.string().optional(),
+  language: z.string().optional(),
+  niche: z.string().optional(),
+  folder: z.string().optional(),
+  followers: z.number().int().min(0).optional(),
+  notes: z.string().optional(),
+  affiliateProductId: z.string().uuid().nullable().optional(),
+});
+
+/** Edits an existing page in place (same id) — e.g. correcting a URL typed
+ *  before the real page was confirmed. Never used to silently "fix" a
+ *  duplicate; INVALID_URL/DUPLICATE still surface to the caller. */
+export const updateViralPage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => UpdateViralPageInput.parse(d))
+  .handler(async ({ data, context }): Promise<SaveViralPageResult> => {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (data.pageUrl !== undefined) {
+      const check = checkFacebookUrl(data.pageUrl);
+      if (!check.valid || !check.normalizedUrl) {
+        return { ok: false, error: check.error ?? "URL inválida", code: "INVALID_URL" };
+      }
+      patch.page_url = check.normalizedUrl;
+    }
+    if (data.pageName !== undefined) patch.page_name = data.pageName.trim() || null;
+    if (data.country !== undefined) patch.country = data.country.trim() || null;
+    if (data.language !== undefined) patch.language = data.language.trim() || null;
+    if (data.niche !== undefined) patch.niche = data.niche.trim() || null;
+    if (data.folder !== undefined) patch.folder = data.folder.trim() || null;
+    if (data.followers !== undefined) patch.followers = data.followers;
+    if (data.notes !== undefined) patch.notes = data.notes.trim() || null;
+    if (data.affiliateProductId !== undefined) patch.affiliate_product_id = data.affiliateProductId;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { data: row, error } = await sb
+      .from("viral_pages")
+      .update(patch)
+      .eq("id", data.id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          ok: false,
+          error: "Já existe outra página guardada com esse URL.",
+          code: "DUPLICATE",
+        };
+      }
+      return { ok: false, error: error.message, code: "DB_ERROR" };
+    }
+    return { ok: true, page: row as ViralPageRow };
+  });
+
 export const deleteViralPage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
@@ -252,6 +312,42 @@ export const getViralReel = createServerFn({ method: "POST" })
     const sb = context.supabase as any;
     const { data: row } = await sb.from("viral_reels").select("*").eq("id", data.id).maybeSingle();
     return (row as ViralReelRow) ?? null;
+  });
+
+const UpdateViralReelInput = z.object({
+  id: z.string().uuid(),
+  views: z.number().int().min(0).optional(),
+  publishedAt: z.string().optional(),
+  productPromoted: z.string().optional(),
+  affiliateLink: z.string().optional(),
+  affiliateProductId: z.string().uuid().nullable().optional(),
+  notes: z.string().optional(),
+});
+
+/** Partial edit — mainly for linking an existing affiliate product after
+ *  the reel was already saved (the create form only takes a free-text
+ *  productPromoted/affiliateLink, not a picker). */
+export const updateViralReel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => UpdateViralReelInput.parse(d))
+  .handler(async ({ data, context }): Promise<{ ok: boolean; error?: string }> => {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (data.views !== undefined) patch.views = data.views;
+    if (data.publishedAt !== undefined) {
+      const d2 = new Date(data.publishedAt);
+      patch.published_at = !Number.isNaN(d2.getTime()) ? d2.toISOString() : null;
+    }
+    if (data.productPromoted !== undefined)
+      patch.product_promoted = data.productPromoted.trim() || null;
+    if (data.affiliateLink !== undefined) patch.affiliate_link = data.affiliateLink.trim() || null;
+    if (data.affiliateProductId !== undefined) patch.affiliate_product_id = data.affiliateProductId;
+    if (data.notes !== undefined) patch.notes = data.notes.trim() || null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = context.supabase as any;
+    const { error } = await sb.from("viral_reels").update(patch).eq("id", data.id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
   });
 
 export const deleteViralReel = createServerFn({ method: "POST" })

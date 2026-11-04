@@ -6,6 +6,7 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { ArrowLeft, Upload, Loader2, Copy, CopyCheck, Scissors, Film } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   listViralAvatars,
   saveViralAvatar,
   saveViralScript,
+  listViralScripts,
   generateClipsForScript,
   listScriptClips,
   updateScriptClip,
@@ -232,6 +234,7 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
   const listAvatars = useServerFn(listViralAvatars);
   const createAvatar = useServerFn(saveViralAvatar);
   const saveScript = useServerFn(saveViralScript);
+  const listScripts = useServerFn(listViralScripts);
   const generateClips = useServerFn(generateClipsForScript);
   const listClips = useServerFn(listScriptClips);
   const updateClip = useServerFn(updateScriptClip);
@@ -245,10 +248,12 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
 
   const [scriptId, setScriptId] = useState<string | null>(null);
   const [scriptText, setScriptText] = useState("");
+  const [savedScriptText, setSavedScriptText] = useState("");
   const [language, setLanguage] = useState<"en-US" | "es">("en-US");
   const [avatarId, setAvatarId] = useState<string>("");
   const [newAvatarName, setNewAvatarName] = useState("");
   const [savingScript, setSavingScript] = useState(false);
+  const [restoredExisting, setRestoredExisting] = useState(false);
 
   const analysisQ = useQuery({
     queryKey: ["facebook-viral", "analysis", videoId],
@@ -263,6 +268,36 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
       setWhyItWorks(analysisQ.data.why_it_works ?? "");
     }
   }, [analysisQ.data]);
+
+  // Reopens the script already saved for this video's analysis (if any) —
+  // without this, refreshing the page loses the script even though it's
+  // still in the DB, since scriptId only gets set after a save in-session.
+  const scriptsQ = useQuery({
+    queryKey: ["facebook-viral", "scripts"],
+    queryFn: () => listScripts(),
+    enabled: !!analysisQ.data?.id,
+  });
+
+  useEffect(() => {
+    if (restoredExisting || !analysisQ.data?.id || !scriptsQ.data) return;
+    const existing = scriptsQ.data.find((s) => s.viral_analysis_id === analysisQ.data!.id);
+    if (existing) {
+      setScriptId(existing.id);
+      setScriptText(existing.script_text);
+      setSavedScriptText(existing.script_text);
+      setLanguage(existing.language);
+      setAvatarId(existing.viral_avatar_id ?? "");
+    }
+    setRestoredExisting(true);
+  }, [restoredExisting, analysisQ.data, scriptsQ.data]);
+
+  useEffect(() => {
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (scriptText !== savedScriptText) e.preventDefault();
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [scriptText, savedScriptText]);
 
   const avatarsQ = useQuery({
     queryKey: ["facebook-viral", "avatars"],
@@ -281,9 +316,14 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
   async function handleSaveAnalysis() {
     setSavingAnalysis(true);
     try {
-      await saveAnalysis({
+      const result = await saveAnalysis({
         data: { viralVideoId: videoId, hookText, pacingNotes, ctaNotes, whyItWorks },
       });
+      if (!result.ok) {
+        toast.error(result.error ?? "Não foi possível guardar a análise.");
+        return;
+      }
+      toast.success("Análise guardada.");
       queryClient.invalidateQueries({ queryKey: ["facebook-viral", "analysis", videoId] });
     } finally {
       setSavingAnalysis(false);
@@ -293,11 +333,14 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
   async function handleCreateAvatar() {
     if (!newAvatarName.trim()) return;
     const result = await createAvatar({ data: { name: newAvatarName } });
-    if (result.ok) {
-      setAvatarId(result.avatar.id);
-      setNewAvatarName("");
-      queryClient.invalidateQueries({ queryKey: ["facebook-viral", "avatars"] });
+    if (!result.ok) {
+      toast.error(result.error ?? "Não foi possível criar o avatar.");
+      return;
     }
+    setAvatarId(result.avatar.id);
+    setNewAvatarName("");
+    toast.success("Avatar criado.");
+    queryClient.invalidateQueries({ queryKey: ["facebook-viral", "avatars"] });
   }
 
   async function handleSaveScript() {
@@ -312,7 +355,13 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
           scriptText,
         },
       });
-      if (result.ok) setScriptId(result.script.id);
+      if (!result.ok) {
+        toast.error(result.error ?? "Não foi possível guardar o roteiro.");
+        return;
+      }
+      setScriptId(result.script.id);
+      setSavedScriptText(scriptText);
+      toast.success("Roteiro guardado.");
     } finally {
       setSavingScript(false);
     }
@@ -320,7 +369,12 @@ function AnalysisAndScript({ videoId, reelId }: { videoId: string; reelId: strin
 
   async function handleGenerateClips() {
     if (!scriptId) return;
-    await generateClips({ data: { viralScriptId: scriptId } });
+    const result = await generateClips({ data: { viralScriptId: scriptId } });
+    if (!result.ok) {
+      toast.error(result.error ?? "Não foi possível dividir o roteiro em clipes.");
+      return;
+    }
+    toast.success(`${result.clips.length} clipes gerados.`);
     queryClient.invalidateQueries({ queryKey: ["facebook-viral", "clips", scriptId] });
   }
 

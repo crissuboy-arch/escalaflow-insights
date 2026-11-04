@@ -22,8 +22,10 @@ vi.mock("@tanstack/react-start", () => ({
 import {
   saveViralPage,
   listViralPages,
+  updateViralPage,
   deleteViralPage,
   saveViralReel,
+  updateViralReel,
 } from "./facebook-viral.functions";
 
 /** Minimal chainable fake query builder — thenable so `await query` resolves
@@ -43,12 +45,19 @@ function fakeSupabase(opts: {
   insertResult?: { data: unknown; error: unknown };
   selectResult?: { data: unknown; error: unknown };
   deleteResult?: { data: unknown; error: unknown };
+  updateResult?: { data: unknown; error: unknown };
 }) {
   const insertFn = vi.fn(() => fakeBuilder(opts.insertResult ?? { data: null, error: null }));
   const selectFn = vi.fn(() => fakeBuilder(opts.selectResult ?? { data: [], error: null }));
   const deleteFn = vi.fn(() => fakeBuilder(opts.deleteResult ?? { data: null, error: null }));
-  const fromFn = vi.fn(() => ({ insert: insertFn, select: selectFn, delete: deleteFn }));
-  return { supabase: { from: fromFn }, insertFn, selectFn, deleteFn, fromFn };
+  const updateFn = vi.fn(() => fakeBuilder(opts.updateResult ?? { data: null, error: null }));
+  const fromFn = vi.fn(() => ({
+    insert: insertFn,
+    select: selectFn,
+    delete: deleteFn,
+    update: updateFn,
+  }));
+  return { supabase: { from: fromFn }, insertFn, selectFn, deleteFn, updateFn, fromFn };
 }
 
 describe("saveViralPage", () => {
@@ -112,6 +121,59 @@ describe("listViralPages", () => {
   });
 });
 
+describe("updateViralPage", () => {
+  it("rejeita URL inválida sem tocar na base de dados", async () => {
+    const { supabase, fromFn } = fakeSupabase({});
+    const result = await updateViralPage({
+      data: { id: "11111111-1111-1111-1111-111111111111", pageUrl: "https://tiktok.com/x" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false, code: "INVALID_URL" });
+    expect(fromFn).not.toHaveBeenCalled();
+  });
+
+  it("normaliza a URL corrigida e grava pelo mesmo id (não recria a linha)", async () => {
+    const updatedRow = { id: "p1", page_url: "https://www.facebook.com/realtysonreed" };
+    const { supabase, updateFn } = fakeSupabase({
+      updateResult: { data: updatedRow, error: null },
+    });
+    const result = await updateViralPage({
+      data: { id: "p1", pageUrl: "www.facebook.com/realtysonreed" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: true, page: updatedRow });
+    expect(updateFn).toHaveBeenCalledWith(
+      expect.objectContaining({ page_url: "https://www.facebook.com/realtysonreed" }),
+    );
+  });
+
+  it("permite só trocar o produto de afiliado associado, sem tocar na URL", async () => {
+    const updatedRow = { id: "p1" };
+    const { supabase, updateFn } = fakeSupabase({
+      updateResult: { data: updatedRow, error: null },
+    });
+    await updateViralPage({
+      data: { id: "p1", affiliateProductId: "22222222-2222-2222-2222-222222222222" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(updateFn).toHaveBeenCalledWith(
+      expect.objectContaining({ affiliate_product_id: "22222222-2222-2222-2222-222222222222" }),
+    );
+    expect(updateFn.mock.calls[0][0]).not.toHaveProperty("page_url");
+  });
+
+  it("mapeia violação de unicidade (23505) para DUPLICATE", async () => {
+    const { supabase } = fakeSupabase({
+      updateResult: { data: null, error: { code: "23505", message: "duplicate key" } },
+    });
+    const result = await updateViralPage({
+      data: { id: "p1", pageUrl: "https://www.facebook.com/outrapagina" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false, code: "DUPLICATE" });
+  });
+});
+
 describe("deleteViralPage", () => {
   it("devolve ok:false com a mensagem de erro em falha", async () => {
     const { supabase } = fakeSupabase({ deleteResult: { data: null, error: { message: "nope" } } });
@@ -143,5 +205,28 @@ describe("saveViralReel", () => {
     } as never);
     expect(result).toMatchObject({ ok: true, reel: savedRow });
     expect(insertFn).toHaveBeenCalledWith(expect.objectContaining({ link_type: "reel" }));
+  });
+});
+
+describe("updateViralReel", () => {
+  it("liga um produto de afiliado já cadastrado ao reel existente", async () => {
+    const { supabase, updateFn } = fakeSupabase({ updateResult: { data: {}, error: null } });
+    const result = await updateViralReel({
+      data: { id: "r1", affiliateProductId: "22222222-2222-2222-2222-222222222222" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toEqual({ ok: true });
+    expect(updateFn).toHaveBeenCalledWith(
+      expect.objectContaining({ affiliate_product_id: "22222222-2222-2222-2222-222222222222" }),
+    );
+  });
+
+  it("devolve ok:false com a mensagem de erro em falha", async () => {
+    const { supabase } = fakeSupabase({ updateResult: { data: null, error: { message: "nope" } } });
+    const result = await updateViralReel({
+      data: { id: "r1", views: 1000 },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toEqual({ ok: false, error: "nope" });
   });
 });
