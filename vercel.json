@@ -4,6 +4,6 @@
   "installCommand": "npm install",
   "crons": [
     { "path": "/api/cron/publicar-artigos", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/persistir-midia-anuncios", "schedule": "0 * * * *" }
+    { "path": "/api/cron/persistir-midia-anuncios", "schedule": "0 10 * * *" }
   ]
 }

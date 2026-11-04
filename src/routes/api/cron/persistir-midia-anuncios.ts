@@ -1,11 +1,14 @@
 // Cron de mídia durável para collected_ads (ver src/lib/collector/
 // media-persist.ts e a migration 20261104140000_collected_ads_media_persist.sql).
-// Processa um lote pequeno por execução — imagens são rápidas (poucos
-// segundos), vídeos podem chegar perto do timeout de 20s do helper, então
-// processamos só 1 vídeo por execução pra caber com margem no timeout padrão
-// de função serverless (10s no plano Hobby da Vercel, sem maxDuration
-// configurado neste repositório — ajustar o batch/timeout se o plano
-// permitir mais).
+// Agendado 1x/dia em vercel.json — o plano Hobby da Vercel só permite cron
+// diário (um agendamento de hora em hora quebrou o deploy: "Hobby accounts
+// are limited to daily cron jobs"). Processa um lote pequeno por execução —
+// imagens são rápidas (poucos segundos), vídeos podem chegar perto do
+// timeout de 20s do helper, então processamos só 1 vídeo por execução pra
+// caber com margem no timeout padrão de função serverless (sem maxDuration
+// configurado neste repositório). Isto é deliberadamente lento para o
+// backlog de anúncios antigos — para esses, ver
+// src/lib/collector/media-backfill.ts (execução manual, mais itens de uma vez).
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { persistAdImage, persistAdVideo } from "@/lib/collector/media-persist";
