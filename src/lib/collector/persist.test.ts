@@ -43,14 +43,19 @@ describe("summarizePersistResults", () => {
   it("conta salvos e falhos, preservando a primeira mensagem de erro real", () => {
     const results: PersistResult[] = [
       { inserted: true, updated: false },
-      { inserted: false, updated: false, error: "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache" },
+      {
+        inserted: false,
+        updated: false,
+        error: "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache",
+      },
       { inserted: false, updated: false, error: "outro erro" },
     ];
     const summary = summarizePersistResults(results);
     expect(summary).toEqual({
       saved: 1,
       failed: 2,
-      firstError: "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache",
+      firstError:
+        "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache",
     });
   });
 
@@ -71,7 +76,9 @@ describe("upsertCollectedAd — reprodução exata do erro real de schema cache"
   it("um anúncio novo (sem linha existente) tenta INSERT com first_seen_at e reporta erro sem lançar quando a coluna não é reconhecida", async () => {
     maybeSingleMock.mockResolvedValue({ data: null }); // "Carla Figurinhas" nunca existiu
     insertMock.mockResolvedValue({
-      error: { message: "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache" },
+      error: {
+        message: "Could not find the 'first_seen_at' column of 'collected_ads' in the schema cache",
+      },
     });
 
     const result = await upsertCollectedAd({
@@ -113,5 +120,49 @@ describe("upsertCollectedAd — reprodução exata do erro real de schema cache"
     await expect(
       upsertCollectedAd({ advertiser: "X", headline: "Y", adLibraryId: "z" }),
     ).resolves.toMatchObject({ inserted: false, error: "qualquer erro de banco" });
+  });
+});
+
+describe("upsertCollectedAd — marcação de media_status (ver media-persist.ts/cron)", () => {
+  it("anúncio novo com imagem é marcado not_attempted, pro cron pegar", async () => {
+    maybeSingleMock.mockResolvedValue({ data: null });
+    insertMock.mockResolvedValue({ error: null });
+    await upsertCollectedAd({
+      advertiser: "X",
+      headline: "Y",
+      adLibraryId: "z",
+      imageUrl: "https://cdn.fb.com/img.jpg",
+    });
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ media_status: "not_attempted" });
+  });
+
+  it("anúncio sem imagem nem vídeo é marcado no_media (nunca inventa uma cópia)", async () => {
+    maybeSingleMock.mockResolvedValue({ data: null });
+    insertMock.mockResolvedValue({ error: null });
+    await upsertCollectedAd({ advertiser: "X", headline: "Y", adLibraryId: "z" });
+    expect(insertMock.mock.calls[0][0]).toMatchObject({ media_status: "no_media" });
+  });
+
+  it("re-mine de um anúncio já copiado com sucesso preserva o status (não tenta de novo)", async () => {
+    maybeSingleMock.mockResolvedValue({ data: { id: "ad-1", media_status: "image_copied" } });
+    const result = await upsertCollectedAd({
+      advertiser: "X",
+      headline: "Y",
+      adLibraryId: "z",
+      imageUrl: "https://cdn.fb.com/img.jpg",
+    });
+    expect(result.updated).toBe(true);
+    expect(updateMock.mock.calls[0][0]).not.toHaveProperty("media_status");
+  });
+
+  it("re-mine de um anúncio com status 'expired' e URL novo volta a not_attempted (merece nova tentativa)", async () => {
+    maybeSingleMock.mockResolvedValue({ data: { id: "ad-1", media_status: "expired" } });
+    await upsertCollectedAd({
+      advertiser: "X",
+      headline: "Y",
+      adLibraryId: "z",
+      imageUrl: "https://cdn.fb.com/img-novo.jpg",
+    });
+    expect(updateMock.mock.calls[0][0]).toMatchObject({ media_status: "not_attempted" });
   });
 });

@@ -2,5 +2,8 @@
   "framework": "tanstack-start",
   "buildCommand": "node --max-old-space-size=8192 node_modules/vite/bin/vite.js build",
   "installCommand": "npm install",
-  "crons": [{ "path": "/api/cron/publicar-artigos", "schedule": "0 9 * * *" }]
+  "crons": [
+    { "path": "/api/cron/publicar-artigos", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/persistir-midia-anuncios", "schedule": "0 * * * *" }
+  ]
 }

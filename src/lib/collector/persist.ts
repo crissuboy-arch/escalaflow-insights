@@ -66,22 +66,49 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
     ...(item.favorite ? { favorite: true } : {}),
   };
 
+  // Mídia durável (src/lib/collector/media-persist.ts) é feita por um cron
+  // em segundo plano, nunca aqui — o coletor processa vários anúncios numa
+  // única execução, e baixar+reenviar imagens/vídeos sincronamente para cada
+  // um arriscaria o timeout da função serverless. Aqui só marcamos a
+  // intenção para o cron processar.
   const existingQuery = item.adLibraryId
-    ? supabaseAdmin.from("collected_ads").select("id").eq("ad_library_id", item.adLibraryId).maybeSingle()
+    ? supabaseAdmin
+        .from("collected_ads")
+        .select("id, media_status")
+        .eq("ad_library_id", item.adLibraryId)
+        .maybeSingle()
     : item.adUrl
-      ? supabaseAdmin.from("collected_ads").select("id").eq("ad_url", item.adUrl).maybeSingle()
+      ? supabaseAdmin
+          .from("collected_ads")
+          .select("id, media_status")
+          .eq("ad_url", item.adUrl)
+          .maybeSingle()
       : null;
 
   const { data: existing } = existingQuery ? await existingQuery : { data: null };
 
+  const hasMedia = Boolean(base.image_url || base.video_url);
+  const alreadyCopied =
+    existing?.media_status === "image_copied" || existing?.media_status === "both_copied";
+  // Se já copiada com sucesso, preserva (idempotente). Senão: sem mídia
+  // nenhuma = 'no_media'; com mídia (nova ou repetida) = 'not_attempted',
+  // mesmo que um status anterior fosse 'expired' — um re-mine traz um URL
+  // novo, que merece uma nova tentativa do cron.
+  const mediaStatus = alreadyCopied ? null : !hasMedia ? "no_media" : "not_attempted";
+  const mediaPatch = mediaStatus ? { media_status: mediaStatus } : {};
+
   if (existing) {
-    const { error } = await supabaseAdmin.from("collected_ads").update(base as never).eq("id", existing.id);
+    const { error } = await supabaseAdmin
+      .from("collected_ads")
+      .update({ ...base, ...mediaPatch } as never)
+      .eq("id", existing.id);
     if (error) return { inserted: false, updated: false, error: error.message };
     return { inserted: false, updated: true };
   }
 
   const { error } = await supabaseAdmin.from("collected_ads").insert({
     ...base,
+    ...mediaPatch,
     ad_library_id: item.adLibraryId || null,
     first_seen_at: now,
   } as never);
@@ -92,9 +119,11 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
 /** Aggregates a batch of persist outcomes so callers can tell the user the
  *  truth when some ads were shown but not actually saved (e.g. a stale
  *  PostgREST schema cache rejecting a real, existing column). */
-export function summarizePersistResults(
-  results: PersistResult[],
-): { saved: number; failed: number; firstError: string | null } {
+export function summarizePersistResults(results: PersistResult[]): {
+  saved: number;
+  failed: number;
+  firstError: string | null;
+} {
   let saved = 0;
   let failed = 0;
   let firstError: string | null = null;

@@ -28,6 +28,7 @@ import {
 } from "@/lib/queries";
 import { openAdLink } from "@/lib/external";
 import { TransformToProjectButton } from "@/components/TransformToProjectButton";
+import { resolveAdImageUrl, resolveAdVideoUrl } from "@/lib/collector/media-url";
 
 type Row = {
   id: string;
@@ -38,6 +39,8 @@ type Row = {
   cta: string | null;
   image_url: string | null;
   video_url: string | null;
+  image_storage_path?: string | null;
+  video_storage_path?: string | null;
   platform: string;
   country: string;
   niche: string;
@@ -57,6 +60,8 @@ type Scaled = {
   cta: string | null;
   image_url: string | null;
   video_url: string | null;
+  image_storage_path?: string | null;
+  video_storage_path?: string | null;
   platform: string;
   platforms: string[];
   country: string;
@@ -91,7 +96,7 @@ function ScaledPage() {
       const { data } = await supabase
         .from("collected_ads")
         .select(
-          "id,advertiser,headline,copy,cta,image_url,video_url,platform,country,niche,score,created_at,ad_library_id,ad_url",
+          "id,advertiser,headline,copy,cta,image_url,video_url,image_storage_path,video_storage_path,platform,country,niche,score,created_at,ad_library_id,ad_url",
         )
         .order("created_at", { ascending: false })
         .limit(500);
@@ -108,6 +113,8 @@ function ScaledPage() {
         cta: a.cta,
         image_url: a.image_url,
         video_url: a.video_url,
+        image_storage_path: a.image_storage_path,
+        video_storage_path: a.video_storage_path,
         platform: a.platform,
         country: a.country,
         niche: a.niche,
@@ -152,6 +159,8 @@ function ScaledPage() {
         cta: top.cta,
         image_url: top.image_url,
         video_url: top.video_url,
+        image_storage_path: top.image_storage_path,
+        video_storage_path: top.video_storage_path,
         platform: top.platform,
         platforms,
         country: top.country,
@@ -241,15 +250,15 @@ function ScaledPage() {
           pains: [],
           desires: [],
           source_ad_key: r.key,
-          cover_url: r.image_url ?? null,
+          cover_url: resolveAdImageUrl(r),
           advertiser: r.advertiser,
           platform: r.platform,
           country: r.country,
           headline: r.headline,
           copy: r.copy ?? undefined,
           cta: r.cta ?? undefined,
-          imageUrl: r.image_url ?? null,
-          videoUrl: r.video_url ?? null,
+          imageUrl: resolveAdImageUrl(r),
+          videoUrl: resolveAdVideoUrl(r),
         },
       });
       toast.success("Estratégia modelada");
@@ -367,7 +376,11 @@ function ScaledPage() {
                           >
                             <Rocket className="h-3.5 w-3.5 text-primary" />
                           </Button>
-                          <TransformToProjectButton adLibraryId={r.ad_library_id} adUrl={r.ad_url} variant="icon" />
+                          <TransformToProjectButton
+                            adLibraryId={r.ad_library_id}
+                            adUrl={r.ad_url}
+                            variant="icon"
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

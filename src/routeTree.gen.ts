@@ -58,6 +58,7 @@ import { Route as AuthenticatedProdutosEbookRouteImport } from './routes/_authen
 import { Route as AuthenticatedProjetosIdRouteImport } from './routes/_authenticated/projetos.$id'
 import { Route as AuthenticatedStorybookIdRouteImport } from './routes/_authenticated/storybook.$id'
 import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
+import { Route as ApiCronPersistirMidiaAnunciosRouteImport } from './routes/api/cron/persistir-midia-anuncios'
 import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
 import { Route as ApiIntegrationsHealthRouteImport } from './routes/api/integrations.health'
 import { Route as ApiIntegrationsStatsRouteImport } from './routes/api/integrations.stats'
@@ -335,6 +336,12 @@ const ApiCollectorRunRoute = ApiCollectorRunRouteImport.update({
   path: '/api/collector/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronPersistirMidiaAnunciosRoute =
+  ApiCronPersistirMidiaAnunciosRouteImport.update({
+    id: '/api/cron/persistir-midia-anuncios',
+    path: '/api/cron/persistir-midia-anuncios',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiCronPublicarArtigosRoute = ApiCronPublicarArtigosRouteImport.update({
   id: '/api/cron/publicar-artigos',
   path: '/api/cron/publicar-artigos',
@@ -424,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/persistir-midia-anuncios': typeof ApiCronPersistirMidiaAnunciosRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
@@ -481,6 +489,7 @@ export interface FileRoutesByTo {
   '/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/persistir-midia-anuncios': typeof ApiCronPersistirMidiaAnunciosRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
@@ -540,6 +549,7 @@ export interface FileRoutesById {
   '/_authenticated/projetos/$id': typeof AuthenticatedProjetosIdRoute
   '/_authenticated/storybook/$id': typeof AuthenticatedStorybookIdRoute
   '/api/collector/run': typeof ApiCollectorRunRoute
+  '/api/cron/persistir-midia-anuncios': typeof ApiCronPersistirMidiaAnunciosRoute
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
@@ -599,6 +609,7 @@ export interface FileRouteTypes {
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/persistir-midia-anuncios'
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
@@ -656,6 +667,7 @@ export interface FileRouteTypes {
     | '/projetos/$id'
     | '/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/persistir-midia-anuncios'
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
@@ -714,6 +726,7 @@ export interface FileRouteTypes {
     | '/_authenticated/projetos/$id'
     | '/_authenticated/storybook/$id'
     | '/api/collector/run'
+    | '/api/cron/persistir-midia-anuncios'
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
@@ -733,6 +746,7 @@ export interface RootRouteChildren {
   StorySlugRoute: typeof StorySlugRoute
   StorybookShareTokenRoute: typeof StorybookShareTokenRoute
   ApiCollectorRunRoute: typeof ApiCollectorRunRoute
+  ApiCronPersistirMidiaAnunciosRoute: typeof ApiCronPersistirMidiaAnunciosRoute
   ApiCronPublicarArtigosRoute: typeof ApiCronPublicarArtigosRoute
   ApiIntegrationsHealthRoute: typeof ApiIntegrationsHealthRoute
   ApiIntegrationsStatsRoute: typeof ApiIntegrationsStatsRoute
@@ -1085,6 +1099,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCollectorRunRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/persistir-midia-anuncios': {
+      id: '/api/cron/persistir-midia-anuncios'
+      path: '/api/cron/persistir-midia-anuncios'
+      fullPath: '/api/cron/persistir-midia-anuncios'
+      preLoaderRoute: typeof ApiCronPersistirMidiaAnunciosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cron/publicar-artigos': {
       id: '/api/cron/publicar-artigos'
       path: '/api/cron/publicar-artigos'
@@ -1305,6 +1326,7 @@ const rootRouteChildren: RootRouteChildren = {
   StorySlugRoute: StorySlugRoute,
   StorybookShareTokenRoute: StorybookShareTokenRoute,
   ApiCollectorRunRoute: ApiCollectorRunRoute,
+  ApiCronPersistirMidiaAnunciosRoute: ApiCronPersistirMidiaAnunciosRoute,
   ApiCronPublicarArtigosRoute: ApiCronPublicarArtigosRoute,
   ApiIntegrationsHealthRoute: ApiIntegrationsHealthRoute,
   ApiIntegrationsStatsRoute: ApiIntegrationsStatsRoute,
