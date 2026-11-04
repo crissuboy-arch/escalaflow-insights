@@ -24,6 +24,7 @@ import { Route as AuthenticatedDinheiroRapidoRouteImport } from './routes/_authe
 import { Route as AuthenticatedEbookForgeRouteImport } from './routes/_authenticated/ebook-forge'
 import { Route as AuthenticatedEbookStudioRouteImport } from './routes/_authenticated/ebook-studio'
 import { Route as AuthenticatedEscalaRouteImport } from './routes/_authenticated/escala'
+import { Route as AuthenticatedFacebookViralRouteImport } from './routes/_authenticated/facebook-viral'
 import { Route as AuthenticatedFavoritosRouteImport } from './routes/_authenticated/favoritos'
 import { Route as AuthenticatedGoogleRadarRouteImport } from './routes/_authenticated/google-radar'
 import { Route as AuthenticatedImportarAnuncioRouteImport } from './routes/_authenticated/importar-anuncio'
@@ -60,6 +61,7 @@ import { Route as ApiCollectorRunRouteImport } from './routes/api/collector.run'
 import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
 import { Route as ApiIntegrationsHealthRouteImport } from './routes/api/integrations.health'
 import { Route as ApiIntegrationsStatsRouteImport } from './routes/api/integrations.stats'
+import { Route as AuthenticatedFacebookViralReelIdRemixRouteImport } from './routes/_authenticated/facebook-viral.$reelId.remix'
 import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
 import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
 import { Route as ApiIntegrationsMiningRunRouteImport } from './routes/api/integrations.mining.run'
@@ -142,6 +144,12 @@ const AuthenticatedEscalaRoute = AuthenticatedEscalaRouteImport.update({
   path: '/escala',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFacebookViralRoute =
+  AuthenticatedFacebookViralRouteImport.update({
+    id: '/facebook-viral',
+    path: '/facebook-viral',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedFavoritosRoute = AuthenticatedFavoritosRouteImport.update({
   id: '/favoritos',
   path: '/favoritos',
@@ -342,6 +350,12 @@ const ApiIntegrationsStatsRoute = ApiIntegrationsStatsRouteImport.update({
   path: '/api/integrations/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedFacebookViralReelIdRemixRoute =
+  AuthenticatedFacebookViralReelIdRemixRouteImport.update({
+    id: '/$reelId/remix',
+    path: '/$reelId/remix',
+    getParentRoute: () => AuthenticatedFacebookViralRoute,
+  } as any)
 const AuthenticatedProjetosHandoffHandoffIdRoute =
   AuthenticatedProjetosHandoffHandoffIdRouteImport.update({
     id: '/handoff/$handoffId',
@@ -376,6 +390,7 @@ export interface FileRoutesByFullPath {
   '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
+  '/facebook-viral': typeof AuthenticatedFacebookViralRouteWithChildren
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -412,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -431,6 +447,7 @@ export interface FileRoutesByTo {
   '/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/escala': typeof AuthenticatedEscalaRoute
+  '/facebook-viral': typeof AuthenticatedFacebookViralRouteWithChildren
   '/favoritos': typeof AuthenticatedFavoritosRoute
   '/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -467,6 +484,7 @@ export interface FileRoutesByTo {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -488,6 +506,7 @@ export interface FileRoutesById {
   '/_authenticated/ebook-forge': typeof AuthenticatedEbookForgeRoute
   '/_authenticated/ebook-studio': typeof AuthenticatedEbookStudioRoute
   '/_authenticated/escala': typeof AuthenticatedEscalaRoute
+  '/_authenticated/facebook-viral': typeof AuthenticatedFacebookViralRouteWithChildren
   '/_authenticated/favoritos': typeof AuthenticatedFavoritosRoute
   '/_authenticated/google-radar': typeof AuthenticatedGoogleRadarRoute
   '/_authenticated/importar-anuncio': typeof AuthenticatedImportarAnuncioRoute
@@ -524,6 +543,7 @@ export interface FileRoutesById {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/_authenticated/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/_authenticated/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
   '/api/integrations/mining/run': typeof ApiIntegrationsMiningRunRoute
@@ -545,6 +565,7 @@ export interface FileRouteTypes {
     | '/ebook-forge'
     | '/ebook-studio'
     | '/escala'
+    | '/facebook-viral'
     | '/favoritos'
     | '/google-radar'
     | '/importar-anuncio'
@@ -581,6 +602,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/facebook-viral/$reelId/remix'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -600,6 +622,7 @@ export interface FileRouteTypes {
     | '/ebook-forge'
     | '/ebook-studio'
     | '/escala'
+    | '/facebook-viral'
     | '/favoritos'
     | '/google-radar'
     | '/importar-anuncio'
@@ -636,6 +659,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/facebook-viral/$reelId/remix'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -656,6 +680,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ebook-forge'
     | '/_authenticated/ebook-studio'
     | '/_authenticated/escala'
+    | '/_authenticated/facebook-viral'
     | '/_authenticated/favoritos'
     | '/_authenticated/google-radar'
     | '/_authenticated/importar-anuncio'
@@ -692,6 +717,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/_authenticated/facebook-viral/$reelId/remix'
     | '/_authenticated/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
     | '/api/integrations/mining/run'
@@ -819,6 +845,13 @@ declare module '@tanstack/react-router' {
       path: '/escala'
       fullPath: '/escala'
       preLoaderRoute: typeof AuthenticatedEscalaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/facebook-viral': {
+      id: '/_authenticated/facebook-viral'
+      path: '/facebook-viral'
+      fullPath: '/facebook-viral'
+      preLoaderRoute: typeof AuthenticatedFacebookViralRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/favoritos': {
@@ -1073,6 +1106,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsStatsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/facebook-viral/$reelId/remix': {
+      id: '/_authenticated/facebook-viral/$reelId/remix'
+      path: '/$reelId/remix'
+      fullPath: '/facebook-viral/$reelId/remix'
+      preLoaderRoute: typeof AuthenticatedFacebookViralReelIdRemixRouteImport
+      parentRoute: typeof AuthenticatedFacebookViralRoute
+    }
     '/_authenticated/projetos/handoff/$handoffId': {
       id: '/_authenticated/projetos/handoff/$handoffId'
       path: '/handoff/$handoffId'
@@ -1096,6 +1136,21 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AuthenticatedFacebookViralRouteChildren {
+  AuthenticatedFacebookViralReelIdRemixRoute: typeof AuthenticatedFacebookViralReelIdRemixRoute
+}
+
+const AuthenticatedFacebookViralRouteChildren: AuthenticatedFacebookViralRouteChildren =
+  {
+    AuthenticatedFacebookViralReelIdRemixRoute:
+      AuthenticatedFacebookViralReelIdRemixRoute,
+  }
+
+const AuthenticatedFacebookViralRouteWithChildren =
+  AuthenticatedFacebookViralRoute._addFileChildren(
+    AuthenticatedFacebookViralRouteChildren,
+  )
 
 interface AuthenticatedLaunchAnalyzerRouteChildren {
   AuthenticatedLaunchAnalyzerIdRoute: typeof AuthenticatedLaunchAnalyzerIdRoute
@@ -1169,6 +1224,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedEbookForgeRoute: typeof AuthenticatedEbookForgeRoute
   AuthenticatedEbookStudioRoute: typeof AuthenticatedEbookStudioRoute
   AuthenticatedEscalaRoute: typeof AuthenticatedEscalaRoute
+  AuthenticatedFacebookViralRoute: typeof AuthenticatedFacebookViralRouteWithChildren
   AuthenticatedFavoritosRoute: typeof AuthenticatedFavoritosRoute
   AuthenticatedGoogleRadarRoute: typeof AuthenticatedGoogleRadarRoute
   AuthenticatedImportarAnuncioRoute: typeof AuthenticatedImportarAnuncioRoute
@@ -1207,6 +1263,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedEbookForgeRoute: AuthenticatedEbookForgeRoute,
   AuthenticatedEbookStudioRoute: AuthenticatedEbookStudioRoute,
   AuthenticatedEscalaRoute: AuthenticatedEscalaRoute,
+  AuthenticatedFacebookViralRoute: AuthenticatedFacebookViralRouteWithChildren,
   AuthenticatedFavoritosRoute: AuthenticatedFavoritosRoute,
   AuthenticatedGoogleRadarRoute: AuthenticatedGoogleRadarRoute,
   AuthenticatedImportarAnuncioRoute: AuthenticatedImportarAnuncioRoute,
