@@ -40,6 +40,10 @@ export type RunMiningResult =
       verifiedName: string | null;
       insertedReels: number;
       skippedDuplicates: number;
+      // true quando o fornecedor devolveu 0 Reels (não confundir com
+      // sucesso silencioso — a UI deve mostrar isto como um aviso distinto,
+      // nunca como "pesquisa concluída" sem mais nada).
+      zeroResults: boolean;
     }
   | { ok: false; error: string };
 
@@ -55,10 +59,15 @@ export const runFacebookMining = createServerFn({ method: "POST" })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
 
+    console.log(`[facebook-viral-miner] ▶ página=${check.normalizedUrl}`);
     let minedPage;
     try {
       minedPage = await mineFacebookPage(check.normalizedUrl);
+      console.log(
+        `[facebook-viral-miner] ✓ página — nome_verificado=${minedPage?.verifiedName ?? "—"} seguidores=${minedPage?.followers ?? "—"}`,
+      );
     } catch (e) {
+      console.error(`[facebook-viral-miner] ✗ falha ao minerar página:`, e);
       return { ok: false, error: e instanceof Error ? e.message : "Falha ao minerar a página." };
     }
 
@@ -102,8 +111,12 @@ export const runFacebookMining = createServerFn({ method: "POST" })
         periodDays: data.periodDays,
         limit: data.limit,
       });
+      console.log(
+        `[facebook-viral-miner] ✓ reels — brutos=${minedReels.length} período=${data.periodDays}d limite=${data.limit}`,
+      );
     } catch (e) {
       // A página já foi confirmada/gravada — só a parte de Reels falhou.
+      console.error(`[facebook-viral-miner] ✗ falha ao minerar reels:`, e);
       return {
         ok: false,
         error:
@@ -112,6 +125,7 @@ export const runFacebookMining = createServerFn({ method: "POST" })
             : "Falha ao minerar os Reels.",
       };
     }
+    const zeroResults = minedReels.length === 0;
 
     const candidates = minedReels
       .map((r) => {
@@ -144,6 +158,7 @@ export const runFacebookMining = createServerFn({ method: "POST" })
         verifiedName: minedPage?.verifiedName ?? null,
         insertedReels: 0,
         skippedDuplicates: 0,
+        zeroResults,
       };
     }
 
@@ -172,5 +187,6 @@ export const runFacebookMining = createServerFn({ method: "POST" })
       verifiedName: minedPage?.verifiedName ?? null,
       insertedReels: newRows.length,
       skippedDuplicates: candidates.length - newRows.length,
+      zeroResults,
     };
   });

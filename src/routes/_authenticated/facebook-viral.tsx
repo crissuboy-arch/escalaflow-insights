@@ -51,6 +51,40 @@ import {
   type RunMiningResult,
 } from "@/lib/facebook-viral-mining.functions";
 
+// LATAM é uma região, não um país — tratado como um valor próprio no mesmo
+// campo (nunca "dentro" de um país específico), consistente com
+// src/lib/scale/i18n.ts (REGION_PRESETS). Lista própria deste módulo:
+// fácil de estender depois (só adicionar uma linha, sem migration).
+const MARKETS = [
+  { value: "US", label: "Estados Unidos" },
+  { value: "BR", label: "Brasil" },
+  { value: "ES", label: "Espanha" },
+  { value: "LATAM", label: "América Latina (LATAM)" },
+] as const;
+
+// Idioma do CONTEÚDO (não o idioma da interface do ScalaFlow — são listas
+// diferentes de propósito, por isso não reaproveita src/i18n/config).
+const CONTENT_LANGUAGES = [
+  { value: "en-US", label: "Inglês (en-US)" },
+  { value: "pt-BR", label: "Português (pt-BR)" },
+  { value: "es-ES", label: "Espanhol (es-ES)" },
+  { value: "fr-FR", label: "Francês (fr-FR)" },
+  { value: "uk-UA", label: "Ucraniano (uk-UA)" },
+  { value: "tr-TR", label: "Turco (tr-TR)" },
+] as const;
+
+const NICHE_PRESETS = [
+  "Saúde e Bem-estar",
+  "Beleza",
+  "Cabelo",
+  "Receitas",
+  "Relacionamentos",
+  "Casa",
+  "Animais",
+  "Finanças",
+  "Entretenimento",
+] as const;
+
 export const Route = createFileRoute("/_authenticated/facebook-viral")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
@@ -98,6 +132,114 @@ function FacebookViralPage() {
   );
 }
 
+// ── Seletores reaproveitáveis (mercado/idioma/nicho/pasta) ────────────────
+
+function MarketField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">Mercado</label>
+      <select
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Selecionar…</option>
+        {MARKETS.map((m) => (
+          <option key={m.value} value={m.value}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function LanguageField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">Idioma</label>
+      <select
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="">Selecionar…</option>
+        {CONTENT_LANGUAGES.map((l) => (
+          <option key={l.value} value={l.value}>
+            {l.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function NicheField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isKnownPreset = (NICHE_PRESETS as readonly string[]).includes(value);
+  const [showCustom, setShowCustom] = useState(value !== "" && !isKnownPreset);
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">Nicho</label>
+      <select
+        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+        value={showCustom ? "custom" : value}
+        onChange={(e) => {
+          if (e.target.value === "custom") {
+            setShowCustom(true);
+            onChange("");
+          } else {
+            setShowCustom(false);
+            onChange(e.target.value);
+          }
+        }}
+      >
+        <option value="">Selecionar…</option>
+        {NICHE_PRESETS.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+        <option value="custom">Personalizado…</option>
+      </select>
+      {showCustom ? (
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Nicho personalizado"
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function FolderField({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-muted-foreground">Pasta</label>
+      <Input
+        list="facebook-viral-pastas"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Selecionar ou escrever uma nova…"
+      />
+      <datalist id="facebook-viral-pastas">
+        {options.map((f) => (
+          <option key={f} value={f} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
 // ── Minerar Página (Apify, gasto real — precisa de confirmação explícita) ──
 
 function MineFacebookPageCard() {
@@ -128,10 +270,16 @@ function MineFacebookPageCard() {
         toast.error(result.error);
         return;
       }
-      const nameNote = result.verifiedName ? ` Nome confirmado: "${result.verifiedName}".` : "";
-      toast.success(
-        `Mineração concluída: ${result.insertedReels} Reel(s) novo(s), ${result.skippedDuplicates} já existiam.${nameNote}`,
-      );
+      if (result.zeroResults) {
+        toast.warning(
+          "Nenhum Reel encontrado para esta página no período selecionado — a página pode não ter Reels públicos recentes, ou a fonte não devolveu dados. O crédito da pesquisa foi consumido mesmo sem resultados.",
+        );
+      } else {
+        const nameNote = result.verifiedName ? ` Nome confirmado: "${result.verifiedName}".` : "";
+        toast.success(
+          `Pesquisa concluída: ${result.insertedReels} Reel(s) novo(s), ${result.skippedDuplicates} já existiam.${nameNote}`,
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ["facebook-viral"] });
     } finally {
       setMining(false);
@@ -143,15 +291,15 @@ function MineFacebookPageCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Search className="h-4 w-4" /> Minerar Página (Apify)
+          <Search className="h-4 w-4" /> Pesquisar Páginas e Reels Virais
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Busca a página e os Reels reais via Apify — confirma a identidade da página (nome real,
-          não o que foi digitado) e traz métricas que o Facebook não mostra a visitantes anónimos.{" "}
-          <strong>Isto gasta créditos Apify reais</strong> — mostra o custo estimado antes de
-          confirmar, e nunca executa sem confirmação explícita.
+          Encontre vídeos populares de páginas públicas do Facebook, compare visualizações e
+          descubra oportunidades de conteúdo.{" "}
+          <strong>Isto consome créditos de pesquisa reais</strong> — mostra o custo estimado antes
+          de confirmar, e nunca executa sem confirmação explícita.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5 sm:col-span-3">
@@ -203,7 +351,7 @@ function MineFacebookPageCard() {
               ) : (
                 <Search className="mr-2 h-4 w-4" />
               )}
-              Minerar Página
+              Pesquisar Reels
             </Button>
           </div>
         </div>
@@ -215,11 +363,11 @@ function MineFacebookPageCard() {
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar gasto de créditos Apify?</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar consumo de créditos de pesquisa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Isto vai gastar aproximadamente{" "}
-              <strong>US${costQ.data?.totalUSD.toFixed(4) ?? "?"}</strong> em créditos Apify reais
-              para minerar a página e até {limit} Reel(s) dos últimos {periodDays} dias. Reels já
+              Isto vai consumir aproximadamente{" "}
+              <strong>US${costQ.data?.totalUSD.toFixed(4) ?? "?"}</strong> em créditos reais para
+              pesquisar a página e até {limit} Reel(s) dos últimos {periodDays} dias. Reels já
               guardados não são duplicados nem sobrescritos.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -240,6 +388,8 @@ function MineFacebookPageCard() {
 function ImportForm() {
   const findPage = useServerFn(findOrCreateViralPage);
   const saveReel = useServerFn(saveViralReel);
+  const listPagesForFolders = useServerFn(listViralPages);
+  const listProductsForImport = useServerFn(listAffiliateProducts);
   const queryClient = useQueryClient();
 
   const [pageUrl, setPageUrl] = useState("");
@@ -254,12 +404,28 @@ function ImportForm() {
   const [publishedAt, setPublishedAt] = useState("");
   const [productPromoted, setProductPromoted] = useState("");
   const [affiliateLink, setAffiliateLink] = useState("");
+  const [affiliateProductId, setAffiliateProductId] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
   const reelCheck = reelUrl.trim() ? checkFacebookUrl(reelUrl) : null;
   const pageCheck = pageUrl.trim() ? checkFacebookUrl(pageUrl) : null;
+
+  const pagesQ = useQuery({
+    queryKey: ["facebook-viral", "pages", ""],
+    queryFn: () => listPagesForFolders({ data: { orderBy: "created_at" } }),
+  });
+  const productsQ = useQuery({
+    queryKey: ["facebook-viral", "affiliate-products"],
+    queryFn: () => listProductsForImport(),
+  });
+  const folderOptions = Array.from(
+    new Set(
+      ((pagesQ.data ?? []) as ViralPageRow[]).map((p) => p.folder).filter((f): f is string => !!f),
+    ),
+  );
+  const products = (productsQ.data ?? []) as AffiliateProductRow[];
 
   async function handleSubmit() {
     setFeedback(null);
@@ -282,6 +448,7 @@ function ImportForm() {
             folder: folder || undefined,
             followers: followers ? Number(followers) : undefined,
             notes: notes || undefined,
+            affiliateProductId: affiliateProductId || undefined,
           },
         });
         if (!pageResult.ok) {
@@ -320,6 +487,7 @@ function ImportForm() {
       setPublishedAt("");
       setProductPromoted("");
       setAffiliateLink("");
+      setAffiliateProductId("");
       setNotes("");
       queryClient.invalidateQueries({ queryKey: ["facebook-viral"] });
     } finally {
@@ -363,10 +531,10 @@ function ImportForm() {
             ) : null}
           </div>
           <Field label="Nome da página" value={pageName} onChange={setPageName} />
-          <Field label="País" value={country} onChange={setCountry} />
-          <Field label="Idioma" value={language} onChange={setLanguage} />
-          <Field label="Nicho" value={niche} onChange={setNiche} />
-          <Field label="Pasta" value={folder} onChange={setFolder} />
+          <MarketField value={country} onChange={setCountry} />
+          <LanguageField value={language} onChange={setLanguage} />
+          <NicheField value={niche} onChange={setNiche} />
+          <FolderField value={folder} onChange={setFolder} options={folderOptions} />
           <Field
             label="Seguidores (manual)"
             value={followers}
@@ -387,6 +555,23 @@ function ImportForm() {
           />
           <Field label="Produto promovido" value={productPromoted} onChange={setProductPromoted} />
           <Field label="Link de afiliado" value={affiliateLink} onChange={setAffiliateLink} />
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Produto de afiliado cadastrado
+            </label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              value={affiliateProductId}
+              onChange={(e) => setAffiliateProductId(e.target.value)}
+            >
+              <option value="">Nenhum</option>
+              {products.map((prod) => (
+                <option key={prod.id} value={prod.id}>
+                  {prod.product_name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Observações</label>
@@ -451,6 +636,9 @@ function PagesList() {
 
   const pages = (pagesQ.data ?? []) as ViralPageRow[];
   const products = (productsQ.data ?? []) as AffiliateProductRow[];
+  const folderOptions = Array.from(
+    new Set(pages.map((p) => p.folder).filter((f): f is string => !!f)),
+  );
 
   async function handleDelete(id: string) {
     const result = await removePage({ data: { id } });
@@ -505,7 +693,7 @@ function PagesList() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {p.verified_name ? (
-                      <Badge variant="default">Identidade verificada (Apify)</Badge>
+                      <Badge variant="default">Identidade verificada</Badge>
                     ) : (
                       <Badge variant="outline">Nome não verificado</Badge>
                     )}
@@ -519,6 +707,11 @@ function PagesList() {
                       <Badge variant="outline">Produto: {linkedProduct.product_name}</Badge>
                     ) : null}
                   </div>
+                  {p.last_mined_at ? (
+                    <p className="text-xs text-muted-foreground">
+                      Última consulta: {new Date(p.last_mined_at).toLocaleString("pt-BR")}
+                    </p>
+                  ) : null}
                   {p.notes ? <p className="text-xs text-muted-foreground">{p.notes}</p> : null}
                 </CardContent>
               </Card>
@@ -531,6 +724,7 @@ function PagesList() {
         <EditPageDialog
           page={editing}
           products={products}
+          folderOptions={folderOptions}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -563,11 +757,13 @@ function PagesList() {
 function EditPageDialog({
   page,
   products,
+  folderOptions,
   onClose,
   onSaved,
 }: {
   page: ViralPageRow;
   products: AffiliateProductRow[];
+  folderOptions: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -631,10 +827,10 @@ function EditPageDialog({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Nome da página" value={pageName} onChange={setPageName} />
-            <Field label="País" value={country} onChange={setCountry} />
-            <Field label="Idioma" value={language} onChange={setLanguage} />
-            <Field label="Nicho" value={niche} onChange={setNiche} />
-            <Field label="Pasta" value={folder} onChange={setFolder} />
+            <MarketField value={country} onChange={setCountry} />
+            <LanguageField value={language} onChange={setLanguage} />
+            <NicheField value={niche} onChange={setNiche} />
+            <FolderField value={folder} onChange={setFolder} options={folderOptions} />
             <Field
               label="Seguidores (manual)"
               value={followers}
@@ -744,9 +940,9 @@ function ReelsList() {
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value as "all" | "manual" | "apify")}
         >
-          <option value="all">Manual + Apify</option>
+          <option value="all">Manual + automático</option>
           <option value="manual">Só manual</option>
-          <option value="apify">Só Apify</option>
+          <option value="apify">Só encontrado automaticamente</option>
         </select>
         <select
           className="flex h-9 rounded-md border border-input bg-background px-3 text-xs"
@@ -801,7 +997,7 @@ function ReelsList() {
                   <div className="flex flex-wrap gap-1.5">
                     <Badge variant="outline">{r.link_type}</Badge>
                     <Badge variant={r.data_source === "apify" ? "default" : "outline"}>
-                      {r.data_source === "apify" ? "Apify" : "Manual"}
+                      {r.data_source === "apify" ? "Encontrado automaticamente" : "Manual"}
                     </Badge>
                     {typeof r.views === "number" ? (
                       <Badge variant="secondary">

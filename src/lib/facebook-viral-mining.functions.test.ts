@@ -158,7 +158,28 @@ describe("runFacebookMining", () => {
       data: { pageUrl: "facebook.com/tysonreed", periodDays: 30, limit: 10 },
       context: { supabase, userId: "user-1" },
     } as never);
-    expect(result).toMatchObject({ ok: true, insertedReels: 0, skippedDuplicates: 1 });
+    expect(result).toMatchObject({
+      ok: true,
+      insertedReels: 0,
+      skippedDuplicates: 1,
+      zeroResults: false,
+    });
     expect(reelInsertFn).not.toHaveBeenCalled();
+  });
+
+  it("marca zeroResults:true quando o fornecedor devolve 0 Reels — nunca parecido com sucesso vazio", async () => {
+    mineFacebookPage.mockResolvedValueOnce(null);
+    mineFacebookReels.mockResolvedValueOnce([]);
+    const { supabase } = fakeSupabase({ findPageResult: { data: { id: "page-1" }, error: null } });
+    const result = await runFacebookMining({
+      data: { pageUrl: "facebook.com/paginasemreels", periodDays: 7, limit: 10 },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({
+      ok: true,
+      insertedReels: 0,
+      skippedDuplicates: 0,
+      zeroResults: true,
+    });
   });
 });
