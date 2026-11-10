@@ -2,6 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/providers/AuthProvider";
+import { supabase } from "@/integrations/supabase/client";
+import { startGoogleSignIn } from "@/lib/auth/google-oauth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,8 +70,15 @@ function LoginPage() {
     }
   };
 
-  const google = () => {
-    toast.info("Disponível em breve");
+  const google = async () => {
+    setLoading(true);
+    const { error } = await startGoogleSignIn(supabase.auth, window.location.origin);
+    // Em caso de sucesso o browser é redirecionado para o Google; só voltamos
+    // aqui se algo falhou (ex.: provider desativado no Supabase).
+    if (error) {
+      toast.error(error);
+      setLoading(false);
+    }
   };
 
   return (
@@ -168,9 +177,9 @@ function LoginPage() {
             <Button
               type="button"
               variant="outline"
-              className="w-full opacity-70"
+              className="w-full"
               onClick={google}
-              title="Disponível em breve"
+              disabled={loading}
             >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12 5c1.6 0 3 .55 4.1 1.6l3-3C17.2 1.9 14.8 1 12 1 7.4 1 3.4 3.6 1.4 7.4l3.5 2.7C5.9 7.1 8.7 5 12 5z"/>
