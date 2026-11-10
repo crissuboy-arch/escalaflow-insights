@@ -64,7 +64,7 @@ export function OfferMedia({
     return (
       <video
         ref={videoRef}
-        src={offer.video ?? undefined}
+        src={offer.video ? (showImage ? offer.video : `${offer.video}#t=0.1`) : undefined}
         poster={showImage ? (offer.image ?? undefined) : undefined}
         className={cn(
           "h-full w-full bg-black",
@@ -76,7 +76,7 @@ export function OfferMedia({
         playsInline
         controls={mode === "full"}
         autoPlay={mode === "hero"}
-        preload={mode === "full" ? "metadata" : "none"}
+        preload={mode === "full" || !showImage ? "metadata" : "none"}
         onError={() => setVideoFailed(true)}
         data-testid="offer-media-video"
       />
