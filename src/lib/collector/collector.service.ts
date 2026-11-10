@@ -14,8 +14,13 @@ export async function runCollector(input: CollectorRunInput): Promise<CollectorR
   // ── Facebook Ad Library requested explicitly: go straight to the real
   //    Apify actor instead of the Bing/Yahoo commercial-page search, which
   //    never returns actual ad creatives (no image/video by design). ──────
+  // Sem plataforma (ou "all") o padrão é o Facebook Ad Library: é a única
+  // fonte aqui que devolve criativo real (imagem/vídeo), anunciante e página
+  // de venda. O caminho Bing/Playwright só roda quando se pede outra
+  // plataforma explicitamente — antes ele era o padrão e devolvia páginas
+  // comerciais (ex.: o próprio shopify.com) sem mídia.
   const platformNormalized = input.platform?.trim().toLowerCase();
-  if (platformNormalized === "facebook" || platformNormalized === "meta") {
+  if (!platformNormalized || platformNormalized === "all" || platformNormalized === "facebook" || platformNormalized === "meta") {
     if (!process.env.APIFY_TOKEN) {
       return { ok: false, count: 0, ads: [], error: "Motor de Coleta do Facebook Ad Library não configurado (APIFY_TOKEN ausente)." };
     }

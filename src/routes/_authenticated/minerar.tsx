@@ -182,7 +182,8 @@ function MinePage() {
   const keyword = search.keyword ?? "";
   const niche = search.niche ?? "all";
   const country = search.country ?? "all";
-  const platform = search.platform ?? "all";
+  // Padrão Facebook: é a fonte com criativo real (imagem/vídeo) e anunciante.
+  const platform = search.platform ?? "Facebook";
   const scaleFilter = (search.scale ?? "all") as "all" | "cold" | "warming" | "hot" | "scaled";
   const page = search.page ?? 0;
 
