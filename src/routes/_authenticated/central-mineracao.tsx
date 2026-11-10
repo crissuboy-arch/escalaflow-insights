@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -153,7 +154,7 @@ function MiningCenterPage() {
     }
     setMining(true);
     try {
-      const res = await fetch("/api/collector/run", {
+      const res = await authedFetch("/api/collector/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

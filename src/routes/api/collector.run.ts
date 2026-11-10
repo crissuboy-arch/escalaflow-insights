@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runCollector } from "@/lib/collector/collector.service";
 import { upsertCollectedAd, summarizePersistResults, type PersistResult } from "@/lib/collector/persist";
+import { requireUserFromRequest } from "@/lib/auth/require-user-from-request";
 
 const cors = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "POST, OPTIONS",
-  "access-control-allow-headers": "content-type",
+  "access-control-allow-headers": "content-type, authorization",
 };
 
 export const Route = createFileRoute("/api/collector/run")({
@@ -13,6 +14,12 @@ export const Route = createFileRoute("/api/collector/run")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: cors }),
       POST: async ({ request }) => {
+        // Esta rota gasta créditos do Apify: exige sessão válida.
+        const user = await requireUserFromRequest(request);
+        if (!user) {
+          return Response.json({ ok: false, error: "Sessão inválida ou ausente" }, { status: 401, headers: cors });
+        }
+
         let body: Record<string, unknown> = {};
         try {
           body = (await request.json()) as Record<string, unknown>;
@@ -59,6 +66,7 @@ export const Route = createFileRoute("/api/collector/run")({
                 landingPageUrl: a.landingPageUrl,
                 startDate: a.startDate,
                 source: "collector",
+                userId: user.userId,
                 raw: {
                   ...(a.raw && typeof a.raw === "object" ? (a.raw as Record<string, unknown>) : { original: a.raw ?? null }),
                   enriched: {

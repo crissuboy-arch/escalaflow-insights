@@ -115,3 +115,20 @@ describe("upsertCollectedAd — reprodução exata do erro real de schema cache"
     ).resolves.toMatchObject({ inserted: false, error: "qualquer erro de banco" });
   });
 });
+
+describe("upsertCollectedAd — dono da oferta (user_id)", () => {
+  it("grava user_id quando o dono é conhecido, para que a oferta apareça nas consultas por utilizador", async () => {
+    insertMock.mockResolvedValue({ error: null });
+    const r = await upsertCollectedAd({ adLibraryId: "lib-1", advertiser: "X", userId: "user-123" });
+    expect(r.inserted).toBe(true);
+    const row = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(row.user_id).toBe("user-123");
+  });
+
+  it("não inventa user_id quando não há dono (extensão sem sessão)", async () => {
+    insertMock.mockResolvedValue({ error: null });
+    await upsertCollectedAd({ adLibraryId: "lib-2", advertiser: "Y" });
+    const row = insertMock.mock.calls[0][0] as Record<string, unknown>;
+    expect("user_id" in row).toBe(false);
+  });
+});
