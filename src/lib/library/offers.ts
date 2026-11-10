@@ -699,7 +699,11 @@ export function dedupeOffers(list: LibraryOffer[]): LibraryOffer[] {
   return Array.from(seen.values());
 }
 
+/** Tem criativo que ainda abre: cópia guardada no Storage, ou link original
+ *  que o pipeline ainda não marcou como expirado. */
 export function hasMedia(o: LibraryOffer): boolean {
+  if (o.mediaDurable) return true;
+  if (o.media_status === "expired" || o.media_status === "no_media") return false;
   return Boolean(o.image || o.video);
 }
 
@@ -715,8 +719,16 @@ export function isScaling(o: LibraryOffer): boolean {
 /** Força de escala para ordenar: usa sinais reais quando existem. */
 export function scaleRank(o: LibraryOffer): number {
   const active = o.activeAdsCount ?? 0;
+  // Ofertas com mídia guardada sobem: o link original pode expirar a qualquer momento.
+  const durableBoost = o.mediaDurable ? 25 : 0;
   const lvl = { cold: 0, warming: 1, hot: 2, scaled: 3 }[o.scaleLevel ?? "cold"];
-  return o.score + Math.min(active, 50) * 1.5 + lvl * 8 + Math.min(o.daysRunning ?? 0, 60) * 0.3;
+  return (
+    o.score +
+    Math.min(active, 50) * 1.5 +
+    lvl * 8 +
+    Math.min(o.daysRunning ?? 0, 60) * 0.3 +
+    durableBoost
+  );
 }
 
 export function isNewThisWeek(o: LibraryOffer): boolean {

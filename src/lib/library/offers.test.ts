@@ -103,3 +103,15 @@ describe("pesquisa e filtros", () => {
     expect(lib.dedupeOffers([dup, a]).map((o) => o.id)).toEqual(["1"]);
   });
 });
+
+describe("hasMedia", () => {
+  it("esconde ofertas cujo link expirou e não têm cópia guardada", () => {
+    expect(lib.hasMedia(row({ image_storage_path: null, media_status: "expired" }))).toBe(false);
+    expect(lib.hasMedia(row({ image_storage_path: "media/x.jpg", media_status: "expired" }))).toBe(
+      true,
+    );
+    expect(lib.hasMedia(row({ image_storage_path: null, media_status: "not_attempted" }))).toBe(
+      true,
+    );
+  });
+});
