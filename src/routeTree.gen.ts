@@ -34,6 +34,7 @@ import { Route as AuthenticatedLinkExternoRouteImport } from './routes/_authenti
 import { Route as AuthenticatedLivroTemplateMestreRouteImport } from './routes/_authenticated/livro-template-mestre'
 import { Route as AuthenticatedMineradorPublicoRouteImport } from './routes/_authenticated/minerador-publico'
 import { Route as AuthenticatedMinerarRouteImport } from './routes/_authenticated/minerar'
+import { Route as AuthenticatedMinerarAvancadoRouteImport } from './routes/_authenticated/minerar-avancado'
 import { Route as AuthenticatedMotorAfiliadosSeoRouteImport } from './routes/_authenticated/motor-afiliados-seo'
 import { Route as AuthenticatedOfertasEscaladasRouteImport } from './routes/_authenticated/ofertas-escaladas'
 import { Route as AuthenticatedOfertasSalvasRouteImport } from './routes/_authenticated/ofertas-salvas'
@@ -51,6 +52,7 @@ import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiScrapeOfferRouteImport } from './routes/api/scrape-offer'
 import { Route as StorySlugRouteImport } from './routes/story.$slug'
 import { Route as StorybookShareTokenRouteImport } from './routes/storybook-share.$token'
+import { Route as AuthenticatedBibliotecaIdRouteImport } from './routes/_authenticated/biblioteca.$id'
 import { Route as AuthenticatedLaunchAnalyzerIdRouteImport } from './routes/_authenticated/launch-analyzer.$id'
 import { Route as AuthenticatedMotorAfiliadosSeoIdRouteImport } from './routes/_authenticated/motor-afiliados-seo.$id'
 import { Route as AuthenticatedOfertaIdRouteImport } from './routes/_authenticated/oferta.$id'
@@ -62,6 +64,7 @@ import { Route as ApiCronPersistirMidiaAnunciosRouteImport } from './routes/api/
 import { Route as ApiCronPublicarArtigosRouteImport } from './routes/api/cron/publicar-artigos'
 import { Route as ApiIntegrationsHealthRouteImport } from './routes/api/integrations.health'
 import { Route as ApiIntegrationsStatsRouteImport } from './routes/api/integrations.stats'
+import { Route as ApiMediaPersistRouteImport } from './routes/api/media.persist'
 import { Route as AuthenticatedFacebookViralReelIdRemixRouteImport } from './routes/_authenticated/facebook-viral.$reelId.remix'
 import { Route as AuthenticatedProjetosHandoffHandoffIdRouteImport } from './routes/_authenticated/projetos.handoff.$handoffId'
 import { Route as ApiIntegrationsIntelligenceRunRouteImport } from './routes/api/integrations.intelligence.run'
@@ -203,6 +206,12 @@ const AuthenticatedMinerarRoute = AuthenticatedMinerarRouteImport.update({
   path: '/minerar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMinerarAvancadoRoute =
+  AuthenticatedMinerarAvancadoRouteImport.update({
+    id: '/minerar-avancado',
+    path: '/minerar-avancado',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMotorAfiliadosSeoRoute =
   AuthenticatedMotorAfiliadosSeoRouteImport.update({
     id: '/motor-afiliados-seo',
@@ -297,6 +306,12 @@ const StorybookShareTokenRoute = StorybookShareTokenRouteImport.update({
   path: '/storybook-share/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedBibliotecaIdRoute =
+  AuthenticatedBibliotecaIdRouteImport.update({
+    id: '/biblioteca/$id',
+    path: '/biblioteca/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedLaunchAnalyzerIdRoute =
   AuthenticatedLaunchAnalyzerIdRouteImport.update({
     id: '/$id',
@@ -357,6 +372,11 @@ const ApiIntegrationsStatsRoute = ApiIntegrationsStatsRouteImport.update({
   path: '/api/integrations/stats',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMediaPersistRoute = ApiMediaPersistRouteImport.update({
+  id: '/api/media/persist',
+  path: '/api/media/persist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedFacebookViralReelIdRemixRoute =
   AuthenticatedFacebookViralReelIdRemixRouteImport.update({
     id: '/$reelId/remix',
@@ -407,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/minerar-avancado': typeof AuthenticatedMinerarAvancadoRoute
   '/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -424,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/api/scrape-offer': typeof ApiScrapeOfferRoute
   '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/biblioteca/$id': typeof AuthenticatedBibliotecaIdRoute
   '/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
   '/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -435,6 +457,7 @@ export interface FileRoutesByFullPath {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/api/media/persist': typeof ApiMediaPersistRoute
   '/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
@@ -465,6 +488,7 @@ export interface FileRoutesByTo {
   '/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/minerar': typeof AuthenticatedMinerarRoute
+  '/minerar-avancado': typeof AuthenticatedMinerarAvancadoRoute
   '/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -482,6 +506,7 @@ export interface FileRoutesByTo {
   '/api/scrape-offer': typeof ApiScrapeOfferRoute
   '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/biblioteca/$id': typeof AuthenticatedBibliotecaIdRoute
   '/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
   '/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -493,6 +518,7 @@ export interface FileRoutesByTo {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/api/media/persist': typeof ApiMediaPersistRoute
   '/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
@@ -525,6 +551,7 @@ export interface FileRoutesById {
   '/_authenticated/livro-template-mestre': typeof AuthenticatedLivroTemplateMestreRoute
   '/_authenticated/minerador-publico': typeof AuthenticatedMineradorPublicoRoute
   '/_authenticated/minerar': typeof AuthenticatedMinerarRoute
+  '/_authenticated/minerar-avancado': typeof AuthenticatedMinerarAvancadoRoute
   '/_authenticated/motor-afiliados-seo': typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   '/_authenticated/ofertas-escaladas': typeof AuthenticatedOfertasEscaladasRoute
   '/_authenticated/ofertas-salvas': typeof AuthenticatedOfertasSalvasRoute
@@ -542,6 +569,7 @@ export interface FileRoutesById {
   '/api/scrape-offer': typeof ApiScrapeOfferRoute
   '/story/$slug': typeof StorySlugRoute
   '/storybook-share/$token': typeof StorybookShareTokenRoute
+  '/_authenticated/biblioteca/$id': typeof AuthenticatedBibliotecaIdRoute
   '/_authenticated/launch-analyzer/$id': typeof AuthenticatedLaunchAnalyzerIdRoute
   '/_authenticated/motor-afiliados-seo/$id': typeof AuthenticatedMotorAfiliadosSeoIdRoute
   '/_authenticated/oferta/$id': typeof AuthenticatedOfertaIdRoute
@@ -553,6 +581,7 @@ export interface FileRoutesById {
   '/api/cron/publicar-artigos': typeof ApiCronPublicarArtigosRoute
   '/api/integrations/health': typeof ApiIntegrationsHealthRoute
   '/api/integrations/stats': typeof ApiIntegrationsStatsRoute
+  '/api/media/persist': typeof ApiMediaPersistRoute
   '/_authenticated/facebook-viral/$reelId/remix': typeof AuthenticatedFacebookViralReelIdRemixRoute
   '/_authenticated/projetos/handoff/$handoffId': typeof AuthenticatedProjetosHandoffHandoffIdRoute
   '/api/integrations/intelligence/run': typeof ApiIntegrationsIntelligenceRunRoute
@@ -585,6 +614,7 @@ export interface FileRouteTypes {
     | '/livro-template-mestre'
     | '/minerador-publico'
     | '/minerar'
+    | '/minerar-avancado'
     | '/motor-afiliados-seo'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -602,6 +632,7 @@ export interface FileRouteTypes {
     | '/api/scrape-offer'
     | '/story/$slug'
     | '/storybook-share/$token'
+    | '/biblioteca/$id'
     | '/launch-analyzer/$id'
     | '/motor-afiliados-seo/$id'
     | '/oferta/$id'
@@ -613,6 +644,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/api/media/persist'
     | '/facebook-viral/$reelId/remix'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
@@ -643,6 +675,7 @@ export interface FileRouteTypes {
     | '/livro-template-mestre'
     | '/minerador-publico'
     | '/minerar'
+    | '/minerar-avancado'
     | '/motor-afiliados-seo'
     | '/ofertas-escaladas'
     | '/ofertas-salvas'
@@ -660,6 +693,7 @@ export interface FileRouteTypes {
     | '/api/scrape-offer'
     | '/story/$slug'
     | '/storybook-share/$token'
+    | '/biblioteca/$id'
     | '/launch-analyzer/$id'
     | '/motor-afiliados-seo/$id'
     | '/oferta/$id'
@@ -671,6 +705,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/api/media/persist'
     | '/facebook-viral/$reelId/remix'
     | '/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
@@ -702,6 +737,7 @@ export interface FileRouteTypes {
     | '/_authenticated/livro-template-mestre'
     | '/_authenticated/minerador-publico'
     | '/_authenticated/minerar'
+    | '/_authenticated/minerar-avancado'
     | '/_authenticated/motor-afiliados-seo'
     | '/_authenticated/ofertas-escaladas'
     | '/_authenticated/ofertas-salvas'
@@ -719,6 +755,7 @@ export interface FileRouteTypes {
     | '/api/scrape-offer'
     | '/story/$slug'
     | '/storybook-share/$token'
+    | '/_authenticated/biblioteca/$id'
     | '/_authenticated/launch-analyzer/$id'
     | '/_authenticated/motor-afiliados-seo/$id'
     | '/_authenticated/oferta/$id'
@@ -730,6 +767,7 @@ export interface FileRouteTypes {
     | '/api/cron/publicar-artigos'
     | '/api/integrations/health'
     | '/api/integrations/stats'
+    | '/api/media/persist'
     | '/_authenticated/facebook-viral/$reelId/remix'
     | '/_authenticated/projetos/handoff/$handoffId'
     | '/api/integrations/intelligence/run'
@@ -750,6 +788,7 @@ export interface RootRouteChildren {
   ApiCronPublicarArtigosRoute: typeof ApiCronPublicarArtigosRoute
   ApiIntegrationsHealthRoute: typeof ApiIntegrationsHealthRoute
   ApiIntegrationsStatsRoute: typeof ApiIntegrationsStatsRoute
+  ApiMediaPersistRoute: typeof ApiMediaPersistRoute
   ApiIntegrationsIntelligenceRunRoute: typeof ApiIntegrationsIntelligenceRunRoute
   ApiIntegrationsMiningRunRoute: typeof ApiIntegrationsMiningRunRoute
 }
@@ -931,6 +970,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMinerarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/minerar-avancado': {
+      id: '/_authenticated/minerar-avancado'
+      path: '/minerar-avancado'
+      fullPath: '/minerar-avancado'
+      preLoaderRoute: typeof AuthenticatedMinerarAvancadoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/motor-afiliados-seo': {
       id: '/_authenticated/motor-afiliados-seo'
       path: '/motor-afiliados-seo'
@@ -1050,6 +1096,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StorybookShareTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/biblioteca/$id': {
+      id: '/_authenticated/biblioteca/$id'
+      path: '/biblioteca/$id'
+      fullPath: '/biblioteca/$id'
+      preLoaderRoute: typeof AuthenticatedBibliotecaIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/launch-analyzer/$id': {
       id: '/_authenticated/launch-analyzer/$id'
       path: '/$id'
@@ -1125,6 +1178,13 @@ declare module '@tanstack/react-router' {
       path: '/api/integrations/stats'
       fullPath: '/api/integrations/stats'
       preLoaderRoute: typeof ApiIntegrationsStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/media/persist': {
+      id: '/api/media/persist'
+      path: '/api/media/persist'
+      fullPath: '/api/media/persist'
+      preLoaderRoute: typeof ApiMediaPersistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/facebook-viral/$reelId/remix': {
@@ -1255,6 +1315,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedLivroTemplateMestreRoute: typeof AuthenticatedLivroTemplateMestreRoute
   AuthenticatedMineradorPublicoRoute: typeof AuthenticatedMineradorPublicoRoute
   AuthenticatedMinerarRoute: typeof AuthenticatedMinerarRoute
+  AuthenticatedMinerarAvancadoRoute: typeof AuthenticatedMinerarAvancadoRoute
   AuthenticatedMotorAfiliadosSeoRoute: typeof AuthenticatedMotorAfiliadosSeoRouteWithChildren
   AuthenticatedOfertasEscaladasRoute: typeof AuthenticatedOfertasEscaladasRoute
   AuthenticatedOfertasSalvasRoute: typeof AuthenticatedOfertasSalvasRoute
@@ -1267,6 +1328,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedStrategicAiRoute: typeof AuthenticatedStrategicAiRoute
   AuthenticatedTiktokRadarRoute: typeof AuthenticatedTiktokRadarRoute
   AuthenticatedYoutubeRadarRoute: typeof AuthenticatedYoutubeRadarRoute
+  AuthenticatedBibliotecaIdRoute: typeof AuthenticatedBibliotecaIdRoute
   AuthenticatedOfertaIdRoute: typeof AuthenticatedOfertaIdRoute
   AuthenticatedProdutosEbookRoute: typeof AuthenticatedProdutosEbookRoute
 }
@@ -1295,6 +1357,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedLivroTemplateMestreRoute: AuthenticatedLivroTemplateMestreRoute,
   AuthenticatedMineradorPublicoRoute: AuthenticatedMineradorPublicoRoute,
   AuthenticatedMinerarRoute: AuthenticatedMinerarRoute,
+  AuthenticatedMinerarAvancadoRoute: AuthenticatedMinerarAvancadoRoute,
   AuthenticatedMotorAfiliadosSeoRoute:
     AuthenticatedMotorAfiliadosSeoRouteWithChildren,
   AuthenticatedOfertasEscaladasRoute: AuthenticatedOfertasEscaladasRoute,
@@ -1308,6 +1371,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedStrategicAiRoute: AuthenticatedStrategicAiRoute,
   AuthenticatedTiktokRadarRoute: AuthenticatedTiktokRadarRoute,
   AuthenticatedYoutubeRadarRoute: AuthenticatedYoutubeRadarRoute,
+  AuthenticatedBibliotecaIdRoute: AuthenticatedBibliotecaIdRoute,
   AuthenticatedOfertaIdRoute: AuthenticatedOfertaIdRoute,
   AuthenticatedProdutosEbookRoute: AuthenticatedProdutosEbookRoute,
 }
@@ -1330,6 +1394,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCronPublicarArtigosRoute: ApiCronPublicarArtigosRoute,
   ApiIntegrationsHealthRoute: ApiIntegrationsHealthRoute,
   ApiIntegrationsStatsRoute: ApiIntegrationsStatsRoute,
+  ApiMediaPersistRoute: ApiMediaPersistRoute,
   ApiIntegrationsIntelligenceRunRoute: ApiIntegrationsIntelligenceRunRoute,
   ApiIntegrationsMiningRunRoute: ApiIntegrationsMiningRunRoute,
 }

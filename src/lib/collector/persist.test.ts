@@ -23,7 +23,18 @@ const selectMock = vi.fn(() => ({ eq: eqSelectMock }));
 const fromMock = vi.fn(() => ({
   select: selectMock,
   update: updateMock,
-  insert: insertMock,
+  // insert(...).select("id").single() — o resultado de insertMock decide.
+  insert: (...args: unknown[]) => {
+    const r = insertMock(...args);
+    return {
+      select: () => ({
+        single: async () => {
+          const v = (await r) as { error?: unknown } | undefined;
+          return { data: v?.error ? null : { id: "new-id" }, error: v?.error ?? null };
+        },
+      }),
+    };
+  },
 }));
 
 vi.mock("@/integrations/supabase/client.server", () => ({
@@ -161,7 +172,9 @@ describe("upsertCollectedAd — marcação de media_status (ver media-persist.ts
   });
 
   it("re-mine de um anúncio já copiado com sucesso preserva o status (não tenta de novo)", async () => {
-    maybeSingleMock.mockResolvedValue({ data: { id: "ad-1", media_status: "image_copied" } });
+    maybeSingleMock.mockResolvedValue({
+      data: { id: "ad-1", media_status: "image_copied", image_storage_path: "media/abc.jpg" },
+    });
     const result = await upsertCollectedAd({
       advertiser: "X",
       headline: "Y",
@@ -181,5 +194,27 @@ describe("upsertCollectedAd — marcação de media_status (ver media-persist.ts
       imageUrl: "https://cdn.fb.com/img-novo.jpg",
     });
     expect(updateMock.mock.calls[0][0]).toMatchObject({ media_status: "not_attempted" });
+  });
+
+  it("re-mine sem mídia nunca apaga o URL nem a cópia já guardada", async () => {
+    maybeSingleMock.mockResolvedValue({
+      data: {
+        id: "ad-1",
+        media_status: "image_copied",
+        image_url: "https://cdn.fb.com/antigo.jpg",
+        image_storage_path: "media/abc.jpg",
+      },
+    });
+    await upsertCollectedAd({ advertiser: "X", headline: "Y", adLibraryId: "z" });
+    const patch = updateMock.mock.calls[0][0] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty("image_url");
+    expect(patch).not.toHaveProperty("image_storage_path");
+    expect(patch).not.toHaveProperty("media_status");
+  });
+
+  it("devolve o id da linha para o pipeline de mídia", async () => {
+    insertMock.mockResolvedValue({ error: null });
+    const r = await upsertCollectedAd({ advertiser: "X", headline: "Y", adLibraryId: "novo", imageUrl: "https://cdn/x.jpg" });
+    expect(r).toMatchObject({ id: "new-id", inserted: true });
   });
 });

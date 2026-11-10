@@ -31,6 +31,8 @@ export interface PersistAdInput {
 }
 
 export interface PersistResult {
+  /** id da linha em collected_ads (para o pipeline de mídia). */
+  id?: string;
   inserted: boolean;
   updated: boolean;
   error?: string;
@@ -47,8 +49,6 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
     headline: item.headline?.trim() || item.advertiser?.trim() || "Anúncio",
     copy: item.copy?.trim() || "",
     cta: item.cta || null,
-    image_url: item.imageUrl || null,
-    video_url: item.videoUrl || null,
     creative_type: item.creativeType || (item.videoUrl ? "video" : item.imageUrl ? "image" : null),
     platform: item.platform || "Facebook",
     country: item.country || "—",
@@ -78,46 +78,78 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
   const existingQuery = item.adLibraryId
     ? supabaseAdmin
         .from("collected_ads")
-        .select("id, media_status")
+        .select("id, media_status, image_url, video_url, image_storage_path, video_storage_path")
         .eq("ad_library_id", item.adLibraryId)
         .maybeSingle()
     : item.adUrl
       ? supabaseAdmin
           .from("collected_ads")
-          .select("id, media_status")
+          .select("id, media_status, image_url, video_url, image_storage_path, video_storage_path")
           .eq("ad_url", item.adUrl)
           .maybeSingle()
       : null;
 
   const { data: existing } = existingQuery ? await existingQuery : { data: null };
 
-  const hasMedia = Boolean(base.image_url || base.video_url);
-  const alreadyCopied =
-    existing?.media_status === "image_copied" || existing?.media_status === "both_copied";
-  // Se já copiada com sucesso, preserva (idempotente). Senão: sem mídia
-  // nenhuma = 'no_media'; com mídia (nova ou repetida) = 'not_attempted',
-  // mesmo que um status anterior fosse 'expired' — um re-mine traz um URL
-  // novo, que merece uma nova tentativa do cron.
-  const mediaStatus = alreadyCopied ? null : !hasMedia ? "no_media" : "not_attempted";
-  const mediaPatch = mediaStatus ? { media_status: mediaStatus } : {};
+  const prev = existing as unknown as {
+    id: string;
+    media_status: string | null;
+    image_url: string | null;
+    video_url: string | null;
+    image_storage_path: string | null;
+    video_storage_path: string | null;
+  } | null;
+  // Uma nova coleta NUNCA apaga mídia: se o item novo não trouxe URL, o URL
+  // anterior fica; cópias duráveis já gravadas no Storage nunca são tocadas.
+  const imageUrl = item.imageUrl || null;
+  const videoUrl = item.videoUrl || null;
+  const mediaUrls = {
+    ...(imageUrl ? { image_url: imageUrl } : prev ? {} : { image_url: null }),
+    ...(videoUrl ? { video_url: videoUrl } : prev ? {} : { video_url: null }),
+  };
+  const finalImageUrl = imageUrl ?? prev?.image_url ?? null;
+  const finalVideoUrl = videoUrl ?? prev?.video_url ?? null;
+  const imageDone = !finalImageUrl || Boolean(prev?.image_storage_path);
+  const videoDone = !finalVideoUrl || Boolean(prev?.video_storage_path);
+  const hasAnyMedia = Boolean(
+    finalImageUrl || finalVideoUrl || prev?.image_storage_path || prev?.video_storage_path,
+  );
+  // Tudo já copiado → preserva o status (idempotente, sem novo download).
+  // Falta algo → volta para a fila: um re-mine traz URLs frescos, que
+  // merecem nova tentativa mesmo que a anterior tenha expirado.
+  const mediaStatus = !hasAnyMedia
+    ? "no_media"
+    : imageDone && videoDone
+      ? null
+      : prev?.image_storage_path && !videoDone
+        ? "pending_video"
+        : "not_attempted";
+  const mediaPatch = {
+    ...mediaUrls,
+    ...(mediaStatus ? { media_status: mediaStatus } : {}),
+  };
 
-  if (existing) {
+  if (prev) {
     const { error } = await supabaseAdmin
       .from("collected_ads")
       .update({ ...base, ...mediaPatch } as never)
-      .eq("id", existing.id);
-    if (error) return { inserted: false, updated: false, error: error.message };
-    return { inserted: false, updated: true };
+      .eq("id", prev.id);
+    if (error) return { id: prev.id, inserted: false, updated: false, error: error.message };
+    return { id: prev.id, inserted: false, updated: true };
   }
 
-  const { error } = await supabaseAdmin.from("collected_ads").insert({
-    ...base,
-    ...mediaPatch,
-    ad_library_id: item.adLibraryId || null,
-    first_seen_at: now,
-  } as never);
+  const { data: created, error } = await supabaseAdmin
+    .from("collected_ads")
+    .insert({
+      ...base,
+      ...mediaPatch,
+      ad_library_id: item.adLibraryId || null,
+      first_seen_at: now,
+    } as never)
+    .select("id")
+    .single();
   if (error) return { inserted: false, updated: false, error: error.message };
-  return { inserted: true, updated: false };
+  return { id: (created as { id: string } | null)?.id, inserted: true, updated: false };
 }
 
 /** Aggregates a batch of persist outcomes so callers can tell the user the

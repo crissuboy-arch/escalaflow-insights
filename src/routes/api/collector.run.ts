@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { runCollector } from "@/lib/collector/collector.service";
 import { upsertCollectedAd, summarizePersistResults, type PersistResult } from "@/lib/collector/persist";
 import { requireUserFromRequest } from "@/lib/auth/require-user-from-request";
+import { persistMediaForIds } from "@/lib/collector/media-pipeline";
 
 const cors = {
   "access-control-allow-origin": "*",
@@ -99,8 +100,22 @@ export const Route = createFileRoute("/api/collector/run")({
           console.error(`[collector] ${failed}/${persistResults.length} ads returned to the UI were NOT persisted — they will not survive a reload. First error: ${firstError}`);
         }
 
+        // Cópia durável IMEDIATA das imagens desta coleta (os links do CDN do
+        // Facebook expiram em dias). Vídeos ficam para o /api/media/persist,
+        // que a Biblioteca chama em segundo plano. Nunca derruba a resposta.
+        let media: Awaited<ReturnType<typeof persistMediaForIds>> | { error: string } | null = null;
+        const newIds = persistResults.map((r) => r.id).filter((id): id is string => !!id);
+        if (newIds.length) {
+          try {
+            media = await persistMediaForIds(newIds, { budgetMs: 9_000 });
+          } catch (e) {
+            media = { error: e instanceof Error ? e.message : String(e) };
+            console.error("[collector] media pipeline failed:", e);
+          }
+        }
+
         return Response.json(
-          { ...result, saved, persistFailed: failed, persistError: failed > 0 ? firstError : undefined },
+          { ...result, media, saved, persistFailed: failed, persistError: failed > 0 ? firstError : undefined },
           { status: result.ok ? 200 : 502, headers: cors },
         );
       },
