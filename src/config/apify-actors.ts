@@ -10,14 +10,18 @@ function req(key: string, fallback?: string): string {
 
 export const APIFY_ACTORS = {
   // Social radars
-  tiktok:     () => req("APIFY_TIKTOK_ACTOR",         "clockworks~tiktok-scraper"),
-  youtube:    () => req("APIFY_YOUTUBE_ACTOR",         "streamers~youtube-scraper"),
-  instagram:  () => req("APIFY_INSTAGRAM_ACTOR",       "apify~instagram-scraper"),
-  facebook:   () => req("APIFY_META_ADS_ACTOR",        "apify~facebook-ads-scraper"),
+  tiktok: () => req("APIFY_TIKTOK_ACTOR", "clockworks~tiktok-scraper"),
+  youtube: () => req("APIFY_YOUTUBE_ACTOR", "streamers~youtube-scraper"),
+  instagram: () => req("APIFY_INSTAGRAM_ACTOR", "apify~instagram-scraper"),
+  facebook: () => req("APIFY_META_ADS_ACTOR", "apify~facebook-ads-scraper"),
+  // Facebook Viral — páginas/Reels orgânicos (distinto do miner de ADS acima)
+  facebookPagesViral: () =>
+    req("APIFY_FACEBOOK_PAGES_ACTOR", "themineworks~facebook-pages-scraper"),
+  facebookReelsViral: () => req("APIFY_FACEBOOK_REELS_ACTOR", "coregent~facebook-reels-scraper"),
   // Trends
   googleTrends: () => req("APIFY_GOOGLE_TRENDS_ACTOR", "apify~google-trends-scraper"),
   // E-commerce (platform-specific, falls back to generic)
-  amazon:       () => req("APIFY_ECOMMERCE_AMAZON_ACTOR", "") || req("APIFY_ECOMMERCE_ACTOR"),
-  shopee:       () => req("APIFY_ECOMMERCE_SHOPEE_ACTOR",  "") || req("APIFY_ECOMMERCE_ACTOR"),
-  mercadolivre: () => req("APIFY_ECOMMERCE_ML_ACTOR",      "") || req("APIFY_ECOMMERCE_ACTOR"),
+  amazon: () => req("APIFY_ECOMMERCE_AMAZON_ACTOR", "") || req("APIFY_ECOMMERCE_ACTOR"),
+  shopee: () => req("APIFY_ECOMMERCE_SHOPEE_ACTOR", "") || req("APIFY_ECOMMERCE_ACTOR"),
+  mercadolivre: () => req("APIFY_ECOMMERCE_ML_ACTOR", "") || req("APIFY_ECOMMERCE_ACTOR"),
 } as const;
