@@ -17,11 +17,11 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolvesToPrivateIp } from "@/lib/net/ssrf-guard";
 
-const BUCKET = "mining-media";
-const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8MB
-const VIDEO_MAX_BYTES = 25 * 1024 * 1024; // 25MB
-const IMAGE_TIMEOUT_MS = 8_000;
-const VIDEO_TIMEOUT_MS = 20_000;
+export const BUCKET = "mining-media";
+export const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8MB
+export const VIDEO_MAX_BYTES = 25 * 1024 * 1024; // 25MB
+export const IMAGE_TIMEOUT_MS = 8_000;
+export const VIDEO_TIMEOUT_MS = 20_000;
 const MAX_REDIRECTS = 3;
 
 export type MediaStatus =
@@ -34,7 +34,7 @@ export type MediaStatus =
   | "too_large_skipped"
   | "no_media";
 
-const EXT_BY_CONTENT_TYPE: Record<string, string> = {
+export const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/jpg": "jpg",
   "image/png": "png",
@@ -73,18 +73,18 @@ async function guardedFetch(rawUrl: string, timeoutMs: number): Promise<Response
   }
 }
 
-interface DownloadResult {
+export interface DownloadResult {
   ok: true;
   bytes: Uint8Array;
   contentType: string;
 }
-interface DownloadFailure {
+export interface DownloadFailure {
   ok: false;
   reason: "expired" | "too_large" | "network_error";
   detail: string;
 }
 
-async function downloadCapped(
+export async function downloadCapped(
   url: string,
   timeoutMs: number,
   maxBytes: number,

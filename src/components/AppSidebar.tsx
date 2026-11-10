@@ -78,6 +78,11 @@ export function AppSidebar() {
       .then(setShowDatabase);
   }, []);
   type Item = { to: string; label: string; icon: typeof LayoutDashboard; badge?: number };
+  // A Biblioteca de Ofertas (/minerar) também cobre as páginas de detalhe
+  // (/biblioteca/:id) e a Coleta avançada.
+  const isItemActive = (to: string) =>
+    path === to ||
+    (to === "/minerar" && (path.startsWith("/biblioteca/") || path === "/minerar-avancado"));
   const mineracao: Item[] = [
     { to: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
     { to: "/minerar", label: t("nav.mine"), icon: Search },
@@ -176,12 +181,12 @@ export function AppSidebar() {
                   <SidebarMenuItem key={it.to}>
                     <SidebarMenuButton
                       asChild
-                      isActive={path === it.to}
+                      isActive={isItemActive(it.to)}
                       className="relative transition-all duration-200 hover:bg-primary/5 hover:text-foreground data-[active=true]:bg-primary/10 data-[active=true]:text-foreground data-[active=true]:shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_30%,transparent),0_0_18px_-4px_color-mix(in_oklab,var(--primary)_50%,transparent)] data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:top-1.5 data-[active=true]:before:bottom-1.5 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-primary data-[active=true]:before:shadow-[0_0_8px_var(--primary)]"
                     >
                       <Link to={it.to} className="flex items-center gap-3">
                         <it.icon
-                          className={`h-4 w-4 transition-colors ${path === it.to ? "text-primary" : "text-muted-foreground"}`}
+                          className={`h-4 w-4 transition-colors ${isItemActive(it.to) ? "text-primary" : "text-muted-foreground"}`}
                         />
                         <span className="flex-1">{it.label}</span>
                         {it.badge ? (

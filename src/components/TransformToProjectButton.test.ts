@@ -18,7 +18,9 @@ const BUTTON_SRC = readFileSync(
   "utf-8",
 );
 const MINERAR_SRC = readFileSync(
-  join(__dirname, "../routes/_authenticated/minerar.tsx"),
+  // O card com a grelha completa de ações vive agora na Coleta avançada;
+  // a Biblioteca (/minerar) usa o mesmo botão na página da oferta.
+  join(__dirname, "../routes/_authenticated/minerar-avancado.tsx"),
   "utf-8",
 );
 const ANALISE_IA_SRC = readFileSync(

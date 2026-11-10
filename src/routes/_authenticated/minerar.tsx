@@ -1,15 +1,33 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { authedFetch } from "@/lib/auth/authed-fetch";
+// Minerar Ofertas → Biblioteca de Ofertas.
+//
+// Experiência de biblioteca visual (banner em destaque, carrosséis, Top 10
+// por nicho, novas da semana, prateleiras por nicho) sobre as ofertas REAIS
+// já coletadas em collected_ads. Abre com ofertas imediatamente — não é
+// preciso iniciar uma pesquisa. A coleta nova (Apify) continua disponível
+// pelo botão "Minerar novas" e pela Coleta avançada (página antiga).
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import {
+  CalendarPlus,
+  CloudUpload,
+  Flame,
+  Heart,
+  Loader2,
+  Radar,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Trophy,
+  X,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -17,1361 +35,1009 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Search,
-  Sparkles,
-  Flame,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Loader2,
-  Wand2,
-  Radar,
-  Rocket,
-} from "lucide-react";
-import {
-  toggleSaveOffer,
-  subscribeChange,
-  fetchSavedIds,
-  fetchFavIds,
-  getAITrends,
-  toggleFavorite,
-  saveCollectedAd,
-  favoriteCollectedAd,
-  rememberAdForAnalysis,
-  type AITrends,
-  type PersistedAd,
-} from "@/lib/queries";
-import { useAuth } from "@/providers/AuthProvider";
-import { toast } from "sonner";
-import { miningRepo } from "@/lib/mining/repository";
-import type { CollectorRunResult } from "@/lib/collector/collector.types";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { LibraryHero } from "@/components/library/LibraryHero";
+import { OfferRow } from "@/components/library/OfferRow";
+import { LibraryOfferCard } from "@/components/library/LibraryOfferCard";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import { supabase } from "@/integrations/supabase/client";
-import { Badge as UIBadge } from "@/components/ui/badge";
+import { useOfferActions } from "@/lib/library/use-offer-actions";
 import {
-  ExternalLink,
-  Flame as FlameIcon,
-  Image as ImageIcon,
-  Globe2,
-  BookmarkCheck,
-  Star,
-} from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { openAdLink } from "@/lib/external";
-import { CATEGORY_LIST, KEYWORD_CATEGORIES, type CategoryId } from "@/lib/mining/keywords";
-import { useServerFn } from "@tanstack/react-start";
-import { createProjectFromOffer } from "@/lib/project.functions";
-import { SkillButton } from "@/components/module-skills/SkillButton";
-import { GenerateOfferModal } from "@/components/minerar/GenerateOfferModal";
-import { TransformToProjectButton } from "@/components/TransformToProjectButton";
-import { resolveAdImageUrl, resolveAdVideoUrl } from "@/lib/collector/media-url";
+  COUNTRY_LABELS,
+  EMPTY_FILTERS,
+  LANGUAGE_LABELS,
+  NICHES,
+  NICHE_LABEL,
+  applyFilters,
+  countryFlag,
+  fetchLibraryOffers,
+  hasMedia,
+  isFiltering,
+  isNewThisWeek,
+  isScaling,
+  scaleRank,
+  type LanguageCode,
+  type LibraryFilters,
+  type LibraryOffer,
+  type NicheId,
+} from "@/lib/library/offers";
+import { cn } from "@/lib/utils";
 
-type CollectedAd = {
-  id: string;
-  ad_library_id: string | null;
-  ad_url: string | null;
-  advertiser: string;
-  headline: string;
-  copy: string | null;
-  cta: string | null;
-  image_url: string | null;
-  video_url: string | null;
-  image_storage_path?: string | null;
-  video_storage_path?: string | null;
-  creative_type: string | null;
-  platform: string;
-  country: string;
-  niche: string;
-  keyword: string | null;
-  score: number;
-  created_at: string;
-  media_source?: string;
-  tags?: string[];
-  subniche?: string | null;
-  scale_level?: "cold" | "warming" | "hot" | "scaled" | null;
-  promise?: string | null;
-  emotion?: string | null;
-  isVsl?: boolean;
-  vslScaling?: boolean;
-  hookRepeated?: boolean;
-  viralStructure?: boolean;
-  copyPattern?: boolean;
-  offerType?: "anuncio" | "pagina-venda" | "vsl" | "checkout" | "ecommerce" | "conteudo" | null;
-  source_engine?: string | null;
-  offer_network?: string | null;
-  offer_network_confidence?: string | null;
-  landing_page_url?: string | null;
-  first_seen_at?: string | null;
-  last_seen_at?: string | null;
-};
-
-const mineSearch = z.object({
+const librarySearch = z.object({
+  q: z.string().optional().catch(undefined),
+  // compatibilidade com links antigos (?keyword=)
   keyword: z.string().optional().catch(undefined),
-  niche: z.string().optional().catch(undefined),
   country: z.string().optional().catch(undefined),
+  language: z.string().optional().catch(undefined),
   platform: z.string().optional().catch(undefined),
-  scale: z.string().optional().catch(undefined),
-  page: z.coerce.number().optional().catch(undefined),
+  niche: z.string().optional().catch(undefined),
+  media: z.coerce.boolean().optional().catch(undefined),
+  /** lista completa (inclui ofertas sem criativo) em vez das prateleiras */
+  all: z.coerce.boolean().optional().catch(undefined),
+  /** Abas da biblioteca: Início (prateleiras), Explorar (filtros), Minha Lista. */
+  tab: z.enum(["inicio", "explorar", "lista"]).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).optional().catch(undefined),
 });
+
+type LibraryTab = "inicio" | "explorar" | "lista";
 
 export const Route = createFileRoute("/_authenticated/minerar")({
-  validateSearch: mineSearch,
-  component: MinePage,
+  validateSearch: librarySearch,
+  component: OfferLibraryPage,
 });
 
-function AdMedia({
-  imageUrl,
-  videoUrl,
-  headline,
-}: {
-  imageUrl: string | null;
-  videoUrl: string | null;
-  headline: string;
-}) {
-  const [imgError, setImgError] = useState(false);
-  const [videoError, setVideoError] = useState(false);
-  // Facebook's CDN media URLs are signed with a short expiry (days/weeks) — once
-  // expired they 403, which otherwise renders as a blank "0:00" video player.
-  // Confirmed 2026-09-15: an older ad's video_url returned "URL signature expired".
-  if (videoUrl && !videoError) {
-    return (
-      <video
-        src={videoUrl}
-        poster={imageUrl ?? undefined}
-        className="h-full w-full object-cover"
-        muted
-        loop
-        playsInline
-        controls
-        onError={() => setVideoError(true)}
-      />
+const PLATFORMS = ["Facebook", "Instagram", "Messenger", "Audience_network", "TikTok", "YouTube"];
+const GRID_PAGE = 25;
+const MEDIA_SYNC_MAX_ROUNDS = 12;
+
+function OfferLibraryPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const actions = useOfferActions();
+
+  const filters: LibraryFilters = {
+    q: search.q ?? search.keyword ?? "",
+    country: search.country ?? "all",
+    language: search.language ?? "all",
+    platform: search.platform ?? "all",
+    niche: search.niche ?? "all",
+    onlyMedia: search.media ?? false,
+  };
+  const setFilters = (patch: Partial<LibraryFilters>, keepTab = false) => {
+    const next = { ...filters, ...patch };
+    // Mexer em pesquisa/filtros leva sempre para Explorar (como na referência).
+    navigate({
+      to: "/minerar",
+      search: {
+        q: next.q || undefined,
+        country: next.country !== "all" ? next.country : undefined,
+        language: next.language !== "all" ? next.language : undefined,
+        platform: next.platform !== "all" ? next.platform : undefined,
+        niche: next.niche !== "all" ? next.niche : undefined,
+        media: next.onlyMedia || undefined,
+        all: search.all || undefined,
+        tab: keepTab ? search.tab : "explorar",
+      },
+      replace: true,
+    });
+  };
+  const setTab = (tab: LibraryTab) =>
+    navigate({ to: "/minerar", search: { ...search, tab, page: undefined }, replace: false });
+  const setPage = (page: number) => {
+    navigate({
+      to: "/minerar",
+      search: { ...search, page: page > 1 ? page : undefined },
+      replace: true,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const [offers, setOffers] = useState<LibraryOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [queryDraft, setQueryDraft] = useState(filters.q);
+  const [top10Niche, setTop10Niche] = useState<NicheId | "all">("all");
+  const [mineOpen, setMineOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const list = await fetchLibraryOffers();
+      setOffers(list);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao carregar a biblioteca");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    // Novas ofertas (coleta, extensão) aparecem sem refresh.
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ch = supabase
+      .channel("collected_ads_biblioteca")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "collected_ads" }, () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => load(true), 1500);
+      })
+      .subscribe();
+    return () => {
+      if (t) clearTimeout(t);
+      supabase.removeChannel(ch);
+    };
+  }, [load]);
+
+  // Debounce da pesquisa → URL
+  useEffect(() => {
+    if (queryDraft === filters.q) return;
+    const t = setTimeout(() => setFilters({ q: queryDraft }), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryDraft]);
+
+  // ── Guardar mídia pendente no Supabase Storage em segundo plano ──
+  const media = useMediaSync(offers, () => load(true));
+
+  const filtering = isFiltering(filters) || Boolean(search.all);
+  const tab: LibraryTab = search.tab ?? (filtering ? "explorar" : "inicio");
+  const filtered = useMemo(() => applyFilters(offers, filters), [offers, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / GRID_PAGE));
+  const page = Math.min(search.page ?? 1, totalPages);
+
+  const sections = useMemo(() => {
+    const withMedia = offers.filter(hasMedia);
+    const byStrength = [...withMedia].sort((a, b) => scaleRank(b) - scaleRank(a));
+    const hero = byStrength.slice(0, 5);
+    const scaling = byStrength.filter(isScaling).slice(0, 20);
+    const fresh = withMedia
+      .filter(isNewThisWeek)
+      .sort(
+        (a, b) =>
+          new Date(b.first_seen_at ?? b.created_at).getTime() -
+          new Date(a.first_seen_at ?? a.created_at).getTime(),
+      )
+      .slice(0, 24);
+    const nicheCounts = new Map<NicheId, number>();
+    for (const o of withMedia)
+      nicheCounts.set(o.nicheGroup, (nicheCounts.get(o.nicheGroup) ?? 0) + 1);
+    const nicheShelves = [...nicheCounts.entries()]
+      .filter(([id, n]) => id !== "outros" && n >= 2)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => ({
+        id,
+        offers: byStrength.filter((o) => o.nicheGroup === id).slice(0, 20),
+      }));
+    return { hero, scaling, fresh, nicheShelves, nicheCounts, withMediaCount: withMedia.length };
+  }, [offers]);
+
+  const top10 = useMemo(() => {
+    const pool = offers
+      .filter(hasMedia)
+      .filter((o) => top10Niche === "all" || o.nicheGroup === top10Niche);
+    return [...pool].sort((a, b) => scaleRank(b) - scaleRank(a)).slice(0, 10);
+  }, [offers, top10Niche]);
+
+  const countries = useMemo(() => {
+    const m = new Map<string, number>();
+    offers.forEach(
+      (o) => o.country && o.country !== "—" && m.set(o.country, (m.get(o.country) ?? 0) + 1),
     );
-  }
-  if (imageUrl && !imgError) {
-    return (
-      <img
-        src={imageUrl}
-        alt={headline}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        onError={() => setImgError(true)}
-      />
-    );
-  }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [offers]);
+  const languages = useMemo(() => {
+    const m = new Map<LanguageCode, number>();
+    offers.forEach((o) => o.language && m.set(o.language, (m.get(o.language) ?? 0) + 1));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [offers]);
+  const platforms = useMemo(() => {
+    const m = new Map<string, number>();
+    offers.forEach((o) => {
+      const all = new Set([
+        o.platform,
+        ...o.publisherPlatforms.map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()),
+      ]);
+      all.forEach((p) => m.set(p, (m.get(p) ?? 0) + 1));
+    });
+    return PLATFORMS.filter((p) => m.has(p)).map((p) => [p, m.get(p)!] as const);
+  }, [offers]);
+
+  const stats = useMemo(
+    () => ({
+      total: offers.length,
+      durable: offers.filter((o) => o.mediaDurable).length,
+      advertisers: new Set(offers.map((o) => o.advertiser)).size,
+      fresh: offers.filter(isNewThisWeek).length,
+    }),
+    [offers],
+  );
+
+  const activeFilterCount =
+    (filters.country !== "all" ? 1 : 0) +
+    (filters.language !== "all" ? 1 : 0) +
+    (filters.platform !== "all" ? 1 : 0) +
+    (filters.onlyMedia ? 1 : 0);
+
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
-      <ImageIcon className="h-8 w-8 opacity-40" />
-      <span className="text-sm font-medium">
-        {videoError || imgError ? "mídia expirada — minere novamente" : "sem mídia capturada"}
+    <div className="space-y-6" data-testid="offer-library">
+      {/* Cabeçalho */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Biblioteca de Ofertas</h1>
+          <p className="text-sm text-muted-foreground">
+            Ofertas reais coletadas da Biblioteca de Anúncios, organizadas por escala e nicho.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/minerar-avancado">
+              <SlidersHorizontal className="mr-1.5 h-4 w-4" /> Coleta avançada
+            </Link>
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setMineOpen(true)}
+            className="text-primary-foreground"
+            style={{ background: "var(--gradient-primary)" }}
+            data-testid="open-mine-dialog"
+          >
+            <Radar className="mr-1.5 h-4 w-4" /> Minerar novas
+          </Button>
+        </div>
+      </div>
+
+      {/* Abas */}
+      <div className="flex items-center gap-1 border-b border-border/60" role="tablist">
+        {(
+          [
+            ["inicio", "Início"],
+            ["explorar", "Explorar"],
+            ["lista", `Minha Lista${actions.favCount ? ` (${actions.favCount})` : ""}`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition",
+              tab === id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            data-testid={`tab-${id}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Indicadores reais */}
+      <div
+        className={cn("grid grid-cols-4 gap-1.5 sm:gap-2", tab === "inicio" && "hidden")}
+        data-testid="library-stats"
+      >
+        {[
+          { label: "Ofertas na biblioteca", value: stats.total },
+          { label: "Com mídia guardada", value: stats.durable },
+          { label: "Anunciantes", value: stats.advertisers },
+          { label: "Novas nesta semana", value: stats.fresh },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-border/60 bg-card px-2 py-1.5 sm:px-3 sm:py-2.5"
+          >
+            <p className="line-clamp-2 text-[10px] leading-tight text-muted-foreground sm:text-[11px]">
+              {s.label}
+            </p>
+            <p className="text-base font-bold tabular-nums sm:text-xl">{loading ? "…" : s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Pesquisa + filtros */}
+      <div className="sticky top-0 z-20 -mx-4 space-y-3 border-b border-border/40 bg-background/85 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-3">
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={queryDraft}
+              onChange={(e) => setQueryDraft(e.target.value)}
+              placeholder='Pesquisar anunciante, promessa, copy, palavra-chave… (use "aspas" para frase exata)'
+              className="h-10 pl-9 pr-9"
+              data-testid="library-search"
+            />
+            {queryDraft && (
+              <button
+                type="button"
+                aria-label="Limpar pesquisa"
+                onClick={() => {
+                  setQueryDraft("");
+                  setFilters({ q: "" });
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            className="h-10 md:hidden"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {activeFilterCount > 0 && (
+              <span className="ml-1 text-xs font-bold">{activeFilterCount}</span>
+            )}
+          </Button>
+        </div>
+        <div
+          className={cn(
+            "grid gap-2 sm:grid-cols-2 md:grid md:grid-cols-[repeat(4,minmax(0,1fr))_auto]",
+            !filtersOpen && "hidden md:grid",
+            tab !== "explorar" && "!hidden",
+          )}
+        >
+          <FilterSelect
+            label="País"
+            value={filters.country}
+            onChange={(v) => setFilters({ country: v })}
+            options={countries.map(([c, n]) => ({
+              value: c,
+              label: `${countryFlag(c)} ${COUNTRY_LABELS[c] ?? c} (${n})`,
+            }))}
+            testId="filter-country"
+          />
+          <FilterSelect
+            label="Idioma"
+            value={filters.language}
+            onChange={(v) => setFilters({ language: v })}
+            options={languages.map(([l, n]) => ({
+              value: l,
+              label: `${LANGUAGE_LABELS[l]} (${n})`,
+            }))}
+            testId="filter-language"
+          />
+          <FilterSelect
+            label="Plataforma"
+            value={filters.platform}
+            onChange={(v) => setFilters({ platform: v })}
+            options={platforms.map(([p, n]) => ({
+              value: p,
+              label: `${p.replace("_", " ")} (${n})`,
+            }))}
+            testId="filter-platform"
+          />
+          <FilterSelect
+            label="Nicho"
+            value={filters.niche}
+            onChange={(v) => setFilters({ niche: v })}
+            options={NICHES.map((n) => ({
+              value: n.id,
+              label: `${n.emoji} ${n.label} (${sections.nicheCounts.get(n.id) ?? 0})`,
+            }))}
+            testId="filter-niche"
+          />
+          <label className="flex h-9 items-center gap-2 rounded-md border border-border/60 px-3 text-xs">
+            <Switch
+              checked={filters.onlyMedia}
+              onCheckedChange={(v) => setFilters({ onlyMedia: v })}
+              data-testid="filter-media"
+            />
+            Só com mídia
+          </label>
+        </div>
+        {/* Chips de nicho */}
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <NicheChip active={filters.niche === "all"} onClick={() => setFilters({ niche: "all" })}>
+            ✨ Todos
+          </NicheChip>
+          {NICHES.filter((n) => (sections.nicheCounts.get(n.id) ?? 0) > 0).map((n) => (
+            <NicheChip
+              key={n.id}
+              active={filters.niche === n.id}
+              onClick={() => setFilters({ niche: filters.niche === n.id ? "all" : n.id })}
+            >
+              {n.emoji} {n.label}
+            </NicheChip>
+          ))}
+        </div>
+      </div>
+
+      <MediaSyncBanner state={media} />
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
+          <span>Não foi possível carregar a biblioteca: {error}</span>
+          <Button size="sm" variant="outline" onClick={() => load()}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Tentar de novo
+          </Button>
+        </div>
+      )}
+
+      {loading ? (
+        <LibrarySkeleton />
+      ) : offers.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 py-16 text-center">
+          <Radar className="h-10 w-10 text-muted-foreground" />
+          <p className="max-w-md text-sm text-muted-foreground">
+            A biblioteca ainda não tem ofertas coletadas. Faça a primeira mineração para começar.
+          </p>
+          <Button onClick={() => setMineOpen(true)}>Minerar ofertas</Button>
+        </div>
+      ) : tab === "lista" ? (
+        <section className="space-y-4" data-testid="library-list">
+          {(() => {
+            const mine = offers.filter((o) => actions.isFavorite(o));
+            return mine.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/60 py-14 text-center">
+                <Heart className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  A sua lista está vazia. Toque no coração de uma oferta para a guardar aqui.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{mine.length}</span> ofertas na
+                  Minha Lista
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {mine.map((o) => (
+                    <LibraryOfferCard
+                      key={o.id}
+                      offer={o}
+                      variant="grid"
+                      isFavorite
+                      onToggleFavorite={actions.toggleFavorite}
+                    />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+        </section>
+      ) : tab === "explorar" ? (
+        <section className="space-y-4" data-testid="library-results">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{filtered.length}</span> ofertas
+              {filters.niche !== "all" && <> em {NICHE_LABEL[filters.niche as NicheId]}</>}
+              {filtered.length > GRID_PAGE && (
+                <>
+                  {" "}
+                  · Página {page} de {totalPages}
+                </>
+              )}
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setQueryDraft("");
+                navigate({ to: "/minerar", search: { tab: "explorar" }, replace: true });
+              }}
+            >
+              Limpar filtros
+            </Button>
+          </div>
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border/60 py-14 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nenhuma oferta da biblioteca corresponde a estes filtros.
+              </p>
+              {filters.q && (
+                <Button size="sm" onClick={() => setMineOpen(true)}>
+                  <Radar className="mr-1.5 h-4 w-4" /> Minerar “{filters.q}” na Biblioteca de
+                  Anúncios
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {filtered.slice((page - 1) * GRID_PAGE, page * GRID_PAGE).map((o) => (
+                  <LibraryOfferCard
+                    key={o.id}
+                    offer={o}
+                    variant="grid"
+                    isFavorite={actions.isFavorite(o)}
+                    onToggleFavorite={actions.toggleFavorite}
+                  />
+                ))}
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2" data-testid="pagination">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                    data-testid="next-page"
+                  >
+                    Próxima
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <div className="space-y-8">
+          <LibraryHero
+            offers={sections.hero}
+            isFavorite={actions.isFavorite}
+            onToggleFavorite={actions.toggleFavorite}
+          />
+
+          <OfferRow
+            testId="row-scaling"
+            title="Escalando agora"
+            subtitle="Score ≥ 70, nível quente/escalada ou ≥ 5 anúncios com o mesmo criativo"
+            icon={<Flame className="h-5 w-5 text-orange-500" />}
+            offers={sections.scaling}
+            isFavorite={actions.isFavorite}
+            onToggleFavorite={actions.toggleFavorite}
+          />
+
+          <section className="space-y-3" data-testid="row-top10">
+            <OfferRow
+              title={
+                top10Niche === "all"
+                  ? "Top 10 da biblioteca"
+                  : `Top 10 · ${NICHE_LABEL[top10Niche]}`
+              }
+              subtitle="Ranking por força de escala (score, anúncios ativos e tempo no ar)"
+              icon={<Trophy className="h-5 w-5 text-amber-500" />}
+              offers={top10}
+              ranked
+              isFavorite={actions.isFavorite}
+              onToggleFavorite={actions.toggleFavorite}
+              action={
+                <Select
+                  value={top10Niche}
+                  onValueChange={(v) => setTop10Niche(v as NicheId | "all")}
+                >
+                  <SelectTrigger className="h-8 w-[170px] text-xs" data-testid="top10-niche">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os nichos</SelectItem>
+                    {NICHES.filter((n) => (sections.nicheCounts.get(n.id) ?? 0) > 0).map((n) => (
+                      <SelectItem key={n.id} value={n.id}>
+                        {n.emoji} {n.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              }
+            />
+          </section>
+
+          {sections.fresh.length > 0 ? (
+            <OfferRow
+              testId="row-fresh"
+              title="Novas desta semana"
+              subtitle="Descobertas pela primeira vez nos últimos 7 dias"
+              icon={<CalendarPlus className="h-5 w-5 text-sky-500" />}
+              offers={sections.fresh}
+              isFavorite={actions.isFavorite}
+              onToggleFavorite={actions.toggleFavorite}
+            />
+          ) : (
+            <section className="rounded-xl border border-dashed border-border/60 p-4 text-sm text-muted-foreground">
+              <CalendarPlus className="mr-1.5 inline h-4 w-4 text-sky-500" />
+              Nenhuma oferta nova descoberta nos últimos 7 dias.{" "}
+              <button
+                className="font-semibold text-primary underline-offset-2 hover:underline"
+                onClick={() => setMineOpen(true)}
+              >
+                Minerar agora
+              </button>
+            </section>
+          )}
+
+          {actions.favCount > 0 && (
+            <OfferRow
+              testId="row-favorites"
+              title="Os seus favoritos"
+              icon={<Heart className="h-5 w-5 text-rose-500" />}
+              offers={offers.filter((o) => actions.isFavorite(o))}
+              isFavorite={actions.isFavorite}
+              onToggleFavorite={actions.toggleFavorite}
+              action={
+                <Button size="sm" variant="ghost" asChild>
+                  <Link to="/favoritos">Ver todos</Link>
+                </Button>
+              }
+            />
+          )}
+
+          {sections.nicheShelves.map((shelf) => {
+            const meta = NICHES.find((n) => n.id === shelf.id)!;
+            return (
+              <OfferRow
+                key={shelf.id}
+                testId={`row-niche-${shelf.id}`}
+                title={`${meta.emoji} ${meta.label}`}
+                offers={shelf.offers}
+                isFavorite={actions.isFavorite}
+                onToggleFavorite={actions.toggleFavorite}
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => setFilters({ niche: shelf.id })}>
+                    Ver todas
+                  </Button>
+                }
+              />
+            );
+          })}
+
+          {offers.length > sections.withMediaCount && (
+            <p className="text-center text-xs text-muted-foreground">
+              {offers.length - sections.withMediaCount} ofertas sem criativo capturado não aparecem
+              nas prateleiras —{" "}
+              <button
+                className="font-semibold text-primary hover:underline"
+                onClick={() =>
+                  navigate({ to: "/minerar", search: { ...search, all: true }, replace: true })
+                }
+              >
+                ver todas na lista
+              </button>
+              .
+            </p>
+          )}
+        </div>
+      )}
+
+      <MineDialog
+        open={mineOpen}
+        onOpenChange={setMineOpen}
+        defaultKeyword={filters.q.trim()}
+        defaultCountry={filters.country !== "all" ? filters.country : "BR"}
+        onDone={async (keyword) => {
+          await load(true);
+          setQueryDraft(keyword);
+          setFilters({ q: keyword });
+        }}
+      />
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  testId,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  testId?: string;
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className="h-9 text-xs" aria-label={label} data-testid={testId}>
+        <span className="mr-1 text-muted-foreground">{label}:</span>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Todos</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function NicheChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition",
+        active
+          ? "border-transparent text-primary-foreground shadow"
+          : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5",
+      )}
+      style={active ? { background: "var(--gradient-primary)" } : undefined}
+      data-testid="niche-chip"
+    >
+      {children}
+    </button>
+  );
+}
+
+function LibrarySkeleton() {
+  return (
+    <div className="space-y-8" data-testid="library-skeleton">
+      <Skeleton className="h-[320px] w-full rounded-2xl" />
+      {[0, 1].map((r) => (
+        <div key={r} className="space-y-3">
+          <Skeleton className="h-6 w-48" />
+          <div className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton
+                key={i}
+                className="aspect-[4/5] w-[160px] shrink-0 rounded-xl sm:w-[200px]"
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ───────────────────────── Sincronização de mídia ─────────────────────────
+
+interface MediaSyncState {
+  running: boolean;
+  pending: number;
+  copied: number;
+  lastError: string | null;
+}
+
+/** Enquanto houver ofertas com mídia ainda não guardada, pede ao servidor
+ *  para copiá-las (lotes curtos). Sem custo de Apify: usa os URLs já
+ *  coletados. Para por si quando a fila esvazia ou após N rondas. */
+function useMediaSync(offers: LibraryOffer[], onProgress: () => void): MediaSyncState {
+  const [state, setState] = useState<MediaSyncState>({
+    running: false,
+    pending: 0,
+    copied: 0,
+    lastError: null,
+  });
+  const started = useRef(false);
+  const pendingLocal = offers.filter(
+    (o) => o.media_status === "not_attempted" || o.media_status === "pending_video",
+  ).length;
+
+  useEffect(() => {
+    if (started.current || pendingLocal === 0) return;
+    started.current = true;
+    let cancelled = false;
+    (async () => {
+      setState((s) => ({ ...s, running: true, pending: pendingLocal }));
+      let copiedTotal = 0;
+      for (let round = 0; round < MEDIA_SYNC_MAX_ROUNDS && !cancelled; round++) {
+        try {
+          const res = await authedFetch("/api/media/persist", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          });
+          const data = (await res.json()) as {
+            ok: boolean;
+            error?: string;
+            processed?: number;
+            imagesCopied?: number;
+            videosCopied?: number;
+            remaining?: number | null;
+          };
+          if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+          copiedTotal += (data.imagesCopied ?? 0) + (data.videosCopied ?? 0);
+          setState({
+            running: true,
+            pending: data.remaining ?? 0,
+            copied: copiedTotal,
+            lastError: null,
+          });
+          if ((data.imagesCopied ?? 0) + (data.videosCopied ?? 0) > 0) onProgress();
+          if (!data.processed || !data.remaining) break;
+        } catch (e) {
+          setState((s) => ({ ...s, lastError: e instanceof Error ? e.message : String(e) }));
+          break;
+        }
+      }
+      if (!cancelled) setState((s) => ({ ...s, running: false }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingLocal > 0]);
+
+  return state;
+}
+
+function MediaSyncBanner({ state }: { state: MediaSyncState }) {
+  if (!state.running && !state.copied && !state.lastError) return null;
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs",
+        state.lastError ? "border-amber-500/40 bg-amber-500/5" : "border-primary/30 bg-primary/5",
+      )}
+      data-testid="media-sync"
+    >
+      {state.running ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+      ) : (
+        <CloudUpload className="h-3.5 w-3.5 text-primary" />
+      )}
+      <span>
+        {state.running
+          ? `Guardando mídias no armazenamento permanente… ${state.copied} guardadas${state.pending ? `, ${state.pending} na fila` : ""}`
+          : state.lastError
+            ? `Sincronização de mídia interrompida: ${state.lastError}`
+            : `${state.copied} mídias guardadas permanentemente nesta sessão.`}
       </span>
     </div>
   );
 }
 
-function MinePage() {
-  const { t } = useTranslation();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const search = Route.useSearch();
-  const createFromOffer = useServerFn(createProjectFromOffer);
-  const [modeling, setModeling] = useState<string | null>(null);
-  const [generateTarget, setGenerateTarget] = useState<CollectedAd | null>(null);
+// ───────────────────────── Minerar novas (Apify) ─────────────────────────
 
-  // Filter state persisted in URL so navigating back restores it
-  const keyword = search.keyword ?? "";
-  const niche = search.niche ?? "all";
-  const country = search.country ?? "all";
-  // Padrão Facebook: é a fonte com criativo real (imagem/vídeo) e anunciante.
-  const platform = search.platform ?? "Facebook";
-  const scaleFilter = (search.scale ?? "all") as "all" | "cold" | "warming" | "hot" | "scaled";
-  const page = search.page ?? 0;
-
-  const updateSearch = (updates: Partial<z.infer<typeof mineSearch>>) =>
-    navigate({ to: "/minerar", search: { ...search, ...updates }, replace: true });
-
-  const setKeyword = (k: string) => updateSearch({ keyword: k, page: 0 });
-  const setNiche = (n: string) => updateSearch({ niche: n, page: 0 });
-  const setCountry = (c: string) => updateSearch({ country: c, page: 0 });
-  const setPlatform = (p: string) => updateSearch({ platform: p, page: 0 });
-  const setScaleFilter = (s: string) => updateSearch({ scale: s, page: 0 });
-  const setPage = (fn: ((p: number) => number) | number) =>
-    updateSearch({ page: typeof fn === "function" ? fn(page) : fn });
-
-  const [quantity, setQuantity] = useState(20);
-  const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
-  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
-  const [networkFilter, setNetworkFilter] = useState<string>("all");
-  const [countryFilter, setCountryFilter] = useState<string>("all");
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
-  const [favIds, setFavIds] = useState<Set<string>>(new Set());
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [trends, setTrends] = useState<AITrends | null>(null);
-  const [collecting, setCollecting] = useState(false);
-  const [collectorProgress, setCollectorProgress] = useState(0);
-  const [collectorFound, setCollectorFound] = useState<number | null>(null);
-  const signals = getAITrends().signals;
-
-  // Real ads from collected_ads (Supabase)
-  const [collected, setCollected] = useState<CollectedAd[]>([]);
-  const [latestRunAds, setLatestRunAds] = useState<CollectedAd[]>([]);
-  const [collectedLoading, setCollectedLoading] = useState(true);
-  const PAGE_SIZE = 12;
-  const visibleCollected = latestRunAds.length > 0 ? latestRunAds : collected;
-
-  const categoryKeywordsLower = activeCategory
-    ? KEYWORD_CATEGORIES[activeCategory].keywords.map((k) => k.toLowerCase())
-    : null;
-
-  const filtered = visibleCollected.filter((a) => {
-    if (scaleFilter !== "all" && a.scale_level !== scaleFilter) return false;
-    if (networkFilter !== "all" && (a.offer_network ?? "desconhecido") !== networkFilter)
-      return false;
-    if (countryFilter !== "all" && a.country !== countryFilter) return false;
-    if (tagFilters.size && !(a.tags ?? []).some((t) => tagFilters.has(t))) return false;
-    if (categoryKeywordsLower) {
-      const tagsLower = (a.tags ?? []).map((t) => t.toLowerCase());
-      const hay = `${a.headline} ${a.copy ?? ""}`.toLowerCase();
-      const hit =
-        tagsLower.some((t) => categoryKeywordsLower.includes(t)) ||
-        categoryKeywordsLower.some((kw) => hay.includes(kw));
-      if (!hit) return false;
-    }
-    return true;
-  });
-
-  const availableTags = (() => {
-    const counts = new Map<string, number>();
-    for (const a of visibleCollected) {
-      for (const t of a.tags ?? []) counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-    return Array.from(counts.entries())
-      .sort((x, y) => y[1] - x[1])
-      .slice(0, 20)
-      .map(([t]) => t);
-  })();
-
-  const toggleTagFilter = (t: string) => {
-    setTagFilters((s) => {
-      const n = new Set(s);
-      if (n.has(t)) n.delete(t);
-      else n.add(t);
-      return n;
-    });
-    updateSearch({ page: 0 });
-  };
-
-  const fetchCollected = async () => {
-    setCollectedLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("collected_ads")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      console.log("[minerar] collected_ads fetched:", data?.length ?? 0);
-      console.log("[minerar] collected_ads rows:", data ?? []);
-      const enriched = (data ?? []).map((row) => {
-        const r = row as unknown as { raw?: { enriched?: Record<string, unknown> } };
-        const e = r.raw?.enriched ?? {};
-        return {
-          ...(row as object),
-          tags: Array.isArray(e.tags) ? (e.tags as string[]) : undefined,
-          subniche: (e.subniche as string | null | undefined) ?? null,
-          scale_level: (e.scaleLevel as CollectedAd["scale_level"]) ?? null,
-          promise: (e.promise as string | null | undefined) ?? null,
-          emotion: (e.emotion as string | null | undefined) ?? null,
-          isVsl: !!e.isVsl,
-          vslScaling: !!e.vslScaling,
-          hookRepeated: !!e.hookRepeated,
-          viralStructure: !!e.viralStructure,
-          copyPattern: !!e.copyPattern,
-          offerType: (e.offerType as CollectedAd["offerType"]) ?? null,
-          source_engine: (e.sourceEngine as string | null | undefined) ?? null,
-        } as CollectedAd;
-      });
-      setCollected(enriched);
-    } catch (e) {
-      console.error("[minerar] collected_ads fetch failed", e);
-      toast.error("Falha ao carregar ofertas coletadas — os cards podem ficar desatualizados.");
-    } finally {
-      setCollectedLoading(false);
-    }
-  };
-
+function MineDialog({
+  open,
+  onOpenChange,
+  defaultKeyword,
+  defaultCountry,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  defaultKeyword: string;
+  defaultCountry: string;
+  onDone: (keyword: string) => Promise<void> | void;
+}) {
+  const [keyword, setKeyword] = useState(defaultKeyword);
+  const [country, setCountry] = useState(defaultCountry);
+  const [limit, setLimit] = useState(20);
+  const [running, setRunning] = useState(false);
   useEffect(() => {
-    fetchCollected();
-    const ch = supabase
-      .channel("collected_ads_minerar")
-      .on("postgres_changes", { event: "*", schema: "public", table: "collected_ads" }, () =>
-        fetchCollected(),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    fetchSavedIds(user.id).then(setSavedIds);
-    fetchFavIds(user.id).then(setFavIds);
-    const unsub = subscribeChange((s) => {
-      if (s === "saved") fetchSavedIds(user.id).then(setSavedIds);
-      if (s === "fav") fetchFavIds(user.id).then(setFavIds);
-    });
-    return unsub;
-  }, [user]);
-
-  const onSave = async (id: string) => {
-    if (!user) return;
-    const isSaved = await toggleSaveOffer(user.id, id);
-    setSavedIds((s) => {
-      const n = new Set(s);
-      isSaved ? n.add(id) : n.delete(id);
-      return n;
-    });
-    toast.success(isSaved ? t("mine.saved") : "OK");
-  };
-
-  const onAnalyzeCollected = async (ad: CollectedAd) => {
-    console.log("analysis payload", ad);
-    const persisted = toPersisted(ad);
-    await rememberAdForAnalysis(persisted).catch(() => {});
-    const [ingested] = await miningRepo.ingestMany(
-      [
-        {
-          headline: ad.headline || ad.advertiser,
-          copy: ad.copy ?? "",
-          platform: ad.platform,
-          country: ad.country,
-          niche: ad.niche,
-          score: ad.score,
-          adUrl: ad.ad_url ?? undefined,
-          adLibraryId: ad.ad_library_id ?? undefined,
-          analysisType: "manual",
-          creativeUrl: ad.image_url || ad.video_url || undefined,
-          creativeType: ad.video_url ? "video" : ad.image_url ? "image" : undefined,
-          advertiser: ad.advertiser,
-          cta: ad.cta ?? undefined,
-          createdAt: ad.created_at,
-        },
-      ],
-      "extension",
-    );
-    toast.success("Anúncio enviado para Análise IA");
-    navigate({ to: "/analise-ia", search: { ad: persisted.key } as never });
-  };
-
-  const toPersisted = (ad: CollectedAd): PersistedAd => {
-    const key = ad.ad_library_id || ad.ad_url || ad.id;
-    return {
-      key,
-      ad_library_id: ad.ad_library_id,
-      ad_url: ad.ad_url,
-      advertiser: ad.advertiser,
-      headline: ad.headline,
-      copy: ad.copy,
-      cta: ad.cta,
-      image_url: ad.image_url,
-      video_url: ad.video_url,
-      platform: ad.platform,
-      country: ad.country,
-      niche: ad.niche,
-      score: ad.score,
-      created_at: ad.created_at,
-      saved_at: new Date().toISOString(),
-    };
-  };
-
-  const onSaveCollected = async (ad: CollectedAd) => {
-    const persisted = toPersisted(ad);
-    try {
-      const isSaved = await saveCollectedAd(persisted);
-      setSavedIds((s) => {
-        const n = new Set(s);
-        isSaved ? n.add(persisted.key) : n.delete(persisted.key);
-        return n;
-      });
-      toast.success(isSaved ? "Salvo em Ofertas Salvas" : "Removido dos salvos");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar anúncio");
+    if (open) {
+      setKeyword(defaultKeyword);
+      setCountry(defaultCountry);
     }
-  };
+  }, [open, defaultKeyword, defaultCountry]);
 
-  const onFavoriteCollected = async (ad: CollectedAd) => {
-    const persisted = toPersisted(ad);
-    const next = !favIds.has(persisted.key);
-    // Optimistic update
-    setFavIds((s) => {
-      const n = new Set(s);
-      next ? n.add(persisted.key) : n.delete(persisted.key);
-      return n;
-    });
-    try {
-      await favoriteCollectedAd(persisted, next);
-      toast.success(next ? "Adicionado aos favoritos" : "Removido dos favoritos");
-    } catch (e) {
-      // Revert optimistic update
-      setFavIds((s) => {
-        const n = new Set(s);
-        next ? n.delete(persisted.key) : n.add(persisted.key);
-        return n;
-      });
-      toast.error(e instanceof Error ? e.message : "Erro ao favoritar anúncio");
-    }
-  };
-
-  const onCategoryClick = (id: CategoryId) => {
-    setActiveCategory((cur) => (cur === id ? null : id));
-  };
-  const onKeywordChip = (kw: string) => {
-    setKeyword(kw);
-  };
-
-  const onAIMine = async () => {
-    setAiOpen(true);
-    setAiLoading(true);
-    setTrends(null);
-    setTimeout(() => {
-      setTrends(getAITrends());
-      setAiLoading(false);
-    }, 1200);
-  };
-
-  const onCollectorMine = async () => {
-    if (!keyword.trim()) {
-      toast.error("Digite uma palavra-chave para minerar.");
+  const run = async () => {
+    const kw = keyword.trim();
+    if (!kw) {
+      toast.error("Digite uma palavra-chave.");
       return;
     }
-    setCollecting(true);
-    setCollectorProgress(8);
-    setCollectorFound(null);
-    // A stale scale/tag/category filter from a previous session can hide every
-    // ad from a brand-new search, making a successful mine look like it
-    // returned nothing. Clear filters so this run's results are always visible.
-    setTagFilters(new Set());
-    setActiveCategory(null);
-    setNetworkFilter("all");
-    setCountryFilter("all");
-    updateSearch({ scale: "all", page: 0 });
-    const tick = setInterval(() => {
-      setCollectorProgress((p) => (p < 88 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
-    }, 350);
+    setRunning(true);
     try {
       const res = await authedFetch("/api/collector/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          keyword,
-          country: country === "all" ? undefined : country,
-          niche: niche === "all" ? undefined : niche,
-          limit: quantity,
-          platform: platform === "all" ? undefined : platform,
-        }),
+        body: JSON.stringify({ keyword: kw, country, limit, platform: "Facebook" }),
       });
-      const data = (await res.json()) as CollectorRunResult;
+      const data = (await res.json()) as {
+        ok: boolean;
+        error?: string;
+        ads?: unknown[];
+        saved?: number;
+        media?: { imagesCopied?: number } | { error: string } | null;
+      };
       if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
-      console.log("collector results:", data.ads?.length ?? 0, data.ads);
-      const adsArr = data.ads ?? [];
-      console.log("[minerar] collector adsArr:", adsArr);
-      // Optimistically merge returned ads into local state so UI updates instantly
-      const optimistic: CollectedAd[] = (data.ads ?? []).map((a, idx) => ({
-        id: a.adLibraryId || `${Date.now()}-${idx}`,
-        ad_library_id: a.adLibraryId ?? null,
-        ad_url: a.adUrl ?? null,
-        advertiser: a.advertiser,
-        headline: a.headline,
-        copy: a.copy ?? null,
-        cta: a.cta ?? null,
-        image_url: a.imageUrl ?? null,
-        video_url: a.videoUrl ?? null,
-        creative_type: a.videoUrl ? "video" : a.imageUrl ? "image" : null,
-        media_source: (a as unknown as { mediaSource?: string }).mediaSource,
-        platform: a.platform,
-        country: a.country,
-        niche: a.niche,
-        keyword: keyword,
-        score: a.score,
-        created_at: a.createdAt || new Date().toISOString(),
-        tags: a.tags,
-        subniche: a.subniche ?? null,
-        scale_level: a.scaleLevel ?? null,
-        promise: a.promise ?? null,
-        emotion: a.emotion ?? null,
-        offerType: a.offerType ?? null,
-        source_engine: a.sourceEngine ?? null,
-      }));
-      setLatestRunAds(optimistic);
-      setCollected((prev) => {
-        const map = new Map<string, CollectedAd>();
-        [...optimistic, ...prev].forEach((x) => {
-          const key = x.ad_library_id || x.ad_url || x.id;
-          if (!map.has(key)) map.set(key, x);
-        });
-        return Array.from(map.values());
-      });
-      const ingested = await miningRepo.ingestMany(
-        data.ads.map((a) => ({
-          headline: a.headline,
-          copy: a.copy,
-          platform: a.platform,
-          country: a.country,
-          niche: a.niche,
-          score: a.score,
-          adUrl: a.adUrl,
-          adLibraryId: a.adLibraryId,
-          analysisType: "manual",
-          creativeUrl: a.imageUrl || a.videoUrl,
-          creativeType: a.videoUrl ? "video" : "image",
-          advertiser: a.advertiser,
-          cta: a.cta,
-          createdAt: a.createdAt,
-        })),
-        "extension",
+      const copied =
+        data.media && "imagesCopied" in data.media ? (data.media.imagesCopied ?? 0) : 0;
+      toast.success(
+        `${data.ads?.length ?? 0} ofertas coletadas · ${data.saved ?? 0} guardadas · ${copied} imagens já no armazenamento permanente`,
       );
-      setCollectorProgress(100);
-      setCollectorFound(optimistic.length || ingested.length);
-      toast.success(`Mineração concluída: ${optimistic.length || ingested.length} anúncios`);
-      // The API may return ads that could not actually be saved (e.g. a
-      // stale database schema cache). Those still render this session, but
-      // won't survive a refresh — the user must be told instead of finding
-      // out by watching cards vanish later.
-      if (typeof data.saved === "number" && data.saved < optimistic.length) {
-        const missing = optimistic.length - data.saved;
-        toast.warning(
-          `Atenção: ${missing} de ${optimistic.length} anúncios não foram salvos e vão desaparecer se a página for atualizada.`,
-          { duration: 10000 },
-        );
-        console.error("[minerar] persistência parcial do lote de mineração:", data.persistError);
-      }
-      await fetchCollected();
-      updateSearch({ page: 0 });
+      onOpenChange(false);
+      await onDone(kw);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha na mineração");
     } finally {
-      clearInterval(tick);
-      setTimeout(() => {
-        setCollecting(false);
-        setCollectorProgress(0);
-      }, 1200);
+      setRunning(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("mine.title")}</h1>
-          <p className="text-muted-foreground">{t("mine.subtitle")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SkillButton moduleKey="meta_ads_radar" />
-          <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="relative">
-            <Button
-              onClick={onAIMine}
-              className="ai-pulse ai-glow relative overflow-hidden text-white hover:opacity-95"
-            >
-              <motion.span
-                animate={{ rotate: [0, 12, -8, 0] }}
-                transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                className="mr-2 inline-flex"
-              >
-                <Wand2 className="h-4 w-4" />
-              </motion.span>
-              Minerar com IA
-              <Sparkles className="ml-2 h-3.5 w-3.5 animate-pulse" />
-            </Button>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Estatísticas reais do motor de coleta */}
-      <Card className="border-border/60 bg-gradient-to-br from-card to-primary/5">
-        <CardContent className="p-5">
-          {collected.length === 0 ? (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <Radar className="h-5 w-5 shrink-0 text-primary" />
-              <p className="text-sm">
-                Motor de coleta pronto. Digite uma palavra-chave e clique em{" "}
-                <span className="font-semibold text-foreground">Minerar com Motor de Coleta</span>{" "}
-                para encontrar ofertas comerciais reais.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-6">
-              <div className="flex items-center gap-2">
-                <Radar className="h-4 w-4 text-primary" />
-                <span className="text-xs text-muted-foreground">Ofertas coletadas</span>
-                <span className="text-lg font-bold text-foreground">{collected.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Globe2 className="h-4 w-4 text-blue-400" />
-                <span className="text-xs text-muted-foreground">Plataformas</span>
-                <span className="text-lg font-bold text-foreground">
-                  {new Set(collected.map((a) => a.platform)).size}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FlameIcon className="h-4 w-4 text-orange-400" />
-                <span className="text-xs text-muted-foreground">Score médio</span>
-                <span className="text-lg font-bold text-foreground">
-                  {Math.round(collected.reduce((s, a) => s + a.score, 0) / collected.length)}
-                </span>
-              </div>
-              {(latestRunAds[0]?.created_at ?? collected[0]?.created_at) && (
-                <div className="ml-auto text-[11px] text-muted-foreground">
-                  Última coleta:{" "}
-                  {new Date(latestRunAds[0]?.created_at ?? collected[0].created_at).toLocaleString(
-                    "pt-BR",
-                    { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" },
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Categorias de inteligência */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap gap-2">
-          {CATEGORY_LIST.map((c) => {
-            const active = activeCategory === c.id;
-            return (
-              <motion.button
-                key={c.id}
-                whileTap={{ scale: 0.94 }}
-                onClick={() => onCategoryClick(c.id)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
-                  active
-                    ? "border-transparent text-primary-foreground shadow-[var(--shadow-elegant)]"
-                    : "border-border/60 bg-card hover:border-primary/40 hover:bg-primary/5"
-                }`}
-                style={active ? { background: "var(--gradient-primary)" } : undefined}
-              >
-                <span className="mr-1">{c.emoji}</span>
-                {c.label}
-              </motion.button>
-            );
-          })}
-        </div>
-        {activeCategory && (
-          <div className="flex flex-wrap gap-1.5 rounded-lg border border-border/60 bg-card/60 p-3">
-            {(CATEGORY_LIST.find((c) => c.id === activeCategory)?.keywords ?? []).map((kw) => (
-              <button
-                key={kw}
-                onClick={() => onKeywordChip(kw)}
-                className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                  keyword === kw
-                    ? "border-primary/60 bg-primary/15 text-primary"
-                    : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
-                }`}
-              >
-                {kw}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Filtros principais */}
-      <Card className="border-border/60">
-        <CardContent className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-6">
-          <div className="lg:col-span-2">
-            <Label>{t("mine.keyword")}</Label>
+    <Dialog open={open} onOpenChange={(v) => !running && onOpenChange(v)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" /> Minerar novas ofertas
+          </DialogTitle>
+          <DialogDescription>
+            Busca anúncios reais na Biblioteca de Anúncios da Meta (consome créditos da Apify). As
+            ofertas e as imagens ficam guardadas — não é preciso minerar de novo para as rever.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="mine-kw">Palavra-chave</Label>
             <Input
+              id="mine-kw"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="ex: emagrecer"
+              placeholder="ex: emagrecer, renda extra, colágeno"
+              onKeyDown={(e) => e.key === "Enter" && run()}
             />
           </div>
-          <div>
-            <Label>{t("mine.niche")}</Label>
-            <Select value={niche} onValueChange={setNiche}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
-                {[
-                  "Saúde",
-                  "Finanças",
-                  "Marketing",
-                  "Educação",
-                  "Beleza",
-                  "Tecnologia",
-                  "Produtividade",
-                  "E-commerce",
-                  "Carreira",
-                ].map((n) => (
-                  <SelectItem key={n} value={n}>
-                    {n}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>{t("mine.country")}</Label>
-            <Select value={country} onValueChange={setCountry}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
-                {[
-                  { code: "BR", label: "Brasil" },
-                  { code: "US", label: "Estados Unidos" },
-                  { code: "GB", label: "Reino Unido" },
-                  { code: "ES", label: "Espanha" },
-                  { code: "PT", label: "Portugal" },
-                  { code: "FR", label: "França" },
-                ].map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    {c.label} ({c.code})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>{t("mine.platform")}</Label>
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.all")}</SelectItem>
-                {["Facebook", "Instagram", "TikTok", "YouTube", "LinkedIn", "Pinterest"].map(
-                  (p) => (
-                    <SelectItem key={p} value={p}>
-                      {p}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>País</Label>
+              <Select value={country} onValueChange={setCountry}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(COUNTRY_LABELS).map(([c, l]) => (
+                    <SelectItem key={c} value={c}>
+                      {countryFlag(c)} {l}
                     </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="flex items-center justify-between">
-              <span>{t("mine.quantity")}</span>
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
-                {quantity}
-              </span>
-            </Label>
-            <Slider
-              value={[quantity]}
-              min={4}
-              max={100}
-              step={1}
-              onValueChange={(v) => setQuantity(v[0])}
-              className="mt-3"
-            />
-          </div>
-          <div>
-            <Label>Nível de escala</Label>
-            <Select value={scaleFilter} onValueChange={(v) => setScaleFilter(v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="cold">Cold</SelectItem>
-                <SelectItem value="warming">Warming</SelectItem>
-                <SelectItem value="hot">Hot</SelectItem>
-                <SelectItem value="scaled">Scaled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Rede da oferta</Label>
-            <Select value={networkFilter} onValueChange={setNetworkFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="hotmart">Hotmart</SelectItem>
-                <SelectItem value="kiwify">Kiwify</SelectItem>
-                <SelectItem value="clickbank">ClickBank</SelectItem>
-                <SelectItem value="digistore24">Digistore24</SelectItem>
-                <SelectItem value="shopify">Shopify</SelectItem>
-                <SelectItem value="braip">Braip</SelectItem>
-                <SelectItem value="checkout-proprio">Checkout próprio</SelectItem>
-                <SelectItem value="desconhecido">Não identificado</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Mercado</Label>
-            <Select value={countryFilter} onValueChange={setCountryFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="US">Estados Unidos</SelectItem>
-                <SelectItem value="BR">Brasil</SelectItem>
-                <SelectItem value="PT">Portugal</SelectItem>
-                <SelectItem value="ES">Espanha</SelectItem>
-                <SelectItem value="GB">Reino Unido</SelectItem>
-                <SelectItem value="CA">Canadá</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {availableTags.length > 0 && (
-            <div className="md:col-span-2 lg:col-span-6">
-              <Label>Tags detectadas</Label>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {availableTags.map((t) => {
-                  const active = tagFilters.has(t);
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => toggleTagFilter(t)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] transition ${
-                        active
-                          ? "border-primary/60 bg-primary/15 text-primary"
-                          : "border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-                {tagFilters.size > 0 && (
-                  <button
-                    onClick={() => {
-                      setTagFilters(new Set());
-                      updateSearch({ page: 0 });
-                    }}
-                    className="rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] text-muted-foreground hover:border-destructive/40 hover:text-destructive"
-                  >
-                    limpar
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="flex items-center justify-between gap-3 md:col-span-2 lg:col-span-6">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
-              {latestRunAds.length > 0
-                ? `de ${latestRunAds.length} ofertas desta busca`
-                : `de ${visibleCollected.length} ofertas salvas`}
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                onClick={onCollectorMine}
-                disabled={collecting}
-                variant="outline"
-                className="border-primary/40"
-              >
-                {collecting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Radar className="mr-2 h-4 w-4" />
-                )}
-                Minerar com Motor de Coleta
-              </Button>
-              <Button
-                onClick={fetchCollected}
-                disabled={collectedLoading}
-                className="text-primary-foreground"
-                style={{ background: "var(--gradient-primary)" }}
-              >
-                {collectedLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="mr-2 h-4 w-4" />
-                )}
-                Atualizar coleta
-              </Button>
-            </div>
-          </div>
-          {collecting || collectorFound !== null ? (
-            <div className="md:col-span-2 lg:col-span-6">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>{collecting ? "Coletando anúncios em tempo real…" : "Coleta concluída"}</span>
-                <span>
-                  {collectorFound !== null
-                    ? `${collectorFound} salvos na Central`
-                    : `${collectorProgress}%`}
-                </span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${collectorProgress}%`, background: "var(--gradient-primary)" }}
-                />
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* Anúncios coletados (Motor de Coleta) */}
-      <Card className="border-border/60">
-        <CardContent className="p-6">
-          <div className="mb-4 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Radar className="h-4 w-4 text-primary" />
-              <h2 className="font-semibold">Anúncios coletados</h2>
-              <Badge variant="outline" className="rounded-full">
-                {filtered.length}
-              </Badge>
-            </div>
-            <Button size="sm" variant="ghost" onClick={fetchCollected}>
-              <Loader2
-                className={`mr-1 h-3.5 w-3.5 ${collectedLoading ? "animate-spin" : "hidden"}`}
-              />
-              Atualizar
-            </Button>
-          </div>
-
-          {/* Debug visual removido — logs continuam no console do navegador */}
-
-          {collectedLoading && visibleCollected.length === 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="space-y-2 rounded-lg border border-border/60 p-3">
-                  <Skeleton className="aspect-video w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              ))}
-            </div>
-          ) : visibleCollected.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Radar className="h-10 w-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Nenhuma oferta real encontrada ainda. Digite uma palavra-chave e clique em
-                <span className="mx-1 font-semibold text-foreground">
-                  Minerar com Motor de Coleta
-                </span>
-                .
-              </p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center">
-              <Radar className="h-10 w-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Nenhuma oferta com os filtros atuais.</p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setScaleFilter("all");
-                  setTagFilters(new Set());
-                  setActiveCategory(null);
-                  setNetworkFilter("all");
-                  setCountryFilter("all");
-                  updateSearch({ scale: "all", page: 0 });
-                }}
-              >
-                Limpar filtros
-              </Button>
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((a) => {
-                  const key = a.ad_library_id || a.ad_url || a.id;
-                  const scaleStyles: Record<
-                    NonNullable<CollectedAd["scale_level"]>,
-                    { label: string; cls: string; gradient?: boolean }
-                  > = {
-                    cold: { label: "Cold", cls: "bg-muted text-muted-foreground" },
-                    warming: {
-                      label: "Warming",
-                      cls: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-                    },
-                    hot: {
-                      label: "Hot",
-                      cls: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-                    },
-                    scaled: {
-                      label: "Scaled",
-                      cls: "text-primary-foreground border-transparent",
-                      gradient: true,
-                    },
-                  };
-                  const scale = a.scale_level ? scaleStyles[a.scale_level] : null;
-                  const tags = a.tags ?? [];
-                  return (
-                    <div
-                      key={key}
-                      className="group flex min-h-[520px] flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:border-primary/40 hover:shadow-[var(--shadow-elegant)]"
-                    >
-                      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                        <AdMedia
-                          imageUrl={resolveAdImageUrl(a)}
-                          videoUrl={resolveAdVideoUrl(a)}
-                          headline={a.headline}
-                        />
-                        <div className="absolute left-2 top-2 flex gap-1">
-                          <UIBadge className="rounded-full bg-background/80 text-foreground backdrop-blur">
-                            <FlameIcon className="mr-1 h-3 w-3 text-primary" />
-                            {a.score}
-                          </UIBadge>
-                        </div>
-                        <div className="absolute right-2 top-2">
-                          <UIBadge
-                            variant="outline"
-                            className="rounded-full bg-background/80 backdrop-blur"
-                          >
-                            {a.platform}
-                          </UIBadge>
-                        </div>
-                        {/* badge de mídia removido — AdMedia exibe fallback automaticamente */}
-                      </div>
-                      <div className="flex flex-1 flex-col gap-3 p-4">
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <p className="line-clamp-1 text-base font-semibold flex-1">
-                              {a.advertiser || a.platform}
-                            </p>
-                            {/* Nomenclatura correta: só "Anúncio" se veio de Ads Library/Apify */}
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {a.ad_library_id ? "Anúncio" : "Oferta encontrada"}
-                            </span>
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-sm font-medium leading-snug">
-                            {a.headline || "Sem headline capturada"}
-                          </p>
-                          <p className="mt-2 line-clamp-4 text-sm leading-relaxed text-muted-foreground">
-                            {a.copy || "Sem descrição capturada"}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="secondary" className="rounded-full">
-                            {a.platform || "Web"}
-                          </Badge>
-                          <Badge variant="outline" className="rounded-full">
-                            <Globe2 className="mr-1 h-3 w-3" />
-                            {a.country || "—"}
-                          </Badge>
-                          {a.offerType &&
-                            (() => {
-                              const offerTypeMap: Record<string, { label: string; cls: string }> = {
-                                anuncio: {
-                                  label: "Anúncio",
-                                  cls: "border-purple-500/40 bg-purple-500/10 text-purple-400",
-                                },
-                                "pagina-venda": {
-                                  label: "Pág. Venda",
-                                  cls: "border-blue-500/40 bg-blue-500/10 text-blue-400",
-                                },
-                                vsl: {
-                                  label: "VSL",
-                                  cls: "border-red-500/40 bg-red-500/10 text-red-400",
-                                },
-                                checkout: {
-                                  label: "Checkout",
-                                  cls: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
-                                },
-                                ecommerce: {
-                                  label: "E-commerce",
-                                  cls: "border-orange-500/40 bg-orange-500/10 text-orange-400",
-                                },
-                                conteudo: {
-                                  label: "Conteúdo",
-                                  cls: "border-slate-500/40 bg-slate-500/10 text-slate-400",
-                                },
-                              };
-                              const info = offerTypeMap[a.offerType];
-                              return info ? (
-                                <Badge
-                                  variant="outline"
-                                  className={`rounded-full text-[10px] ${info.cls}`}
-                                >
-                                  {info.label}
-                                </Badge>
-                              ) : null;
-                            })()}
-                          {/* Source engine — mostra de qual query veio */}
-                          {a.source_engine && (
-                            <Badge
-                              variant="outline"
-                              className="rounded-full text-[10px] border-slate-600/40 text-slate-500"
-                            >
-                              {a.source_engine.replace("bing:", "Bing/").replace("yahoo", "Yahoo")}
-                            </Badge>
-                          )}
-                        </div>
-                        {(a.subniche || scale || tags.length > 0) && (
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {a.subniche && (
-                              <Badge variant="secondary" className="rounded-full text-[10px]">
-                                {a.subniche}
-                              </Badge>
-                            )}
-                            {scale && (
-                              <Badge
-                                variant="outline"
-                                className={`rounded-full text-[10px] ${scale.cls}`}
-                                style={
-                                  scale.gradient
-                                    ? { background: "var(--gradient-primary)" }
-                                    : undefined
-                                }
-                              >
-                                {scale.label}
-                              </Badge>
-                            )}
-                            {tags.slice(0, 3).map((t) => (
-                              <Badge key={t} variant="outline" className="rounded-full text-[10px]">
-                                {t}
-                              </Badge>
-                            ))}
-                            {tags.length > 3 && (
-                              <span className="text-[10px] text-muted-foreground">
-                                +{tags.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        <div className="mt-auto grid gap-2 pt-2 sm:grid-cols-2">
-                          <Button
-                            size="sm"
-                            onClick={() => onAnalyzeCollected(a)}
-                            className="text-primary-foreground"
-                            style={{ background: "var(--gradient-primary)" }}
-                          >
-                            <Sparkles className="mr-1 h-3.5 w-3.5" /> Analisar com IA
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => onSaveCollected(a)}>
-                            <BookmarkCheck className="mr-1 h-3.5 w-3.5" />{" "}
-                            {savedIds.has(key) ? "Salvo" : "Salvar"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="sm:col-span-2 text-white font-semibold"
-                            style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}
-                            onClick={() => setGenerateTarget(a)}
-                          >
-                            <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Gerar Oferta Parecida
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="sm:col-span-2"
-                            disabled={modeling === key}
-                            onClick={async () => {
-                              setModeling(key);
-                              try {
-                                const r = await createFromOffer({
-                                  data: {
-                                    title: `${a.advertiser} — ${a.niche}`,
-                                    niche: a.niche,
-                                    promise: a.headline,
-                                    avatar: `Pessoas interessadas em ${a.niche}`,
-                                    uniqueMechanism: a.promise ?? "",
-                                    pains: [],
-                                    desires: [],
-                                    source_ad_key: key,
-                                    cover_url: a.image_url ?? null,
-                                    advertiser: a.advertiser,
-                                    platform: a.platform,
-                                    country: a.country,
-                                    headline: a.headline,
-                                    copy: a.copy ?? undefined,
-                                    cta: a.cta ?? undefined,
-                                    imageUrl: a.image_url ?? null,
-                                    videoUrl: a.video_url ?? null,
-                                  },
-                                });
-                                toast.success("Estratégia modelada");
-                                navigate({
-                                  to: "/projetos/$id",
-                                  params: { id: r.id },
-                                  search: { tab: "escala" } as never,
-                                });
-                              } catch (e) {
-                                toast.error(e instanceof Error ? e.message : "Falha ao modelar");
-                              } finally {
-                                setModeling(null);
-                              }
-                            }}
-                          >
-                            <Rocket className="mr-1 h-3.5 w-3.5" />{" "}
-                            {modeling === key ? "Modelando…" : "Modelar Estratégia"}
-                          </Button>
-                          <TransformToProjectButton
-                            adLibraryId={a.ad_library_id}
-                            adUrl={a.ad_url}
-                          />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onFavoriteCollected(a)}
-                          >
-                            <Star
-                              className={`mr-1 h-3.5 w-3.5 ${favIds.has(key) ? "fill-yellow-400 text-yellow-400" : ""}`}
-                            />{" "}
-                            Favoritar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              openAdLink({
-                                adUrl: a.ad_url,
-                                adLibraryId: a.ad_library_id,
-                                advertiser: a.advertiser,
-                                headline: a.headline,
-                              })
-                            }
-                          >
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" /> Abrir anúncio
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {filtered.length > PAGE_SIZE && (
-                <div className="mt-4 flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">
-                    Página {page + 1} de {Math.ceil(filtered.length / PAGE_SIZE)}
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={page === 0}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      Anterior
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={(page + 1) * PAGE_SIZE >= filtered.length}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Dialog Minerar com IA */}
-      <Dialog open={aiOpen} onOpenChange={setAiOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5 text-primary" /> Mineração inteligente
-            </DialogTitle>
-          </DialogHeader>
-          {aiLoading || !trends ? (
-            <div className="flex flex-col items-center justify-center gap-5 py-14">
-              <div className="relative h-20 w-20">
-                <div className="ai-glow absolute inset-0 rounded-full opacity-50 blur-xl" />
-                <div
-                  className="absolute inset-0 animate-spin rounded-full border-2 border-dashed border-primary/40"
-                  style={{ animationDuration: "4s" }}
-                />
-                <Wand2 className="absolute inset-0 m-auto h-8 w-8 text-primary" />
-              </div>
-              <div className="relative h-1.5 w-64 overflow-hidden rounded-full bg-muted">
-                <div className="scan-line" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-semibold">Analisando padrões…</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  A IA está varrendo milhares de anúncios em tempo real
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6 py-2">
-              <section>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <Flame className="h-4 w-4 text-primary" /> Nichos aquecendo
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {trends.hotNiches.map((n) => (
-                    <Badge key={n.name} className="bg-primary/15 text-primary hover:bg-primary/20">
-                      {n.name} {n.growth}
-                    </Badge>
                   ))}
-                </div>
-              </section>
-              <section>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <TrendingUp className="h-4 w-4 text-primary" /> Ofertas emergentes
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {trends.emergingOffers.map((o) => (
-                    <div
-                      key={o.id}
-                      className="card-glow rounded-lg border border-border/60 bg-card p-3"
-                    >
-                      <p className="text-sm font-semibold line-clamp-1">{o.advertiser_name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {o.niche} · {o.country}
-                      </p>
-                      <p className="mt-2 text-xs font-bold text-primary">Score {o.scale_score}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <h3 className="mb-2 text-sm font-semibold">Criativos escalando</h3>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {trends.scalingCreatives.map((c) => (
-                    <li key={c}>• {c}</li>
-                  ))}
-                </ul>
-              </section>
-              <section>
-                <h3 className="mb-2 text-sm font-semibold">Países em tendência</h3>
-                <div className="flex flex-wrap gap-2">
-                  {trends.trendingCountries.map((c) => (
-                    <Badge key={c.code} variant="outline" className="border-primary/30">
-                      {c.label} <span className="ml-1 text-primary">{c.growth}</span>
-                    </Badge>
-                  ))}
-                </div>
-              </section>
-              <section>
-                <h3 className="mb-2 text-sm font-semibold">Scores altos detectados</h3>
-                <div className="space-y-2">
-                  {trends.topScores.map((o) => (
-                    <div
-                      key={o.id}
-                      className="flex items-center justify-between rounded-lg border border-border/60 p-2"
-                    >
-                      <span className="text-sm">{o.advertiser_name}</span>
-                      <Badge className="bg-gradient-to-r from-primary to-accent text-primary-foreground">
-                        <Flame className="mr-1 h-3 w-3" /> {o.scale_score}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </section>
+                </SelectContent>
+              </Select>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal Gerar Oferta Parecida */}
-      {generateTarget && (
-        <GenerateOfferModal
-          ad={generateTarget}
-          keyword={keyword || undefined}
-          open={!!generateTarget}
-          onClose={() => setGenerateTarget(null)}
-        />
-      )}
-    </div>
+            <div>
+              <Label>Quantidade</Label>
+              <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 20, 40, 60].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} anúncios
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={running}>
+            Cancelar
+          </Button>
+          <Button onClick={run} disabled={running} data-testid="run-mine">
+            {running ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Radar className="mr-1.5 h-4 w-4" />
+            )}
+            {running ? "Minerando…" : "Minerar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
