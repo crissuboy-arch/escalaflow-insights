@@ -6,15 +6,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Sparkles, Loader2, CheckCircle2, Circle, ChevronDown, ChevronUp,
-  Rocket, Copy, Tag, Wand2, Film, Megaphone, FolderOpen, AlertCircle,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  Circle,
+  ChevronDown,
+  ChevronUp,
+  Rocket,
+  Copy,
+  Tag,
+  Wand2,
+  Film,
+  Megaphone,
+  FolderOpen,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  analyzeOfferFn, generateNewOfferFn, generateVslFn, generateAdsFn,
-  type OfferAnalysis, type GeneratedOffer, type VslScript, type GeneratedAd,
+  analyzeOfferFn,
+  generateNewOfferFn,
+  generateVslFn,
+  generateAdsFn,
+  type OfferAnalysis,
+  type GeneratedOffer,
+  type VslScript,
+  type GeneratedAd,
 } from "@/lib/offer-generator.functions";
 import { createProjectFromOffer } from "@/lib/project.functions";
+import { resolveAdImageUrl } from "@/lib/collector/media-url";
 
 type Step = "idle" | "analyzing" | "offer" | "vsl" | "ads" | "done" | "error";
 
@@ -28,6 +47,7 @@ type CollectedAdMini = {
   platform: string;
   country: string;
   image_url: string | null;
+  image_storage_path?: string | null;
   score: number;
 };
 
@@ -39,11 +59,11 @@ type Props = {
 };
 
 const STEPS = [
-  { id: "analyzing", icon: Tag,       label: "Analisar Oferta"   },
-  { id: "offer",     icon: Wand2,     label: "Gerar Oferta"      },
-  { id: "vsl",       icon: Film,      label: "Criar VSL"         },
-  { id: "ads",       icon: Megaphone, label: "Gerar Anúncios"    },
-  { id: "done",      icon: FolderOpen,label: "Salvar Projeto"    },
+  { id: "analyzing", icon: Tag, label: "Analisar Oferta" },
+  { id: "offer", icon: Wand2, label: "Gerar Oferta" },
+  { id: "vsl", icon: Film, label: "Criar VSL" },
+  { id: "ads", icon: Megaphone, label: "Gerar Anúncios" },
+  { id: "done", icon: FolderOpen, label: "Salvar Projeto" },
 ] as const;
 
 function stepIndex(step: Step): number {
@@ -54,26 +74,28 @@ function stepIndex(step: Step): number {
 export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
   const navigate = useNavigate();
 
-  const analyzeOffer    = useServerFn(analyzeOfferFn);
-  const generateOffer   = useServerFn(generateNewOfferFn);
-  const generateVsl     = useServerFn(generateVslFn);
-  const generateAds     = useServerFn(generateAdsFn);
-  const saveProject     = useServerFn(createProjectFromOffer);
+  const analyzeOffer = useServerFn(analyzeOfferFn);
+  const generateOffer = useServerFn(generateNewOfferFn);
+  const generateVsl = useServerFn(generateVslFn);
+  const generateAds = useServerFn(generateAdsFn);
+  const saveProject = useServerFn(createProjectFromOffer);
 
   const [step, setStep] = useState<Step>("idle");
-  const [analysis, setAnalysis]   = useState<OfferAnalysis | null>(null);
-  const [newOffer, setNewOffer]   = useState<GeneratedOffer | null>(null);
-  const [vsl, setVsl]             = useState<VslScript | null>(null);
-  const [ads, setAds]             = useState<GeneratedAd[] | null>(null);
+  const [analysis, setAnalysis] = useState<OfferAnalysis | null>(null);
+  const [newOffer, setNewOffer] = useState<GeneratedOffer | null>(null);
+  const [vsl, setVsl] = useState<VslScript | null>(null);
+  const [ads, setAds] = useState<GeneratedAd[] | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg]   = useState<string | null>(null);
-  const [expanded, setExpanded]   = useState<Set<string>>(new Set(["analyzing"]));
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(["analyzing"]));
 
-  const toggle = (key: string) => setExpanded((s) => {
-    const n = new Set(s);
-    if (n.has(key)) n.delete(key); else n.add(key);
-    return n;
-  });
+  const toggle = (key: string) =>
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
 
   const handleClose = () => {
     if (step !== "analyzing" && step !== "offer" && step !== "vsl" && step !== "ads") {
@@ -188,7 +210,7 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
           advertiser: ad.advertiser,
           platform: ad.platform,
           country: ad.country,
-          imageUrl: ad.image_url,
+          imageUrl: resolveAdImageUrl(ad),
           source_ad_key: ad.id,
         },
       });
@@ -218,17 +240,27 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
           {/* Step progress bar */}
           <div className="flex items-center gap-2 pt-4">
             {STEPS.map((s, i) => {
-              const done    = currentIdx > i || step === "done";
-              const active  = (STEPS[currentIdx]?.id === s.id) && step !== "done" && step !== "idle" && step !== "error";
+              const done = currentIdx > i || step === "done";
+              const active =
+                STEPS[currentIdx]?.id === s.id &&
+                step !== "done" &&
+                step !== "idle" &&
+                step !== "error";
               const pending = currentIdx < i && step !== "done";
               return (
                 <div key={s.id} className="flex items-center flex-1">
-                  <div className={`flex flex-col items-center gap-1 min-w-0 ${pending ? "opacity-40" : ""}`}>
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all ${
-                      done    ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" :
-                      active  ? "border-blue-400 bg-blue-500/20 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.5)]" :
-                                "border-white/20 bg-white/5 text-slate-500"
-                    }`}>
+                  <div
+                    className={`flex flex-col items-center gap-1 min-w-0 ${pending ? "opacity-40" : ""}`}
+                  >
+                    <div
+                      className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                        done
+                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                          : active
+                            ? "border-blue-400 bg-blue-500/20 text-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.5)]"
+                            : "border-white/20 bg-white/5 text-slate-500"
+                      }`}
+                    >
                       {active ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : done ? (
@@ -237,10 +269,14 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                         <s.icon className="h-3.5 w-3.5" />
                       )}
                     </div>
-                    <span className="text-[10px] text-center leading-tight text-slate-400 hidden sm:block">{s.label}</span>
+                    <span className="text-[10px] text-center leading-tight text-slate-400 hidden sm:block">
+                      {s.label}
+                    </span>
                   </div>
                   {i < STEPS.length - 1 && (
-                    <div className={`h-px flex-1 mx-1 transition-all ${done ? "bg-emerald-500/60" : "bg-white/10"}`} />
+                    <div
+                      className={`h-px flex-1 mx-1 transition-all ${done ? "bg-emerald-500/60" : "bg-white/10"}`}
+                    />
                   )}
                 </div>
               );
@@ -269,21 +305,23 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
 
           {/* Result cards — appear as steps complete */}
           <div className="space-y-3">
-
             {/* Analysis result */}
             {analysis && (
               <ResultCard
                 icon={<Tag className="h-4 w-4 text-purple-400" />}
                 title="Análise da Oferta"
-                badge={{ label: "Concluído", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }}
+                badge={{
+                  label: "Concluído",
+                  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                }}
                 open={expanded.has("analyzing")}
                 onToggle={() => toggle("analyzing")}
               >
                 <div className="grid gap-3 sm:grid-cols-2 text-sm">
-                  <Info label="Promessa"         value={analysis.promise} />
-                  <Info label="Mecanismo"        value={analysis.mechanism} />
-                  <Info label="Público"          value={analysis.audience} />
-                  <Info label="Dor principal"    value={analysis.mainPain} />
+                  <Info label="Promessa" value={analysis.promise} />
+                  <Info label="Mecanismo" value={analysis.mechanism} />
+                  <Info label="Público" value={analysis.audience} />
+                  <Info label="Dor principal" value={analysis.mainPain} />
                   <Info label="Desejo principal" value={analysis.mainDesire} />
                   <Info label="Ângulo emocional" value={analysis.emotionalAngle} />
                   <Info label="Nível consciência" value={analysis.awarenessLevel} />
@@ -292,7 +330,13 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                       <p className="text-[10px] text-slate-500 mb-1">Bônus identificados</p>
                       <div className="flex flex-wrap gap-1.5">
                         {analysis.bonuses.map((b, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] border-purple-500/30 text-purple-300">{b}</Badge>
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-[10px] border-purple-500/30 text-purple-300"
+                          >
+                            {b}
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -306,23 +350,32 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
               <ResultCard
                 icon={<Wand2 className="h-4 w-4 text-blue-400" />}
                 title="Nova Oferta Gerada"
-                badge={{ label: "Concluído", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }}
+                badge={{
+                  label: "Concluído",
+                  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                }}
                 open={expanded.has("offer")}
                 onToggle={() => toggle("offer")}
               >
                 <div className="space-y-3 text-sm">
                   <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
-                    <p className="text-lg font-bold text-white leading-tight">{newOffer.headline}</p>
+                    <p className="text-lg font-bold text-white leading-tight">
+                      {newOffer.headline}
+                    </p>
                     <p className="text-slate-400 mt-1">{newOffer.subheadline}</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <Info label="Produto"        value={newOffer.name} />
+                    <Info label="Produto" value={newOffer.name} />
                     <Info label="Preço sugerido" value={newOffer.suggestedPrice} />
-                    <Info label="Promessa"       value={newOffer.promise} />
-                    <Info label="Mecanismo"      value={newOffer.mechanism} />
-                    <Info label="Diferencial"    value={newOffer.differentiator} className="sm:col-span-2" />
-                    <Info label="Garantia"       value={newOffer.guarantee} />
-                    <Info label="Público"        value={newOffer.targetAudience} />
+                    <Info label="Promessa" value={newOffer.promise} />
+                    <Info label="Mecanismo" value={newOffer.mechanism} />
+                    <Info
+                      label="Diferencial"
+                      value={newOffer.differentiator}
+                      className="sm:col-span-2"
+                    />
+                    <Info label="Garantia" value={newOffer.guarantee} />
+                    <Info label="Público" value={newOffer.targetAudience} />
                   </div>
                   {newOffer.bullets?.length > 0 && (
                     <div>
@@ -330,7 +383,8 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                       <ul className="space-y-1">
                         {newOffer.bullets.map((b, i) => (
                           <li key={i} className="flex items-start gap-2 text-slate-300">
-                            <span className="text-blue-400 mt-0.5">•</span>{b}
+                            <span className="text-blue-400 mt-0.5">•</span>
+                            {b}
                           </li>
                         ))}
                       </ul>
@@ -341,7 +395,13 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                       <p className="text-[10px] text-slate-500 mb-1.5">Bônus</p>
                       <div className="flex flex-wrap gap-1.5">
                         {newOffer.bonuses.map((b, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] border-blue-500/30 text-blue-300">{b}</Badge>
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-[10px] border-blue-500/30 text-blue-300"
+                          >
+                            {b}
+                          </Badge>
                         ))}
                       </div>
                     </div>
@@ -355,27 +415,37 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
               <ResultCard
                 icon={<Film className="h-4 w-4 text-red-400" />}
                 title="Script VSL"
-                badge={{ label: "Concluído", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }}
+                badge={{
+                  label: "Concluído",
+                  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                }}
                 open={expanded.has("vsl")}
                 onToggle={() => toggle("vsl")}
                 copyValue={vsl.fullScript}
               >
                 <div className="space-y-2 text-sm">
                   {[
-                    { key: "hook",      label: "Hook (0–15s)",     color: "text-red-400" },
-                    { key: "problem",   label: "Problema",         color: "text-orange-400" },
-                    { key: "agitation", label: "Agravamento",      color: "text-yellow-400" },
-                    { key: "solution",  label: "Solução",          color: "text-blue-400" },
-                    { key: "mechanism", label: "Mecanismo",        color: "text-purple-400" },
-                    { key: "offer",     label: "Oferta",           color: "text-emerald-400" },
-                    { key: "urgency",   label: "Urgência",         color: "text-orange-400" },
-                    { key: "cta",       label: "CTA",              color: "text-blue-400" },
+                    { key: "hook", label: "Hook (0–15s)", color: "text-red-400" },
+                    { key: "problem", label: "Problema", color: "text-orange-400" },
+                    { key: "agitation", label: "Agravamento", color: "text-yellow-400" },
+                    { key: "solution", label: "Solução", color: "text-blue-400" },
+                    { key: "mechanism", label: "Mecanismo", color: "text-purple-400" },
+                    { key: "offer", label: "Oferta", color: "text-emerald-400" },
+                    { key: "urgency", label: "Urgência", color: "text-orange-400" },
+                    { key: "cta", label: "CTA", color: "text-blue-400" },
                   ].map(({ key, label, color }) => {
                     const val = (vsl as Record<string, string>)[key];
                     if (!val) return null;
                     return (
-                      <div key={key} className="rounded-md border border-white/5 bg-white/[0.02] p-3">
-                        <p className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${color}`}>{label}</p>
+                      <div
+                        key={key}
+                        className="rounded-md border border-white/5 bg-white/[0.02] p-3"
+                      >
+                        <p
+                          className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${color}`}
+                        >
+                          {label}
+                        </p>
                         <p className="text-slate-300 leading-relaxed">{val}</p>
                       </div>
                     );
@@ -389,19 +459,31 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
               <ResultCard
                 icon={<Megaphone className="h-4 w-4 text-orange-400" />}
                 title={`${ads.length} Anúncios Gerados`}
-                badge={{ label: "Concluído", cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" }}
+                badge={{
+                  label: "Concluído",
+                  cls: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+                }}
                 open={expanded.has("ads")}
                 onToggle={() => toggle("ads")}
               >
                 <div className="space-y-3">
                   {ads.map((a, i) => (
-                    <div key={i} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-2">
+                    <div
+                      key={i}
+                      className="rounded-lg border border-white/10 bg-white/[0.02] p-4 space-y-2"
+                    >
                       <div className="flex items-center justify-between">
-                        <Badge variant="outline" className={`text-[10px] capitalize border-orange-500/30 text-orange-300`}>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] capitalize border-orange-500/30 text-orange-300`}
+                        >
                           {a.format}
                         </Badge>
                         <button
-                          onClick={() => { navigator.clipboard.writeText(`${a.hook}\n\n${a.primaryText}`); toast.success("Copiado!"); }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${a.hook}\n\n${a.primaryText}`);
+                            toast.success("Copiado!");
+                          }}
                           className="text-slate-500 hover:text-slate-300 transition"
                         >
                           <Copy className="h-3.5 w-3.5" />
@@ -412,8 +494,15 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                       <p className="text-[11px] text-slate-500 font-medium mt-2">TEXTO PRINCIPAL</p>
                       <p className="text-sm text-slate-300 leading-relaxed">{a.primaryText}</p>
                       <div className="flex items-center justify-between mt-2">
-                        <p className="text-[10px] text-slate-500">Headline: <span className="text-slate-300">{a.headline}</span></p>
-                        <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-300">{a.cta}</Badge>
+                        <p className="text-[10px] text-slate-500">
+                          Headline: <span className="text-slate-300">{a.headline}</span>
+                        </p>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] border-blue-500/30 text-blue-300"
+                        >
+                          {a.cta}
+                        </Badge>
                       </div>
                     </div>
                   ))}
@@ -428,9 +517,9 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
                 <div>
                   <p className="text-sm font-medium text-blue-300">
                     {step === "analyzing" && "Analisando oferta com IA…"}
-                    {step === "offer"     && "Gerando nova oferta…"}
-                    {step === "vsl"       && "Criando script VSL…"}
-                    {step === "ads"       && "Gerando variações de anúncio…"}
+                    {step === "offer" && "Gerando nova oferta…"}
+                    {step === "vsl" && "Criando script VSL…"}
+                    {step === "ads" && "Gerando variações de anúncio…"}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">Isso pode levar alguns segundos</p>
                 </div>
@@ -439,32 +528,40 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
           </div>
 
           {/* Save to project (done state) */}
-            {step === "done" && newOffer && (
-              <div className="space-y-3 pt-2 border-t border-white/5">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                  <p className="text-sm font-semibold text-emerald-300">Geração completa! Produto: {newOffer.name}</p>
-                </div>
-
-                {projectId ? (
-                  <Button
-                    className="w-full text-white"
-                    style={{ background: "var(--gradient-primary)" }}
-                    onClick={() => navigate({ to: "/projetos/$id", params: { id: projectId }, search: { tab: "escala" } as never })}
-                  >
-                    <Rocket className="mr-2 h-4 w-4" /> Abrir Projeto no EscalaFlow
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full text-white"
-                    style={{ background: "var(--gradient-primary)" }}
-                    onClick={handleSave}
-                  >
-                    <FolderOpen className="mr-2 h-4 w-4" /> Salvar no Projeto EscalaFlow
-                  </Button>
-                )}
+          {step === "done" && newOffer && (
+            <div className="space-y-3 pt-2 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                <p className="text-sm font-semibold text-emerald-300">
+                  Geração completa! Produto: {newOffer.name}
+                </p>
               </div>
-            )}
+
+              {projectId ? (
+                <Button
+                  className="w-full text-white"
+                  style={{ background: "var(--gradient-primary)" }}
+                  onClick={() =>
+                    navigate({
+                      to: "/projetos/$id",
+                      params: { id: projectId },
+                      search: { tab: "escala" } as never,
+                    })
+                  }
+                >
+                  <Rocket className="mr-2 h-4 w-4" /> Abrir Projeto no EscalaFlow
+                </Button>
+              ) : (
+                <Button
+                  className="w-full text-white"
+                  style={{ background: "var(--gradient-primary)" }}
+                  onClick={handleSave}
+                >
+                  <FolderOpen className="mr-2 h-4 w-4" /> Salvar no Projeto EscalaFlow
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -474,7 +571,13 @@ export function GenerateOfferModal({ ad, keyword, open, onClose }: Props) {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function ResultCard({
-  icon, title, badge, open, onToggle, copyValue, children,
+  icon,
+  title,
+  badge,
+  open,
+  onToggle,
+  copyValue,
+  children,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -493,18 +596,28 @@ function ResultCard({
         <div className="flex items-center gap-2.5">
           {icon}
           <span className="text-sm font-semibold text-white">{title}</span>
-          <Badge variant="outline" className={`text-[10px] ${badge.cls}`}>{badge.label}</Badge>
+          <Badge variant="outline" className={`text-[10px] ${badge.cls}`}>
+            {badge.label}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
           {copyValue && (
             <button
-              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(copyValue); toast.success("Copiado!"); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(copyValue);
+                toast.success("Copiado!");
+              }}
               className="text-slate-500 hover:text-slate-300 transition p-1"
             >
               <Copy className="h-3.5 w-3.5" />
             </button>
           )}
-          {open ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+          {open ? (
+            <ChevronUp className="h-4 w-4 text-slate-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-slate-400" />
+          )}
         </div>
       </button>
       {open && (
@@ -516,7 +629,15 @@ function ResultCard({
   );
 }
 
-function Info({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+function Info({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  className?: string;
+}) {
   return (
     <div className={className}>
       <p className="text-[10px] text-slate-500 mb-0.5">{label}</p>

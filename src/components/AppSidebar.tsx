@@ -30,6 +30,7 @@ import {
   Network,
   Zap,
   Film,
+  Facebook,
 } from "lucide-react";
 import {
   Sidebar,
@@ -71,7 +72,10 @@ export function AppSidebar() {
     return subscribeChange(sync);
   }, []);
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => isAdmin(supabase, data.user?.id)).then(setShowDatabase);
+    supabase.auth
+      .getUser()
+      .then(({ data }) => isAdmin(supabase, data.user?.id))
+      .then(setShowDatabase);
   }, []);
   type Item = { to: string; label: string; icon: typeof LayoutDashboard; badge?: number };
   const mineracao: Item[] = [
@@ -93,6 +97,9 @@ export function AppSidebar() {
   ];
   const centralMineracao: Item[] = [
     { to: "/central-mineracao", label: t("nav.miningCenter"), icon: Radio },
+  ];
+  const facebookViral: Item[] = [
+    { to: "/facebook-viral", label: "Facebook Viral", icon: Facebook },
   ];
   const inteligencia: Item[] = [
     { to: "/ofertas-salvas", label: t("nav.saved"), icon: Bookmark, badge: savedCount },
@@ -130,7 +137,10 @@ export function AppSidebar() {
   // porque nenhum dos dois tem módulo real implementado ainda — um grupo
   // de menu sem nenhuma tela por trás seria um link morto em produção.
   const groups: { label: string; items: Item[] }[] = [
-    { label: "Inteligência", items: [...mineracao, ...radares, ...centralMineracao, ...inteligencia] },
+    {
+      label: "Inteligência",
+      items: [...mineracao, ...radares, ...centralMineracao, ...facebookViral, ...inteligencia],
+    },
     { label: "Criação", items: esteira },
     { label: "Conta", items: conta },
   ];

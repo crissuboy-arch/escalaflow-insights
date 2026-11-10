@@ -208,8 +208,11 @@ describe("Wiring real: /minerar → card da oferta → TransformToProjectButton"
   });
 
   it("o botão recebe a identidade real do anúncio (ad_library_id/ad_url), sem inventar dado novo", () => {
+    // [\s\S]{0,120} em vez de espaço literal — o prettier pode quebrar os
+    // atributos JSX em múltiplas linhas; o que importa é a prop, não a
+    // formatação exata.
     expect(MINERAR_SRC).toMatch(
-      /<TransformToProjectButton adLibraryId=\{a\.ad_library_id\} adUrl=\{a\.ad_url\} \/>/,
+      /<TransformToProjectButton[\s\S]{0,120}adLibraryId=\{a\.ad_library_id\}[\s\S]{0,120}adUrl=\{a\.ad_url\}[\s\S]{0,40}\/>/,
     );
   });
 
@@ -232,6 +235,8 @@ describe("Reuso confirmado em Análise IA e Ofertas Escaladas (nenhum componente
     expect(OFERTAS_ESCALADAS_SRC).toMatch(
       /import \{ TransformToProjectButton \} from "@\/components\/TransformToProjectButton";/,
     );
-    expect(OFERTAS_ESCALADAS_SRC).toMatch(/<TransformToProjectButton[\s\S]{0,80}variant="icon"/);
+    // {0,250} (não {0,80}) porque o prettier pode quebrar os atributos JSX em
+    // múltiplas linhas — o que importa é a prop, não a formatação exata.
+    expect(OFERTAS_ESCALADAS_SRC).toMatch(/<TransformToProjectButton[\s\S]{0,250}variant="icon"/);
   });
 });

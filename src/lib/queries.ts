@@ -19,6 +19,8 @@ function rowToPersisted(row: Record<string, unknown>): PersistedAd {
     cta: string | null;
     image_url: string | null;
     video_url: string | null;
+    image_storage_path?: string | null;
+    video_storage_path?: string | null;
     platform: string;
     country: string;
     niche: string;
@@ -36,6 +38,8 @@ function rowToPersisted(row: Record<string, unknown>): PersistedAd {
     cta: r.cta,
     image_url: r.image_url,
     video_url: r.video_url,
+    image_storage_path: r.image_storage_path ?? null,
+    video_storage_path: r.video_storage_path ?? null,
     platform: r.platform,
     country: r.country,
     niche: r.niche,
@@ -242,6 +246,8 @@ export interface PersistedAd {
   cta: string | null;
   image_url: string | null;
   video_url: string | null;
+  image_storage_path?: string | null;
+  video_storage_path?: string | null;
   platform: string;
   country: string;
   niche: string;
