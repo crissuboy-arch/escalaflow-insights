@@ -1,0 +1,27 @@
+media-persist called
+rows: row-scaling, row-prev, row-next, row-track, row-top10, row-prev, row-next, row-track, row-fresh, row-prev, row-next, row-track, row-niche-saude, row-prev, row-next, row-track, row-niche-renda, row-prev, row-next, row-track, row-niche-relacionamento, row-prev, row-next, row-track, row-niche-educacao, row-prev, row-next, row-track, row-niche-religioso, row-prev, row-next, row-track, row-niche-beleza, row-prev, row-next, row-track, row-niche-infantil, row-prev, row-next, row-track
+carrossel scrollLeft 0 -> 1060
+media sync banner: 3 mídias guardadas permanentemente nesta sessão.
+search "barriga" url: http://127.0.0.1:5173/minerar?q=barriga cards=5
+filtro PT: url=http://127.0.0.1:5173/minerar?country=PT cards=6
+filtro PT+pt: cards=6
+media-persist called
+nicho saude cards=9
+media-persist called
+detalhe url: http://127.0.0.1:5173/biblioteca/00000000-0000-0000-0000-000000000031
+media-persist called
+top10 renda: Top 10 · Renda Extra & Finanças
+5 cards=5
+modulo /tiktok-radar: TikTok Radar
+modulo /instagram-radar: Radar Instagram
+modulo /google-radar: Radar Google Trends
+modulo /youtube-radar: Radar YouTube
+modulo /radar-videos: Radar de Vídeos
+modulo /facebook-viral: Dashboard
+modulo /radar-produtos: Radar Produtos
+modulo /ofertas-salvas: Ofertas Salvas
+modulo /favoritos: Favoritos
+modulo /minerar-avancado: Minerar Ofertas
+media-persist called
+mobile overflow horizontal px: 0
+desktop overflow px: 0
