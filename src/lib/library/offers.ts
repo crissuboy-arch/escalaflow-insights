@@ -707,13 +707,57 @@ export function hasMedia(o: LibraryOffer): boolean {
   return Boolean(o.image || o.video);
 }
 
+// ── Estado de escala: SÓ com números reais da Biblioteca de Anúncios ──
+// activeAdsCount = anúncios que usam este criativo (collation_count)
+// daysRunning    = dias desde o início da veiculação (start_date)
+// isActive       = a Ad Library diz se ainda está a rodar
+export type RealStatus = "escalando" | "teste" | "estavel" | "inativo";
+
+export const STATUS_RULES = {
+  /** Escalando: muitos anúncios com o mesmo criativo, ou vários e há tempo no ar. */
+  scalingAds: 10,
+  scalingAdsWithTime: 3,
+  scalingMinDays: 14,
+  /** Estável: no ar há bastante tempo, sem multiplicar anúncios. */
+  stableMinDays: 30,
+} as const;
+
+export const STATUS_LABEL: Record<RealStatus, string> = {
+  escalando: "Escalando",
+  teste: "Em teste",
+  estavel: "Estável",
+  inativo: "Inativo",
+};
+
+export const STATUS_EXPLAIN =
+  `Escalando: ≥ ${STATUS_RULES.scalingAds} anúncios com o mesmo criativo, ou ≥ ${STATUS_RULES.scalingAdsWithTime} anúncios e ≥ ${STATUS_RULES.scalingMinDays} dias no ar. ` +
+  `Estável: ≥ ${STATUS_RULES.stableMinDays} dias no ar sem multiplicar anúncios. ` +
+  `Em teste: há menos tempo no ar e poucos anúncios. Dados da Biblioteca de Anúncios da Meta.`;
+
+/** null quando a Ad Library não devolveu dados suficientes — nunca adivinha. */
+export function realStatus(o: LibraryOffer): RealStatus | null {
+  if (o.isActive === false) return "inativo";
+  const ads = o.activeAdsCount;
+  const days = o.daysRunning;
+  if (ads === null && days === null) return null;
+  if (ads !== null && ads >= STATUS_RULES.scalingAds) return "escalando";
+  if (
+    ads !== null &&
+    days !== null &&
+    ads >= STATUS_RULES.scalingAdsWithTime &&
+    days >= STATUS_RULES.scalingMinDays
+  )
+    return "escalando";
+  if (days !== null && days >= STATUS_RULES.stableMinDays) return "estavel";
+  return "teste";
+}
+
 export function isScaling(o: LibraryOffer): boolean {
-  return (
-    o.scaleLevel === "hot" ||
-    o.scaleLevel === "scaled" ||
-    (o.activeAdsCount ?? 0) >= 5 ||
-    o.score >= 70
-  );
+  return realStatus(o) === "escalando";
+}
+
+export function isVideo(o: LibraryOffer): boolean {
+  return Boolean(o.video);
 }
 
 /** Força de escala para ordenar: usa sinais reais quando existem. */
@@ -821,4 +865,29 @@ export function formatCount(n: number): string {
   return new Intl.NumberFormat("pt-BR", { notation: n >= 10_000 ? "compact" : "standard" }).format(
     n,
   );
+}
+
+export interface ActivitySnapshot {
+  date: string;
+  activeAds: number | null;
+  isActive: boolean | null;
+}
+
+/** Histórico diário real (tabela ad_activity_snapshots). Vazio se a migration
+ *  ainda não foi aplicada ou se o anúncio só foi visto uma vez. */
+export async function fetchActivitySnapshots(adId: string): Promise<ActivitySnapshot[]> {
+  const { data, error } = await supabase
+    .from("ad_activity_snapshots" as never)
+    .select("snapshot_date, active_ads, is_active")
+    .eq("ad_id", adId)
+    .order("snapshot_date", { ascending: true })
+    .limit(120);
+  if (error) return [];
+  return (
+    (data ?? []) as Array<{
+      snapshot_date: string;
+      active_ads: number | null;
+      is_active: boolean | null;
+    }>
+  ).map((r) => ({ date: r.snapshot_date, activeAds: r.active_ads, isActive: r.is_active }));
 }

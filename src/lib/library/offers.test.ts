@@ -115,3 +115,22 @@ describe("hasMedia", () => {
     );
   });
 });
+
+describe("realStatus (só números reais da Ad Library)", () => {
+  const day = 86_400_000;
+  const at = (d: number) => new Date(Date.now() - d * day).toISOString();
+  it("Escalando com ≥10 anúncios ou ≥3 anúncios e ≥14 dias", () => {
+    expect(lib.realStatus(row({ collation_count: 12, start_date: at(2) }))).toBe("escalando");
+    expect(lib.realStatus(row({ collation_count: 3, start_date: at(20) }))).toBe("escalando");
+  });
+  it("Estável com ≥30 dias sem multiplicar anúncios; Em teste caso contrário", () => {
+    expect(lib.realStatus(row({ collation_count: 1, start_date: at(40) }))).toBe("estavel");
+    expect(lib.realStatus(row({ collation_count: 1, start_date: at(5) }))).toBe("teste");
+  });
+  it("Inativo quando a Ad Library diz que parou; sem dados → sem selo", () => {
+    expect(lib.realStatus(row({ is_active: false }))).toBe("inativo");
+    expect(
+      lib.realStatus(row({ collation_count: null, start_date: null, is_active: null })),
+    ).toBeNull();
+  });
+});
