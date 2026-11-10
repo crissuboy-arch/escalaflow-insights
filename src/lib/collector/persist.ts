@@ -38,6 +38,39 @@ export interface PersistResult {
   error?: string;
 }
 
+function num(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
+/** Guarda a contagem real do dia (collation_count/is_active da Ad Library).
+ *  Nunca lança: se a tabela ainda não existir (migration por aplicar), ignora. */
+async function recordActivitySnapshot(
+  adId: string,
+  raw: Record<string, unknown> | null | undefined,
+) {
+  if (!raw) return;
+  const activeAds = num(raw.collation_count);
+  const isActive = typeof raw.is_active === "boolean" ? raw.is_active : null;
+  if (activeAds === null && isActive === null) return;
+  try {
+    const { error } = await supabaseAdmin.from("ad_activity_snapshots" as never).upsert(
+      {
+        ad_id: adId,
+        snapshot_date: new Date().toISOString().slice(0, 10),
+        active_ads: activeAds,
+        is_active: isActive,
+        captured_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "ad_id,snapshot_date" },
+    );
+    if (error) console.warn("[persist] snapshot de atividade não gravado:", error.message);
+  } catch (e) {
+    console.warn("[persist] snapshot de atividade falhou:", e);
+  }
+}
+
 export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistResult> {
   const startDate = item.startDate ? new Date(item.startDate) : null;
   const landingPageUrl = item.landingPageUrl?.trim() || null;
@@ -135,6 +168,7 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
       .update({ ...base, ...mediaPatch } as never)
       .eq("id", prev.id);
     if (error) return { id: prev.id, inserted: false, updated: false, error: error.message };
+    await recordActivitySnapshot(prev.id, item.raw);
     return { id: prev.id, inserted: false, updated: true };
   }
 
@@ -149,7 +183,9 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
     .select("id")
     .single();
   if (error) return { inserted: false, updated: false, error: error.message };
-  return { id: (created as { id: string } | null)?.id, inserted: true, updated: false };
+  const newId = (created as { id: string } | null)?.id;
+  if (newId) await recordActivitySnapshot(newId, item.raw);
+  return { id: newId, inserted: true, updated: false };
 }
 
 /** Aggregates a batch of persist outcomes so callers can tell the user the

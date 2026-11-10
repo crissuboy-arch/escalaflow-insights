@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfferMedia } from "@/components/library/OfferMedia";
 import { OfferRow } from "@/components/library/OfferRow";
+import { ActivityChart } from "@/components/library/ActivityChart";
 import { ScaleChip, offerStatus } from "@/components/library/LibraryOfferCard";
 import { GenerateOfferModal } from "@/components/minerar/GenerateOfferModal";
 import { TransformToProjectButton } from "@/components/TransformToProjectButton";
@@ -461,6 +462,7 @@ function OfferDetail() {
               </div>
             </div>
           </div>
+          <ActivityChart adId={o.id} />
         </div>
 
         {/* Coluna lateral: Informações · Tags · Estatísticas · IA */}

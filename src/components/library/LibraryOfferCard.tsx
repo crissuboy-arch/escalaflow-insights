@@ -2,19 +2,24 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Heart } from "lucide-react";
 import { OfferMedia } from "@/components/library/OfferMedia";
-import { NICHE_LABEL, formatCount, type LibraryOffer } from "@/lib/library/offers";
+import {
+  NICHE_LABEL,
+  STATUS_EXPLAIN,
+  STATUS_LABEL,
+  formatCount,
+  realStatus,
+  type LibraryOffer,
+} from "@/lib/library/offers";
 import { cn } from "@/lib/utils";
 
-/** Selo de estado, só a partir de sinais reais (nível de escala do coletor
- *  e tempo no ar da Ad Library). Sem sinal suficiente, não há selo. */
+/** Selo de estado calculado só com números reais da Ad Library (ver realStatus). */
 export function offerStatus(
   o: LibraryOffer,
-): { label: string; tone: "hot" | "warm" | "steady" } | null {
-  if (o.scaleLevel === "scaled" || o.scaleLevel === "hot")
-    return { label: "Escalando", tone: "hot" };
-  if (o.scaleLevel === "warming") return { label: "Aquecendo", tone: "warm" };
-  if (o.daysRunning !== null && o.daysRunning >= 30) return { label: "Estável", tone: "steady" };
-  return null;
+): { label: string; tone: "hot" | "warm" | "steady" | "off" } | null {
+  const st = realStatus(o);
+  if (!st) return null;
+  const tone = { escalando: "hot", teste: "warm", estavel: "steady", inativo: "off" } as const;
+  return { label: STATUS_LABEL[st], tone: tone[st] };
 }
 
 export function StatusBadge({ offer, className }: { offer: LibraryOffer; className?: string }) {
@@ -26,6 +31,7 @@ export function StatusBadge({ offer, className }: { offer: LibraryOffer; classNa
         "inline-flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur",
         className,
       )}
+      title={STATUS_EXPLAIN}
       data-testid="status-badge"
     >
       <span
@@ -34,6 +40,7 @@ export function StatusBadge({ offer, className }: { offer: LibraryOffer; classNa
           s.tone === "hot" && "bg-orange-500",
           s.tone === "warm" && "bg-sky-400",
           s.tone === "steady" && "bg-zinc-300",
+          s.tone === "off" && "bg-red-500",
         )}
       />
       {s.label}

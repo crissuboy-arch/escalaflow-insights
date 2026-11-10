@@ -46,6 +46,7 @@ import {
 import { LibraryHero } from "@/components/library/LibraryHero";
 import { OfferRow } from "@/components/library/OfferRow";
 import { LibraryOfferCard } from "@/components/library/LibraryOfferCard";
+import { CreativesGrid } from "@/components/library/CreativesGrid";
 import { authedFetch } from "@/lib/auth/authed-fetch";
 import { supabase } from "@/integrations/supabase/client";
 import { useOfferActions } from "@/lib/library/use-offer-actions";
@@ -82,11 +83,11 @@ const librarySearch = z.object({
   /** lista completa (inclui ofertas sem criativo) em vez das prateleiras */
   all: z.coerce.boolean().optional().catch(undefined),
   /** Abas da biblioteca: Início (prateleiras), Explorar (filtros), Minha Lista. */
-  tab: z.enum(["inicio", "explorar", "lista"]).optional().catch(undefined),
+  tab: z.enum(["inicio", "explorar", "criativos", "lista"]).optional().catch(undefined),
   page: z.coerce.number().int().min(1).optional().catch(undefined),
 });
 
-type LibraryTab = "inicio" | "explorar" | "lista";
+type LibraryTab = "inicio" | "explorar" | "criativos" | "lista";
 
 export const Route = createFileRoute("/_authenticated/minerar")({
   validateSearch: librarySearch,
@@ -302,6 +303,7 @@ function OfferLibraryPage() {
           [
             ["inicio", "Início"],
             ["explorar", "Explorar"],
+            ["criativos", "Criativos"],
             ["lista", `Minha Lista${actions.favCount ? ` (${actions.favCount})` : ""}`],
           ] as const
         ).map(([id, label]) => (
@@ -479,6 +481,8 @@ function OfferLibraryPage() {
           </p>
           <Button onClick={() => setMineOpen(true)}>Minerar ofertas</Button>
         </div>
+      ) : tab === "criativos" ? (
+        <CreativesGrid offers={offers} />
       ) : tab === "lista" ? (
         <section className="space-y-4" data-testid="library-list">
           {(() => {
@@ -598,7 +602,7 @@ function OfferLibraryPage() {
           <OfferRow
             testId="row-scaling"
             title="Escalando agora"
-            subtitle="Score ≥ 70, nível quente/escalada ou ≥ 5 anúncios com o mesmo criativo"
+            subtitle="≥ 10 anúncios com o mesmo criativo, ou ≥ 3 anúncios e ≥ 14 dias no ar (dados da Biblioteca de Anúncios)"
             icon={<Flame className="h-5 w-5 text-orange-500" />}
             offers={sections.scaling}
             isFavorite={actions.isFavorite}
