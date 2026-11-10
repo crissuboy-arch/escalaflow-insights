@@ -25,6 +25,9 @@ export interface PersistAdInput {
   source?: string;
   favorite?: boolean;
   raw?: Record<string, unknown> | null;
+  /** Dono da oferta. Sem isto a linha fica com user_id NULL e as consultas
+   *  filtradas por utilizador (API privada, Cris OS) nunca a encontram. */
+  userId?: string | null;
 }
 
 export interface PersistResult {
@@ -64,6 +67,7 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
     // Only ever set favorite=true here; a later re-scan must never silently
     // un-favorite something the user favorited through the app.
     ...(item.favorite ? { favorite: true } : {}),
+    ...(item.userId ? { user_id: item.userId } : {}),
   };
 
   const existingQuery = item.adLibraryId

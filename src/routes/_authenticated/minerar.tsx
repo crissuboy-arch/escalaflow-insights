@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { authedFetch } from "@/lib/auth/authed-fetch";
 import { z } from "zod";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -397,7 +398,7 @@ function MinePage() {
       setCollectorProgress((p) => (p < 88 ? p + Math.max(1, Math.round((90 - p) / 12)) : p));
     }, 350);
     try {
-      const res = await fetch("/api/collector/run", {
+      const res = await authedFetch("/api/collector/run", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
