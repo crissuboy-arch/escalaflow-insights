@@ -1,47 +1,162 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Flame, Heart, Layers, Timer } from "lucide-react";
+import { Heart } from "lucide-react";
 import { OfferMedia } from "@/components/library/OfferMedia";
-import { NICHE_LABEL, countryFlag, formatCount, type LibraryOffer } from "@/lib/library/offers";
+import { NICHE_LABEL, formatCount, type LibraryOffer } from "@/lib/library/offers";
 import { cn } from "@/lib/utils";
 
-export function ScaleChip({ offer, className }: { offer: LibraryOffer; className?: string }) {
-  if (!offer.scaleLevel || offer.scaleLevel === "cold") return null;
-  const map = {
-    warming: { label: "Aquecendo", cls: "bg-sky-500/90 text-white" },
-    hot: { label: "Quente", cls: "bg-orange-500/95 text-white" },
-    scaled: { label: "Escalada", cls: "text-white" },
-  } as const;
-  const info = map[offer.scaleLevel];
+/** Selo de estado, só a partir de sinais reais (nível de escala do coletor
+ *  e tempo no ar da Ad Library). Sem sinal suficiente, não há selo. */
+export function offerStatus(
+  o: LibraryOffer,
+): { label: string; tone: "hot" | "warm" | "steady" } | null {
+  if (o.scaleLevel === "scaled" || o.scaleLevel === "hot")
+    return { label: "Escalando", tone: "hot" };
+  if (o.scaleLevel === "warming") return { label: "Aquecendo", tone: "warm" };
+  if (o.daysRunning !== null && o.daysRunning >= 30) return { label: "Estável", tone: "steady" };
+  return null;
+}
+
+export function StatusBadge({ offer, className }: { offer: LibraryOffer; className?: string }) {
+  const s = offerStatus(offer);
+  if (!s) return null;
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow",
-        info.cls,
+        "inline-flex items-center gap-1.5 rounded-md bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur",
         className,
       )}
-      style={offer.scaleLevel === "scaled" ? { background: "var(--gradient-primary)" } : undefined}
+      data-testid="status-badge"
     >
-      <Flame className="h-3 w-3" />
-      {info.label}
+      <span
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          s.tone === "hot" && "bg-orange-500",
+          s.tone === "warm" && "bg-sky-400",
+          s.tone === "steady" && "bg-zinc-300",
+        )}
+      />
+      {s.label}
     </span>
   );
 }
 
+/** Mantido para a página de detalhe. */
+export const ScaleChip = StatusBadge;
+
+function FavButton({
+  offer,
+  isFavorite,
+  onToggleFavorite,
+  className,
+}: {
+  offer: LibraryOffer;
+  isFavorite: boolean;
+  onToggleFavorite: (o: LibraryOffer) => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggleFavorite(offer);
+      }}
+      aria-label={isFavorite ? "Remover da Minha Lista" : "Adicionar à Minha Lista"}
+      aria-pressed={isFavorite}
+      className={cn(
+        "grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:scale-110",
+        isFavorite && "bg-rose-500/90",
+        className,
+      )}
+      data-testid="favorite-button"
+    >
+      <Heart className={cn("h-4 w-4", isFavorite && "fill-white")} />
+    </button>
+  );
+}
+
+/**
+ * Cartão de prateleira (Início): criativo com o título por cima, selo de
+ * estado no topo e, por baixo, "N ads · Nicho" — como numa biblioteca de
+ * swipes. Variante "grid" (Explorar): título, data e tags por baixo.
+ */
 export function LibraryOfferCard({
   offer,
   isFavorite,
   onToggleFavorite,
   rank,
+  variant = "shelf",
   className,
 }: {
   offer: LibraryOffer;
   isFavorite: boolean;
   onToggleFavorite: (o: LibraryOffer) => void;
   rank?: number;
+  variant?: "shelf" | "grid";
   className?: string;
 }) {
   const [hover, setHover] = useState(false);
+  const title = offer.headline ? `${offer.headline} - ${offer.advertiser}` : offer.advertiser;
+
+  if (variant === "grid") {
+    return (
+      <Link
+        to="/biblioteca/$id"
+        params={{ id: offer.id }}
+        className={cn(
+          "group flex flex-col overflow-hidden rounded-xl border border-border/60 bg-card transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[var(--shadow-elegant)]",
+          className,
+        )}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        data-testid="library-card"
+      >
+        <div className="relative aspect-[3/2] w-full overflow-hidden bg-muted">
+          <OfferMedia offer={offer} active={hover} />
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2">
+            <StatusBadge offer={offer} />
+          </div>
+          <FavButton
+            offer={offer}
+            isFavorite={isFavorite}
+            onToggleFavorite={onToggleFavorite}
+            className="absolute right-2 top-2"
+          />
+          {offer.activeAdsCount !== null && (
+            <span className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-[11px] font-bold text-white">
+              {formatCount(offer.activeAdsCount)}{" "}
+              <span className="font-medium opacity-80">ADS</span>
+            </span>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5 p-3">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug">{title}</p>
+          <p className="font-mono text-[11px] text-muted-foreground">
+            {new Date(offer.first_seen_at ?? offer.created_at).toLocaleDateString("pt-BR")}
+          </p>
+          <div className="mt-auto flex flex-wrap gap-1">
+            <span className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px]">
+              {NICHE_LABEL[offer.nicheGroup]}
+            </span>
+            <span className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px]">
+              {offer.platform}
+            </span>
+            {offer.tags.slice(0, 1).map((t) => (
+              <span
+                key={t}
+                className="rounded-md border border-border/60 px-1.5 py-0.5 text-[10px]"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <div
       className={cn("group relative flex shrink-0 flex-col", className)}
@@ -52,8 +167,10 @@ export function LibraryOfferCard({
       {rank !== undefined && (
         <span
           aria-hidden
-          className="pointer-events-none absolute -left-3 bottom-16 z-10 select-none text-[88px] font-black leading-none text-transparent sm:text-[104px]"
-          style={{ WebkitTextStroke: "2px var(--primary)" }}
+          className="pointer-events-none absolute -left-1 bottom-6 z-10 select-none text-[96px] font-black leading-none text-transparent sm:text-[120px]"
+          style={{
+            WebkitTextStroke: "2px color-mix(in oklab, var(--muted-foreground) 60%, transparent)",
+          }}
         >
           {rank}
         </span>
@@ -61,70 +178,43 @@ export function LibraryOfferCard({
       <Link
         to="/biblioteca/$id"
         params={{ id: offer.id }}
-        className={cn(
-          "relative block overflow-hidden rounded-xl border border-border/60 bg-card transition duration-300",
-          "hover:-translate-y-1 hover:border-primary/50 hover:shadow-[var(--shadow-elegant)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-          rank !== undefined && "ml-10",
-        )}
+        className={cn("block focus-visible:outline-none", rank !== undefined && "ml-12 sm:ml-16")}
       >
-        <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/60 bg-muted transition duration-300 group-hover:-translate-y-1 group-hover:border-primary/50 group-hover:shadow-[var(--shadow-elegant)]">
           <OfferMedia
             offer={offer}
             active={hover}
-            className="transition duration-500 group-hover:scale-[1.03]"
+            className="transition duration-500 group-hover:scale-[1.04]"
           />
-          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-1 p-2">
-            <span className="inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">
-              <Flame className="h-3 w-3 text-orange-400" /> {offer.score}
-            </span>
-            <ScaleChip offer={offer} />
+          <div className="pointer-events-none absolute left-2 top-2">
+            <StatusBadge offer={offer} />
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap gap-1 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 pt-8">
-            {offer.activeAdsCount !== null && offer.activeAdsCount > 1 && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold text-white"
-                title="Anúncios com este criativo segundo a Biblioteca de Anúncios"
-              >
-                <Layers className="h-3 w-3" /> {formatCount(offer.activeAdsCount)} anúncios
-              </span>
-            )}
-            {offer.daysRunning !== null && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur"
-                title="Dias desde o início da veiculação (Ad Library)"
-              >
-                <Timer className="h-3 w-3" /> {offer.daysRunning}d no ar
-              </span>
-            )}
-            <span className="ml-auto rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
-              {offer.platform}
-            </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent p-3 pt-10">
+            <p className="line-clamp-2 text-sm font-bold leading-snug text-white">{title}</p>
           </div>
         </div>
-        <div className="space-y-1 p-3">
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span>{countryFlag(offer.country)}</span>
-            <span className="truncate">{NICHE_LABEL[offer.nicheGroup]}</span>
-          </p>
-          <p className="line-clamp-1 text-sm font-semibold">{offer.advertiser}</p>
-          <p className="line-clamp-2 min-h-[2.5rem] text-xs leading-snug text-muted-foreground">
-            {offer.headline || offer.copy || "Sem texto capturado"}
-          </p>
-        </div>
+        <p className="mt-1.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+          {offer.activeAdsCount !== null && (
+            <>
+              <span className="font-semibold text-foreground">
+                {formatCount(offer.activeAdsCount)}
+              </span>
+              <span>ads</span>
+              <span>·</span>
+            </>
+          )}
+          <span className="truncate">{NICHE_LABEL[offer.nicheGroup]}</span>
+        </p>
       </Link>
-      <button
-        type="button"
-        onClick={() => onToggleFavorite(offer)}
-        aria-label={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-        aria-pressed={isFavorite}
+      <FavButton
+        offer={offer}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
         className={cn(
-          "absolute right-2 top-10 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:scale-110",
-          isFavorite && "bg-rose-500/90",
+          "absolute right-2 top-2 z-10 transition",
+          !isFavorite && "opacity-0 group-hover:opacity-100 max-sm:opacity-100",
         )}
-        data-testid="favorite-button"
-      >
-        <Heart className={cn("h-4 w-4", isFavorite && "fill-white")} />
-      </button>
+      />
     </div>
   );
 }

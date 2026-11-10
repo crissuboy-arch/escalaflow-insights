@@ -81,7 +81,12 @@ const librarySearch = z.object({
   media: z.coerce.boolean().optional().catch(undefined),
   /** lista completa (inclui ofertas sem criativo) em vez das prateleiras */
   all: z.coerce.boolean().optional().catch(undefined),
+  /** Abas da biblioteca: Início (prateleiras), Explorar (filtros), Minha Lista. */
+  tab: z.enum(["inicio", "explorar", "lista"]).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).optional().catch(undefined),
 });
+
+type LibraryTab = "inicio" | "explorar" | "lista";
 
 export const Route = createFileRoute("/_authenticated/minerar")({
   validateSearch: librarySearch,
@@ -89,7 +94,7 @@ export const Route = createFileRoute("/_authenticated/minerar")({
 });
 
 const PLATFORMS = ["Facebook", "Instagram", "Messenger", "Audience_network", "TikTok", "YouTube"];
-const GRID_PAGE = 24;
+const GRID_PAGE = 25;
 const MEDIA_SYNC_MAX_ROUNDS = 12;
 
 function OfferLibraryPage() {
@@ -105,8 +110,9 @@ function OfferLibraryPage() {
     niche: search.niche ?? "all",
     onlyMedia: search.media ?? false,
   };
-  const setFilters = (patch: Partial<LibraryFilters>) => {
+  const setFilters = (patch: Partial<LibraryFilters>, keepTab = false) => {
     const next = { ...filters, ...patch };
+    // Mexer em pesquisa/filtros leva sempre para Explorar (como na referência).
     navigate({
       to: "/minerar",
       search: {
@@ -117,16 +123,26 @@ function OfferLibraryPage() {
         niche: next.niche !== "all" ? next.niche : undefined,
         media: next.onlyMedia || undefined,
         all: search.all || undefined,
+        tab: keepTab ? search.tab : "explorar",
       },
       replace: true,
     });
+  };
+  const setTab = (tab: LibraryTab) =>
+    navigate({ to: "/minerar", search: { ...search, tab, page: undefined }, replace: false });
+  const setPage = (page: number) => {
+    navigate({
+      to: "/minerar",
+      search: { ...search, page: page > 1 ? page : undefined },
+      replace: true,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const [offers, setOffers] = useState<LibraryOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [queryDraft, setQueryDraft] = useState(filters.q);
-  const [gridLimit, setGridLimit] = useState(GRID_PAGE);
   const [top10Niche, setTop10Niche] = useState<NicheId | "all">("all");
   const [mineOpen, setMineOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -168,13 +184,16 @@ function OfferLibraryPage() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryDraft]);
-  useEffect(() => setGridLimit(GRID_PAGE), [search]);
 
   // ── Guardar mídia pendente no Supabase Storage em segundo plano ──
   const media = useMediaSync(offers, () => load(true));
 
   const filtering = isFiltering(filters) || Boolean(search.all);
+  const tab: LibraryTab = search.tab ?? (filtering ? "explorar" : "inicio");
   const filtered = useMemo(() => applyFilters(offers, filters), [offers, search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / GRID_PAGE));
+  const page = Math.min(search.page ?? 1, totalPages);
 
   const sections = useMemo(() => {
     const withMedia = offers.filter(hasMedia);
@@ -277,8 +296,39 @@ function OfferLibraryPage() {
         </div>
       </div>
 
+      {/* Abas */}
+      <div className="flex items-center gap-1 border-b border-border/60" role="tablist">
+        {(
+          [
+            ["inicio", "Início"],
+            ["explorar", "Explorar"],
+            ["lista", `Minha Lista${actions.favCount ? ` (${actions.favCount})` : ""}`],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition",
+              tab === id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            data-testid={`tab-${id}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* Indicadores reais */}
-      <div className="grid grid-cols-4 gap-1.5 sm:gap-2" data-testid="library-stats">
+      <div
+        className={cn("grid grid-cols-4 gap-1.5 sm:gap-2", tab === "inicio" && "hidden")}
+        data-testid="library-stats"
+      >
         {[
           { label: "Ofertas na biblioteca", value: stats.total },
           { label: "Com mídia guardada", value: stats.durable },
@@ -339,6 +389,7 @@ function OfferLibraryPage() {
           className={cn(
             "grid gap-2 sm:grid-cols-2 md:grid md:grid-cols-[repeat(4,minmax(0,1fr))_auto]",
             !filtersOpen && "hidden md:grid",
+            tab !== "explorar" && "!hidden",
           )}
         >
           <FilterSelect
@@ -428,20 +479,57 @@ function OfferLibraryPage() {
           </p>
           <Button onClick={() => setMineOpen(true)}>Minerar ofertas</Button>
         </div>
-      ) : filtering ? (
+      ) : tab === "lista" ? (
+        <section className="space-y-4" data-testid="library-list">
+          {(() => {
+            const mine = offers.filter((o) => actions.isFavorite(o));
+            return mine.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border/60 py-14 text-center">
+                <Heart className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  A sua lista está vazia. Toque no coração de uma oferta para a guardar aqui.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{mine.length}</span> ofertas na
+                  Minha Lista
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {mine.map((o) => (
+                    <LibraryOfferCard
+                      key={o.id}
+                      offer={o}
+                      variant="grid"
+                      isFavorite
+                      onToggleFavorite={actions.toggleFavorite}
+                    />
+                  ))}
+                </div>
+              </>
+            );
+          })()}
+        </section>
+      ) : tab === "explorar" ? (
         <section className="space-y-4" data-testid="library-results">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{filtered.length}</span> ofertas
-              encontradas
               {filters.niche !== "all" && <> em {NICHE_LABEL[filters.niche as NicheId]}</>}
+              {filtered.length > GRID_PAGE && (
+                <>
+                  {" "}
+                  · Página {page} de {totalPages}
+                </>
+              )}
             </p>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
                 setQueryDraft("");
-                navigate({ to: "/minerar", search: {}, replace: true });
+                navigate({ to: "/minerar", search: { tab: "explorar" }, replace: true });
               }}
             >
               Limpar filtros
@@ -462,23 +550,37 @@ function OfferLibraryPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {filtered.slice(0, gridLimit).map((o) => (
+                {filtered.slice((page - 1) * GRID_PAGE, page * GRID_PAGE).map((o) => (
                   <LibraryOfferCard
                     key={o.id}
                     offer={o}
+                    variant="grid"
                     isFavorite={actions.isFavorite(o)}
                     onToggleFavorite={actions.toggleFavorite}
                   />
                 ))}
               </div>
-              {filtered.length > gridLimit && (
-                <div className="flex justify-center">
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2" data-testid="pagination">
                   <Button
                     variant="outline"
-                    onClick={() => setGridLimit((n) => n + GRID_PAGE)}
-                    data-testid="load-more"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage(page - 1)}
                   >
-                    Carregar mais ({filtered.length - gridLimit} restantes)
+                    Anterior
+                  </Button>
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage(page + 1)}
+                    data-testid="next-page"
+                  >
+                    Próxima
                   </Button>
                 </div>
               )}

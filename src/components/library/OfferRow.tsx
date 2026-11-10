@@ -108,7 +108,7 @@ export function OfferRow({
             onToggleFavorite={onToggleFavorite}
             className={cn(
               "snap-start",
-              ranked ? "w-[190px] sm:w-[220px]" : "w-[160px] sm:w-[200px]",
+              ranked ? "w-[200px] sm:w-[260px]" : "w-[160px] sm:w-[210px]",
             )}
           />
         ))}

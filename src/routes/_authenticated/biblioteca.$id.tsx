@@ -7,6 +7,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  BarChart3,
+  Info,
+  RefreshCw,
+  Share2,
   BookmarkCheck,
   Bookmark,
   CalendarClock,
@@ -35,7 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OfferMedia } from "@/components/library/OfferMedia";
 import { OfferRow } from "@/components/library/OfferRow";
-import { ScaleChip } from "@/components/library/LibraryOfferCard";
+import { ScaleChip, offerStatus } from "@/components/library/LibraryOfferCard";
 import { GenerateOfferModal } from "@/components/minerar/GenerateOfferModal";
 import { TransformToProjectButton } from "@/components/TransformToProjectButton";
 import { useOfferActions, offerToPersisted } from "@/lib/library/use-offer-actions";
@@ -77,6 +81,7 @@ function OfferDetail() {
   const [notFound, setNotFound] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [modeling, setModeling] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -103,7 +108,7 @@ function OfferDetail() {
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, reloadKey]);
 
   if (loading) {
     return (
@@ -218,267 +223,312 @@ function OfferDetail() {
     }
   };
 
-  const info: { icon: typeof Tag; label: string; value: string | null }[] = [
-    { icon: Tag, label: "Nicho (detectado)", value: NICHE_LABEL[o.nicheGroup] },
+  const typeLabel: Record<string, string> = {
+    anuncio: "Anúncio",
+    "pagina-venda": "Página de vendas",
+    vsl: "VSL",
+    checkout: "Checkout",
+    ecommerce: "E-commerce",
+    conteudo: "Conteúdo",
+  };
+  const informacoes: { label: string; value: string | null }[] = [
+    { label: "Tipo", value: o.offerType ? (typeLabel[o.offerType] ?? o.offerType) : null },
+    { label: "Nicho", value: NICHE_LABEL[o.nicheGroup] },
+    { label: "Idioma", value: o.language ? LANGUAGE_LABELS[o.language] : null },
     {
-      icon: Globe2,
-      label: "País",
-      value: `${countryFlag(o.country)} ${COUNTRY_LABELS[o.country] ?? o.country}`,
-    },
-    {
-      icon: Languages,
-      label: "Idioma (detectado)",
-      value: o.language ? LANGUAGE_LABELS[o.language] : null,
-    },
-    {
-      icon: MonitorSmartphone,
-      label: "Plataformas",
+      label: "Plataforma",
       value: o.publisherPlatforms.length
         ? o.publisherPlatforms
             .map((p) => p.charAt(0) + p.slice(1).toLowerCase().replace("_", " "))
             .join(", ")
         : o.platform,
     },
+    { label: "País", value: `${countryFlag(o.country)} ${COUNTRY_LABELS[o.country] ?? o.country}` },
+    { label: "Ads", value: o.activeAdsCount !== null ? formatCount(o.activeAdsCount) : null },
     {
-      icon: Layers,
-      label: "Anúncios com este criativo",
-      value: o.activeAdsCount !== null ? formatCount(o.activeAdsCount) : null,
-    },
-    {
-      icon: ShieldCheck,
-      label: "Status na Ad Library",
-      value: o.isActive === null ? null : o.isActive ? "Ativo" : "Inativo",
-    },
-    {
-      icon: Timer,
-      label: "Tempo no ar",
-      value: o.daysRunning !== null ? `${o.daysRunning} dias` : null,
-    },
-    { icon: CalendarClock, label: "Início da veiculação", value: fmtDate(o.start_date) },
-    {
-      icon: Eye,
-      label: "Descoberta no ScalaFlow",
-      value: fmtDate(o.first_seen_at ?? o.created_at),
-    },
-    { icon: Eye, label: "Vista pela última vez", value: fmtDate(o.last_seen_at) },
-    {
-      icon: Users,
-      label: "Seguidores da página",
-      value: o.pageLikes !== null ? formatCount(o.pageLikes) : null,
-    },
-    {
-      icon: Link2,
-      label: "Rede / checkout",
+      label: "Rede",
       value: o.offer_network && o.offer_network !== "desconhecido" ? o.offer_network : null,
     },
   ];
+  const status = offerStatus(o);
+  const estatisticas: { label: string; value: string | null }[] = [
+    { label: "Dias ativos", value: o.daysRunning !== null ? `${o.daysRunning} dias` : null },
+    {
+      label: "Status",
+      value: status?.label ?? (o.isActive === null ? null : o.isActive ? "Ativo" : "Inativo"),
+    },
+    { label: "Início da veiculação", value: fmtDate(o.start_date) },
+    { label: "Subiu no ScalaFlow em", value: fmtDate(o.first_seen_at ?? o.created_at) },
+    { label: "Vista pela última vez", value: fmtDate(o.last_seen_at) },
+    {
+      label: "Seguidores da página",
+      value: o.pageLikes !== null ? formatCount(o.pageLikes) : null,
+    },
+  ];
+  const title = o.headline ? `${o.headline} - ${o.advertiser}` : o.advertiser;
+
+  const onShare = async () => {
+    const url = window.location.href;
+    const ok = await copyToClipboard(url);
+    toast[ok ? "success" : "error"](ok ? "Link da oferta copiado" : "Não foi possível copiar");
+  };
 
   return (
-    <div className="space-y-8" data-testid="offer-detail">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="space-y-6" data-testid="offer-detail">
+      {/* Cabeçalho: Voltar · título · Atualizar / Favoritar / Compartilhar */}
+      <div className="space-y-3">
         <Button
           variant="ghost"
           size="sm"
+          className="-ml-2"
           onClick={() =>
             window.history.length > 1 ? window.history.back() : navigate({ to: "/minerar" })
           }
         >
-          <ArrowLeft className="mr-1.5 h-4 w-4" /> Biblioteca
+          <ArrowLeft className="mr-1.5 h-4 w-4" /> Voltar
         </Button>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant={fav ? "default" : "outline"}
-            size="sm"
-            onClick={() => actions.toggleFavorite(o)}
-            aria-pressed={fav}
-            className={cn(fav && "bg-rose-500 text-white hover:bg-rose-600")}
-            data-testid="detail-favorite"
-          >
-            <Heart className={cn("mr-1.5 h-4 w-4", fav && "fill-white")} />
-            {fav ? "Favoritada" : "Favoritar"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => actions.toggleSaved(o)}
-            disabled={actions.busy === o.key}
-            data-testid="detail-save"
-          >
-            {saved ? (
-              <BookmarkCheck className="mr-1.5 h-4 w-4 text-primary" />
-            ) : (
-              <Bookmark className="mr-1.5 h-4 w-4" />
-            )}
-            {saved ? "Salva" : "Salvar"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-        {/* Criativo */}
-        <div className="space-y-3">
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-black">
-            <div className="aspect-[4/5] w-full">
-              <OfferMedia offer={o} mode="full" />
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-            {o.mediaDurable ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                <ShieldCheck className="h-3 w-3" /> Mídia guardada permanentemente
-              </span>
-            ) : o.image || o.video ? (
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-600">
-                Mídia ainda no link original (temporário)
-              </span>
-            ) : null}
-            {(o.image || o.video) && (
-              <button
-                className="inline-flex items-center gap-1 hover:text-foreground"
-                onClick={onDownload}
-              >
-                <Download className="h-3 w-3" /> Baixar criativo
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Informações */}
-        <div className="min-w-0 space-y-5">
-          <div className="space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <ScaleChip offer={o} />
               <Badge variant="outline" className="rounded-full">
                 <Flame className="mr-1 h-3 w-3 text-orange-500" /> Score {o.score}
               </Badge>
-              {o.offerType && (
-                <Badge variant="secondary" className="rounded-full capitalize">
-                  {o.offerType.replace("-", " ")}
-                </Badge>
-              )}
             </div>
-            <p className="text-sm font-semibold text-primary">{o.advertiser}</p>
             <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">
-              {o.headline || o.advertiser}
+              {title}
             </h1>
             {o.promise && <p className="text-sm text-muted-foreground">Promessa: {o.promise}</p>}
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReloadKey((k) => k + 1)}
+              data-testid="detail-refresh"
+            >
+              <RefreshCw className="mr-1.5 h-4 w-4" /> Atualizar
+            </Button>
+            <Button
+              variant={fav ? "default" : "outline"}
+              size="sm"
+              onClick={() => actions.toggleFavorite(o)}
+              aria-pressed={fav}
+              className={cn(fav && "bg-rose-500 text-white hover:bg-rose-600")}
+              data-testid="detail-favorite"
+            >
+              <Heart className={cn("mr-1.5 h-4 w-4", fav && "fill-white")} />
+              {fav ? "Na Minha Lista" : "Favoritar"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={onShare} data-testid="detail-share">
+              <Share2 className="mr-1.5 h-4 w-4" /> Compartilhar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => actions.toggleSaved(o)}
+              disabled={actions.busy === o.key}
+              data-testid="detail-save"
+            >
+              {saved ? (
+                <BookmarkCheck className="mr-1.5 h-4 w-4 text-primary" />
+              ) : (
+                <Bookmark className="mr-1.5 h-4 w-4" />
+              )}
+              {saved ? "Salva" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="detail-info">
-            {info
-              .filter((i) => i.value)
-              .map((i) => (
-                <div key={i.label} className="rounded-xl border border-border/60 bg-card px-3 py-2">
-                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <i.icon className="h-3.5 w-3.5" /> {i.label}
-                  </p>
-                  <p className="truncate text-sm font-semibold">{i.value}</p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* Coluna principal */}
+        <div className="min-w-0 space-y-5">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,380px)_1fr]">
+            <div className="space-y-2">
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-black">
+                <div className="aspect-[4/5] w-full">
+                  <OfferMedia offer={o} mode="full" />
                 </div>
-              ))}
-          </div>
-
-          {o.copy && (
-            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Copy do anúncio</h2>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    const ok = await copyToClipboard(o.copy);
-                    toast[ok ? "success" : "error"](
-                      ok ? "Copy copiada" : "Não foi possível copiar",
-                    );
-                  }}
-                >
-                  <Copy className="mr-1 h-3.5 w-3.5" /> Copiar
-                </Button>
               </div>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {o.copy}
-              </p>
-              {o.cta && (
-                <p className="text-xs">
-                  CTA: <span className="font-semibold">{o.cta}</span>
-                </p>
-              )}
-            </div>
-          )}
-
-          {o.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {o.tags.map((t) => (
-                <Link
-                  key={t}
-                  to="/minerar"
-                  search={{ q: t }}
-                  className="rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] hover:border-primary/50 hover:text-primary"
-                >
-                  #{t}
-                </Link>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold">Links importantes</h2>
-            <div className="flex flex-wrap gap-2">
-              {adLibraryUrl && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openExternal(adLibraryUrl)}
-                  data-testid="open-ad-library"
-                >
-                  <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Ver na Biblioteca de Anúncios
-                </Button>
-              )}
-              {o.landing_page_url && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => openExternal(o.landing_page_url)}
-                >
-                  <Globe2 className="mr-1.5 h-3.5 w-3.5" /> Página de destino
-                </Button>
-              )}
-              {o.ad_url && o.ad_url !== adLibraryUrl && (
-                <Button size="sm" variant="outline" onClick={() => openExternal(o.ad_url)}>
-                  <Link2 className="mr-1.5 h-3.5 w-3.5" /> Link do anúncio
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold">Usar esta oferta</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Button
-                onClick={onAnalyze}
-                className="text-primary-foreground"
-                style={{ background: "var(--gradient-primary)" }}
-              >
-                <Sparkles className="mr-1.5 h-4 w-4" /> Analisar com IA
-              </Button>
-              <Button
-                onClick={() => setGenerateOpen(true)}
-                className="text-white"
-                style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}
-              >
-                <Wand2 className="mr-1.5 h-4 w-4" /> Gerar oferta parecida
-              </Button>
-              <Button variant="secondary" onClick={onModel} disabled={modeling}>
-                {modeling ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                ) : (
-                  <Rocket className="mr-1.5 h-4 w-4" />
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                {o.mediaDurable ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                    <ShieldCheck className="h-3 w-3" /> Mídia guardada permanentemente
+                  </span>
+                ) : o.image || o.video ? (
+                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-semibold text-amber-600">
+                    Mídia ainda no link original (temporário)
+                  </span>
+                ) : null}
+                {(o.image || o.video) && (
+                  <button
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    onClick={onDownload}
+                  >
+                    <Download className="h-3 w-3" /> Baixar criativo
+                  </button>
                 )}
-                {modeling ? "Modelando…" : "Modelar estratégia"}
-              </Button>
-              <TransformToProjectButton adLibraryId={o.ad_library_id} adUrl={o.ad_url} />
+              </div>
+            </div>
+
+            <div className="min-w-0 space-y-4">
+              {o.copy && (
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">Copy do anúncio</h2>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={async () => {
+                        const ok = await copyToClipboard(o.copy);
+                        toast[ok ? "success" : "error"](
+                          ok ? "Copy copiada" : "Não foi possível copiar",
+                        );
+                      }}
+                    >
+                      <Copy className="mr-1 h-3.5 w-3.5" /> Copiar
+                    </Button>
+                  </div>
+                  <p className="max-h-[320px] overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                    {o.copy}
+                  </p>
+                  {o.cta && (
+                    <p className="text-xs">
+                      CTA: <span className="font-semibold">{o.cta}</span>
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4">
+                <h2 className="text-sm font-semibold">Links importantes</h2>
+                <div className="flex flex-wrap gap-2">
+                  {adLibraryUrl && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openExternal(adLibraryUrl)}
+                      data-testid="open-ad-library"
+                    >
+                      <ExternalLink className="mr-1.5 h-3.5 w-3.5" /> Biblioteca de Anúncios
+                    </Button>
+                  )}
+                  {o.landing_page_url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openExternal(o.landing_page_url)}
+                    >
+                      <Globe2 className="mr-1.5 h-3.5 w-3.5" /> Landing Page
+                    </Button>
+                  )}
+                  {o.ad_url && o.ad_url !== adLibraryUrl && (
+                    <Button size="sm" variant="outline" onClick={() => openExternal(o.ad_url)}>
+                      <Link2 className="mr-1.5 h-3.5 w-3.5" /> Link do anúncio
+                    </Button>
+                  )}
+                  {!adLibraryUrl && !o.landing_page_url && !o.ad_url && (
+                    <p className="text-xs text-muted-foreground">
+                      Nenhum link foi capturado nesta coleta.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4">
+                <h2 className="text-sm font-semibold">Usar esta oferta</h2>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    onClick={() => setGenerateOpen(true)}
+                    className="text-white"
+                    style={{ background: "linear-gradient(135deg, #7c3aed, #2563eb)" }}
+                  >
+                    <Wand2 className="mr-1.5 h-4 w-4" /> Gerar oferta parecida
+                  </Button>
+                  <Button variant="secondary" onClick={onModel} disabled={modeling}>
+                    {modeling ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Rocket className="mr-1.5 h-4 w-4" />
+                    )}
+                    {modeling ? "Modelando…" : "Modelar estratégia"}
+                  </Button>
+                  <div className="sm:col-span-2">
+                    <TransformToProjectButton adLibraryId={o.ad_library_id} adUrl={o.ad_url} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Coluna lateral: Informações · Tags · Estatísticas · IA */}
+        <aside className="space-y-4">
+          <div className="rounded-xl border border-border/60 bg-card p-4" data-testid="detail-info">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <Info className="h-4 w-4" /> Informações
+            </h2>
+            <dl className="space-y-2 text-sm">
+              {informacoes
+                .filter((i) => i.value)
+                .map((i) => (
+                  <div key={i.label} className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">{i.label}:</dt>
+                    <dd className="text-right font-semibold capitalize">{i.value}</dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+
+          {o.tags.length > 0 && (
+            <div className="rounded-xl border border-border/60 bg-card p-4">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <Tag className="h-4 w-4" /> Tags
+              </h2>
+              <div className="flex flex-wrap gap-1.5">
+                {o.tags.map((t) => (
+                  <Link
+                    key={t}
+                    to="/minerar"
+                    search={{ q: t, tab: "explorar" }}
+                    className="rounded-md border border-border/60 px-2 py-0.5 text-xs hover:border-primary/50 hover:text-primary"
+                  >
+                    {t}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div
+            className="rounded-xl border border-border/60 bg-card p-4"
+            data-testid="detail-stats"
+          >
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <BarChart3 className="h-4 w-4" /> Estatísticas
+            </h2>
+            <dl className="space-y-2 text-sm">
+              {estatisticas
+                .filter((i) => i.value)
+                .map((i) => (
+                  <div key={i.label} className="flex justify-between gap-3">
+                    <dt className="text-muted-foreground">{i.label}:</dt>
+                    <dd className="text-right font-semibold">{i.value}</dd>
+                  </div>
+                ))}
+            </dl>
+          </div>
+
+          <Button
+            onClick={onAnalyze}
+            className="w-full text-primary-foreground"
+            style={{ background: "var(--gradient-primary)" }}
+            data-testid="detail-ask-ai"
+          >
+            <Sparkles className="mr-1.5 h-4 w-4" /> Perguntar à IA
+          </Button>
+        </aside>
       </div>
 
       {related.length > 0 && (
