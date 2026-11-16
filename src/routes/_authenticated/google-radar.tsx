@@ -327,7 +327,9 @@ export default function GoogleRadarPage() {
       if (msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("demorou")) {
         setError("A busca demorou demais. Tente outro termo ou país.");
       } else if (msg.includes("404") || msg.includes("actor")) {
-        setError("Actor do Google Trends não encontrado. Verifique APIFY_GOOGLE_TRENDS_ACTOR no .env.");
+        setError(
+          "Coletor do Google Trends não encontrado. Verifique a configuração da fonte automática no servidor.",
+        );
       } else {
         setError(msg || "Erro ao buscar tendências.");
       }

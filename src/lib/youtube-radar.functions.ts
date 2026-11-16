@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runYouTubeRadarSkill } from "@/skills/youtube-radar.skill";
+import { publicProviderError } from "@/lib/integrations/provider-error";
 import { generateAIJson } from "@/lib/aiService";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,15 +56,15 @@ export async function runYouTubeMining(
 
     if (!result.ok) {
       // Return warning instead of throwing so the frontend keeps showing saved videos.
-      const actor = process.env.APIFY_YOUTUBE_ACTOR?.trim() ?? "streamers~youtube-scraper";
+      // Mensagens para a UI: sem nome do fornecedor/actor/variáveis.
       const raw = result.error ?? "YouTube skill failed";
       const friendly = raw.includes("403")
-        ? `YouTube Radar: actor "${actor}" desativado ou sem permissão (403). Troque APIFY_YOUTUBE_ACTOR no .env.`
+        ? "YouTube Radar: coletor desativado ou sem permissão (403). Verifique a configuração do servidor."
         : raw.includes("404")
-        ? `YouTube Radar: actor "${actor}" não encontrado (404). Verifique APIFY_YOUTUBE_ACTOR no .env.`
+        ? "YouTube Radar: coletor não encontrado (404). Verifique a configuração do servidor."
         : raw.includes("401")
-        ? `YouTube Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actor}`
-        : raw;
+        ? "YouTube Radar: credencial da fonte automática inválida (401). Verifique a configuração do servidor."
+        : publicProviderError(raw);
       console.warn("[youtube-radar] mine failed:", friendly);
       return { inserted: 0, skipped: 0, warning: friendly };
     }

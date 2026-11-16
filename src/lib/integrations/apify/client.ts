@@ -1,4 +1,5 @@
 // src/lib/integrations/apify/client.ts
+import { extractProviderItemError, publicProviderError } from "@/lib/integrations/provider-error";
 
 const BASE = "https://api.apify.com/v2";
 const MAX_TIMEOUT_SEC = 120;
@@ -11,7 +12,8 @@ function normalizeActorId(id: string): string {
 
 function getToken(): string {
   const token = process.env.APIFY_TOKEN;
-  if (!token) throw new Error("APIFY_TOKEN não configurado.");
+  if (!token)
+    throw new Error("Fonte automática não configurada no servidor (token do coletor ausente).");
   return token;
 }
 
@@ -31,9 +33,16 @@ export async function runApifyActor(actorId: string, input: any) {
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    if (response.status === 403) throw new Error(`Apify: actor "${actorId}" desativado ou sem permissão (403).`);
-    if (response.status === 401) throw new Error(`Apify: token inválido (401). Verifique APIFY_TOKEN.`);
-    throw new Error(`Apify Actor falhou (${response.status}): ${body.slice(0, 200)}`);
+    console.error(
+      `[apify] ✗ runApifyActor actor=${safeId} status=${response.status}: ${body.slice(0, 300)}`,
+    );
+    if (response.status === 403)
+      throw new Error("Fonte automática: coletor desativado ou sem permissão (403).");
+    if (response.status === 401)
+      throw new Error(
+        "Fonte automática: credencial inválida (401). Verifique a configuração do servidor.",
+      );
+    throw new Error(`Fonte automática falhou (${response.status}).`);
   }
   return await response.json();
 }
@@ -72,22 +81,52 @@ export async function runSyncGetDatasetItems<T = any>(
     const body = await response.text().catch(() => "");
     console.error(`[apify] ✗ status=${response.status} after ${elapsed}s`);
     console.error(`[apify] ✗ response body: ${body.slice(0, 500)}`);
+    // Mensagens para a UI: sem nome do fornecedor/actor/variáveis (o detalhe
+    // técnico completo fica no log acima). Os radares que procuram "401"/
+    // "403"/"404" na mensagem continuam a funcionar.
     if (response.status === 401) {
-      throw new Error(`Apify: token inválido ou expirado (401). Verifique APIFY_TOKEN no .env.`);
+      throw new Error(
+        "Fonte automática: credencial inválida ou expirada (401). Verifique a configuração do servidor.",
+      );
+    }
+    if (response.status === 402) {
+      throw new Error("Fonte automática sem créditos disponíveis (402).");
     }
     if (response.status === 403) {
-      throw new Error(`Apify: actor desativado ou sem permissão (403). Verifique o actor "${safeId}" no .env.`);
+      throw new Error("Fonte automática: coletor desativado ou sem permissão (403).");
     }
     if (response.status === 404) {
-      throw new Error(`Apify: actor "${safeId}" não encontrado (404). Verifique o nome no .env.`);
+      throw new Error(
+        "Fonte automática: coletor não encontrado (404). Verifique a configuração do servidor.",
+      );
     }
-    throw new Error(
-      `Apify sync run failed (${response.status}) after ${elapsed}s: ${body.slice(0, 300)}`,
-    );
+    if (response.status === 408 || response.status === 504) {
+      throw new Error(
+        `A fonte automática não terminou a coleta a tempo (${elapsed}s). Tente com menos resultados.`,
+      );
+    }
+    throw new Error(`Fonte automática falhou (${response.status}) após ${elapsed}s.`);
   }
 
-  const data = (await response.json()) as unknown;
-  const items = Array.isArray(data) ? data : [];
+  const data = (await response.json().catch(() => null)) as unknown;
+  if (!Array.isArray(data)) {
+    // Resposta inesperada (objeto de erro em vez de lista) — nunca tratar
+    // como "0 resultados" silencioso.
+    const detail =
+      data && typeof data === "object" && "error" in data
+        ? JSON.stringify((data as { error: unknown }).error).slice(0, 300)
+        : typeof data;
+    console.error(`[apify] ✗ resposta não é uma lista: ${detail}`);
+    throw new Error("A fonte automática devolveu uma resposta inválida.");
+  }
+  const items = data;
+  const itemError = extractProviderItemError(items);
+  if (itemError) {
+    console.error(`[apify] ✗ dataset só com erro: ${itemError.slice(0, 300)}`);
+    throw new Error(
+      `A fonte automática recusou o pedido: ${publicProviderError(itemError).slice(0, 200)}`,
+    );
+  }
   console.log(`[apify] ✓ ${items.length} items in ${elapsed}s`);
   return items;
 }

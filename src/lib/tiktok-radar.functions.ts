@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
+import { publicProviderError } from "@/lib/integrations/provider-error";
 import { generateAIJson } from "@/lib/aiService";
 import { buildHandoffFromTikTokEscalate } from "@/lib/cris-os/contract";
 import { handoffToCrisOs } from "@/lib/cris-os/service";
@@ -253,10 +254,11 @@ export async function runTikTokHashtagMining(
     } catch (err: any) {
       const msg: string = err?.message ?? "";
       console.error("[tiktok-radar] Apify error:", msg);
-      if (msg.includes("403")) throw new Error(`TikTok Radar: actor "${actorId}" desativado ou sem permissão (403). Troque APIFY_TIKTOK_ACTOR no .env.`);
-      if (msg.includes("404")) throw new Error(`TikTok Radar: actor "${actorId}" não encontrado (404). Verifique APIFY_TIKTOK_ACTOR no .env.`);
-      if (msg.includes("401")) throw new Error(`TikTok Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actorId}`);
-      throw new Error(`TikTok Radar: ${msg}`);
+      // Mensagens para a UI: sem nome do fornecedor/actor/variáveis.
+      if (msg.includes("403")) throw new Error("TikTok Radar: coletor desativado ou sem permissão (403). Verifique a configuração do servidor.");
+      if (msg.includes("404")) throw new Error("TikTok Radar: coletor não encontrado (404). Verifique a configuração do servidor.");
+      if (msg.includes("401")) throw new Error("TikTok Radar: credencial da fonte automática inválida (401). Verifique a configuração do servidor.");
+      throw new Error(`TikTok Radar: ${publicProviderError(msg)}`);
     }
 
     if (!raw.length) return { inserted: 0, skipped: 0 };
