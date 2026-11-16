@@ -49,28 +49,58 @@ export const EXT_BY_CONTENT_TYPE: Record<string, string> = {
  *  one-time check before following redirects is not enough (see
  *  src/lib/net/ssrf-guard.ts). These URLs come from Apify/Facebook's own CDN
  *  in practice, but a corrupted/unexpected dataset item is still guarded. */
-async function guardedFetch(rawUrl: string, timeoutMs: number): Promise<Response> {
+async function guardedFetch(rawUrl: string, signal: AbortSignal): Promise<Response> {
   let currentUrl = rawUrl;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      const u = new URL(currentUrl);
-      if (await resolvesToPrivateIp(u.hostname)) {
-        throw new Error(`Bloqueado pelo SSRF guard: ${u.hostname}`);
-      }
-      const res = await fetch(currentUrl, { redirect: "manual", signal: controller.signal });
-      const location = res.headers.get("location");
-      if (res.status >= 300 && res.status < 400 && location) {
-        currentUrl = new URL(location, currentUrl).toString();
-        continue;
-      }
-      return res;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const u = new URL(currentUrl);
+    if (await resolvesToPrivateIp(u.hostname)) {
+      throw new Error(`Bloqueado pelo SSRF guard: ${u.hostname}`);
     }
-    throw new Error("Demasiados redirecionamentos.");
-  } finally {
-    clearTimeout(timer);
+    const res = await fetch(currentUrl, { redirect: "manual", signal });
+    const location = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && location) {
+      currentUrl = new URL(location, currentUrl).toString();
+      continue;
+    }
+    return res;
   }
+  throw new Error("Demasiados redirecionamentos.");
+}
+
+/** Lê o corpo com limite de bytes: aborta assim que passa de maxBytes, em vez
+ *  de descarregar o vídeo inteiro para só depois o rejeitar. */
+async function readCapped(
+  res: Response,
+  maxBytes: number,
+  controller: AbortController,
+): Promise<Uint8Array | "too_large"> {
+  const body = (res as { body?: ReadableStream<Uint8Array> | null }).body;
+  if (!body || typeof body.getReader !== "function") {
+    const buf = await res.arrayBuffer();
+    return buf.byteLength > maxBytes ? "too_large" : new Uint8Array(buf);
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      controller.abort();
+      await reader.cancel().catch(() => {});
+      return "too_large";
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.byteLength;
+  }
+  return out;
 }
 
 export interface DownloadResult {
@@ -89,28 +119,38 @@ export async function downloadCapped(
   timeoutMs: number,
   maxBytes: number,
 ): Promise<DownloadResult | DownloadFailure> {
+  // O temporizador cobre o pedido E a leitura do corpo. Antes era limpo assim
+  // que chegavam os cabeçalhos, e um vídeo lento podia ficar a descarregar
+  // até a função serverless ser morta — sem nunca gravar o resultado, o
+  // anúncio ficava em pending_video para sempre.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await guardedFetch(url, timeoutMs);
+    const res = await guardedFetch(url, controller.signal);
     if (!res.ok) {
       return { ok: false, reason: "expired", detail: `HTTP ${res.status}` };
     }
     const contentLength = res.headers.get("content-length");
     if (contentLength && Number(contentLength) > maxBytes) {
+      controller.abort();
       return { ok: false, reason: "too_large", detail: `content-length=${contentLength}` };
     }
-    const buf = await res.arrayBuffer();
-    if (buf.byteLength > maxBytes) {
-      return { ok: false, reason: "too_large", detail: `downloaded=${buf.byteLength}` };
+    const bytes = await readCapped(res, maxBytes, controller);
+    if (bytes === "too_large") {
+      return { ok: false, reason: "too_large", detail: `downloaded>${maxBytes}` };
     }
     const contentType =
       res.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
-    return { ok: true, bytes: new Uint8Array(buf), contentType };
+    return { ok: true, bytes, contentType };
   } catch (e) {
+    const aborted = controller.signal.aborted;
     return {
       ok: false,
       reason: "network_error",
-      detail: e instanceof Error ? e.message : String(e),
+      detail: aborted ? `timeout após ${timeoutMs}ms` : e instanceof Error ? e.message : String(e),
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

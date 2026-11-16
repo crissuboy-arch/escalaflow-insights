@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ImageOff, Play } from "lucide-react";
+import { ExternalLink, ImageOff, Play } from "lucide-react";
 import type { LibraryOffer } from "@/lib/library/offers";
+import { resolveAdLink } from "@/lib/links/social-urls";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,6 +43,12 @@ export function OfferMedia({
   }, [active, mode]);
 
   if (!showVideo && !showImage) {
+    const expired = imgFailed || videoFailed || offer.media_status === "expired";
+    // Link real do anúncio (Biblioteca de Anúncios por ID) — nunca um perfil
+    // adivinhado. Em cartões a mídia já está dentro de um <Link> para a
+    // página da oferta (âncoras aninhadas são inválidas), por isso o link só
+    // aparece no modo "full"; no cartão fica a indicação.
+    const adHref = resolveAdLink(offer);
     return (
       <div
         className={cn(
@@ -52,10 +59,23 @@ export function OfferMedia({
       >
         <ImageOff className="h-7 w-7 opacity-50" />
         <span className="text-xs font-medium">
-          {imgFailed || videoFailed || offer.media_status === "expired"
+          {expired
             ? "Mídia original expirou antes de ser guardada"
             : "Oferta sem criativo capturado"}
         </span>
+        {adHref && mode === "full" ? (
+          <a
+            href={adHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            data-testid="offer-media-original-link"
+          >
+            Ver anúncio original <ExternalLink className="h-3 w-3" />
+          </a>
+        ) : adHref ? (
+          <span className="text-[10px] opacity-80">Abra a oferta para ver o anúncio original</span>
+        ) : null}
       </div>
     );
   }

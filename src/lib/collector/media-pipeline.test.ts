@@ -134,9 +134,153 @@ describe("processAdMedia", () => {
       },
       { includeVideo: true },
     );
-    const patch = updates[0].patch;
+    // updates[0] é a "reserva" da tentativa (antes do download); o resultado é o último.
+    const patch = updates[updates.length - 1].patch;
     expect(patch).not.toHaveProperty("image_storage_path");
     expect(patch).not.toHaveProperty("video_storage_path");
     expect(patch.media_status).toBe("image_copied");
+  });
+
+  it("reserva a tentativa ANTES de descarregar o vídeo (função morta a meio não fica no topo da fila)", async () => {
+    let claimedBeforeFetch = false;
+    fetchMock.mockImplementation(async () => {
+      claimedBeforeFetch = updates.some(
+        (u) => u.id === "ad2" && u.patch.media_attempts === 1 && "media_last_attempt_at" in u.patch,
+      );
+      return res("video-bytes", "video/mp4");
+    });
+    const r = await mod.processAdMedia(
+      {
+        id: "ad2",
+        image_url: null,
+        video_url: "https://cdn.example/v2.mp4",
+        image_storage_path: "media/img.jpg",
+        video_storage_path: null,
+        media_status: "pending_video",
+        media_attempts: 0,
+      },
+      { includeVideo: true },
+    );
+    expect(claimedBeforeFetch).toBe(true);
+    expect(r.status).toBe("both_copied");
+    expect(updates[updates.length - 1].patch.video_storage_path).toMatch(/^media\/.+\.mp4$/);
+  });
+
+  it("desiste do vídeo após MAX_ATTEMPTS: sai de pending_video sem novo download", async () => {
+    const r = await mod.processAdMedia(
+      {
+        id: "ad3",
+        image_url: null,
+        video_url: "https://cdn.example/stuck.mp4",
+        image_storage_path: "media/img.jpg",
+        video_storage_path: null,
+        media_status: "pending_video",
+        media_attempts: mod.MAX_ATTEMPTS,
+      },
+      { includeVideo: true },
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.status).toBe("image_copied");
+  });
+
+  it("sem tempo no orçamento, adia o vídeo sem gastar tentativa", async () => {
+    const r = await mod.processAdMedia(
+      {
+        id: "ad4",
+        image_url: null,
+        video_url: "https://cdn.example/v4.mp4",
+        image_storage_path: "media/img.jpg",
+        video_storage_path: null,
+        media_status: "pending_video",
+        media_attempts: 1,
+      },
+      { includeVideo: true, deadline: Date.now() + 500 },
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(r.status).toBe("pending_video");
+  });
+
+  it("HD grande demais → copia a versão SD do mesmo vídeo", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes("hd")) {
+        return {
+          ok: true,
+          status: 200,
+          headers: {
+            get: (k: string) =>
+              k.toLowerCase() === "content-length"
+                ? String(500 * 1024 * 1024)
+                : k.toLowerCase() === "content-type"
+                  ? "video/mp4"
+                  : null,
+          },
+          arrayBuffer: async () => new ArrayBuffer(1),
+        } as unknown as Response;
+      }
+      return res("sd-bytes", "video/mp4");
+    });
+    const r = await mod.processAdMedia(
+      {
+        id: "ad5",
+        image_url: null,
+        video_url: "https://cdn.example/hd.mp4",
+        video_sd_url: "https://cdn.example/sd.mp4",
+        image_storage_path: "media/img.jpg",
+        video_storage_path: null,
+        media_status: "pending_video",
+        media_attempts: 0,
+      },
+      { includeVideo: true },
+    );
+    expect(r.videoCopied).toBe(true);
+    expect(r.status).toBe("both_copied");
+  });
+});
+
+describe("downloadCapped (timeout cobre a leitura do corpo)", () => {
+  it("aborta um corpo que nunca termina e devolve network_error (transitório)", async () => {
+    const { downloadCapped } = await import("./media-persist");
+    fetchMock.mockImplementation(async (_url: string, init: { signal: AbortSignal }) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1, 2, 3]));
+          init.signal.addEventListener("abort", () =>
+            controller.error(new DOMException("aborted", "AbortError")),
+          );
+          // nunca fecha — simula um vídeo lento
+        },
+      });
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (k: string) => (k.toLowerCase() === "content-type" ? "video/mp4" : null) },
+        body,
+      } as unknown as Response;
+    });
+    const r = await downloadCapped("https://cdn.example/slow.mp4", 50, 1024 * 1024);
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.reason).toBe("network_error");
+      expect(r.detail).toMatch(/timeout/);
+    }
+  });
+
+  it("para de ler assim que passa do limite de bytes (sem content-length)", async () => {
+    const { downloadCapped } = await import("./media-persist");
+    fetchMock.mockImplementation(async () => {
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          controller.enqueue(new Uint8Array(1024));
+        },
+      });
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (k: string) => (k.toLowerCase() === "content-type" ? "video/mp4" : null) },
+        body,
+      } as unknown as Response;
+    });
+    const r = await downloadCapped("https://cdn.example/huge.mp4", 5_000, 4096);
+    expect(r).toMatchObject({ ok: false, reason: "too_large" });
   });
 });
