@@ -10,9 +10,13 @@
 import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { checkFacebookUrl } from "@/lib/facebook-viral/link-detector";
+import { checkFacebookUrl, checkReelUrl } from "@/lib/facebook-viral/link-detector";
+import { facebookUrlVariants } from "@/lib/links/social-urls";
 
 // ── Páginas ──────────────────────────────────────────────────────────────
+
+const NOT_A_PAGE_ERROR =
+  "Este link é de um Reel/publicação, não de uma página. Use o link da página (ex.: facebook.com/nomedapagina).";
 
 const SaveViralPageInput = z.object({
   pageUrl: z.string().min(1),
@@ -58,6 +62,9 @@ export const saveViralPage = createServerFn({ method: "POST" })
     const check = checkFacebookUrl(data.pageUrl);
     if (!check.valid || !check.normalizedUrl) {
       return { ok: false, error: check.error ?? "URL inválida", code: "INVALID_URL" };
+    }
+    if (check.linkType !== "page") {
+      return { ok: false, error: NOT_A_PAGE_ERROR, code: "INVALID_URL" };
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -131,15 +138,24 @@ export const findOrCreateViralPage = createServerFn({ method: "POST" })
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = context.supabase as any;
+      // Procura primeiro (incluindo variantes antigas do mesmo URL, ex.: sem
+      // "www.") para não criar uma segunda página igual.
+      const findExisting = async () =>
+        sb
+          .from("viral_pages")
+          .select("*")
+          .in("page_url", facebookUrlVariants(check.normalizedUrl!))
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+      const before = await findExisting();
+      if (before.data) return { ok: true, page: before.data as ViralPageRow };
+
       const created = await saveViralPage({ data, context } as never);
       if (created.ok) return created;
       if (created.code !== "DUPLICATE") return { ok: false, error: created.error };
 
-      const { data: existing, error } = await sb
-        .from("viral_pages")
-        .select("*")
-        .eq("page_url", check.normalizedUrl)
-        .single();
+      const { data: existing, error } = await findExisting();
       if (error || !existing)
         return { ok: false, error: error?.message ?? "Página não encontrada." };
       return { ok: true, page: existing as ViralPageRow };
@@ -172,6 +188,9 @@ export const updateViralPage = createServerFn({ method: "POST" })
       const check = checkFacebookUrl(data.pageUrl);
       if (!check.valid || !check.normalizedUrl) {
         return { ok: false, error: check.error ?? "URL inválida", code: "INVALID_URL" };
+      }
+      if (check.linkType !== "page") {
+        return { ok: false, error: NOT_A_PAGE_ERROR, code: "INVALID_URL" };
       }
       patch.page_url = check.normalizedUrl;
     }
@@ -261,7 +280,9 @@ export const saveViralReel = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => SaveViralReelInput.parse(d))
   .handler(async ({ data, context }): Promise<SaveViralReelResult> => {
-    const check = checkFacebookUrl(data.reelUrl);
+    // Reels do Facebook (reel/<id>, <página>/videos/<id>, fb.watch, watch?v=)
+    // ou do Instagram (instagram.com/reel/<código>), sempre canónicos.
+    const check = checkReelUrl(data.reelUrl);
     if (!check.valid || !check.normalizedUrl) {
       return { ok: false, error: check.error ?? "URL inválida", code: "INVALID_URL" };
     }

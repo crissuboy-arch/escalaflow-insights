@@ -1,4 +1,10 @@
 import { toast } from "sonner";
+import {
+  adLibraryIdFromUrl,
+  normalizeAdLibraryId,
+  normalizeFacebookPageUrl,
+  resolveAdLink,
+} from "@/lib/links/social-urls";
 
 /** Open a URL directly in a new tab. No interstitial, no auto-redirect.
  *  If the popup is blocked, copy the URL and notify the user. */
@@ -88,12 +94,29 @@ export type AdLinkInput = {
   headline?: string | null;
 };
 
+function sanitizeProfileUrl(raw?: string | null): string | null {
+  if (!raw || !/^https?:\/\//i.test(raw)) return null;
+  try {
+    const host = new URL(raw).hostname.toLowerCase();
+    if (host.endsWith("facebook.com")) return normalizeFacebookPageUrl(raw);
+    return raw;
+  } catch {
+    return null;
+  }
+}
+
 /** Navigate to the internal "Link externo" page. Never auto-opens Meta links. */
 export function openAdLink(input: AdLinkInput): void {
   const params = new URLSearchParams();
-  if (input.adUrl) params.set("url", input.adUrl);
-  if (input.adLibraryId) params.set("id", input.adLibraryId);
-  if (input.profileUrl) params.set("profile", input.profileUrl);
+  // Link canónico do anúncio (por ID) e nunca a página de PESQUISA da
+  // Biblioteca de Anúncios, que abria anúncios/perfis de terceiros.
+  const adId = normalizeAdLibraryId(input.adLibraryId) ?? adLibraryIdFromUrl(input.adUrl);
+  const adUrl = resolveAdLink({ ad_library_id: adId, ad_url: input.adUrl ?? null });
+  // Perfil: só se for um URL de página real (no Facebook, validado).
+  const profileUrl = sanitizeProfileUrl(input.profileUrl);
+  if (adUrl) params.set("url", adUrl);
+  if (adId) params.set("id", adId);
+  if (profileUrl) params.set("profile", profileUrl);
   if (input.advertiser) params.set("advertiser", input.advertiser);
   if (input.headline) params.set("headline", input.headline);
   if (!params.toString()) {

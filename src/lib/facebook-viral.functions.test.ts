@@ -72,20 +72,31 @@ describe("saveViralPage", () => {
   });
 
   it("normaliza a URL e grava com o user_id do contexto", async () => {
-    const savedRow = { id: "p1", page_url: "https://facebook.com/tysonreed" };
+    const savedRow = { id: "p1", page_url: "https://www.facebook.com/tysonreed" };
     const { supabase, insertFn } = fakeSupabase({ insertResult: { data: savedRow, error: null } });
     const result = await saveViralPage({
-      data: { pageUrl: "facebook.com/tysonreed", niche: "receitas" },
+      data: { pageUrl: "m.facebook.com/tysonreed/?mibextid=abc", niche: "receitas" },
       context: { supabase, userId: "user-1" },
     } as never);
     expect(result).toMatchObject({ ok: true, page: savedRow });
     expect(insertFn).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: "user-1",
-        page_url: "https://facebook.com/tysonreed",
+        // canónico: www, sem parâmetros de rastreio
+        page_url: "https://www.facebook.com/tysonreed",
         niche: "receitas",
       }),
     );
+  });
+
+  it("recusa um link de Reel no campo de página", async () => {
+    const { supabase, fromFn } = fakeSupabase({});
+    const result = await saveViralPage({
+      data: { pageUrl: "https://www.facebook.com/reel/1234567890123" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false, code: "INVALID_URL" });
+    expect(fromFn).not.toHaveBeenCalled();
   });
 
   it("mapeia violação de unicidade (23505) para DUPLICATE, nunca um erro genérico", async () => {
@@ -200,11 +211,40 @@ describe("saveViralReel", () => {
     const savedRow = { id: "r1" };
     const { supabase, insertFn } = fakeSupabase({ insertResult: { data: savedRow, error: null } });
     const result = await saveViralReel({
-      data: { reelUrl: "https://www.facebook.com/tysonreed/reels/123" },
+      data: { reelUrl: "https://www.facebook.com/tysonreed/reels/1234567890123" },
       context: { supabase, userId: "user-1" },
     } as never);
     expect(result).toMatchObject({ ok: true, reel: savedRow });
-    expect(insertFn).toHaveBeenCalledWith(expect.objectContaining({ link_type: "reel" }));
+    expect(insertFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        link_type: "reel",
+        reel_url: "https://www.facebook.com/reel/1234567890123",
+      }),
+    );
+  });
+
+  it("aceita Reel do Instagram (instagram.com/reel/<código>)", async () => {
+    const { supabase, insertFn } = fakeSupabase({
+      insertResult: { data: { id: "r2" }, error: null },
+    });
+    const result = await saveViralReel({
+      data: { reelUrl: "https://instagram.com/reels/C1aBcD2eF3/?igsh=xyz" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: true });
+    expect(insertFn).toHaveBeenCalledWith(
+      expect.objectContaining({ reel_url: "https://www.instagram.com/reel/C1aBcD2eF3/" }),
+    );
+  });
+
+  it("recusa um link de página como Reel (não abriria um vídeo)", async () => {
+    const { supabase, fromFn } = fakeSupabase({});
+    const result = await saveViralReel({
+      data: { reelUrl: "https://www.facebook.com/reel/" },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false, code: "INVALID_URL" });
+    expect(fromFn).not.toHaveBeenCalled();
   });
 });
 
