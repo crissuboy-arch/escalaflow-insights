@@ -4,6 +4,7 @@
 // again; last_seen_at is bumped on every re-discovery of the same ad.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { detectOfferNetwork } from "@/lib/offer-network";
+import { hasRetryColumns } from "@/lib/collector/media-pipeline";
 
 export interface PersistAdInput {
   advertiser?: string | null;
@@ -157,9 +158,16 @@ export async function upsertCollectedAd(item: PersistAdInput): Promise<PersistRe
       : prev?.image_storage_path && !videoDone
         ? "pending_video"
         : "not_attempted";
+  // Uma nova coleta com links frescos reabre as tentativas de cópia (senão um
+  // anúncio que esgotou MAX_ATTEMPTS com links mortos nunca mais seria
+  // copiado, mesmo com links novos). Só quando as colunas de retry existem.
+  const resetAttempts =
+    Boolean(mediaStatus && mediaStatus !== "no_media" && (imageUrl || videoUrl)) &&
+    (await hasRetryColumns());
   const mediaPatch = {
     ...mediaUrls,
     ...(mediaStatus ? { media_status: mediaStatus } : {}),
+    ...(resetAttempts ? { media_attempts: 0, media_last_attempt_at: null } : {}),
   };
 
   if (prev) {

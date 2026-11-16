@@ -58,6 +58,7 @@ import { rememberAdForAnalysis } from "@/lib/queries";
 import { miningRepo } from "@/lib/mining/repository";
 import { createProjectFromOffer } from "@/lib/project.functions";
 import { copyToClipboard, openExternal } from "@/lib/external";
+import { adLibraryIdFromUrl, buildAdLibraryUrl, resolveAdLink } from "@/lib/links/social-urls";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/biblioteca/$id")({
@@ -139,9 +140,11 @@ function OfferDetail() {
   const o = offer;
   const fav = actions.isFavorite(o);
   const saved = actions.isSaved(o);
-  const adLibraryUrl = o.ad_library_id
-    ? `https://www.facebook.com/ads/library/?id=${encodeURIComponent(o.ad_library_id)}`
-    : null;
+  // Link canónico da Biblioteca de Anúncios (só com ID numérico real). O
+  // ad_url só aparece se for um link real — nunca a página de PESQUISA da
+  // Biblioteca, que abria anúncios/perfis de outras pessoas.
+  const adLibraryUrl = buildAdLibraryUrl(o.ad_library_id ?? adLibraryIdFromUrl(o.ad_url));
+  const adOtherUrl = adLibraryUrl ? null : resolveAdLink({ ad_url: o.ad_url });
 
   const onAnalyze = async () => {
     const persisted = offerToPersisted(o);
@@ -424,12 +427,12 @@ function OfferDetail() {
                       <Globe2 className="mr-1.5 h-3.5 w-3.5" /> Landing Page
                     </Button>
                   )}
-                  {o.ad_url && o.ad_url !== adLibraryUrl && (
-                    <Button size="sm" variant="outline" onClick={() => openExternal(o.ad_url)}>
+                  {adOtherUrl && (
+                    <Button size="sm" variant="outline" onClick={() => openExternal(adOtherUrl)}>
                       <Link2 className="mr-1.5 h-3.5 w-3.5" /> Link do anúncio
                     </Button>
                   )}
-                  {!adLibraryUrl && !o.landing_page_url && !o.ad_url && (
+                  {!adLibraryUrl && !o.landing_page_url && !adOtherUrl && (
                     <p className="text-xs text-muted-foreground">
                       Nenhum link foi capturado nesta coleta.
                     </p>

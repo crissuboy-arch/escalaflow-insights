@@ -27,7 +27,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { checkFacebookUrl } from "@/lib/facebook-viral/link-detector";
+import { checkFacebookUrl, checkReelUrl } from "@/lib/facebook-viral/link-detector";
+import { safePageHref, safeReelHref } from "@/lib/links/social-urls";
+import { isString, usePersistentState } from "@/hooks/use-persistent-state";
 import {
   findOrCreateViralPage,
   saveViralReel,
@@ -93,7 +95,14 @@ export const Route = createFileRoute("/_authenticated/facebook-viral")({
   component: FacebookViralPage,
 });
 
+const VIRAL_TABS = ["importar", "paginas", "reels", "afiliados"] as const;
+type ViralTab = (typeof VIRAL_TABS)[number];
+const isViralTab = (v: unknown): v is ViralTab =>
+  typeof v === "string" && (VIRAL_TABS as readonly string[]).includes(v);
+
 function FacebookViralPage() {
+  // A aba ativa sobrevive a um refresh (os dados vêm sempre do Supabase).
+  const [tab, setTab] = usePersistentState<ViralTab>("facebook-viral:tab", "importar", isViralTab);
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="flex items-center gap-2">
@@ -106,7 +115,7 @@ function FacebookViralPage() {
         manualmente — nunca são inventados.
       </p>
 
-      <Tabs defaultValue="importar">
+      <Tabs value={tab} onValueChange={(v) => isViralTab(v) && setTab(v)}>
         <TabsList className="flex w-full flex-wrap justify-start">
           <TabsTrigger value="importar">Importar</TabsTrigger>
           <TabsTrigger value="paginas">Páginas</TabsTrigger>
@@ -253,7 +262,17 @@ function MineFacebookPageCard() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [mining, setMining] = useState(false);
 
-  const urlCheck = pageUrl.trim() ? checkFacebookUrl(pageUrl) : null;
+  const urlCheckRaw = pageUrl.trim() ? checkFacebookUrl(pageUrl) : null;
+  // O minerador precisa da PÁGINA — um link de Reel/post procuraria a página errada.
+  const urlCheck =
+    urlCheckRaw && urlCheckRaw.valid && urlCheckRaw.linkType !== "page"
+      ? {
+          ...urlCheckRaw,
+          valid: false,
+          error:
+            "Use o link da página (ex.: facebook.com/nomedapagina), não de um Reel/publicação.",
+        }
+      : urlCheckRaw;
 
   const costQ = useQuery({
     queryKey: ["facebook-viral", "mining-cost", limit],
@@ -267,7 +286,7 @@ function MineFacebookPageCard() {
         data: { pageUrl, periodDays, limit },
       });
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(result.error, { duration: 10000 });
         return;
       }
       if (result.zeroResults) {
@@ -281,6 +300,13 @@ function MineFacebookPageCard() {
         );
       }
       queryClient.invalidateQueries({ queryKey: ["facebook-viral"] });
+    } catch (e) {
+      // Falha de rede/servidor (ex.: tempo limite da função) — antes não
+      // aparecia nada e parecia que a pesquisa "não trouxe resultados".
+      toast.error(
+        `A pesquisa não terminou: ${e instanceof Error ? e.message : "erro de comunicação com o servidor"}. Tente de novo com menos Reels.`,
+        { duration: 10000 },
+      );
     } finally {
       setMining(false);
       setConfirmOpen(false);
@@ -409,7 +435,7 @@ function ImportForm() {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
-  const reelCheck = reelUrl.trim() ? checkFacebookUrl(reelUrl) : null;
+  const reelCheck = reelUrl.trim() ? checkReelUrl(reelUrl) : null;
   const pageCheck = pageUrl.trim() ? checkFacebookUrl(pageUrl) : null;
 
   const pagesQ = useQuery({
@@ -520,7 +546,7 @@ function ImportForm() {
             <Input
               value={reelUrl}
               onChange={(e) => setReelUrl(e.target.value)}
-              placeholder="facebook.com/.../reels/..."
+              placeholder="facebook.com/reel/123… ou instagram.com/reel/…"
             />
             {reelCheck ? (
               reelCheck.valid ? (
@@ -621,7 +647,7 @@ function PagesList() {
   const removePage = useServerFn(deleteViralPage);
   const listProducts = useServerFn(listAffiliateProducts);
   const queryClient = useQueryClient();
-  const [niche, setNiche] = useState("");
+  const [niche, setNiche] = usePersistentState("facebook-viral:pages:niche", "", isString);
   const [editing, setEditing] = useState<ViralPageRow | null>(null);
   const [deleting, setDeleting] = useState<ViralPageRow | null>(null);
 
@@ -667,20 +693,28 @@ function PagesList() {
         <div className="grid gap-3 sm:grid-cols-2">
           {pages.map((p) => {
             const linkedProduct = products.find((prod) => prod.id === p.affiliate_product_id);
+            // Só abre o URL real e válido da página — nunca um perfil montado a partir do nome.
+            const pageHref = safePageHref(p.page_url);
             return (
               <Card key={p.id}>
                 <CardContent className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-medium">{p.verified_name || p.page_name || p.page_url}</p>
-                      <a
-                        href={p.page_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-                      >
-                        Abrir página <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {pageHref ? (
+                        <a
+                          href={pageHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+                        >
+                          Abrir página <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <p className="text-xs text-amber-600">
+                          Link da página inválido — edite para corrigir.
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => setEditing(p)}>
@@ -884,9 +918,18 @@ function ReelsList() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<ViralReelRow | null>(null);
   const [deleting, setDeleting] = useState<ViralReelRow | null>(null);
-  const [minViews, setMinViews] = useState("0");
-  const [sourceFilter, setSourceFilter] = useState<"all" | "manual" | "apify">("all");
-  const [pageFilter, setPageFilter] = useState("");
+  // Filtros persistidos (localStorage) — sobrevivem a um refresh.
+  const [minViews, setMinViews] = usePersistentState(
+    "facebook-viral:reels:minViews",
+    "0",
+    isString,
+  );
+  const [sourceFilter, setSourceFilter] = usePersistentState<"all" | "manual" | "apify">(
+    "facebook-viral:reels:source",
+    "all",
+    (v): v is "all" | "manual" | "apify" => v === "all" || v === "manual" || v === "apify",
+  );
+  const [pageFilter, setPageFilter] = usePersistentState("facebook-viral:reels:page", "", isString);
 
   const reelsQ = useQuery({
     queryKey: ["facebook-viral", "reels"],
@@ -965,20 +1008,36 @@ function ReelsList() {
         <div className="grid gap-3 sm:grid-cols-2">
           {reels.map((r) => {
             const linkedProduct = products.find((prod) => prod.id === r.affiliate_product_id);
+            // Só um link para o Reel/vídeo real; posts antigos (link_type "post")
+            // continuam a abrir o URL guardado se for do Facebook.
+            const reelHref =
+              safeReelHref(r.reel_url) ??
+              (r.link_type === "post" && checkFacebookUrl(r.reel_url).linkType === "post"
+                ? checkFacebookUrl(r.reel_url).normalizedUrl
+                : null);
             return (
               <Card key={r.id}>
                 <CardContent className="space-y-2 p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <Film className="h-4 w-4 text-muted-foreground" />
-                      <a
-                        href={r.reel_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm font-medium hover:underline"
-                      >
-                        {r.product_promoted || r.reel_url}
-                      </a>
+                      {reelHref ? (
+                        <a
+                          href={reelHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium hover:underline"
+                        >
+                          {r.product_promoted || reelHref}
+                        </a>
+                      ) : (
+                        <span
+                          className="text-sm font-medium"
+                          title="Link do Reel inválido — não aponta para um vídeo específico"
+                        >
+                          {r.product_promoted || "Reel sem link válido"}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1">
                       <Link to="/facebook-viral/$reelId/remix" params={{ reelId: r.id }}>

@@ -15,9 +15,9 @@ export const Route = createFileRoute("/api/media/persist")({
         if (!user) {
           return Response.json({ ok: false, error: "Sessão inválida ou ausente" }, { status: 401 });
         }
-        let body: { ids?: unknown } = {};
+        let body: { ids?: unknown; mode?: unknown } = {};
         try {
-          body = (await request.json()) as { ids?: unknown };
+          body = (await request.json()) as { ids?: unknown; mode?: unknown };
         } catch {
           // corpo vazio = drenar a fila geral
         }
@@ -27,7 +27,15 @@ export const Route = createFileRoute("/api/media/persist")({
             const summary = await persistMediaForIds(ids, { budgetMs: 8_000, includeVideo: true });
             return Response.json({ ok: true, ...summary, remaining: null });
           }
-          const summary = await drainMediaQueue({ budgetMs: 8_000, batch: 18, includeVideo: true });
+          // mode "videos" = retry dedicado de pending_video (lote pequeno,
+          // backoff e desistência após MAX_ATTEMPTS — ver media-pipeline.ts).
+          const mode = body.mode === "videos" ? "videos" : "all";
+          const summary = await drainMediaQueue({
+            budgetMs: 8_000,
+            batch: mode === "videos" ? 6 : 18,
+            includeVideo: true,
+            mode,
+          });
           return Response.json({ ok: true, ...summary });
         } catch (e) {
           return Response.json(

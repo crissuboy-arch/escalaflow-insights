@@ -48,6 +48,8 @@ import { OfferRow } from "@/components/library/OfferRow";
 import { LibraryOfferCard } from "@/components/library/LibraryOfferCard";
 import { CreativesGrid } from "@/components/library/CreativesGrid";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import { interpretCollectorResponse } from "@/lib/collector/collector-response";
+import { readPersisted, writePersisted } from "@/hooks/use-persistent-state";
 import { supabase } from "@/integrations/supabase/client";
 import { useOfferActions } from "@/lib/library/use-offer-actions";
 import {
@@ -97,6 +99,7 @@ export const Route = createFileRoute("/_authenticated/minerar")({
 const PLATFORMS = ["Facebook", "Instagram", "Messenger", "Audience_network", "TikTok", "YouTube"];
 const GRID_PAGE = 25;
 const MEDIA_SYNC_MAX_ROUNDS = 12;
+const LIBRARY_FILTERS_KEY = "minerar:filters";
 
 function OfferLibraryPage() {
   const search = Route.useSearch();
@@ -147,6 +150,45 @@ function OfferLibraryPage() {
   const [top10Niche, setTop10Niche] = useState<NicheId | "all">("all");
   const [mineOpen, setMineOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // ── Filtros persistentes ──
+  // Os filtros já vivem no URL (sobrevivem a F5). Também ficam guardados no
+  // localStorage para voltar a eles ao abrir /minerar pelo menu (URL "limpo").
+  const restoredFilters = useRef(false);
+  useEffect(() => {
+    if (restoredFilters.current) return;
+    restoredFilters.current = true;
+    const { page: _page, ...rest } = search;
+    void _page;
+    if (Object.values(rest).some((v) => v !== undefined && v !== "")) return;
+    const saved = readPersisted<Record<string, unknown> | null>(
+      LIBRARY_FILTERS_KEY,
+      null,
+      (v): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v),
+    );
+    if (!saved) return;
+    const parsed = librarySearch.safeParse(saved);
+    if (!parsed.success) return;
+    const { page: _p, ...restored } = parsed.data;
+    void _p;
+    if (!Object.values(restored).some((v) => v !== undefined && v !== "")) return;
+    if (restored.q) setQueryDraft(restored.q);
+    navigate({ to: "/minerar", search: restored, replace: true });
+    // só na montagem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Ignora a 1ª execução (montagem): o URL ainda pode estar "limpo" enquanto a
+  // restauração acima navega — gravar aí apagaria os filtros guardados.
+  const skipFirstWrite = useRef(true);
+  useEffect(() => {
+    if (skipFirstWrite.current) {
+      skipFirstWrite.current = false;
+      return;
+    }
+    const { page: _page, ...rest } = search;
+    void _page;
+    writePersisted(LIBRARY_FILTERS_KEY, rest);
+  }, [search]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -950,23 +992,22 @@ function MineDialog({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ keyword: kw, country, limit, platform: "Facebook" }),
       });
-      const data = (await res.json()) as {
-        ok: boolean;
-        error?: string;
-        ads?: unknown[];
-        saved?: number;
-        media?: { imagesCopied?: number } | { error: string } | null;
-      };
-      if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
-      const copied =
-        data.media && "imagesCopied" in data.media ? (data.media.imagesCopied ?? 0) : 0;
+      // Nunca uma lista vazia silenciosa: erro de configuração/fornecedor,
+      // tempo limite (504 com HTML) e coleta vazia viram mensagens claras.
+      const outcome = interpretCollectorResponse(res.status, await res.text());
+      if (outcome.kind === "error") throw new Error(outcome.message);
+      if (outcome.kind === "empty") {
+        toast.warning(outcome.message, { duration: 10000 });
+        return;
+      }
       toast.success(
-        `${data.ads?.length ?? 0} ofertas coletadas · ${data.saved ?? 0} guardadas · ${copied} imagens já no armazenamento permanente`,
+        `${outcome.found} ofertas coletadas · ${outcome.saved} guardadas · ${outcome.imagesCopied} imagens e ${outcome.videosCopied} vídeos já no armazenamento permanente`,
       );
+      if (outcome.warning) toast.warning(outcome.warning, { duration: 10000 });
       onOpenChange(false);
       await onDone(kw);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha na mineração");
+      toast.error(e instanceof Error ? e.message : "Falha na mineração", { duration: 12000 });
     } finally {
       setRunning(false);
     }
@@ -980,8 +1021,9 @@ function MineDialog({
             <Sparkles className="h-5 w-5 text-primary" /> Minerar novas ofertas
           </DialogTitle>
           <DialogDescription>
-            Busca anúncios reais na Biblioteca de Anúncios da Meta (consome créditos da Apify). As
-            ofertas e as imagens ficam guardadas — não é preciso minerar de novo para as rever.
+            Busca anúncios reais na Biblioteca de Anúncios da Meta (consome créditos da fonte
+            automática). As ofertas, imagens e vídeos ficam guardados — não é preciso minerar de
+            novo para os rever.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

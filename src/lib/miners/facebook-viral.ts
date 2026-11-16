@@ -17,6 +17,11 @@
 // primeira corrida real autorizada deve confirmar/ajustar isto.
 import { runSyncGetDatasetItems } from "../integrations/apify/client";
 import { APIFY_ACTORS } from "@/config/apify-actors";
+import {
+  buildFacebookReelUrlFromId,
+  normalizeFacebookPageUrl,
+  normalizeReelUrl,
+} from "@/lib/links/social-urls";
 
 const PAGE_COST_PER_ITEM_USD = 0.0108;
 const PAGE_RUN_START_COST_USD = 0.003;
@@ -109,6 +114,47 @@ export interface MinedReel {
   thumbnailUrl: string | undefined;
 }
 
+const REEL_URL_KEYS = [
+  "reel_url",
+  "reelUrl",
+  "video_url_page",
+  "videoPageUrl",
+  "permalink",
+  "permalink_url",
+  "permalinkUrl",
+  "postUrl",
+  "post_url",
+  "shareable_url",
+  "shareableUrl",
+  "link",
+  "url",
+  "topLevelUrl",
+];
+const VIDEO_ID_KEYS = ["video_id", "videoId", "reel_id", "reelId"];
+
+/**
+ * URL do Reel a partir de um item do dataset. Só aceita links que apontam
+ * para um Reel/vídeo ESPECÍFICO (normalizados por normalizeReelUrl). Antes
+ * pegava o primeiro campo "url" — que em muitos itens é o URL da PÁGINA
+ * (o input) — e todos os "Reels" abriam o perfil e colapsavam num só registo
+ * na deduplicação. Fallback: ID numérico do vídeo → facebook.com/reel/<id>.
+ * Nunca constrói um URL a partir de nomes. Exportado para teste.
+ */
+export function extractReelUrl(item: Record<string, unknown>, pageUrl?: string): string | null {
+  const pageCanonical = pageUrl ? normalizeFacebookPageUrl(pageUrl) : null;
+  for (const key of REEL_URL_KEYS) {
+    const v = pickStr(item, [key]);
+    if (!v) continue;
+    const reel = normalizeReelUrl(v);
+    if (reel && reel.url !== pageCanonical) return reel.url;
+  }
+  for (const key of VIDEO_ID_KEYS) {
+    const built = buildFacebookReelUrlFromId(pickStr(item, [key]));
+    if (built) return built;
+  }
+  return null;
+}
+
 /** Mines up to `limit` Reels newer than `periodDays`, newest first. Never
  *  downloads the third-party video itself — only the reference URL and the
  *  metadata the actor returns, consistent with "no unauthorized download of
@@ -130,7 +176,7 @@ export async function mineFacebookReels(
 
   return raw
     .map((item) => {
-      const reelUrl = pickStr(item, ["url", "reel_url", "reelUrl", "postUrl"]);
+      const reelUrl = extractReelUrl(item, pageUrl);
       if (!reelUrl) return null;
       return {
         reelUrl,

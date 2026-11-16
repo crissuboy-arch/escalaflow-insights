@@ -6,7 +6,7 @@ import { SkillResult, SkillOptions, withTimeout } from "./types";
 // Recommended: apify~google-trends-scraper
 function getActor(): string {
   const id = process.env.APIFY_GOOGLE_TRENDS_ACTOR?.trim();
-  if (!id) throw new Error("APIFY_GOOGLE_TRENDS_ACTOR não configurado no .env");
+  if (!id) throw new Error("Coletor do Google Trends não configurado no servidor.");
   return id;
 }
 

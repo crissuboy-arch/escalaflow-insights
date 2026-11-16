@@ -33,6 +33,7 @@ function fakeBuilder(result: { data: unknown; error: unknown }) {
   builder.eq = vi.fn(() => builder);
   builder.in = vi.fn(() => builder);
   builder.order = vi.fn(() => builder);
+  builder.limit = vi.fn(() => builder);
   builder.select = vi.fn(() => builder);
   builder.single = vi.fn(() => Promise.resolve(result));
   builder.maybeSingle = vi.fn(() => Promise.resolve(result));
@@ -99,12 +100,13 @@ describe("runFacebookMining", () => {
   it("cria a página quando ainda não existe e insere só os Reels novos", async () => {
     mineFacebookPage.mockResolvedValueOnce({ verifiedName: "Tyson Reed", followers: 14234 });
     mineFacebookReels.mockResolvedValueOnce([
-      { reelUrl: "https://www.facebook.com/tysonreed/reels/1", views: 1000 },
-      { reelUrl: "https://www.facebook.com/tysonreed/reels/2", views: 2000 },
+      { reelUrl: "https://www.facebook.com/tysonreed/reels/1000000000001", views: 1000 },
+      { reelUrl: "https://www.facebook.com/tysonreed/reels/1000000000002", views: 2000 },
     ]);
     const { supabase, pageInsertFn, reelInsertFn } = fakeSupabase({
       existingReelsResult: {
-        data: [{ reel_url: "https://www.facebook.com/tysonreed/reels/1" }],
+        // linha antiga gravada no formato antigo — continua a contar como duplicado
+        data: [{ reel_url: "https://www.facebook.com/tysonreed/reels/1000000000001" }],
         error: null,
       },
     });
@@ -125,10 +127,60 @@ describe("runFacebookMining", () => {
     );
     expect(reelInsertFn).toHaveBeenCalledWith([
       expect.objectContaining({
-        reel_url: "https://www.facebook.com/tysonreed/reels/2",
+        reel_url: "https://www.facebook.com/reel/1000000000002",
         data_source: "apify",
       }),
     ]);
+    // Regressão: viral_reels não tem duration_seconds — mandar a coluna fazia
+    // TODOS os inserts falharem. Nem campos auxiliares podem ir para a BD.
+    const inserted = (reelInsertFn.mock.calls[0] as unknown as [Record<string, unknown>[]])[0][0];
+    expect(inserted).not.toHaveProperty("duration_seconds");
+    expect(inserted).not.toHaveProperty("_raw_url");
+  });
+
+  it("recusa um link de Reel no lugar da página, sem gastar créditos", async () => {
+    const { supabase } = fakeSupabase({});
+    const result = await runFacebookMining({
+      data: { pageUrl: "https://www.facebook.com/reel/1234567890123", periodDays: 30, limit: 10 },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false });
+    expect(mineFacebookPage).not.toHaveBeenCalled();
+  });
+
+  it("erro claro (não sucesso vazio) quando os itens não têm link de Reel válido", async () => {
+    mineFacebookPage.mockResolvedValueOnce(null);
+    mineFacebookReels.mockResolvedValueOnce([
+      { reelUrl: "https://www.facebook.com/tysonreed", views: 10 },
+    ]);
+    const { supabase, reelInsertFn } = fakeSupabase({
+      findPageResult: { data: { id: "page-1" }, error: null },
+    });
+    const result = await runFacebookMining({
+      data: { pageUrl: "facebook.com/tysonreed", periodDays: 30, limit: 10 },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/link de Reel/) });
+    expect(reelInsertFn).not.toHaveBeenCalled();
+  });
+
+  it("erro do insert é mostrado ao utilizador (antes: falha silenciosa)", async () => {
+    mineFacebookPage.mockResolvedValueOnce(null);
+    mineFacebookReels.mockResolvedValueOnce([
+      { reelUrl: "https://www.facebook.com/reel/1000000000003", views: 10 },
+    ]);
+    const { supabase } = fakeSupabase({
+      findPageResult: { data: { id: "page-1" }, error: null },
+      insertReelsResult: { data: null, error: { message: "permission denied" } },
+    });
+    const result = await runFacebookMining({
+      data: { pageUrl: "facebook.com/tysonreed", periodDays: 30, limit: 10 },
+      context: { supabase, userId: "user-1" },
+    } as never);
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("permission denied"),
+    });
   });
 
   it("devolve ok:false se a mineração da página falhar, sem gravar nada", async () => {
@@ -139,18 +191,20 @@ describe("runFacebookMining", () => {
       context: { supabase, userId: "user-1" },
     } as never);
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining("401") });
+    // O nome do fornecedor nunca chega à UI.
+    expect((result as { error: string }).error).not.toMatch(/apify/i);
     expect(pageInsertFn).not.toHaveBeenCalled();
   });
 
   it("não duplica quando todos os Reels minerados já existem", async () => {
     mineFacebookPage.mockResolvedValueOnce(null);
     mineFacebookReels.mockResolvedValueOnce([
-      { reelUrl: "https://www.facebook.com/tysonreed/reels/1", views: 1000 },
+      { reelUrl: "https://www.facebook.com/tysonreed/reels/1000000000001", views: 1000 },
     ]);
     const { supabase, reelInsertFn } = fakeSupabase({
       findPageResult: { data: { id: "page-1" }, error: null },
       existingReelsResult: {
-        data: [{ reel_url: "https://www.facebook.com/tysonreed/reels/1" }],
+        data: [{ reel_url: "https://www.facebook.com/reel/1000000000001" }],
         error: null,
       },
     });

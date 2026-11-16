@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runSyncGetDatasetItems } from "@/lib/integrations/apify/client";
+import { publicProviderError } from "@/lib/integrations/provider-error";
 import { withTimeout } from "@/skills/types";
 import { generateAIJson } from "@/lib/aiService";
 
@@ -231,10 +232,11 @@ export async function runInstagramMining(
     } catch (err: any) {
       const msg: string = err?.message ?? "";
       if (msg.includes("timeout")) throw new Error("A busca no Instagram demorou demais. Tente reduzir o limite ou use uma hashtag menor.");
-      if (msg.includes("403")) throw new Error(`Instagram Radar: actor "${actor}" desativado ou sem permissão (403). Troque APIFY_INSTAGRAM_ACTOR no .env.`);
-      if (msg.includes("401")) throw new Error(`Instagram Radar: token inválido (401). Verifique APIFY_TOKEN no .env. Actor: ${actor}`);
-      if (msg.includes("404")) throw new Error(`Instagram Radar: actor "${actor}" não encontrado (404). Verifique APIFY_INSTAGRAM_ACTOR no .env.`);
-      throw new Error(msg || "Erro ao buscar no Instagram.");
+      // Mensagens para a UI: sem nome do fornecedor/actor/variáveis.
+      if (msg.includes("403")) throw new Error("Instagram Radar: coletor desativado ou sem permissão (403). Verifique a configuração do servidor.");
+      if (msg.includes("401")) throw new Error("Instagram Radar: credencial da fonte automática inválida (401). Verifique a configuração do servidor.");
+      if (msg.includes("404")) throw new Error("Instagram Radar: coletor não encontrado (404). Verifique a configuração do servidor.");
+      throw new Error(msg ? publicProviderError(msg) : "Erro ao buscar no Instagram.");
     }
 
     console.log("[instagram-radar] response items=", raw.length);

@@ -5,7 +5,9 @@ function req(key: string, fallback?: string): string {
   const val = process.env[key]?.trim();
   if (val) return val;
   if (fallback !== undefined) return fallback;
-  throw new Error(`${key} não configurado no .env`);
+  // O nome da variável vai só para o log; a mensagem pode chegar à UI.
+  console.error(`[collector-config] ${key} não configurado`);
+  throw new Error("Coletor não configurado no servidor (fonte automática).");
 }
 
 export const APIFY_ACTORS = {

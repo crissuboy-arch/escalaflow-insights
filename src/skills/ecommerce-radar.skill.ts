@@ -14,7 +14,7 @@ function getActor(platform: EcommercePlatform): string {
   };
   const id = platformActors[platform] ?? process.env.APIFY_ECOMMERCE_ACTOR?.trim();
   if (!id) throw new Error(
-    `Nenhum actor configurado para ${platform}. Configure APIFY_ECOMMERCE_ACTOR no .env`
+    `Nenhum coletor configurado para ${platform}. Verifique a configuração da fonte automática no servidor.`
   );
   return id;
 }

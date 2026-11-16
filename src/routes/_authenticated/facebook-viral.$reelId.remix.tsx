@@ -20,6 +20,7 @@ import {
   getViralMediaSignedUrl,
 } from "@/lib/facebook-viral/video-upload";
 import { getViralReel } from "@/lib/facebook-viral.functions";
+import { safeReelHref } from "@/lib/links/social-urls";
 import {
   listViralVideos,
   createViralVideo,
@@ -154,14 +155,18 @@ function RemixStudioPage() {
           <CardContent className="space-y-2 p-4">
             <div className="flex items-center gap-1.5">
               <Film className="h-4 w-4 text-muted-foreground" />
-              <a
-                href={reel.reel_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-medium hover:underline"
-              >
-                {reel.reel_url}
-              </a>
+              {safeReelHref(reel.reel_url) ? (
+                <a
+                  href={safeReelHref(reel.reel_url) ?? undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium hover:underline"
+                >
+                  {safeReelHref(reel.reel_url)}
+                </a>
+              ) : (
+                <span className="text-sm font-medium">{reel.reel_url}</span>
+              )}
             </div>
             {reel.product_promoted ? (
               <p className="text-xs text-muted-foreground">Produto: {reel.product_promoted}</p>

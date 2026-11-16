@@ -60,6 +60,9 @@ export interface CollectorRunResult {
   count: number;
   ads: CollectorAd[];
   error?: string;
+  /** Aviso legível quando a coleta correu bem mas não trouxe anúncios —
+   *  a UI deve mostrá-lo em vez de uma lista vazia silenciosa. */
+  notice?: string;
   /** How many of `ads` were actually persisted to collected_ads. When this
    *  is lower than ads.length, some results shown in the UI will NOT
    *  survive a reload — the caller must warn the user instead of silently

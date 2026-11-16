@@ -15,7 +15,7 @@ export const Route = createFileRoute("/api/collector/run")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: cors }),
       POST: async ({ request }) => {
-        // Esta rota gasta créditos do Apify: exige sessão válida.
+        // Esta rota gasta créditos da fonte automática: exige sessão válida.
         const user = await requireUserFromRequest(request);
         if (!user) {
           return Response.json({ ok: false, error: "Sessão inválida ou ausente" }, { status: 401, headers: cors });
@@ -100,14 +100,16 @@ export const Route = createFileRoute("/api/collector/run")({
           console.error(`[collector] ${failed}/${persistResults.length} ads returned to the UI were NOT persisted — they will not survive a reload. First error: ${firstError}`);
         }
 
-        // Cópia durável IMEDIATA das imagens desta coleta (os links do CDN do
-        // Facebook expiram em dias). Vídeos ficam para o /api/media/persist,
-        // que a Biblioteca chama em segundo plano. Nunca derruba a resposta.
+        // Cópia durável IMEDIATA da mídia desta coleta (os links do CDN do
+        // Facebook expiram em dias): primeiro todas as imagens, depois os
+        // vídeos com o tempo que sobrar. O que não couber fica em
+        // pending_video e o /api/media/persist (chamado pela Biblioteca em
+        // segundo plano) termina. Nunca derruba a resposta.
         let media: Awaited<ReturnType<typeof persistMediaForIds>> | { error: string } | null = null;
         const newIds = persistResults.map((r) => r.id).filter((id): id is string => !!id);
         if (newIds.length) {
           try {
-            media = await persistMediaForIds(newIds, { budgetMs: 9_000 });
+            media = await persistMediaForIds(newIds, { budgetMs: 9_000, includeVideo: true });
           } catch (e) {
             media = { error: e instanceof Error ? e.message : String(e) };
             console.error("[collector] media pipeline failed:", e);

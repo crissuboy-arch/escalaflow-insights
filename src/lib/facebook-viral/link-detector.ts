@@ -1,6 +1,8 @@
 // Pure classifier for a pasted Facebook URL — page vs post vs reel.
 // No network call here: this only looks at the URL shape. The real page/
 // reel data (name, title) comes later from the scraper or from manual entry.
+import { normalizeFacebookPageUrl, normalizeReelUrl } from "@/lib/links/social-urls";
+
 export type FacebookLinkType = "page" | "post" | "reel";
 
 export interface FacebookLinkCheck {
@@ -25,7 +27,9 @@ function classifyPath(hostname: string, pathname: string): FacebookLinkType {
   const path = pathname.replace(/\/+$/, ""); // drop trailing slash
   if (hostname === "fb.watch") return "reel";
   if (/\/reel\//.test(path) || /\/reels\//.test(path)) return "reel";
-  if (/\/videos\//.test(path) || /\/watch\/?$/.test(path)) return "reel";
+  if (/\/videos\//.test(path) || /^\/watch\/?$/.test(path) || /^\/video\.php$/.test(path))
+    return "reel";
+  if (/^\/share\/[rv]\//.test(path)) return "reel";
   if (/\/posts\//.test(path) || /\/photos\//.test(path) || /^\/story\.php/.test(path))
     return "post";
   return "page";
@@ -59,5 +63,54 @@ export function checkFacebookUrl(raw: string): FacebookLinkCheck {
   }
 
   const linkType = classifyPath(hostname, url.pathname);
-  return { valid: true, normalizedUrl: url.toString(), linkType, error: null };
+
+  // URL canónico (www, sem parâmetros de rastreio) para o link do cartão
+  // abrir sempre o objeto real e para não duplicar a mesma página/Reel.
+  if (linkType === "reel") {
+    const reel = normalizeReelUrl(url.toString());
+    if (!reel) {
+      return {
+        valid: false,
+        normalizedUrl: null,
+        linkType: null,
+        error: "Link de vídeo/Reel incompleto — copie o link completo do Reel (com o ID).",
+      };
+    }
+    return { valid: true, normalizedUrl: reel.url, linkType, error: null };
+  }
+  if (linkType === "page") {
+    const page = normalizeFacebookPageUrl(url.toString());
+    if (!page) {
+      return {
+        valid: false,
+        normalizedUrl: null,
+        linkType: null,
+        error: "Este link não é de uma página do Facebook (ex.: facebook.com/nomedapagina).",
+      };
+    }
+    return { valid: true, normalizedUrl: page, linkType, error: null };
+  }
+  return { valid: true, normalizedUrl: stripTracking(url), linkType, error: null };
+}
+
+const TRACKING_PARAMS =
+  /^(utm_.*|mibextid|rdid|sfnsn|ref|fref|refsrc|paipv|eav|__cft__.*|__tn__|_rdr|hc_ref|app)$/i;
+
+function stripTracking(url: URL): string {
+  const u = new URL(url.toString());
+  u.hostname = "www.facebook.com";
+  for (const k of [...u.searchParams.keys()]) {
+    if (TRACKING_PARAMS.test(k)) u.searchParams.delete(k);
+  }
+  u.hash = "";
+  return u.toString();
+}
+
+/** Para Reels: aceita também Instagram (instagram.com/reel/<código>). */
+export function checkReelUrl(raw: string): FacebookLinkCheck {
+  const ig = normalizeReelUrl(raw);
+  if (ig && ig.kind === "instagram_reel") {
+    return { valid: true, normalizedUrl: ig.url, linkType: "reel", error: null };
+  }
+  return checkFacebookUrl(raw);
 }

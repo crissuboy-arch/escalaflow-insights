@@ -51,6 +51,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Radar } from "lucide-react";
 import { openExternal, openChatGPTWithPrompt, openAdLink } from "@/lib/external";
 import {
+  normalizeAdLibraryId,
+  normalizeFacebookPageUrl,
+  resolveAdLink,
+} from "@/lib/links/social-urls";
+import {
   favoriteCollectedAd,
   fetchFavoriteAds,
   fetchSavedAds,
@@ -246,30 +251,34 @@ function MiningCenterPage() {
     toast.success("Oferta enviada para escala");
   };
   const resolveAdUrl = (a: MinedAd): string | null => {
+    // Sempre o link canónico por ID quando existe. raw.url é muitas vezes o
+    // URL de PESQUISA enviado ao coletor — abria outros anúncios/perfis.
     const raw = (a.raw ?? {}) as Record<string, unknown>;
+    const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string) : null);
     const cands = [
       a.adUrl,
       (a as unknown as { libraryUrl?: string }).libraryUrl,
-      typeof raw.ad_snapshot_url === "string" ? (raw.ad_snapshot_url as string) : null,
-      typeof raw.url === "string" ? (raw.url as string) : null,
-      a.adLibraryId ? `https://www.facebook.com/ads/library/?id=${a.adLibraryId}` : null,
+      str("ad_snapshot_url"),
     ];
-    return cands.find((u) => typeof u === "string" && /^https?:\/\//i.test(u as string)) as
-      | string
-      | null
-      | undefined ?? null;
+    return (
+      resolveAdLink({ ad_library_id: a.adLibraryId ?? null, ad_url: null }) ??
+      cands.map((u) => resolveAdLink({ ad_url: u ?? null })).find(Boolean) ??
+      null
+    );
   };
   const resolveProfileUrl = (a: MinedAd): string | null => {
+    // Só páginas reais (URL de página válido ou ID numérico) — nunca um
+    // perfil montado a partir do nome do anunciante.
     const raw = (a.raw ?? {}) as Record<string, unknown>;
     const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string) : null);
-    const pageId = str("page_id");
+    const pageId = normalizeAdLibraryId(raw.page_id);
     const cands = [
       str("page_url"),
       str("profile_url"),
       str("advertiser_url"),
-      pageId ? `https://www.facebook.com/${pageId}` : null,
+      pageId ? `https://www.facebook.com/profile.php?id=${pageId}` : null,
     ];
-    return cands.find((u) => typeof u === "string" && /^https?:\/\//i.test(u)) ?? null;
+    return cands.map((u) => normalizeFacebookPageUrl(u)).find(Boolean) ?? null;
   };
   const onOpenAd = (a: MinedAd) => {
     const url = resolveAdUrl(a);

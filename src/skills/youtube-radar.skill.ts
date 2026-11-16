@@ -6,7 +6,7 @@ import { SkillResult, SkillOptions, withTimeout } from "./types";
 // Recommended: streamers~youtube-scraper
 function getActor(): string {
   const id = process.env.APIFY_YOUTUBE_ACTOR?.trim();
-  if (!id) throw new Error("APIFY_YOUTUBE_ACTOR não configurado no .env");
+  if (!id) throw new Error("Coletor do YouTube não configurado no servidor.");
   return id;
 }
 
