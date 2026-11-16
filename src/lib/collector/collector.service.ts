@@ -6,6 +6,7 @@ import { createPlaywrightProvider } from "./collector.playwright";
 import { createProvider as createApifyProvider } from "./collector.apify";
 import { normalize } from "./collector.normalizer";
 import type { CollectorRunInput, CollectorRunResult } from "./collector.types";
+import { publicProviderError } from "@/lib/integrations/provider-error";
 
 export async function runCollector(input: CollectorRunInput): Promise<CollectorRunResult> {
   const ctx = `keyword="${input.keyword}" country=${input.country} niche=${input.niche} platform=${input.platform ?? "—"}`;
@@ -22,23 +23,48 @@ export async function runCollector(input: CollectorRunInput): Promise<CollectorR
   const platformNormalized = input.platform?.trim().toLowerCase();
   if (!platformNormalized || platformNormalized === "all" || platformNormalized === "facebook" || platformNormalized === "meta") {
     if (!process.env.APIFY_TOKEN) {
-      return { ok: false, count: 0, ads: [], error: "Motor de Coleta do Facebook Ad Library não configurado (APIFY_TOKEN ausente)." };
+      console.error(
+        "[collector] APIFY_TOKEN ausente — coleta da Biblioteca de Anúncios indisponível",
+      );
+      return {
+        ok: false,
+        count: 0,
+        ads: [],
+        error:
+          "O Motor de Coleta da Biblioteca de Anúncios não está configurado no servidor (fonte automática sem credencial). Peça ao administrador para configurar o coletor.",
+      };
     }
     try {
       const apify = createApifyProvider();
       const raw = await apify.run(input);
       console.log(`[collector] facebook (apify direct) returned ${raw.length} items`);
-      if (!raw.length) return { ok: true, count: 0, ads: [], error: undefined };
+      if (!raw.length) {
+        return {
+          ok: true,
+          count: 0,
+          ads: [],
+          notice: `A Biblioteca de Anúncios não devolveu anúncios ativos para "${input.keyword}"${input.country ? ` em ${input.country}` : ""}. Tente outra palavra-chave ou outro país.`,
+        };
+      }
       const ads = normalize(raw, {
         keyword: input.keyword,
         country: input.country || "—",
         niche: input.niche || "Geral",
       });
+      if (!ads.length) {
+        console.warn(`[collector] ${raw.length} itens brutos, 0 anúncios após normalização`);
+        return {
+          ok: false,
+          count: 0,
+          ads: [],
+          error: `A fonte automática devolveu ${raw.length} itens, mas nenhum era um anúncio válido.`,
+        };
+      }
       return { ok: true, count: ads.length, ads };
     } catch (err) {
-      const error = err instanceof Error ? err.message : String(err);
-      console.warn(`[collector] facebook (apify direct) failed: ${error}`);
-      return { ok: false, count: 0, ads: [], error };
+      const raw = err instanceof Error ? err.message : String(err);
+      console.warn(`[collector] facebook (apify direct) failed: ${raw}`);
+      return { ok: false, count: 0, ads: [], error: publicProviderError(raw, "Falha na coleta") };
     }
   }
 

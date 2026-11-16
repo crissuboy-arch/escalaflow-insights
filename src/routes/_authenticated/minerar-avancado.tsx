@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { authedFetch } from "@/lib/auth/authed-fetch";
+import { interpretCollectorResponse } from "@/lib/collector/collector-response";
 import { z } from "zod";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -472,8 +473,16 @@ function MinePage() {
           platform: platform === "all" ? undefined : platform,
         }),
       });
-      const data = (await res.json()) as CollectorRunResult;
-      if (!data.ok) throw new Error(data.error || "Falha no Motor de Coleta");
+      // Erro/tempo limite/coleta vazia → mensagem clara, nunca lista vazia silenciosa.
+      const bodyText = await res.text();
+      const outcome = interpretCollectorResponse(res.status, bodyText);
+      if (outcome.kind === "error") throw new Error(outcome.message);
+      if (outcome.kind === "empty") {
+        setCollectorFound(0);
+        toast.warning(outcome.message, { duration: 10000 });
+        return;
+      }
+      const data = JSON.parse(bodyText) as CollectorRunResult;
       console.log("collector results:", data.ads?.length ?? 0, data.ads);
       const adsArr = data.ads ?? [];
       console.log("[minerar] collector adsArr:", adsArr);

@@ -9,7 +9,9 @@
 import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { checkFacebookUrl } from "@/lib/facebook-viral/link-detector";
+import { checkFacebookUrl, checkReelUrl } from "@/lib/facebook-viral/link-detector";
+import { facebookUrlVariants } from "@/lib/links/social-urls";
+import { publicProviderError } from "@/lib/integrations/provider-error";
 import {
   estimateFacebookMiningCost,
   mineFacebookPage,
@@ -55,6 +57,15 @@ export const runFacebookMining = createServerFn({ method: "POST" })
     if (!check.valid || !check.normalizedUrl) {
       return { ok: false, error: check.error ?? "URL inválida" };
     }
+    // O minerador recebe uma PÁGINA. Um link de Reel/post aqui faria o
+    // coletor procurar a página errada (e gastar créditos) — recusa já.
+    if (check.linkType !== "page") {
+      return {
+        ok: false,
+        error:
+          "Cole o link da PÁGINA do Facebook (ex.: facebook.com/nomedapagina), não de um Reel ou publicação.",
+      };
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sb = context.supabase as any;
@@ -68,7 +79,7 @@ export const runFacebookMining = createServerFn({ method: "POST" })
       );
     } catch (e) {
       console.error(`[facebook-viral-miner] ✗ falha ao minerar página:`, e);
-      return { ok: false, error: e instanceof Error ? e.message : "Falha ao minerar a página." };
+      return { ok: false, error: publicProviderError(e, "Falha ao pesquisar a página.") };
     }
 
     const pagePatch: Record<string, unknown> = { last_mined_at: new Date().toISOString() };
@@ -78,10 +89,14 @@ export const runFacebookMining = createServerFn({ method: "POST" })
     }
     if (typeof minedPage?.followers === "number") pagePatch.followers = minedPage.followers;
 
+    // Inclui variantes antigas (sem www, com barra final) para não duplicar
+    // páginas gravadas antes da canonicalização do URL.
     const { data: existingPage, error: findError } = await sb
       .from("viral_pages")
       .select("*")
-      .eq("page_url", check.normalizedUrl)
+      .in("page_url", facebookUrlVariants(check.normalizedUrl))
+      .order("created_at", { ascending: true })
+      .limit(1)
       .maybeSingle();
     if (findError) return { ok: false, error: findError.message };
 
@@ -119,19 +134,23 @@ export const runFacebookMining = createServerFn({ method: "POST" })
       console.error(`[facebook-viral-miner] ✗ falha ao minerar reels:`, e);
       return {
         ok: false,
-        error:
-          e instanceof Error
-            ? `Página confirmada, mas a mineração de Reels falhou: ${e.message}`
-            : "Falha ao minerar os Reels.",
+        error: `Página confirmada, mas a pesquisa de Reels falhou: ${publicProviderError(e, "erro desconhecido")}`,
       };
     }
     const zeroResults = minedReels.length === 0;
 
+    const seenUrls = new Set<string>();
     const candidates = minedReels
       .map((r) => {
-        const rc = checkFacebookUrl(r.reelUrl);
-        if (!rc.valid || !rc.normalizedUrl) return null;
+        const rc = checkReelUrl(r.reelUrl);
+        // Só Reels/vídeos reais — um link de página/post aqui abriria o perfil.
+        if (!rc.valid || !rc.normalizedUrl || rc.linkType !== "reel") return null;
+        if (seenUrls.has(rc.normalizedUrl)) return null;
+        seenUrls.add(rc.normalizedUrl);
         const publishedAt = r.publishedAt ? new Date(r.publishedAt) : null;
+        // NB: viral_reels NÃO tem duration_seconds (só viral_videos tem) —
+        // mandar essa coluna fazia TODOS os inserts falharem ("Could not find
+        // the 'duration_seconds' column"), e a mineração nunca gravava Reels.
         return {
           user_id: context.userId,
           viral_page_id: pageRow.id,
@@ -142,14 +161,25 @@ export const runFacebookMining = createServerFn({ method: "POST" })
           comments_count: r.commentsCount ?? null,
           shares_count: r.sharesCount ?? null,
           thumbnail_url: r.thumbnailUrl ?? null,
-          duration_seconds: r.durationSeconds ?? null,
           published_at:
             publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt.toISOString() : null,
           data_source: "apify",
           collected_at: new Date().toISOString(),
+          // URL bruto para deduplicar contra linhas antigas (não é gravado).
+          _raw_url: r.reelUrl,
         };
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    if (!zeroResults && candidates.length === 0) {
+      console.warn(
+        `[facebook-viral-miner] ${minedReels.length} itens sem link de Reel válido — nada gravado`,
+      );
+      return {
+        ok: false,
+        error: `A fonte automática devolveu ${minedReels.length} item(ns), mas nenhum tinha um link de Reel válido. Nada foi gravado.`,
+      };
+    }
 
     if (candidates.length === 0) {
       return {
@@ -164,7 +194,9 @@ export const runFacebookMining = createServerFn({ method: "POST" })
 
     // Nunca sobrescreve um Reel já guardado (manual ou de uma mineração
     // anterior) — só insere os que ainda não existem para este utilizador.
-    const urls = candidates.map((c) => c.reel_url);
+    const variantsOf = (c: (typeof candidates)[number]) =>
+      Array.from(new Set([c.reel_url, c._raw_url, ...facebookUrlVariants(c.reel_url)]));
+    const urls = Array.from(new Set(candidates.flatMap(variantsOf)));
     const { data: existingReels, error: existingError } = await sb
       .from("viral_reels")
       .select("reel_url")
@@ -174,11 +206,20 @@ export const runFacebookMining = createServerFn({ method: "POST" })
     const existingUrlSet = new Set(
       (existingReels ?? []).map((r: { reel_url: string }) => r.reel_url),
     );
-    const newRows = candidates.filter((c) => !existingUrlSet.has(c.reel_url));
+    const newRows = candidates
+      .filter((c) => !variantsOf(c).some((u) => existingUrlSet.has(u)))
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      .map(({ _raw_url, ...row }) => row);
 
     if (newRows.length > 0) {
       const { error: insertError } = await sb.from("viral_reels").insert(newRows);
-      if (insertError) return { ok: false, error: insertError.message };
+      if (insertError) {
+        console.error("[facebook-viral-miner] ✗ insert viral_reels:", insertError);
+        return {
+          ok: false,
+          error: `Os Reels foram encontrados, mas não foi possível guardá-los: ${insertError.message}`,
+        };
+      }
     }
 
     return {

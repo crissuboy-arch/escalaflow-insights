@@ -63,7 +63,7 @@ describe("mineFacebookReels", () => {
   it("normaliza views/comentários/legenda com os nomes alternativos de campo", async () => {
     runSyncGetDatasetItems.mockResolvedValueOnce([
       {
-        url: "https://www.facebook.com/tysonreed/reels/123",
+        url: "https://www.facebook.com/tysonreed/reels/1234567890123",
         caption: "treino de pernas",
         view_count: 120000,
         comments_count: 340,
@@ -76,12 +76,30 @@ describe("mineFacebookReels", () => {
     });
     expect(result).toEqual([
       expect.objectContaining({
-        reelUrl: "https://www.facebook.com/tysonreed/reels/123",
+        // URL canónico do Reel
+        reelUrl: "https://www.facebook.com/reel/1234567890123",
         caption: "treino de pernas",
         views: 120000,
         commentsCount: 340,
         sharesCount: 12,
       }),
+    ]);
+  });
+
+  it("nunca usa o URL da PÁGINA como link do Reel (abria o perfil) — usa o ID do vídeo", async () => {
+    runSyncGetDatasetItems.mockResolvedValueOnce([
+      // "url" = o input (página) — o bug antigo gravava isto como reel_url
+      { url: "https://www.facebook.com/tysonreed", video_id: "987654321012345", caption: "a" },
+      { url: "https://www.facebook.com/tysonreed", caption: "sem id nenhum" },
+      { url: "https://www.facebook.com/tysonreed", permalink: "https://fb.watch/AbC123xyz/" },
+    ]);
+    const result = await mineFacebookReels("https://www.facebook.com/tysonreed", {
+      periodDays: 30,
+      limit: 10,
+    });
+    expect(result.map((r) => r.reelUrl)).toEqual([
+      "https://www.facebook.com/reel/987654321012345",
+      "https://fb.watch/AbC123xyz/",
     ]);
   });
 

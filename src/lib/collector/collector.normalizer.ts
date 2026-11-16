@@ -1,6 +1,12 @@
 import type { CollectorAd } from "./collector.types";
 import { inferTagsFromText, scaleLevelFromScore, KEYWORD_CATEGORIES } from "../mining/keywords";
 import { detectOfferNetwork } from "../offer-network";
+import {
+  adLibraryIdFromUrl,
+  buildAdLibraryUrl,
+  normalizeAdLibraryId,
+  resolveAdLink,
+} from "@/lib/links/social-urls";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -117,6 +123,13 @@ export function normalize(
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
     const ad = item as Obj;
+
+    // Linha de erro do fornecedor ({ error, url }) no meio dos resultados:
+    // não é um anúncio — antes virava um cartão falso "Anunciante".
+    if (ad.error && !ad.snapshot && !ad.ad_archive_id && !ad.adArchiveId) {
+      console.warn("[normalizer] item de erro ignorado:", String(ad.error).slice(0, 200));
+      continue;
+    }
 
     // Pre-normalized items from Playwright provider — pass through directly
     if (ad.source === "collector" && ad.headline && ad.adUrl) {
@@ -268,17 +281,21 @@ export function normalize(
 
     const finalVideo = videoUrl ?? deepFind(ad, VID_RE);
 
-    const adLibraryId = pickStr(ad, [
-      "ad_archive_id",
-      "adArchiveId",
-      "snapshot.ad_archive_id",
-      "id",
-      "adLibraryId",
-    ]);
+    // Só IDs numéricos da Biblioteca de Anúncios: um "id" genérico do dataset
+    // (hash/uuid) geraria um link para um anúncio que não existe.
+    const adLibraryId =
+      normalizeAdLibraryId(
+        pickStr(ad, ["ad_archive_id", "adArchiveId", "snapshot.ad_archive_id", "adLibraryId"]),
+      ) ??
+      normalizeAdLibraryId(pickStr(ad, ["id"])) ??
+      adLibraryIdFromUrl(pickStr(ad, ["ad_library_url", "adLibraryUrl", "adUrl", "url"])) ??
+      undefined;
+    // "url" num item do actor é muitas vezes o URL de PESQUISA que foi enviado
+    // como input — nunca usar isso como "link do anúncio".
     const adUrl =
-      adLibraryId
-        ? `https://www.facebook.com/ads/library/?id=${adLibraryId}`
-        : pickStr(ad, ["url", "adUrl", "snapshot_url"]);
+      buildAdLibraryUrl(adLibraryId) ??
+      resolveAdLink({ ad_url: pickStr(ad, ["adUrl", "ad_snapshot_url", "snapshot_url"]) }) ??
+      undefined;
 
     const platformsRaw =
       pickArr(ad, ["publisher_platform", "publisher_platforms", "platforms"]) ?? [];
