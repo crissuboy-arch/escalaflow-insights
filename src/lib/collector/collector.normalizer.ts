@@ -1,6 +1,7 @@
 import type { CollectorAd } from "./collector.types";
 import { inferTagsFromText, scaleLevelFromScore, KEYWORD_CATEGORIES } from "../mining/keywords";
 import { detectOfferNetwork } from "../offer-network";
+import { classifyNiche, storedNicheLabel } from "../niche/classifier";
 import {
   adLibraryIdFromUrl,
   buildAdLibraryUrl,
@@ -343,7 +344,21 @@ export function normalize(
       platform,
       platforms,
       country,
-      niche: ctx.niche || subniche || "Geral",
+      // O serviço passa "Geral" quando ninguém escolheu nicho — antes isso
+      // gravava "Geral" em quase todas as linhas. Agora: nicho explícito, ou
+      // o classificador partilhado sobre o conteúdo real do anúncio.
+      niche:
+        ctx.niche && ctx.niche !== "Geral"
+          ? ctx.niche
+          : storedNicheLabel(
+              classifyNiche({
+                headline,
+                copy,
+                advertiser,
+                landingPageUrl,
+                keyword: ctx.keyword,
+              }).niche,
+            ),
       score,
       source: "collector",
       createdAt: new Date().toISOString(),

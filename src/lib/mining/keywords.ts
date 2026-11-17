@@ -1,5 +1,7 @@
 // Keyword library and lightweight tagging helpers used by the Minerador.
 // Pure data + pure functions — no DB, no React.
+// Extensão explícita: scripts/reclassify-niches.ts também corre em node puro.
+import { makeTermMatcher } from "../niche/classifier.ts";
 
 export type CategoryId =
   | "dinheiro" | "ia" | "automacao" | "infoproduto" | "tiktok" | "instagram"
@@ -41,7 +43,7 @@ export const KEYWORD_CATEGORIES: Record<CategoryId, Category> = {
   automacao: {
     id: "automacao", label: "Automação", emoji: "⚙️",
     keywords: [
-      "automação", "n8n", "make", "zapier", "fluxo automático",
+      "automação", "n8n", "make.com", "zapier", "fluxo automático",
       "robô de vendas", "bot whatsapp", "automação de marketing",
       "automação de vendas",
     ],
@@ -162,11 +164,11 @@ export const KEYWORD_CATEGORIES: Record<CategoryId, Category> = {
   },
   quiz: {
     id: "quiz", label: "Quiz", emoji: "❓",
-    keywords: ["quiz", "teste", "descubra qual", "responda", "qual o seu"],
+    keywords: ["quiz", "descubra qual", "qual o seu"],
   },
   dropshipping: {
     id: "dropshipping", label: "Dropshipping", emoji: "📦",
-    keywords: ["dropshipping", "drop", "shopify", "produto viral", "aliexpress"],
+    keywords: ["dropshipping", "shopify", "produto viral", "aliexpress"],
   },
   afiliado: {
     id: "afiliado", label: "Afiliado", emoji: "🤝",
@@ -182,7 +184,7 @@ export const KEYWORD_CATEGORIES: Record<CategoryId, Category> = {
   },
   nutra: {
     id: "nutra", label: "Nutra", emoji: "💊",
-    keywords: ["suplemento", "emagrecedor", "termogênico", "natural", "fórmula natural", "vitamina", "nutra"],
+    keywords: ["suplemento", "emagrecedor", "termogênico", "100% natural", "fórmula natural", "vitamina", "nutra"],
   },
   financeiro: {
     id: "financeiro", label: "Financeiro", emoji: "💵",
@@ -190,7 +192,7 @@ export const KEYWORD_CATEGORIES: Record<CategoryId, Category> = {
   },
   relacionamento: {
     id: "relacionamento", label: "Relacionamento", emoji: "❤️",
-    keywords: ["reconquistar", "relacionamento", "ex", "casamento", "namoro", "sedução", "atração"],
+    keywords: ["reconquistar", "relacionamento", "seu ex", "sua ex", "meu ex", "casamento", "namoro", "sedução"],
   },
   desenvolvimentoPessoal: {
     id: "desenvolvimentoPessoal", label: "Desenvolvimento pessoal", emoji: "🌱",
@@ -241,12 +243,14 @@ export function allKeywords(): string[] {
 const NORM = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-/** Categories whose keywords appear in the given text. */
+/** Categories whose keywords appear in the given text — whole words/phrases
+ *  only (accent-insensitive). Substring matching made "fé" hit "café",
+ *  "make" hit "makeup", "ex" hit "exemplo", tagging almost every ad. */
 export function categoriesOf(text: string): CategoryId[] {
-  const t = NORM(text);
+  const has = makeTermMatcher(text);
   const hits: CategoryId[] = [];
   for (const c of CATEGORY_LIST) {
-    if (c.keywords.some((k) => t.includes(NORM(k)))) hits.push(c.id);
+    if (c.keywords.some((k) => has(k))) hits.push(c.id);
   }
   return hits;
 }
@@ -292,7 +296,7 @@ export interface InferredTags {
 }
 
 export function inferTagsFromText(text: string): InferredTags {
-  const t = NORM(text);
+  const has = makeTermMatcher(text);
   const categories = categoriesOf(text);
 
   let promise: string | undefined;
@@ -300,11 +304,11 @@ export function inferTagsFromText(text: string): InferredTags {
     if (re.test(text)) { promise = id; break; }
   }
 
-  const mechanism = MECHANISM_WORDS.find((w) => t.includes(NORM(w)));
+  const mechanism = MECHANISM_WORDS.find((w) => has(w));
 
   let emotion: string | undefined;
   for (const e of EMOTIONS) {
-    if (e.words.some((w) => t.includes(NORM(w)))) { emotion = e.id; break; }
+    if (e.words.some((w) => has(w))) { emotion = e.id; break; }
   }
 
   const tags: string[] = [];

@@ -10,6 +10,13 @@
 //    sempre rotulada como "detectado".
 import { supabase } from "@/integrations/supabase/client";
 import { resolveAdImageUrl, resolveAdVideoUrl } from "@/lib/collector/media-url";
+import {
+  NICHE_DEFS,
+  NICHE_LABEL,
+  classifyNiche,
+  normalize,
+  type NicheId,
+} from "@/lib/niche/classifier";
 
 export type ScaleLevel = "cold" | "warming" | "hot" | "scaled";
 
@@ -69,312 +76,18 @@ export const LANGUAGE_LABELS: Record<LanguageCode, string> = {
   it: "Italiano",
 };
 
-export type NicheId =
-  | "saude"
-  | "renda"
-  | "beleza"
-  | "relacionamento"
-  | "educacao"
-  | "desenvolvimento"
-  | "religioso"
-  | "infantil"
-  | "produtos"
-  | "marketing"
-  | "outros";
+// Nichos: definição e classificador partilhados em src/lib/niche/classifier.ts
+// (correspondência por palavra inteira, multilíngue, com pesos por campo).
+export { NICHE_LABEL, normalize, type NicheId };
 
-export const NICHES: { id: NicheId; label: string; emoji: string; words: string[] }[] = [
-  {
-    id: "saude",
-    label: "Saúde & Emagrecimento",
-    emoji: "🩺",
-    words: [
-      "emagrec",
-      "peso",
-      "dieta",
-      "saúde",
-      "saude",
-      "gordura",
-      "diabet",
-      "dor ",
-      "dores",
-      "articula",
-      "pressão",
-      "suplement",
-      "colágeno",
-      "colageno",
-      "detox",
-      "barriga",
-      "jejum",
-      "nutri",
-      "weight",
-      "fat ",
-      "health",
-      "pérdida de peso",
-      "adelgaz",
-      "glp",
-      "ozempic",
-      "keto",
-      "fitness",
-      "treino",
-      "academia",
-      "próstata",
-      "prostata",
-      "visão",
-      "ansiedade",
-      "sono",
-    ],
-  },
-  {
-    id: "renda",
-    label: "Renda Extra & Finanças",
-    emoji: "💰",
-    words: [
-      "renda",
-      "dinheiro",
-      "ganhar",
-      "lucro",
-      "faturar",
-      "fatura",
-      "invest",
-      "finan",
-      "cripto",
-      "bitcoin",
-      "trader",
-      "trade",
-      "bolsa",
-      "afiliad",
-      "money",
-      "income",
-      "dinero",
-      "ingresos",
-      "negócio",
-      "negocio",
-      "empreend",
-      "vender",
-      "vendas",
-      "home office",
-      "trabalhar de casa",
-    ],
-  },
-  {
-    id: "beleza",
-    label: "Beleza & Estética",
-    emoji: "💄",
-    words: [
-      "beleza",
-      "pele",
-      "cabelo",
-      "rugas",
-      "maquiag",
-      "unha",
-      "estética",
-      "estetica",
-      "skincare",
-      "skin",
-      "hair",
-      "cílios",
-      "sobrancelha",
-      "manchas",
-      "belleza",
-      "cabello",
-      "perfume",
-    ],
-  },
-  {
-    id: "relacionamento",
-    label: "Relacionamento",
-    emoji: "❤️",
-    words: [
-      "relacionamento",
-      "namor",
-      "casamento",
-      "conquist",
-      "ex ",
-      "amor",
-      "sedução",
-      "seducao",
-      "marido",
-      "esposa",
-      "dating",
-      "relationship",
-      "pareja",
-      "reconquist",
-    ],
-  },
-  {
-    id: "educacao",
-    label: "Educação & Cursos",
-    emoji: "🎓",
-    words: [
-      "curso",
-      "aula",
-      "aprenda",
-      "aprender",
-      "concurso",
-      "enem",
-      "inglês",
-      "ingles",
-      "idioma",
-      "certificado",
-      "faculdade",
-      "estudo",
-      "estudar",
-      "professor",
-      "course",
-      "learn",
-      "mentoria",
-      "treinamento",
-      "workshop",
-      "masterclass",
-      "ebook",
-      "e-book",
-      "apostila",
-    ],
-  },
-  {
-    id: "desenvolvimento",
-    label: "Desenvolvimento Pessoal",
-    emoji: "🧠",
-    words: [
-      "mentalidade",
-      "hábito",
-      "habito",
-      "produtiv",
-      "autoestima",
-      "foco",
-      "disciplina",
-      "propósito",
-      "proposito",
-      "lei da atração",
-      "manifest",
-      "coach",
-      "motivação",
-      "inteligência emocional",
-    ],
-  },
-  {
-    id: "religioso",
-    label: "Religioso & Espiritualidade",
-    emoji: "🙏",
-    words: [
-      "deus",
-      "jesus",
-      "bíblia",
-      "biblia",
-      "oração",
-      "oracao",
-      "fé ",
-      "igreja",
-      "cristão",
-      "cristao",
-      "devocional",
-      "salmo",
-      "espiritual",
-      "god",
-      "prayer",
-      "bible",
-      "oración",
-    ],
-  },
-  {
-    id: "infantil",
-    label: "Infantil & Maternidade",
-    emoji: "🧸",
-    words: [
-      "criança",
-      "crianca",
-      "filho",
-      "bebê",
-      "bebe",
-      "mãe",
-      "mae ",
-      "maternidade",
-      "infantil",
-      "colorir",
-      "atividades",
-      "alfabetiza",
-      "kids",
-      "baby",
-      "niños",
-      "figurinha",
-    ],
-  },
-  {
-    id: "produtos",
-    label: "Produtos Físicos & E-commerce",
-    emoji: "🛍️",
-    words: [
-      "frete",
-      "compre",
-      "loja",
-      "promoção",
-      "promocao",
-      "desconto",
-      "oferta imperdível",
-      "kit ",
-      "unidades",
-      "shop",
-      "envio",
-      "entrega",
-      "garanta o seu",
-      "estoque",
-      "pague na entrega",
-    ],
-  },
-  {
-    id: "marketing",
-    label: "Marketing Digital & IA",
-    emoji: "🚀",
-    words: [
-      "marketing",
-      "tráfego",
-      "trafego",
-      "instagram",
-      "tiktok",
-      "seguidores",
-      "anúncio",
-      "anuncio",
-      "copy",
-      "lançamento",
-      "lancamento",
-      "infoproduto",
-      "chatgpt",
-      " ia ",
-      "inteligência artificial",
-      "inteligencia artificial",
-      "automação",
-      "automacao",
-      "saas",
-      "app ",
-      "site",
-      "landing",
-      "social media",
-    ],
-  },
-];
+/** Lista para filtros/estantes da UI (ordem de exibição). */
+export const NICHES: { id: NicheId; label: string; emoji: string }[] = NICHE_DEFS.map(
+  ({ id, label, emoji }) => ({ id, label, emoji }),
+);
 
-export const NICHE_LABEL: Record<NicheId, string> = Object.fromEntries([
-  ...NICHES.map((n) => [n.id, n.label]),
-  ["outros", "Outros"],
-]) as Record<NicheId, string>;
-
-export function normalize(s: string): string {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
-
+/** Compatibilidade: classifica um texto livre (tratado como copy). */
 export function detectNiche(text: string, declaredNiche?: string | null): NicheId {
-  const hay = ` ${text.toLowerCase()} ${(declaredNiche ?? "").toLowerCase()} `;
-  let best: NicheId = "outros";
-  let bestHits = 0;
-  for (const n of NICHES) {
-    let hits = 0;
-    for (const w of n.words) if (hay.includes(w)) hits++;
-    if (hits > bestHits) {
-      bestHits = hits;
-      best = n.id;
-    }
-  }
-  return best;
+  return classifyNiche({ copy: text, declaredNiche }).niche;
 }
 
 const LANG_WORDS: Record<LanguageCode, string[]> = {
@@ -604,7 +317,17 @@ export function toLibraryOffer(r: RawRow): LibraryOffer {
     scaleLevel,
     promise: (e.promise as string | null | undefined) ?? null,
     offerType: (e.offerType as string | null | undefined) ?? null,
-    nicheGroup: detectNiche(`${text} ${tags.join(" ")} ${r.keyword ?? ""}`, r.niche),
+    // Tags antigas (raw.enriched.tags) e a palavra-chave da pesquisa não
+    // decidem o nicho: tags têm peso 0, keyword é sinal fraco.
+    nicheGroup: classifyNiche({
+      headline: r.headline,
+      copy: r.copy,
+      advertiser: r.advertiser,
+      landingPageUrl: r.landing_page_url,
+      keyword: r.keyword,
+      declaredNiche: r.niche,
+      tags,
+    }).niche,
     language: detectLanguage(text),
     daysRunning,
     searchText: normalize(
